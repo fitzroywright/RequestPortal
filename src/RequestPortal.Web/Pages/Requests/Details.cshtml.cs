@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Portal;
+using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Infrastructure.Identity;
@@ -16,26 +17,27 @@ namespace RequestPortal.Web.Pages.Requests;
 
 public sealed class DetailsModel : PageModel
 {
-    private static readonly Guid eachUnitId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IPortalWorkflowService workflowService;
     private readonly IDocumentService documentService;
     private readonly IRequestLifecycleService lifecycleService;
     private readonly IProjectProposalService projectProposalService;
+    private readonly IRequestReferenceDataService referenceDataService;
 
     public DetailsModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
         IDocumentService documentService,
         IRequestLifecycleService lifecycleService,
-        IProjectProposalService projectProposalService)
+        IProjectProposalService projectProposalService,
+        IRequestReferenceDataService referenceDataService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.documentService = documentService;
         this.lifecycleService = lifecycleService;
         this.projectProposalService = projectProposalService;
+        this.referenceDataService = referenceDataService;
     }
 
     public new RequestDetail? Request { get; private set; }
@@ -43,6 +45,8 @@ public sealed class DetailsModel : PageModel
     public ProjectProposalDetail? ProjectProposal { get; private set; }
 
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
+
+    public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
 
     [BindProperty]
     public ItemInput Item { get; set; } = new();
@@ -62,6 +66,22 @@ public sealed class DetailsModel : PageModel
     public async Task<IActionResult> OnPostAddItemAsync(Guid id)
     {
         ApplicationUser user = await GetUserAsync();
+        UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
+
+        bool validUnit = false;
+        foreach (UnitOfMeasureOption unit in UnitsOfMeasure)
+        {
+            if (unit.Id == Item.UnitOfMeasureId)
+            {
+                validUnit = true;
+                break;
+            }
+        }
+
+        if (!validUnit)
+        {
+            ModelState.AddModelError(nameof(Item.UnitOfMeasureId), "Select a valid unit of measure.");
+        }
 
         if (!ModelState.IsValid)
         {
@@ -73,7 +93,7 @@ public sealed class DetailsModel : PageModel
             id,
             Item.Description,
             Item.Quantity,
-            eachUnitId,
+            Item.UnitOfMeasureId,
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Requested item added.";
@@ -152,6 +172,19 @@ public sealed class DetailsModel : PageModel
         return RedirectToPage(new { id });
     }
 
+    public string UnitName(Guid unitId)
+    {
+        foreach (UnitOfMeasureOption unit in UnitsOfMeasure)
+        {
+            if (unit.Id == unitId)
+            {
+                return unit.Name;
+            }
+        }
+
+        return "Unit";
+    }
+
     private async Task<IActionResult> LoadPageAsync(ApplicationUser user, Guid id)
     {
         Request = await workflowService.GetRequestAsync(user.Id, id, isStaff: false, HttpContext.RequestAborted);
@@ -162,6 +195,13 @@ public sealed class DetailsModel : PageModel
 
         ProjectProposal = await projectProposalService.GetAsync(user.Id, id, isStaff: false, HttpContext.RequestAborted);
         Documents = await documentService.GetRequestDocumentsAsync(user.Id, id, isStaff: false, HttpContext.RequestAborted);
+        UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
+
+        if (Item.UnitOfMeasureId == Guid.Empty && UnitsOfMeasure.Count > 0)
+        {
+            Item.UnitOfMeasureId = UnitsOfMeasure[0].Id;
+        }
+
         return Page();
     }
 
@@ -179,6 +219,9 @@ public sealed class DetailsModel : PageModel
 
         [Range(typeof(decimal), "0.001", "999999999999")]
         public decimal Quantity { get; set; } = 1;
+
+        [Required]
+        public Guid UnitOfMeasureId { get; set; }
     }
 
     public sealed class DocumentInput
