@@ -1,5 +1,6 @@
 @page
 @model RequestPortal.Web.Pages.Organizations.MembersModel
+@using RequestPortal.Application.Organizations
 @{
     ViewData["Title"] = "Organization Representatives";
 }
@@ -8,33 +9,86 @@
     <div class="shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">Organization administration</div>
-            <h1>Pending representatives</h1>
-            <p>Approve only people you recognize as authorized representatives of this organization.</p>
+            <h1>Representatives & administrators</h1>
+            <p>Approve recognized representatives, remove access when needed, and control who may administer this organization.</p>
         </div>
 
         <section class="card">
             @if (Model.Memberships.Count == 0)
             {
-                <p class="muted">There are no pending membership requests.</p>
+                <p class="muted">No membership records exist for this organization.</p>
             }
             else
             {
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Name</th><th>Email</th><th>Requested</th><th></th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Role</th>
+                                <th>Requested</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody>
-                        @foreach (PendingMembershipSummary membership in Model.Memberships)
+                        @foreach (OrganizationMembershipView membership in Model.Memberships)
                         {
                             <tr>
-                                <td><strong>@membership.UserDisplayName</strong></td>
-                                <td>@membership.UserEmail</td>
+                                <td><strong>@membership.DisplayName</strong></td>
+                                <td>@membership.Email</td>
+                                <td><span class="status status-@membership.Status">@membership.Status</span></td>
+                                <td>@membership.Role</td>
                                 <td>@membership.RequestedUtc.ToLocalTime().ToString("g")</td>
                                 <td>
-                                    <form method="post">
-                                        <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
-                                        <input type="hidden" name="membershipId" value="@membership.MembershipId" />
-                                        <button class="button button-small" type="submit">Approve representative</button>
-                                    </form>
+                                    @if (membership.Status == "Pending")
+                                    {
+                                        <div class="action-row">
+                                            <form method="post" asp-page-handler="Approve">
+                                                <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
+                                                <input type="hidden" name="membershipId" value="@membership.MembershipId" />
+                                                <button class="button button-small" type="submit">Approve</button>
+                                            </form>
+                                            <form method="post" asp-page-handler="Reject" class="action-row">
+                                                <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
+                                                <input type="hidden" name="membershipId" value="@membership.MembershipId" />
+                                                <input type="text" name="reason" required maxlength="500" placeholder="Reason" />
+                                                <button class="button button-small button-secondary" type="submit">Reject</button>
+                                            </form>
+                                        </div>
+                                    }
+                                    else if (membership.Status == "Approved")
+                                    {
+                                        <div class="action-row">
+                                            @if (membership.Role == "Member")
+                                            {
+                                                <form method="post" asp-page-handler="Promote">
+                                                    <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
+                                                    <input type="hidden" name="membershipId" value="@membership.MembershipId" />
+                                                    <button class="button button-small button-secondary" type="submit">Make administrator</button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <form method="post" asp-page-handler="Demote">
+                                                    <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
+                                                    <input type="hidden" name="membershipId" value="@membership.MembershipId" />
+                                                    <button class="button button-small button-secondary" type="submit">Make representative</button>
+                                                </form>
+                                            }
+                                            <form method="post" asp-page-handler="Revoke" class="action-row">
+                                                <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
+                                                <input type="hidden" name="membershipId" value="@membership.MembershipId" />
+                                                <input type="text" name="reason" required maxlength="500" placeholder="Revocation reason" />
+                                                <button class="button button-small button-secondary" type="submit">Revoke access</button>
+                                            </form>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">@(membership.EndReason ?? "No further actions")</span>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -42,6 +96,11 @@
                     </table>
                 </div>
             }
+        </section>
+
+        <section class="card" style="margin-top:1.5rem">
+            <h2>Administrator safety</h2>
+            <p class="muted">The portal prevents removal or demotion of the last approved administrator. Administrators also cannot revoke their own membership.</p>
         </section>
     </div>
 </section>
