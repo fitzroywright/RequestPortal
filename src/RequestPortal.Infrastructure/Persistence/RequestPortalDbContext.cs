@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Domain.Auditing;
 using RequestPortal.Domain.Beneficiaries;
+using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Notifications;
@@ -32,6 +33,8 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
 
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
+
+    public DbSet<CountryConfiguration> CountryConfigurations => Set<CountryConfiguration>();
 
     public DbSet<StoredDocument> Documents => Set<StoredDocument>();
 
