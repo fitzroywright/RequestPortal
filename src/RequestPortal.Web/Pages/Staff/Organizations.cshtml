@@ -1,0 +1,50 @@
+@page
+@model RequestPortal.Web.Pages.Staff.OrganizationsModel
+@using RequestPortal.Application.Portal
+@{
+    ViewData["Title"] = "All Organizations";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">FFP internal</div>
+            <h1>All organizations</h1>
+            <p>FFP staff can view all registered organizations and their portal activity.</p>
+        </div>
+
+        <div class="card">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Organization</th>
+                            <th>Country</th>
+                            <th>Status</th>
+                            <th>Registration</th>
+                            <th>Approved members</th>
+                            <th>Requests</th>
+                            <th>Registered</th>
+                            <th>Approved</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (StaffOrganizationSummary organization in Model.Organizations)
+                    {
+                        <tr>
+                            <td><strong>@organization.Name</strong></td>
+                            <td>@organization.CountryCode</td>
+                            <td><span class="status status-@organization.Status">@organization.Status</span></td>
+                            <td>@(organization.RegistrationNumber ?? "—")</td>
+                            <td>@organization.ApprovedMemberCount</td>
+                            <td>@organization.RequestCount</td>
+                            <td>@organization.CreatedUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</td>
+                            <td>@(organization.ApprovedUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
