@@ -44,7 +44,7 @@
                                     <tbody>
                                     @foreach (RequestItemDetail item in Model.Request.Items)
                                     {
-                                        <tr><td>@item.Description</td><td>@item.Quantity</td><td>Each</td></tr>
+                                        <tr><td>@item.Description</td><td>@item.Quantity</td><td>@Model.UnitName(item.UnitOfMeasureId)</td></tr>
                                     }
                                     </tbody>
                                 </table>
