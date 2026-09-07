@@ -1,7 +1,7 @@
 using System;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Ganss.Xss;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Requests;
 using RequestPortal.Application.Security;
@@ -13,18 +13,7 @@ namespace RequestPortal.Infrastructure.Requests;
 
 public sealed class ProjectProposalService : IProjectProposalService
 {
-    private static readonly Regex dangerousElementRegex = new(
-        "<(script|style|iframe|object|embed|form)[^>]*>.*?</\\1>|<(script|style|iframe|object|embed|form)[^>]*/?>",
-        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-
-    private static readonly Regex eventAttributeRegex = new(
-        "\\s+on[a-z]+\\s*=\\s*(\\\"[^\\\"]*\\\"|'[^']*'|[^\\s>]+)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private static readonly Regex javascriptUrlRegex = new(
-        "(href|src)\\s*=\\s*(['\\\"])\\s*javascript:[^'\\\"]*\\2",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
+    private static readonly HtmlSanitizer sanitizer = CreateSanitizer();
     private readonly RequestPortalDbContext dbContext;
     private readonly IOrganizationAccessService organizationAccessService;
     private readonly IClock clock;
@@ -123,10 +112,10 @@ public sealed class ProjectProposalService : IProjectProposalService
         ProjectProposal proposal = await dbContext.ProjectProposals
             .SingleAsync(item => item.RequestId == requestId, cancellationToken);
 
-        string sanitizedHtml = Sanitize(richContentHtml);
+        string sanitizedHtml = sanitizer.Sanitize(richContentHtml ?? string.Empty).Trim();
         if (sanitizedHtml.Length > 500_000)
         {
-            throw new InvalidOperationException("The project proposal is too large for the demo editor. Reduce embedded image sizes or attach large files separately.");
+            throw new InvalidOperationException("The project proposal is too large. Reduce embedded image sizes or attach large files separately.");
         }
 
         proposal.Update(title, sanitizedHtml, userId, clock.UtcNow);
@@ -142,12 +131,35 @@ public sealed class ProjectProposalService : IProjectProposalService
         }
     }
 
-    private static string Sanitize(string html)
+    private static HtmlSanitizer CreateSanitizer()
     {
-        string value = html ?? string.Empty;
-        value = dangerousElementRegex.Replace(value, string.Empty);
-        value = eventAttributeRegex.Replace(value, string.Empty);
-        value = javascriptUrlRegex.Replace(value, string.Empty);
-        return value.Trim();
+        HtmlSanitizer value = new();
+        value.AllowedTags.Clear();
+        foreach (string tag in new[]
+        {
+            "p", "br", "strong", "b", "em", "i", "u", "s", "h1", "h2", "h3", "h4",
+            "ul", "ol", "li", "blockquote", "table", "thead", "tbody", "tr", "th", "td",
+            "a", "img", "figure", "figcaption", "hr", "span", "div"
+        })
+        {
+            value.AllowedTags.Add(tag);
+        }
+
+        value.AllowedAttributes.Clear();
+        foreach (string attribute in new[]
+        {
+            "href", "src", "alt", "title", "colspan", "rowspan", "width", "height", "class"
+        })
+        {
+            value.AllowedAttributes.Add(attribute);
+        }
+
+        value.AllowedSchemes.Clear();
+        value.AllowedSchemes.Add("https");
+        value.AllowedSchemes.Add("http");
+        value.AllowedSchemes.Add("data");
+        value.AllowDataAttributes = false;
+        value.KeepChildNodes = true;
+        return value;
     }
 }
