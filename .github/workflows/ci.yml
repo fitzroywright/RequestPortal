@@ -28,6 +28,18 @@ jobs:
       - name: Build
         run: dotnet build src/RequestPortal.Web/RequestPortal.Web.csproj --configuration Release --no-restore
 
+      - name: Generate initial migration for review
+        if: ${{ hashFiles('src/RequestPortal.Infrastructure/Persistence/Migrations/*.cs') == '' }}
+        run: |
+          dotnet tool restore
+          dotnet ef migrations add InitialProduction --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web --output-dir Persistence/Migrations
+          echo '=== BEGIN GENERATED MIGRATION FILES ==='
+          for f in src/RequestPortal.Infrastructure/Persistence/Migrations/*.cs; do
+            echo "=== FILE: $f ==="
+            cat "$f"
+          done
+          echo '=== END GENERATED MIGRATION FILES ==='
+
       - name: Test
         run: |
           if find tests -name '*.csproj' -print -quit 2>/dev/null | grep -q .; then
