@@ -1,10 +1,14 @@
+using System;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
+using RequestPortal.Infrastructure.Identity;
 
 namespace RequestPortal.Infrastructure.Persistence;
 
-public sealed class RequestPortalDbContext : DbContext
+public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     public RequestPortalDbContext(DbContextOptions<RequestPortalDbContext> options)
         : base(options)
@@ -21,9 +25,13 @@ public sealed class RequestPortalDbContext : DbContext
 
     public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
 
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(RequestPortalDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(RequestPortalDbContext).Assembly);
     }
 }
