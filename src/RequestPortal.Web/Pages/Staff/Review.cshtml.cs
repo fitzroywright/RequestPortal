@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Portal;
+using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
 using RequestPortal.Infrastructure.Identity;
 
@@ -19,19 +20,22 @@ public sealed class ReviewModel : PageModel
     private readonly IRequestLifecycleService lifecycleService;
     private readonly IDocumentService documentService;
     private readonly IProjectProposalService projectProposalService;
+    private readonly IRequestReferenceDataService referenceDataService;
 
     public ReviewModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
         IRequestLifecycleService lifecycleService,
         IDocumentService documentService,
-        IProjectProposalService projectProposalService)
+        IProjectProposalService projectProposalService,
+        IRequestReferenceDataService referenceDataService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.lifecycleService = lifecycleService;
         this.documentService = documentService;
         this.projectProposalService = projectProposalService;
+        this.referenceDataService = referenceDataService;
     }
 
     public new RequestDetail? Request { get; private set; }
@@ -39,6 +43,8 @@ public sealed class ReviewModel : PageModel
     public ProjectProposalDetail? ProjectProposal { get; private set; }
 
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
+
+    public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
 
     [BindProperty]
     [StringLength(4000)]
@@ -143,6 +149,19 @@ public sealed class ReviewModel : PageModel
         return RedirectToPage("/Staff/Index");
     }
 
+    public string UnitName(Guid unitId)
+    {
+        foreach (UnitOfMeasureOption unit in UnitsOfMeasure)
+        {
+            if (unit.Id == unitId)
+            {
+                return unit.Name;
+            }
+        }
+
+        return "Unit";
+    }
+
     private async Task<IActionResult> LoadPageAsync(ApplicationUser staffUser, Guid id)
     {
         Request = await workflowService.GetRequestAsync(
@@ -168,6 +187,7 @@ public sealed class ReviewModel : PageModel
             isStaff: true,
             HttpContext.RequestAborted);
 
+        UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
         return Page();
     }
 
