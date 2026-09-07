@@ -21,6 +21,7 @@ public sealed class CreateModel : PageModel
     private readonly IPortalWorkflowService workflowService;
     private readonly IBeneficiaryService beneficiaryService;
     private readonly IRequestDraftService requestDraftService;
+    private readonly IProjectProposalService projectProposalService;
     private readonly ICountryPolicyService countryPolicyService;
 
     public CreateModel(
@@ -28,12 +29,14 @@ public sealed class CreateModel : PageModel
         IPortalWorkflowService workflowService,
         IBeneficiaryService beneficiaryService,
         IRequestDraftService requestDraftService,
+        IProjectProposalService projectProposalService,
         ICountryPolicyService countryPolicyService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.beneficiaryService = beneficiaryService;
         this.requestDraftService = requestDraftService;
+        this.projectProposalService = projectProposalService;
         this.countryPolicyService = countryPolicyService;
     }
 
@@ -116,6 +119,13 @@ public sealed class CreateModel : PageModel
             Input.Circumstances,
             HttpContext.RequestAborted);
 
+        if (Input.Kind == RequestKind.Project)
+        {
+            await projectProposalService.InitializeProjectAsync(user.Id, requestId, HttpContext.RequestAborted);
+            TempData["Success"] = "Project draft created. Build the narrative proposal with headings, tables and photos before submitting it.";
+            return RedirectToPage("/Requests/Proposal", new { id = requestId });
+        }
+
         TempData["Success"] = "Draft created. Add at least one requested item and any supporting documents before submission.";
         return RedirectToPage("/Requests/Details", new { id = requestId });
     }
@@ -150,6 +160,8 @@ public sealed class CreateModel : PageModel
     {
         [Required]
         public Guid OrganizationId { get; set; }
+
+        public RequestKind Kind { get; set; } = RequestKind.GoodsAndServices;
 
         [Required]
         [StringLength(4000, MinimumLength = 10)]
