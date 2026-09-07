@@ -13,8 +13,15 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
         builder.Property(organization => organization.Name).HasMaxLength(250).IsRequired();
         builder.Property(organization => organization.CountryCode).HasMaxLength(2).IsRequired();
         builder.Property(organization => organization.RegistrationNumber).HasMaxLength(100);
+        builder.Property(organization => organization.OrganizationType).HasMaxLength(100);
+        builder.Property(organization => organization.Address).HasMaxLength(1000);
+        builder.Property(organization => organization.Phone).HasMaxLength(100);
+        builder.Property(organization => organization.Email).HasMaxLength(320);
+        builder.Property(organization => organization.PrimaryContactName).HasMaxLength(250);
+        builder.Property(organization => organization.ApprovalNotes).HasMaxLength(4000);
         builder.Property(organization => organization.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(organization => new { organization.CountryCode, organization.Name });
+        builder.HasIndex(organization => organization.RegistrationNumber);
         builder.HasMany(organization => organization.Memberships)
             .WithOne()
             .HasForeignKey(membership => membership.OrganizationId)
