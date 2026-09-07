@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Web.Demo;
 
 namespace RequestPortal.Web.Pages.Account;
 
@@ -55,7 +56,7 @@ public sealed class LoginModel : PageModel
         await LoadProvidersAsync();
     }
 
-    public async Task<IActionResult> OnPostExternalAsync(string provider, string? returnUrl = null)
+    public IActionResult OnPostExternal(string provider, string? returnUrl = null)
     {
         if (!supportedProviders.Contains(provider, StringComparer.OrdinalIgnoreCase))
         {
@@ -152,7 +153,7 @@ public sealed class LoginModel : PageModel
         return LocalRedirect(ReturnUrl);
     }
 
-    public async Task<IActionResult> OnPostDemoAsync(string? returnUrl = null)
+    public async Task<IActionResult> OnPostDemoAsync(string persona, string? returnUrl = null)
     {
         DemoEnabled = configuration.GetValue("Demo:Enabled", false);
         if (!DemoEnabled)
@@ -160,29 +161,19 @@ public sealed class LoginModel : PageModel
             return NotFound();
         }
 
-        const string demoEmail = "representative@demo.local";
+        string demoEmail = persona switch
+        {
+            "admin" => DemoDataSeeder.AdministratorEmail,
+            "pending" => DemoDataSeeder.PendingRepresentativeEmail,
+            _ => DemoDataSeeder.RepresentativeEmail
+        };
+
         ApplicationUser? user = await userManager.FindByEmailAsync(demoEmail);
         if (user is null)
         {
-            user = new ApplicationUser
-            {
-                Id = Guid.NewGuid(),
-                UserName = demoEmail,
-                Email = demoEmail,
-                EmailConfirmed = true,
-                DisplayName = "Demo Representative",
-                IsInternalStaff = false,
-                CreatedUtc = clock.UtcNow,
-                LastSignInUtc = clock.UtcNow
-            };
-
-            IdentityResult createResult = await userManager.CreateAsync(user);
-            if (!createResult.Succeeded)
-            {
-                ErrorMessage = "The demo representative account could not be created.";
-                await LoadProvidersAsync();
-                return Page();
-            }
+            ErrorMessage = "Demo data is not initialized. Start the application with Demo:EnsureDatabase enabled once.";
+            await LoadProvidersAsync();
+            return Page();
         }
 
         user.LastSignInUtc = clock.UtcNow;
