@@ -24,20 +24,33 @@
 
             <div class="dashboard-grid">
                 <div>
-                    <section class="card">
-                        <h2>Requested items</h2>
-                        <div class="table-wrap">
-                            <table>
-                                <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
-                                <tbody>
-                                @foreach (RequestItemDetail item in Model.Request.Items)
-                                {
-                                    <tr><td>@item.Description</td><td>@item.Quantity</td><td>Each</td></tr>
-                                }
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
+                    @if (Model.ProjectProposal is not null)
+                    {
+                        <section class="card proposal-review">
+                            <div class="eyebrow" style="color:#b45b09">Project proposal</div>
+                            <h2>@Model.ProjectProposal.Title</h2>
+                            <div class="muted" style="margin-bottom:20px">Version @Model.ProjectProposal.Version · last updated @Model.ProjectProposal.UpdatedUtc.ToString("u")</div>
+                            <article class="proposal-document">@Html.Raw(Model.ProjectProposal.RichContentHtml)</article>
+                        </section>
+                    }
+
+                    @if (Model.Request.Items.Count > 0)
+                    {
+                        <section class="card" style="margin-top:1.5rem">
+                            <h2>Requested items</h2>
+                            <div class="table-wrap">
+                                <table>
+                                    <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
+                                    <tbody>
+                                    @foreach (RequestItemDetail item in Model.Request.Items)
+                                    {
+                                        <tr><td>@item.Description</td><td>@item.Quantity</td><td>Each</td></tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    }
 
                     <section class="card" style="margin-top:1.5rem">
                         <h2>Supporting documents</h2>
@@ -130,3 +143,30 @@
         }
     </div>
 </section>
+
+<style>
+    .proposal-document {
+        background: #fff;
+        border: 1px solid #e0e4e7;
+        padding: 36px 42px;
+        font-family: Georgia, 'Times New Roman', serif;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+    }
+
+    .proposal-document table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+    }
+
+    .proposal-document th, .proposal-document td {
+        border: 1px solid #8b949c;
+        padding: 8px;
+    }
+
+    .proposal-document img {
+        max-width: 100%;
+        height: auto;
+    }
+</style>
