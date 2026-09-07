@@ -1,5 +1,6 @@
 @page
 @model RequestPortal.Web.Pages.Requests.CreateModel
+@using RequestPortal.Domain.Requests
 @{
     ViewData["Title"] = "Create Request";
 }
@@ -8,7 +9,7 @@
     <div class="shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">New assistance request</div>
-            <h1>Choose who you are acting for.</h1>
+            <h1>Tell FFP what is needed.</h1>
             <p>
                 The organization selected here becomes the permanent owner of this request. Only approved memberships
                 are available for request creation.
@@ -26,6 +27,8 @@
                 else
                 {
                     <form method="post" class="form-grid">
+                        <div asp-validation-summary="ModelOnly" class="validation"></div>
+
                         <div class="field">
                             <label asp-for="Input.OrganizationId">Acting on behalf of</label>
                             <select asp-for="Input.OrganizationId">
@@ -44,6 +47,64 @@
                             <span asp-validation-for="Input.Summary" class="validation"></span>
                         </div>
 
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.Category">Category</label>
+                                <input asp-for="Input.Category" placeholder="e.g. Education" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.Subcategory">Subcategory</label>
+                                <input asp-for="Input.Subcategory" placeholder="e.g. School supplies" />
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.ProgramCategory">Program category</label>
+                                <input asp-for="Input.ProgramCategory" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.Priority">Priority</label>
+                                <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Input.Location">Location</label>
+                            <input asp-for="Input.Location" placeholder="Community, parish or address" />
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Input.Circumstances">Request circumstances</label>
+                            <textarea asp-for="Input.Circumstances" rows="4" placeholder="Provide enough context for FFP to understand the need."></textarea>
+                        </div>
+
+                        <hr style="border:0;border-top:1px solid #dde3e8;margin:24px 0" />
+                        <h2>Beneficiary</h2>
+                        <p class="muted">Optional for requests that are not tied to a specific person.</p>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.BeneficiaryFirstName">First name</label>
+                                <input asp-for="Input.BeneficiaryFirstName" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.BeneficiaryLastName">Last name</label>
+                                <input asp-for="Input.BeneficiaryLastName" />
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.BeneficiaryDateOfBirth">Date of birth</label>
+                                <input asp-for="Input.BeneficiaryDateOfBirth" type="date" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.ParentOrGuardian">Parent or guardian</label>
+                                <input asp-for="Input.ParentOrGuardian" />
+                            </div>
+                        </div>
+
                         <button class="button" type="submit">Create draft and add items</button>
                     </form>
                 }
@@ -51,12 +112,13 @@
 
             <aside class="card">
                 <h2>Before you submit</h2>
-                <p class="muted">The demo workflow requires at least one line item before submission.</p>
+                <p class="muted">The request stays in Draft until you add at least one requested item and submit it.</p>
                 <ul>
-                    <li>Use a concise summary of the request.</li>
-                    <li>Add the requested goods or services as line items.</li>
-                    <li>Review the organization before submitting.</li>
-                    <li>After submission, FFP can approve, reject, or request more information.</li>
+                    <li>Select the correct organization. It cannot be changed after creation.</li>
+                    <li>Add a beneficiary when the request is for a specific person.</li>
+                    <li>Use category, location and priority to help FFP triage the request.</li>
+                    <li>Upload supporting documents from the request detail page.</li>
+                    <li>After submission, FFP can approve, reject, request more information, or mark a duplicate.</li>
                 </ul>
             </aside>
         </div>
