@@ -10,7 +10,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-and-test:
@@ -31,19 +31,7 @@ jobs:
       - name: Build
         run: dotnet build src/RequestPortal.Web/RequestPortal.Web.csproj --configuration Release --no-restore
 
-      - name: Generate initial production migration
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/chatgpt/mvp-rescue' && hashFiles('src/RequestPortal.Infrastructure/Persistence/Migrations/*.cs') == '' }}
-        run: |
-          dotnet tool restore
-          dotnet ef migrations add InitialProduction --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web --output-dir Persistence/Migrations
-          git config user.name "Request Portal CI"
-          git config user.email "actions@github.com"
-          git add src/RequestPortal.Infrastructure/Persistence/Migrations
-          git commit -m "Add initial production database migration"
-          git push origin HEAD:chatgpt/mvp-rescue
-
       - name: Verify migration model is current
-        if: ${{ hashFiles('src/RequestPortal.Infrastructure/Persistence/Migrations/*.cs') != '' }}
         run: |
           dotnet tool restore
           dotnet ef migrations has-pending-model-changes --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web
