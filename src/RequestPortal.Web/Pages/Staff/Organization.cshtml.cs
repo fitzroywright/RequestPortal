@@ -76,6 +76,30 @@ public sealed class OrganizationModel : PageModel
         return RedirectToPage(new { id });
     }
 
+    public async Task<IActionResult> OnPostRejectOrganizationAsync(Guid id, string reason)
+    {
+        ApplicationUser user = await GetUserAsync();
+        await organizationService.RejectAsync(user.Id, id, reason, HttpContext.RequestAborted);
+        TempData["Success"] = "Organization registration rejected.";
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostSuspendOrganizationAsync(Guid id, string reason)
+    {
+        ApplicationUser user = await GetUserAsync();
+        await organizationService.SuspendAsync(user.Id, id, reason, HttpContext.RequestAborted);
+        TempData["Success"] = "Organization suspended.";
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostReactivateOrganizationAsync(Guid id, string? notes)
+    {
+        ApplicationUser user = await GetUserAsync();
+        await organizationService.ReactivateAsync(user.Id, id, notes, HttpContext.RequestAborted);
+        TempData["Success"] = "Organization reactivated.";
+        return RedirectToPage(new { id });
+    }
+
     private async Task<IActionResult> LoadAsync(Guid id)
     {
         ApplicationUser user = await GetUserAsync();
