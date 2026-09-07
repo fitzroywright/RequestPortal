@@ -115,23 +115,29 @@ public sealed class DocumentService : IDocumentService
             await EnsureApprovedMemberAsync(userId, organizationId, cancellationToken);
         }
 
-        List<DocumentSummary> documents = await dbContext.Documents
-            .AsNoTracking()
-            .Where(document =>
-                document.OwnerType == DocumentOwnerType.AssistanceRequest &&
-                document.OwnerId == requestId)
-            .OrderByDescending(document => document.UploadedUtc)
-            .Select(document => new DocumentSummary(
-                document.Id,
-                document.DocumentType,
-                document.OriginalFileName,
-                document.ContentType,
-                document.SizeBytes,
-                document.UploadedUtc,
-                document.IsArchived))
-            .ToListAsync(cancellationToken);
+        return await QueryDocumentsAsync(DocumentOwnerType.AssistanceRequest, requestId, cancellationToken);
+    }
 
-        return documents;
+    public async Task<IReadOnlyList<DocumentSummary>> GetOrganizationDocumentsAsync(
+        Guid userId,
+        Guid organizationId,
+        bool isStaff,
+        CancellationToken cancellationToken = default)
+    {
+        if (!isStaff)
+        {
+            Organization organization = await dbContext.Organizations
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == organizationId, cancellationToken);
+
+            bool isApprovedMember = await organizationAccessService.IsApprovedMemberAsync(userId, organizationId, cancellationToken);
+            if (organization.RegisteredByUserId != userId && !isApprovedMember)
+            {
+                throw new UnauthorizedAccessException("The current user cannot access documents for this organization.");
+            }
+        }
+
+        return await QueryDocumentsAsync(DocumentOwnerType.Organization, organizationId, cancellationToken);
     }
 
     public async Task<DocumentDownload?> DownloadAsync(
@@ -156,6 +162,86 @@ public sealed class DocumentService : IDocumentService
 
         Stream stream = await fileStorage.OpenReadAsync(document.StorageKey, cancellationToken);
         return new DocumentDownload(stream, document.ContentType, document.OriginalFileName);
+    }
+
+    public async Task VerifyAsync(
+        Guid staffUserId,
+        Guid documentId,
+        string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        StoredDocument document = await dbContext.Documents
+            .SingleAsync(item => item.Id == documentId, cancellationToken);
+
+        document.Verify(staffUserId, clock.UtcNow, notes);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RejectVerificationAsync(
+        Guid staffUserId,
+        Guid documentId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        StoredDocument document = await dbContext.Documents
+            .SingleAsync(item => item.Id == documentId, cancellationToken);
+
+        document.RejectVerification(staffUserId, clock.UtcNow, reason);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetRetentionAsync(
+        Guid staffUserId,
+        Guid documentId,
+        DocumentRetentionClass retentionClass,
+        DateTimeOffset? retainUntilUtc,
+        CancellationToken cancellationToken = default)
+    {
+        _ = staffUserId;
+        StoredDocument document = await dbContext.Documents
+            .SingleAsync(item => item.Id == documentId, cancellationToken);
+
+        document.SetRetention(retentionClass, retainUntilUtc);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ArchiveAsync(
+        Guid staffUserId,
+        Guid documentId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = staffUserId;
+        StoredDocument document = await dbContext.Documents
+            .SingleAsync(item => item.Id == documentId, cancellationToken);
+
+        document.MarkArchived(clock.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<DocumentSummary>> QueryDocumentsAsync(
+        DocumentOwnerType ownerType,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        List<DocumentSummary> documents = await dbContext.Documents
+            .AsNoTracking()
+            .Where(document => document.OwnerType == ownerType && document.OwnerId == ownerId)
+            .OrderByDescending(document => document.UploadedUtc)
+            .Select(document => new DocumentSummary(
+                document.Id,
+                document.DocumentType,
+                document.OriginalFileName,
+                document.ContentType,
+                document.SizeBytes,
+                document.UploadedUtc,
+                document.VerificationStatus,
+                document.RetentionClass,
+                document.RetainUntilUtc,
+                document.IsArchived,
+                document.VerificationNotes))
+            .ToListAsync(cancellationToken);
+
+        return documents;
     }
 
     private async Task<Guid> StoreMetadataAsync(
