@@ -24,14 +24,8 @@ internal sealed class AssistanceRequestConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(request => new { request.OrganizationId, request.Status });
         builder.HasIndex(request => new { request.OrganizationId, request.Kind });
         builder.HasIndex(request => request.BeneficiaryId);
-        builder.HasMany(request => request.Items)
-            .WithOne()
-            .HasForeignKey(item => item.RequestId)
-            .OnDelete(DeleteBehavior.Cascade);
-        builder.HasMany(request => request.StatusHistory)
-            .WithOne()
-            .HasForeignKey(history => history.RequestId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(request => request.Items).WithOne().HasForeignKey(item => item.RequestId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(request => request.StatusHistory).WithOne().HasForeignKey(history => history.RequestId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -67,5 +61,34 @@ internal sealed class ProjectProposalConfiguration : IEntityTypeConfiguration<Pr
         builder.Property(proposal => proposal.Title).HasMaxLength(500).IsRequired();
         builder.Property(proposal => proposal.RichContentHtml).HasColumnType("text").IsRequired();
         builder.HasIndex(proposal => proposal.RequestId).IsUnique();
+    }
+}
+
+internal sealed class ProjectBudgetItemConfiguration : IEntityTypeConfiguration<ProjectBudgetItem>
+{
+    public void Configure(EntityTypeBuilder<ProjectBudgetItem> builder)
+    {
+        builder.ToTable("project_budget_items");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Description).HasMaxLength(1000).IsRequired();
+        builder.Property(item => item.Quantity).HasPrecision(18, 3);
+        builder.Property(item => item.UnitCost).HasPrecision(18, 2);
+        builder.Property(item => item.FfpRequested).HasPrecision(18, 2);
+        builder.Property(item => item.OrganizationContribution).HasPrecision(18, 2);
+        builder.Property(item => item.OtherFunding).HasPrecision(18, 2);
+        builder.Ignore(item => item.TotalCost);
+        builder.HasIndex(item => item.RequestId);
+    }
+}
+
+internal sealed class ProjectMilestoneConfiguration : IEntityTypeConfiguration<ProjectMilestone>
+{
+    public void Configure(EntityTypeBuilder<ProjectMilestone> builder)
+    {
+        builder.ToTable("project_milestones");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Title).HasMaxLength(500).IsRequired();
+        builder.Property(item => item.ExpectedOutcome).HasMaxLength(4000);
+        builder.HasIndex(item => new { item.RequestId, item.Sequence });
     }
 }
