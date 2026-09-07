@@ -25,67 +25,93 @@
 
             <div class="dashboard-grid">
                 <div>
-                    <section class="card">
-                        <h2>Requested items</h2>
-                        @if (Model.Request.Items.Count == 0)
-                        {
-                            <p class="muted">No items have been added yet.</p>
-                        }
-                        else
-                        {
-                            <div class="table-wrap">
-                                <table>
-                                    <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
-                                    <tbody>
-                                    @foreach (RequestItemDetail item in Model.Request.Items)
-                                    {
-                                        <tr>
-                                            <td>@item.Description</td>
-                                            <td>@item.Quantity</td>
-                                            <td>Each</td>
-                                        </tr>
-                                    }
-                                    </tbody>
-                                </table>
-                            </div>
-                        }
-
-                        @if (Model.Request.Status == "Draft")
-                        {
-                            <hr style="border:0;border-top:1px solid #dde3e8;margin:26px 0" />
-                            <h3>Add line item</h3>
-                            <form method="post" asp-page-handler="AddItem" class="form-grid">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <div class="field">
-                                    <label asp-for="Item.Description">Description</label>
-                                    <input asp-for="Item.Description" placeholder="e.g. School bags" />
-                                    <span asp-validation-for="Item.Description" class="validation"></span>
+                    @if (Model.ProjectProposal is not null)
+                    {
+                        <section class="card">
+                            <div class="action-row" style="justify-content:space-between;align-items:center">
+                                <div>
+                                    <div class="eyebrow" style="color:#b45b09">Project proposal</div>
+                                    <h2>@Model.ProjectProposal.Title</h2>
+                                    <p class="muted">Version @Model.ProjectProposal.Version · updated @Model.ProjectProposal.UpdatedUtc.ToString("u")</p>
                                 </div>
-                                <div class="field">
-                                    <label asp-for="Item.Quantity"></label>
-                                    <input asp-for="Item.Quantity" type="number" step="0.001" min="0.001" />
-                                    <span asp-validation-for="Item.Quantity" class="validation"></span>
-                                </div>
-                                <button class="button button-outline" type="submit">Add item</button>
-                            </form>
-
-                            <form method="post" asp-page-handler="Submit" style="margin-top:18px">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <button class="button" type="submit" @(Model.Request.Items.Count == 0 ? "disabled" : null)>Submit request to FFP</button>
-                            </form>
-                        }
-
-                        @if (Model.Request.Status == "MoreInformationRequired")
-                        {
-                            <div class="flash error" style="margin-top:22px">
-                                FFP requested additional information. Review the status history below, upload any requested evidence, then resubmit.
+                                @if (Model.ProjectProposal.CanEdit)
+                                {
+                                    <a class="button" asp-page="/Requests/Proposal" asp-route-id="@Model.Request.Id">Edit proposal</a>
+                                }
                             </div>
+                            <article class="proposal-document">@Html.Raw(Model.ProjectProposal.RichContentHtml)</article>
+                        </section>
+                    }
+                    else
+                    {
+                        <section class="card">
+                            <h2>Requested items</h2>
+                            @if (Model.Request.Items.Count == 0)
+                            {
+                                <p class="muted">No items have been added yet.</p>
+                            }
+                            else
+                            {
+                                <div class="table-wrap">
+                                    <table>
+                                        <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
+                                        <tbody>
+                                        @foreach (RequestItemDetail item in Model.Request.Items)
+                                        {
+                                            <tr>
+                                                <td>@item.Description</td>
+                                                <td>@item.Quantity</td>
+                                                <td>Each</td>
+                                            </tr>
+                                        }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            @if (Model.Request.Status == "Draft")
+                            {
+                                <hr style="border:0;border-top:1px solid #dde3e8;margin:26px 0" />
+                                <h3>Add line item</h3>
+                                <form method="post" asp-page-handler="AddItem" class="form-grid">
+                                    <input type="hidden" name="id" value="@Model.Request.Id" />
+                                    <div class="field">
+                                        <label asp-for="Item.Description">Description</label>
+                                        <input asp-for="Item.Description" placeholder="e.g. School bags" />
+                                        <span asp-validation-for="Item.Description" class="validation"></span>
+                                    </div>
+                                    <div class="field">
+                                        <label asp-for="Item.Quantity"></label>
+                                        <input asp-for="Item.Quantity" type="number" step="0.001" min="0.001" />
+                                        <span asp-validation-for="Item.Quantity" class="validation"></span>
+                                    </div>
+                                    <button class="button button-outline" type="submit">Add item</button>
+                                </form>
+
+                                <form method="post" asp-page-handler="Submit" style="margin-top:18px">
+                                    <input type="hidden" name="id" value="@Model.Request.Id" />
+                                    <button class="button" type="submit" @(Model.Request.Items.Count == 0 ? "disabled" : null)>Submit request to FFP</button>
+                                </form>
+                            }
+                        </section>
+                    }
+
+                    @if (Model.Request.Status == "MoreInformationRequired")
+                    {
+                        <section class="card" style="margin-top:1.5rem">
+                            <div class="flash error">
+                                FFP requested additional information. Review the status history, update the project proposal or upload the requested evidence, then resubmit.
+                            </div>
+                            @if (Model.ProjectProposal is not null)
+                            {
+                                <a class="button button-outline" asp-page="/Requests/Proposal" asp-route-id="@Model.Request.Id">Update project proposal</a>
+                            }
                             <form method="post" asp-page-handler="Resubmit" style="margin-top:14px">
                                 <input type="hidden" name="id" value="@Model.Request.Id" />
                                 <button class="button" type="submit">Resubmit to FFP</button>
                             </form>
-                        }
-                    </section>
+                        </section>
+                    }
 
                     <section class="card" style="margin-top:1.5rem">
                         <h2>Supporting documents</h2>
@@ -169,3 +195,31 @@
         }
     </div>
 </section>
+
+<style>
+    .proposal-document {
+        margin-top: 18px;
+        background: #fff;
+        border: 1px solid #e0e4e7;
+        padding: 32px 38px;
+        font-family: Georgia, 'Times New Roman', serif;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+    }
+
+    .proposal-document table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+    }
+
+    .proposal-document th, .proposal-document td {
+        border: 1px solid #8b949c;
+        padding: 8px;
+    }
+
+    .proposal-document img {
+        max-width: 100%;
+        height: auto;
+    }
+</style>
