@@ -23,9 +23,11 @@
                     <a asp-page="/Dashboard/Index">Dashboard</a>
                     <a asp-page="/Organizations/Index">Organizations</a>
                     <a asp-page="/Requests/Index">Requests</a>
+                    <a asp-page="/Account/Notifications">Notifications</a>
                     @if (User.IsInRole("FfpAdministrator") || User.IsInRole("FfpReviewer"))
                     {
                         <a asp-page="/Staff/Index">FFP Staff</a>
+                        <a asp-page="/Staff/Operations">Operations</a>
                         <a asp-page="/Staff/Diagnostics">Diagnostics</a>
                     }
                     <form method="post" asp-page="/Account/Logout" class="nav-form">
