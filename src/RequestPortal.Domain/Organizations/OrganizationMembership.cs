@@ -34,6 +34,12 @@ public sealed class OrganizationMembership
 
     public Guid? ApprovedByUserId { get; private set; }
 
+    public DateTimeOffset? EndedUtc { get; private set; }
+
+    public Guid? EndedByUserId { get; private set; }
+
+    public string? EndReason { get; private set; }
+
     public void Approve(Guid approvedByUserId, DateTimeOffset approvedUtc)
     {
         EnsurePending();
@@ -51,21 +57,59 @@ public sealed class OrganizationMembership
         ApprovedUtc = approvedUtc;
     }
 
-    public void Revoke()
+    public void Reject(Guid rejectedByUserId, DateTimeOffset rejectedUtc, string reason)
     {
-        if (Status != MembershipStatus.Approved)
-        {
-            throw new InvalidOperationException("Only approved memberships can be revoked.");
-        }
+        EnsurePending();
+        Status = MembershipStatus.Rejected;
+        EndedByUserId = rejectedByUserId;
+        EndedUtc = rejectedUtc;
+        EndReason = NormalizeReason(reason);
+    }
 
+    public void PromoteToAdministrator()
+    {
+        EnsureApproved();
+        Role = OrganizationRole.Administrator;
+    }
+
+    public void DemoteToMember()
+    {
+        EnsureApproved();
+        Role = OrganizationRole.Member;
+    }
+
+    public void Revoke(Guid revokedByUserId, DateTimeOffset revokedUtc, string reason)
+    {
+        EnsureApproved();
         Status = MembershipStatus.Revoked;
+        EndedByUserId = revokedByUserId;
+        EndedUtc = revokedUtc;
+        EndReason = NormalizeReason(reason);
     }
 
     private void EnsurePending()
     {
         if (Status != MembershipStatus.Pending)
         {
-            throw new InvalidOperationException("Only pending memberships can be approved.");
+            throw new InvalidOperationException("Only pending memberships can be approved or rejected.");
         }
+    }
+
+    private void EnsureApproved()
+    {
+        if (Status != MembershipStatus.Approved)
+        {
+            throw new InvalidOperationException("The membership must be approved for this operation.");
+        }
+    }
+
+    private static string NormalizeReason(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("A reason is required.", nameof(reason));
+        }
+
+        return reason.Trim();
     }
 }
