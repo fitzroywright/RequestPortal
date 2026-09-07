@@ -19,6 +19,38 @@
                 <p>@organization.CountryCode · @organization.Status</p>
             </div>
 
+            <section class="card" style="margin-bottom:1.5rem">
+                <h2>Organization status controls</h2>
+                @if (organization.Status == "PendingApproval")
+                {
+                    <form method="post" asp-page-handler="RejectOrganization" class="action-row">
+                        <input type="hidden" name="id" value="@organization.Id" />
+                        <input type="text" name="reason" required maxlength="1000" placeholder="Reason for rejection" />
+                        <button class="button button-small button-secondary" type="submit">Reject registration</button>
+                    </form>
+                }
+                else if (organization.Status == "Approved")
+                {
+                    <form method="post" asp-page-handler="SuspendOrganization" class="action-row">
+                        <input type="hidden" name="id" value="@organization.Id" />
+                        <input type="text" name="reason" required maxlength="1000" placeholder="Reason for suspension" />
+                        <button class="button button-small button-secondary" type="submit">Suspend organization</button>
+                    </form>
+                }
+                else if (organization.Status == "Suspended")
+                {
+                    <form method="post" asp-page-handler="ReactivateOrganization" class="action-row">
+                        <input type="hidden" name="id" value="@organization.Id" />
+                        <input type="text" name="notes" maxlength="1000" placeholder="Reactivation notes (optional)" />
+                        <button class="button button-small" type="submit">Reactivate organization</button>
+                    </form>
+                }
+                else
+                {
+                    <p class="muted">No status transition is available for this organization.</p>
+                }
+            </section>
+
             <div class="grid-2">
                 <section class="card">
                     <h2>Organization profile</h2>
