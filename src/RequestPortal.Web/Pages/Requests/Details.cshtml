@@ -1,6 +1,7 @@
 @page "{id:guid}"
 @model RequestPortal.Web.Pages.Requests.DetailsModel
 @using RequestPortal.Application.Documents
+@using RequestPortal.Application.ReferenceData
 @using RequestPortal.Domain.Documents
 @{
     ViewData["Title"] = "Request Details";
@@ -61,7 +62,7 @@
                                             <tr>
                                                 <td>@item.Description</td>
                                                 <td>@item.Quantity</td>
-                                                <td>Each</td>
+                                                <td>@Model.UnitName(item.UnitOfMeasureId)</td>
                                             </tr>
                                         }
                                         </tbody>
@@ -80,10 +81,22 @@
                                         <input asp-for="Item.Description" placeholder="e.g. School bags" />
                                         <span asp-validation-for="Item.Description" class="validation"></span>
                                     </div>
-                                    <div class="field">
-                                        <label asp-for="Item.Quantity"></label>
-                                        <input asp-for="Item.Quantity" type="number" step="0.001" min="0.001" />
-                                        <span asp-validation-for="Item.Quantity" class="validation"></span>
+                                    <div class="grid-2">
+                                        <div class="field">
+                                            <label asp-for="Item.Quantity"></label>
+                                            <input asp-for="Item.Quantity" type="number" step="0.001" min="0.001" />
+                                            <span asp-validation-for="Item.Quantity" class="validation"></span>
+                                        </div>
+                                        <div class="field">
+                                            <label asp-for="Item.UnitOfMeasureId">Unit of measure</label>
+                                            <select asp-for="Item.UnitOfMeasureId">
+                                                @foreach (UnitOfMeasureOption unit in Model.UnitsOfMeasure)
+                                                {
+                                                    <option value="@unit.Id">@unit.Name (@unit.Code)</option>
+                                                }
+                                            </select>
+                                            <span asp-validation-for="Item.UnitOfMeasureId" class="validation"></span>
+                                        </div>
                                     </div>
                                     <button class="button button-outline" type="submit">Add item</button>
                                 </form>
