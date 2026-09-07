@@ -12,7 +12,15 @@ public enum RequestStatus
     Cancelled = 5,
     PendingFulfilment = 6,
     Fulfilled = 7,
-    Closed = 8
+    Closed = 8,
+    Duplicate = 9
+}
+
+public enum RequestPriority
+{
+    Normal = 0,
+    High = 1,
+    Urgent = 2
 }
 
 public sealed class AssistanceRequestItem
