@@ -9,16 +9,26 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using RequestPortal.Application.Administration;
+using RequestPortal.Application.Auditing;
+using RequestPortal.Application.Documents;
 using RequestPortal.Application.Portal;
+using RequestPortal.Application.Requests;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Security;
+using RequestPortal.Common.Storage;
 using RequestPortal.Common.Time;
+using RequestPortal.Infrastructure.Administration;
+using RequestPortal.Infrastructure.Auditing;
 using RequestPortal.Infrastructure.Diagnostics;
+using RequestPortal.Infrastructure.Documents;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Portal;
+using RequestPortal.Infrastructure.Requests;
 using RequestPortal.Infrastructure.Security;
+using RequestPortal.Infrastructure.Storage;
 using RequestPortal.Web.Demo;
 using RequestPortal.Web.Security;
 
@@ -90,10 +100,15 @@ builder.Services
     .Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
 
 builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
 builder.Services.AddScoped<IStaffDirectoryAuthenticator, ActiveDirectoryStaffAuthenticator>();
 builder.Services.AddScoped<IOrganizationAccessService, OrganizationAccessService>();
 builder.Services.AddScoped<IPortalWorkflowService, PortalWorkflowService>();
 builder.Services.AddScoped<IStaffOrganizationDirectoryService, StaffOrganizationDirectoryService>();
+builder.Services.AddScoped<IStaffOrganizationService, StaffOrganizationService>();
+builder.Services.AddScoped<IBusinessAuditWriter, BusinessAuditWriter>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IRequestLifecycleService, RequestLifecycleService>();
 builder.Services.AddScoped<StaffSignInService>();
 builder.Services.AddScoped<DemoDataSeeder>();
 
