@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Request Portal</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="site-header">
+        <div class="shell nav-shell">
+            <a class="brand" asp-page="/Index">
+                <span class="brand-mark">FFP</span>
+                <span>
+                    <strong>Request Portal</strong>
+                    <small>Food For The Poor Jamaica</small>
+                </span>
+            </a>
+            <nav class="main-nav">
+                <a asp-page="/Index">Home</a>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a asp-page="/Dashboard/Index">Dashboard</a>
+                    <a asp-page="/Organizations/Index">Organizations</a>
+                    <a asp-page="/Requests/Index">Requests</a>
+                    @if (User.IsInRole("FfpAdministrator") || User.IsInRole("FfpReviewer"))
+                    {
+                        <a asp-page="/Staff/Index">FFP Staff</a>
+                    }
+                    <form method="post" asp-page="/Account/Logout" class="nav-form">
+                        <button type="submit" class="nav-link-button">Sign out</button>
+                    </form>
+                }
+                else
+                {
+                    <a class="button button-small" asp-page="/Account/Login">Sign in</a>
+                }
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        @if (TempData["Success"] is string success)
+        {
+            <div class="shell flash success">@success</div>
+        }
+        @if (TempData["Error"] is string error)
+        {
+            <div class="shell flash error">@error</div>
+        }
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        <div class="shell footer-grid">
+            <div>
+                <strong>Request Portal</strong>
+                <p>Secure organization registration, representative approval and assistance request tracking.</p>
+            </div>
+            <div class="footer-meta">Food For The Poor Jamaica</div>
+        </div>
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
