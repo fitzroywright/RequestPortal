@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -60,6 +61,11 @@ using RequestPortal.Web.Security;
 using RequestPortal.Web.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+if (builder.Environment.IsProduction())
+{
+    await HydrateProductionSecretsAsync(builder.Configuration);
+}
 
 string connectionString = builder.Configuration.GetConnectionString("RequestPortal")
     ?? throw new InvalidOperationException("SF-CONFIG-DB-001: PostgreSQL connection string 'RequestPortal' is not configured.");
@@ -237,6 +243,38 @@ app.MapRazorPages();
 await PrepareDemoAsync(app);
 await ReportStartupDiagnosticsAsync(app);
 await app.RunAsync();
+
+static async Task HydrateProductionSecretsAsync(IConfiguration configuration)
+{
+    string? address = configuration["OpenBao:Address"];
+    string tokenEnvironmentVariable = configuration["OpenBao:TokenEnvironmentVariable"] ?? "OPENBAO_TOKEN";
+    if (string.IsNullOrWhiteSpace(address) || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(tokenEnvironmentVariable)))
+    {
+        throw new InvalidOperationException("SF-PROD-SECRETS-BOOTSTRAP-001: OpenBao address or bootstrap token environment variable is missing.");
+    }
+
+    using HttpClient client = new();
+    OpenBaoSecretProvider provider = new(client, configuration);
+    string[] keys =
+    [
+        "ConnectionStrings:RequestPortal",
+        "Authentication:Google:ClientId",
+        "Authentication:Google:ClientSecret",
+        "Authentication:Microsoft:ClientId",
+        "Authentication:Microsoft:ClientSecret",
+        "Authentication:Facebook:AppId",
+        "Authentication:Facebook:AppSecret"
+    ];
+
+    foreach (string key in keys)
+    {
+        string? value = await provider.GetSecretAsync(key);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            configuration[key] = value;
+        }
+    }
+}
 
 static void ValidateProductionConfiguration(IConfiguration configuration)
 {
