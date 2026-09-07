@@ -22,20 +22,25 @@ public sealed class DetailsModel : PageModel
     private readonly IPortalWorkflowService workflowService;
     private readonly IDocumentService documentService;
     private readonly IRequestLifecycleService lifecycleService;
+    private readonly IProjectProposalService projectProposalService;
 
     public DetailsModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
         IDocumentService documentService,
-        IRequestLifecycleService lifecycleService)
+        IRequestLifecycleService lifecycleService,
+        IProjectProposalService projectProposalService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.documentService = documentService;
         this.lifecycleService = lifecycleService;
+        this.projectProposalService = projectProposalService;
     }
 
     public new RequestDetail? Request { get; private set; }
+
+    public ProjectProposalDetail? ProjectProposal { get; private set; }
 
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
 
@@ -155,6 +160,7 @@ public sealed class DetailsModel : PageModel
             return NotFound();
         }
 
+        ProjectProposal = await projectProposalService.GetAsync(user.Id, id, isStaff: false, HttpContext.RequestAborted);
         Documents = await documentService.GetRequestDocumentsAsync(user.Id, id, isStaff: false, HttpContext.RequestAborted);
         return Page();
     }
