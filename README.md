@@ -15,21 +15,22 @@ The solution is designed around PostgreSQL, ASP.NET Core, external identity prov
 - Date/time values are stored in UTC and presented in the user's configured region.
 - Secrets are never committed to source control.
 
-## Quick local demo
+## Quick development startup
 
-Prerequisites: Visual Studio 2022 with .NET 10 support and Docker Desktop.
+Prerequisites: Visual Studio 2022 with .NET 10 support and access to an existing PostgreSQL server.
 
 1. Pull the `chatgpt/mvp-rescue` branch.
-2. From the repository root, start the development PostgreSQL container:
-
-   `docker compose up -d`
-
-3. Open `RequestPortal.sln` in Visual Studio.
-4. Set `RequestPortal.Web` as the startup project if Visual Studio does not select it automatically.
+2. Open `RequestPortal.sln` in Visual Studio.
+3. Set `RequestPortal.Web` as the startup project if Visual Studio does not select it automatically.
+4. Configure the PostgreSQL connection string using Visual Studio User Secrets for the `RequestPortal.Web` project. Use the key `ConnectionStrings:RequestPortal`.
 5. Press F5.
 
-Development mode enables the demo personas and creates the PostgreSQL schema/data automatically. The local development PostgreSQL container listens only on `127.0.0.1:5432` and uses trust authentication solely for the local demo environment.
+Example connection string shape:
 
-Production connection strings, OAuth credentials, AD settings, SMTP credentials, and other secrets must be supplied through approved configuration/secret providers and must not be committed.
+`Host=<postgres-server>;Port=5432;Database=requestportal;Username=<user>;Password=<password>`
+
+Development mode enables the demo personas. `Demo:EnsureDatabase` is currently enabled for the MVP/demo path, so the application can create the schema in the configured PostgreSQL database if the account has sufficient rights.
+
+Do not commit PostgreSQL passwords, OAuth credentials, AD settings, SMTP credentials, or other secrets. Supply them through User Secrets during development and the approved Request Portal secrets provider in production.
 
 See `docs/MVP.md` for the demo scope and workflow.
