@@ -28,10 +28,20 @@ public sealed class IndexModel : PageModel
 
     public IReadOnlyList<RequestSummary> Requests { get; private set; } = Array.Empty<RequestSummary>();
 
+    public IReadOnlyList<RequestSummary> ActionRequired { get; private set; } = Array.Empty<RequestSummary>();
+
     public int ApprovedOrganizations => Organizations.Count(
         organization =>
             organization.OrganizationStatus == "Approved" &&
             organization.MembershipStatus == "Approved");
+
+    public int DraftCount => Requests.Count(request => request.Status == "Draft");
+
+    public int SubmittedCount => Requests.Count(request => request.Status == "Submitted");
+
+    public int ApprovedCount => Requests.Count(request => request.Status == "Approved" || request.Status == "PendingFulfilment" || request.Status == "Fulfilled" || request.Status == "Closed");
+
+    public int MoreInformationCount => Requests.Count(request => request.Status == "MoreInformationRequired");
 
     public async Task OnGetAsync()
     {
@@ -41,5 +51,9 @@ public sealed class IndexModel : PageModel
         DisplayName = user.DisplayName;
         Organizations = await workflowService.GetOrganizationsForUserAsync(user.Id, HttpContext.RequestAborted);
         Requests = await workflowService.GetRequestsForUserAsync(user.Id, HttpContext.RequestAborted);
+        ActionRequired = Requests
+            .Where(request => request.Status == "MoreInformationRequired" || request.Status == "Draft")
+            .OrderByDescending(request => request.CreatedUtc)
+            .ToArray();
     }
 }
