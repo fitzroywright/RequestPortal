@@ -1,7 +1,14 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Security;
@@ -9,6 +16,7 @@ using RequestPortal.Infrastructure.Diagnostics;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Security;
+using RequestPortal.Web.Security;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -79,6 +87,7 @@ builder.Services
 
 builder.Services.AddScoped<IStaffDirectoryAuthenticator, ActiveDirectoryStaffAuthenticator>();
 builder.Services.AddScoped<IOrganizationAccessService, OrganizationAccessService>();
+builder.Services.AddScoped<StaffSignInService>();
 
 builder.Services.AddStarfleetDiagnostics();
 builder.Services.AddScoped<IStartupDiagnostic, PostgreSqlStartupDiagnostic>();
