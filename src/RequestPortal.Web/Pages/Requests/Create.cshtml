@@ -1,5 +1,6 @@
 @page
 @model RequestPortal.Web.Pages.Requests.CreateModel
+@using RequestPortal.Application.ReferenceData
 @using RequestPortal.Domain.Requests
 @{
     ViewData["Title"] = "Create Request";
@@ -56,7 +57,14 @@
                         <div class="grid-2">
                             <div class="field">
                                 <label asp-for="Input.Category">Category</label>
-                                <input asp-for="Input.Category" placeholder="e.g. Education, Housing, Water" />
+                                <select asp-for="Input.Category">
+                                    <option value="">Select a category</option>
+                                    @foreach (RequestCategoryOption category in Model.Categories)
+                                    {
+                                        <option value="@category.Name">@category.Name</option>
+                                    }
+                                </select>
+                                <span asp-validation-for="Input.Category" class="validation"></span>
                             </div>
                             <div class="field">
                                 <label asp-for="Input.Subcategory">Subcategory</label>
@@ -67,7 +75,14 @@
                         <div class="grid-2">
                             <div class="field">
                                 <label asp-for="Input.ProgramCategory">Program category</label>
-                                <input asp-for="Input.ProgramCategory" />
+                                <select asp-for="Input.ProgramCategory">
+                                    <option value="">Select a program</option>
+                                    @foreach (ProgramClassificationOption program in Model.Programs)
+                                    {
+                                        <option value="@program.Name">@program.Name</option>
+                                    }
+                                </select>
+                                <span asp-validation-for="Input.ProgramCategory" class="validation"></span>
                             </div>
                             <div class="field">
                                 <label asp-for="Input.Priority">Priority</label>
