@@ -1,0 +1,46 @@
+@page
+@model RequestPortal.Web.Pages.Requests.IndexModel
+@{
+    ViewData["Title"] = "Requests";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="action-row" style="justify-content:space-between;align-items:end;margin-bottom:24px">
+            <div class="section-heading" style="margin-bottom:0">
+                <div class="eyebrow" style="color:#b45b09">Assistance requests</div>
+                <h1>Requests for my organizations</h1>
+                <p>Every request is permanently associated with the organization selected when it was created.</p>
+            </div>
+            <a class="button" asp-page="/Requests/Create">New request</a>
+        </div>
+
+        <section class="card">
+            @if (Model.Requests.Count == 0)
+            {
+                <p class="muted">There are no requests available for your approved organization memberships.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Reference</th><th>Organization</th><th>Summary</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (RequestSummary request in Model.Requests)
+                        {
+                            <tr>
+                                <td><strong>@request.PublicReference</strong></td>
+                                <td>@request.OrganizationName</td>
+                                <td>@request.Summary</td>
+                                <td><span class="status status-@request.Status">@request.Status</span></td>
+                                <td>@(request.SubmittedUtc?.ToLocalTime().ToString("g") ?? "Not submitted")</td>
+                                <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</section>
