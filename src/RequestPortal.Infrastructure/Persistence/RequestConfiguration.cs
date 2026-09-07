@@ -17,10 +17,12 @@ internal sealed class AssistanceRequestConfiguration : IEntityTypeConfiguration<
         builder.Property(request => request.ProgramCategory).HasMaxLength(150);
         builder.Property(request => request.Location).HasMaxLength(500);
         builder.Property(request => request.Circumstances).HasMaxLength(8000);
+        builder.Property(request => request.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(request => request.Priority).HasConversion<string>().HasMaxLength(24).IsRequired();
         builder.Property(request => request.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(request => request.PublicReference).IsUnique();
         builder.HasIndex(request => new { request.OrganizationId, request.Status });
+        builder.HasIndex(request => new { request.OrganizationId, request.Kind });
         builder.HasIndex(request => request.BeneficiaryId);
         builder.HasMany(request => request.Items)
             .WithOne()
@@ -53,5 +55,17 @@ internal sealed class RequestStatusHistoryConfiguration : IEntityTypeConfigurati
         builder.Property(history => history.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(history => history.Reason).HasMaxLength(4000);
         builder.HasIndex(history => new { history.RequestId, history.ChangedUtc });
+    }
+}
+
+internal sealed class ProjectProposalConfiguration : IEntityTypeConfiguration<ProjectProposal>
+{
+    public void Configure(EntityTypeBuilder<ProjectProposal> builder)
+    {
+        builder.ToTable("project_proposals");
+        builder.HasKey(proposal => proposal.Id);
+        builder.Property(proposal => proposal.Title).HasMaxLength(500).IsRequired();
+        builder.Property(proposal => proposal.RichContentHtml).HasColumnType("text").IsRequired();
+        builder.HasIndex(proposal => proposal.RequestId).IsUnique();
     }
 }
