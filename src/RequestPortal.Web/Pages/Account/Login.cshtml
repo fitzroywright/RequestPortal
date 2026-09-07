@@ -1,0 +1,57 @@
+@page
+@model RequestPortal.Web.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Representative Sign In";
+}
+
+<div class="login-shell">
+    <section class="login-intro">
+        <div class="eyebrow">Organization representatives</div>
+        <h1>Welcome back.</h1>
+        <p>
+            Sign in as yourself. Your organization memberships determine which organizations you may represent
+            and which requests you may view or submit.
+        </p>
+        <p>
+            FFP internal staff should use the separate staff sign-in with their FFP Active Directory credentials.
+        </p>
+        <a class="button button-secondary" asp-page="/Account/StaffLogin">FFP staff sign in</a>
+    </section>
+    <section class="login-panel">
+        <h2>Representative sign in</h2>
+        <p class="muted">Use one of the available external identity providers.</p>
+
+        @if (Model.ExternalProviders.Count > 0)
+        {
+            @foreach (string provider in Model.ExternalProviders)
+            {
+                <form method="post" asp-page-handler="External">
+                    <input type="hidden" name="provider" value="@provider" />
+                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                    <button class="button provider-button" type="submit">Continue with @provider</button>
+                </form>
+            }
+        }
+        else
+        {
+            <div class="card">
+                <strong>External providers are not configured yet.</strong>
+                <p class="muted">The temporary demo sign-in can be used while provider credentials are being completed.</p>
+            </div>
+        }
+
+        @if (Model.DemoEnabled)
+        {
+            <div class="divider">Demo</div>
+            <form method="post" asp-page-handler="Demo">
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <button class="button" type="submit">Sign in as demo representative</button>
+            </form>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="flash error">@Model.ErrorMessage</div>
+        }
+    </section>
+</div>
