@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Administration;
+using RequestPortal.Application.Auditing;
+using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -13,10 +15,17 @@ namespace RequestPortal.Infrastructure.Administration;
 public sealed class StaffOrganizationService : IStaffOrganizationService
 {
     private readonly RequestPortalDbContext dbContext;
+    private readonly IClock clock;
+    private readonly IBusinessAuditWriter auditWriter;
 
-    public StaffOrganizationService(RequestPortalDbContext dbContext)
+    public StaffOrganizationService(
+        RequestPortalDbContext dbContext,
+        IClock clock,
+        IBusinessAuditWriter auditWriter)
     {
         this.dbContext = dbContext;
+        this.clock = clock;
+        this.auditWriter = auditWriter;
     }
 
     public async Task<IReadOnlyList<StaffOrganizationSummary>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -40,7 +49,7 @@ public sealed class StaffOrganizationService : IStaffOrganizationService
 
     public async Task<StaffOrganizationDetail?> GetAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        var organization = await dbContext.Organizations
+        Organization? organization = await dbContext.Organizations
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == organizationId, cancellationToken);
 
@@ -105,5 +114,67 @@ public sealed class StaffOrganizationService : IStaffOrganizationService
             members,
             requests,
             audit);
+    }
+
+    public async Task RejectAsync(
+        Guid staffUserId,
+        Guid organizationId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        Organization organization = await LoadAsync(organizationId, cancellationToken);
+        organization.Reject(staffUserId, reason);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(
+            staffUserId,
+            "OrganizationRejected",
+            "Organization",
+            organizationId,
+            organizationId,
+            reason,
+            cancellationToken);
+    }
+
+    public async Task SuspendAsync(
+        Guid staffUserId,
+        Guid organizationId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        Organization organization = await LoadAsync(organizationId, cancellationToken);
+        organization.Suspend(reason);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(
+            staffUserId,
+            "OrganizationSuspended",
+            "Organization",
+            organizationId,
+            organizationId,
+            reason,
+            cancellationToken);
+    }
+
+    public async Task ReactivateAsync(
+        Guid staffUserId,
+        Guid organizationId,
+        string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        Organization organization = await LoadAsync(organizationId, cancellationToken);
+        organization.Reactivate(notes);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(
+            staffUserId,
+            "OrganizationReactivated",
+            "Organization",
+            organizationId,
+            organizationId,
+            notes,
+            cancellationToken);
+    }
+
+    private Task<Organization> LoadAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        return dbContext.Organizations.SingleAsync(item => item.Id == organizationId, cancellationToken);
     }
 }
