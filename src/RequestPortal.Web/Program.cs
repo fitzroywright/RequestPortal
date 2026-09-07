@@ -9,13 +9,17 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using RequestPortal.Application.Portal;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Security;
+using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Diagnostics;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
+using RequestPortal.Infrastructure.Portal;
 using RequestPortal.Infrastructure.Security;
+using RequestPortal.Web.Demo;
 using RequestPortal.Web.Security;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -85,9 +89,12 @@ builder.Services
     .AddOptions<ActiveDirectoryOptions>()
     .Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
 
+builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<IStaffDirectoryAuthenticator, ActiveDirectoryStaffAuthenticator>();
 builder.Services.AddScoped<IOrganizationAccessService, OrganizationAccessService>();
+builder.Services.AddScoped<IPortalWorkflowService, PortalWorkflowService>();
 builder.Services.AddScoped<StaffSignInService>();
+builder.Services.AddScoped<DemoDataSeeder>();
 
 builder.Services.AddStarfleetDiagnostics();
 builder.Services.AddScoped<IStartupDiagnostic, PostgreSqlStartupDiagnostic>();
@@ -103,6 +110,7 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddRazorPages(options =>
 {
+    options.Conventions.AuthorizeFolder("/Dashboard");
     options.Conventions.AuthorizeFolder("/Staff", PortalPolicies.FfpStaff);
     options.Conventions.AuthorizeFolder("/Organizations");
     options.Conventions.AuthorizeFolder("/Requests");
@@ -123,8 +131,21 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
 
+await SeedDemoDataAsync(app);
 await ReportStartupDiagnosticsAsync(app);
 await app.RunAsync();
+
+static async Task SeedDemoDataAsync(WebApplication app)
+{
+    if (!app.Configuration.GetValue("Demo:Enabled", false))
+    {
+        return;
+    }
+
+    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+    DemoDataSeeder seeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
+    await seeder.SeedAsync();
+}
 
 static async Task ReportStartupDiagnosticsAsync(WebApplication app)
 {
