@@ -1,6 +1,8 @@
 @page
 @model RequestPortal.Web.Pages.Staff.OrganizationModel
 @using RequestPortal.Application.Administration
+@using RequestPortal.Application.Documents
+@using RequestPortal.Domain.Documents
 @{
     ViewData["Title"] = Model.Organization?.Name ?? "Organization";
 }
@@ -60,6 +62,86 @@
                     }
                 </section>
             </div>
+
+            <section class="card" style="margin-top:1.5rem">
+                <div class="action-row" style="justify-content:space-between;align-items:center">
+                    <div>
+                        <h2>Verification documents</h2>
+                        <p class="muted">Registration certificates and other organization evidence can be reviewed here.</p>
+                    </div>
+                    <span class="status">@Model.Documents.Count document(s)</span>
+                </div>
+
+                @if (Model.Documents.Count == 0)
+                {
+                    <p class="muted">No organization documents have been uploaded.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Type</th>
+                                    <th>Verification</th>
+                                    <th>Retention</th>
+                                    <th>Uploaded UTC</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (DocumentSummary document in Model.Documents)
+                            {
+                                <tr>
+                                    <td>
+                                        <a asp-page-handler="DownloadDocument"
+                                           asp-route-id="@organization.Id"
+                                           asp-route-documentId="@document.Id">@document.OriginalFileName</a>
+                                        @if (!string.IsNullOrWhiteSpace(document.VerificationNotes))
+                                        {
+                                            <div class="muted">@document.VerificationNotes</div>
+                                        }
+                                    </td>
+                                    <td>@document.DocumentType</td>
+                                    <td>@document.VerificationStatus</td>
+                                    <td>@document.RetentionClass</td>
+                                    <td>@document.UploadedUtc.ToString("u")</td>
+                                    <td>
+                                        @if (!document.IsArchived)
+                                        {
+                                            <div class="action-row">
+                                                <form method="post" asp-page-handler="VerifyDocument">
+                                                    <input type="hidden" name="id" value="@organization.Id" />
+                                                    <input type="hidden" name="documentId" value="@document.Id" />
+                                                    <input type="text" name="notes" placeholder="Optional verification note" maxlength="1000" />
+                                                    <button class="button button-small" type="submit">Verify</button>
+                                                </form>
+                                                <form method="post" asp-page-handler="RejectDocument">
+                                                    <input type="hidden" name="id" value="@organization.Id" />
+                                                    <input type="hidden" name="documentId" value="@document.Id" />
+                                                    <input type="text" name="reason" placeholder="Rejection reason" maxlength="1000" required />
+                                                    <button class="button button-small button-secondary" type="submit">Reject</button>
+                                                </form>
+                                                <form method="post" asp-page-handler="ArchiveDocument">
+                                                    <input type="hidden" name="id" value="@organization.Id" />
+                                                    <input type="hidden" name="documentId" value="@document.Id" />
+                                                    <button class="button button-small button-secondary" type="submit">Archive</button>
+                                                </form>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="muted">Archived</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
 
             <section class="card" style="margin-top:1.5rem">
                 <h2>Requests</h2>
