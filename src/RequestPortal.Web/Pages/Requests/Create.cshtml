@@ -1,0 +1,64 @@
+@page
+@model RequestPortal.Web.Pages.Requests.CreateModel
+@{
+    ViewData["Title"] = "Create Request";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">New assistance request</div>
+            <h1>Choose who you are acting for.</h1>
+            <p>
+                The organization selected here becomes the permanent owner of this request. Only approved memberships
+                are available for request creation.
+            </p>
+        </div>
+
+        <div class="grid-2">
+            <section class="card">
+                @if (Model.Organizations.Count == 0)
+                {
+                    <h2>No approved organization membership</h2>
+                    <p class="muted">Register an organization or request membership before creating a request.</p>
+                    <a class="button" asp-page="/Organizations/Index">Manage organizations</a>
+                }
+                else
+                {
+                    <form method="post" class="form-grid">
+                        <div class="field">
+                            <label asp-for="Input.OrganizationId">Acting on behalf of</label>
+                            <select asp-for="Input.OrganizationId">
+                                <option value="">Select an organization</option>
+                                @foreach (OrganizationSummary organization in Model.Organizations)
+                                {
+                                    <option value="@organization.Id">@organization.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Input.OrganizationId" class="validation"></span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Input.Summary">Request summary</label>
+                            <textarea asp-for="Input.Summary" placeholder="Briefly describe the need and who will benefit."></textarea>
+                            <span asp-validation-for="Input.Summary" class="validation"></span>
+                        </div>
+
+                        <button class="button" type="submit">Create draft and add items</button>
+                    </form>
+                }
+            </section>
+
+            <aside class="card">
+                <h2>Before you submit</h2>
+                <p class="muted">The demo workflow requires at least one line item before submission.</p>
+                <ul>
+                    <li>Use a concise summary of the request.</li>
+                    <li>Add the requested goods or services as line items.</li>
+                    <li>Review the organization before submitting.</li>
+                    <li>After submission, FFP can approve, reject, or request more information.</li>
+                </ul>
+            </aside>
+        </div>
+    </div>
+</section>
