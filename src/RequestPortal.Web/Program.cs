@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using RequestPortal.Application.Administration;
@@ -116,7 +117,7 @@ builder.Services
     .AddOptions<NotificationOptions>()
     .Bind(builder.Configuration.GetSection(NotificationOptions.SectionName));
 
-builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddSingleton<IClock, RequestPortal.Common.Time.SystemClock>();
 builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
 builder.Services.AddSingleton<ISecretProvider, ConfigurationSecretProvider>();
 builder.Services.AddScoped<INotificationSender, SmtpNotificationSender>();
