@@ -9,6 +9,7 @@ using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
+using RequestPortal.Domain.ReferenceData;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
 using RequestFulfilment = RequestPortal.Domain.Fulfilment.Fulfilment;
@@ -17,11 +18,7 @@ namespace RequestPortal.Infrastructure.Persistence;
 
 public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
-    public RequestPortalDbContext(DbContextOptions<RequestPortalDbContext> options)
-        : base(options)
-    {
-    }
-
+    public RequestPortalDbContext(DbContextOptions<RequestPortalDbContext> options) : base(options) { }
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
     public DbSet<AssistanceRequest> AssistanceRequests => Set<AssistanceRequest>();
@@ -30,6 +27,9 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<ProjectProposal> ProjectProposals => Set<ProjectProposal>();
     public DbSet<ProjectBudgetItem> ProjectBudgetItems => Set<ProjectBudgetItem>();
     public DbSet<ProjectMilestone> ProjectMilestones => Set<ProjectMilestone>();
+    public DbSet<RequestCategory> RequestCategories => Set<RequestCategory>();
+    public DbSet<ProgramClassification> ProgramClassifications => Set<ProgramClassification>();
+    public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
     public DbSet<CountryConfiguration> CountryConfigurations => Set<CountryConfiguration>();
     public DbSet<StoredDocument> Documents => Set<StoredDocument>();
@@ -40,10 +40,5 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        base.OnModelCreating(modelBuilder);
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(RequestPortalDbContext).Assembly);
-    }
+    protected override void OnModelCreating(ModelBuilder modelBuilder) { base.OnModelCreating(modelBuilder); modelBuilder.ApplyConfigurationsFromAssembly(typeof(RequestPortalDbContext).Assembly); }
 }
