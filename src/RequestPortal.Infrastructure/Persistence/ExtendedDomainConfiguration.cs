@@ -35,7 +35,12 @@ internal sealed class StoredDocumentConfiguration : IEntityTypeConfiguration<Sto
         builder.Property(item => item.OriginalFileName).HasMaxLength(512).IsRequired();
         builder.Property(item => item.ContentType).HasMaxLength(200).IsRequired();
         builder.Property(item => item.StorageKey).HasMaxLength(1000).IsRequired();
+        builder.Property(item => item.VerificationStatus).HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(item => item.VerificationNotes).HasMaxLength(4000);
+        builder.Property(item => item.RetentionClass).HasConversion<string>().HasMaxLength(64).IsRequired();
         builder.HasIndex(item => new { item.OrganizationId, item.OwnerType, item.OwnerId });
+        builder.HasIndex(item => new { item.OrganizationId, item.VerificationStatus });
+        builder.HasIndex(item => new { item.IsArchived, item.RetainUntilUtc });
     }
 }
 
@@ -91,5 +96,22 @@ internal sealed class NotificationPreferenceConfiguration : IEntityTypeConfigura
         builder.Property(item => item.Channel).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(item => item.Destination).HasMaxLength(500).IsRequired();
         builder.HasIndex(item => new { item.UserId, item.Channel }).IsUnique();
+    }
+}
+
+internal sealed class NotificationHistoryConfiguration : IEntityTypeConfiguration<NotificationHistory>
+{
+    public void Configure(EntityTypeBuilder<NotificationHistory> builder)
+    {
+        builder.ToTable("notification_history");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Channel).HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(item => item.Destination).HasMaxLength(500).IsRequired();
+        builder.Property(item => item.Subject).HasMaxLength(500).IsRequired();
+        builder.Property(item => item.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(item => item.LastError).HasMaxLength(4000);
+        builder.HasIndex(item => new { item.UserId, item.CreatedUtc });
+        builder.HasIndex(item => new { item.OrganizationId, item.CreatedUtc });
+        builder.HasIndex(item => new { item.RequestId, item.CreatedUtc });
     }
 }
