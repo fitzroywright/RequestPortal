@@ -1,0 +1,75 @@
+@page "{id:guid}"
+@model RequestPortal.Web.Pages.Organizations.ProfileModel
+@{
+    ViewData["Title"] = Model.Organization?.Name ?? "Organization Profile";
+}
+
+<section class="section">
+    <div class="shell">
+        @if (Model.Organization is null)
+        {
+            <section class="card"><h1>Organization not found</h1></section>
+        }
+        else
+        {
+            <div class="section-heading">
+                <div class="eyebrow" style="color:#b45b09">Organization profile</div>
+                <h1>@Model.Organization.Name</h1>
+                <p>@Model.Organization.CountryCode · @Model.Organization.Status</p>
+            </div>
+
+            <div class="grid-2">
+                <section class="card">
+                    <h2>Registration details</h2>
+                    <form method="post" asp-page-handler="Save" class="form-grid">
+                        <input type="hidden" name="id" value="@Model.Organization.Id" />
+                        <div class="field">
+                            <label asp-for="Input.RegistrationNumber">Registration number</label>
+                            <input asp-for="Input.RegistrationNumber" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="Input.OrganizationType">Organization type</label>
+                            <input asp-for="Input.OrganizationType" placeholder="Charity, church, school, NGO..." />
+                        </div>
+                        <div class="field">
+                            <label asp-for="Input.PrimaryContactName">Primary contact</label>
+                            <input asp-for="Input.PrimaryContactName" />
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.Email">Email</label>
+                                <input asp-for="Input.Email" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.Phone">Phone</label>
+                                <input asp-for="Input.Phone" />
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label asp-for="Input.Address">Address</label>
+                            <textarea asp-for="Input.Address" rows="3"></textarea>
+                        </div>
+                        <div class="field">
+                            <label asp-for="Input.RegistrationExpiryDate">Registration expiry date</label>
+                            <input asp-for="Input.RegistrationExpiryDate" type="date" />
+                        </div>
+                        <button class="button" type="submit">Save organization profile</button>
+                    </form>
+                </section>
+
+                <aside class="card">
+                    <h2>Verification document</h2>
+                    <p class="muted">Upload the organization's registration certificate or equivalent verification document.</p>
+                    <form method="post" enctype="multipart/form-data" asp-page-handler="UploadCertificate" class="form-grid">
+                        <input type="hidden" name="id" value="@Model.Organization.Id" />
+                        <div class="field">
+                            <label asp-for="RegistrationCertificate">Registration certificate</label>
+                            <input asp-for="RegistrationCertificate" type="file" />
+                        </div>
+                        <button class="button button-outline" type="submit">Upload certificate</button>
+                    </form>
+                </aside>
+            </div>
+        }
+    </div>
+</section>
