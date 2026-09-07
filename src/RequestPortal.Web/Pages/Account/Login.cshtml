@@ -36,16 +36,27 @@
         {
             <div class="card">
                 <strong>External providers are not configured yet.</strong>
-                <p class="muted">The temporary demo sign-in can be used while provider credentials are being completed.</p>
+                <p class="muted">The temporary demo sign-ins can be used while provider credentials are being completed.</p>
             </div>
         }
 
         @if (Model.DemoEnabled)
         {
-            <div class="divider">Demo</div>
-            <form method="post" asp-page-handler="Demo">
+            <div class="divider">Demo personas</div>
+            <form method="post" asp-page-handler="Demo" style="margin-bottom:10px">
+                <input type="hidden" name="persona" value="representative" />
                 <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-                <button class="button" type="submit">Sign in as demo representative</button>
+                <button class="button" style="width:100%" type="submit">Demo representative · Michael</button>
+            </form>
+            <form method="post" asp-page-handler="Demo" style="margin-bottom:10px">
+                <input type="hidden" name="persona" value="admin" />
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <button class="button button-outline" style="width:100%" type="submit">Demo organization admin · Grace</button>
+            </form>
+            <form method="post" asp-page-handler="Demo">
+                <input type="hidden" name="persona" value="pending" />
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <button class="button button-outline" style="width:100%" type="submit">Demo new representative · Keisha</button>
             </form>
         }
 
