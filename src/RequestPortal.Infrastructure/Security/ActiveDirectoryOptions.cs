@@ -15,4 +15,8 @@ public sealed class ActiveDirectoryOptions
     public bool RequireLdaps { get; set; } = true;
 
     public int TimeoutSeconds { get; set; } = 10;
+
+    public string[] AdministratorGroups { get; set; } = [];
+
+    public string[] ReviewerGroups { get; set; } = [];
 }
