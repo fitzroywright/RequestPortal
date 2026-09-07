@@ -133,6 +133,7 @@ builder.Services.AddScoped<PortalWorkflowService>();
 builder.Services.AddScoped<IPortalWorkflowService, AuditedPortalWorkflowService>();
 builder.Services.AddScoped<IStaffOrganizationDirectoryService, StaffOrganizationDirectoryService>();
 builder.Services.AddScoped<IStaffOrganizationService, StaffOrganizationService>();
+builder.Services.AddScoped<IStaffOperationsService, StaffOperationsService>();
 builder.Services.AddScoped<IBusinessAuditWriter, BusinessAuditWriter>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
