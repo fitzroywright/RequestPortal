@@ -39,6 +39,20 @@ public sealed class Organization
 
     public string? RegistrationNumber { get; private set; }
 
+    public string? OrganizationType { get; private set; }
+
+    public string? Address { get; private set; }
+
+    public string? Phone { get; private set; }
+
+    public string? Email { get; private set; }
+
+    public string? PrimaryContactName { get; private set; }
+
+    public DateOnly? RegistrationExpiryDate { get; private set; }
+
+    public string? ApprovalNotes { get; private set; }
+
     public OrganizationStatus Status { get; private set; }
 
     public Guid RegisteredByUserId { get; private set; }
@@ -51,7 +65,25 @@ public sealed class Organization
 
     public IReadOnlyCollection<OrganizationMembership> Memberships => memberships.AsReadOnly();
 
-    public void Approve(Guid approvedByUserId, DateTimeOffset approvedUtc)
+    public void UpdateProfile(
+        string? registrationNumber,
+        string? organizationType,
+        string? address,
+        string? phone,
+        string? email,
+        string? primaryContactName,
+        DateOnly? registrationExpiryDate)
+    {
+        RegistrationNumber = Normalize(registrationNumber);
+        OrganizationType = Normalize(organizationType);
+        Address = Normalize(address);
+        Phone = Normalize(phone);
+        Email = Normalize(email);
+        PrimaryContactName = Normalize(primaryContactName);
+        RegistrationExpiryDate = registrationExpiryDate;
+    }
+
+    public void Approve(Guid approvedByUserId, DateTimeOffset approvedUtc, string? approvalNotes = null)
     {
         if (Status != OrganizationStatus.PendingApproval)
         {
@@ -61,6 +93,7 @@ public sealed class Organization
         Status = OrganizationStatus.Approved;
         ApprovedByUserId = approvedByUserId;
         ApprovedUtc = approvedUtc;
+        ApprovalNotes = Normalize(approvalNotes);
 
         OrganizationMembership? initialMembership = memberships.Find(
             membership => membership.UserId == RegisteredByUserId && membership.Status == MembershipStatus.Pending);
@@ -69,6 +102,17 @@ public sealed class Organization
         {
             initialMembership.ApproveAsAdministrator(approvedByUserId, approvedUtc);
         }
+    }
+
+    public void Suspend(string? reason)
+    {
+        if (Status != OrganizationStatus.Approved)
+        {
+            throw new InvalidOperationException("Only approved organizations can be suspended.");
+        }
+
+        Status = OrganizationStatus.Suspended;
+        ApprovalNotes = Normalize(reason);
     }
 
     public OrganizationMembership RequestMembership(Guid membershipId, Guid userId, DateTimeOffset requestedUtc)
@@ -81,5 +125,10 @@ public sealed class Organization
         OrganizationMembership membership = new(membershipId, Id, userId, requestedUtc);
         memberships.Add(membership);
         return membership;
+    }
+
+    private static string? Normalize(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
