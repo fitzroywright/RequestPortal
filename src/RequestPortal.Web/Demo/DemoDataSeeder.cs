@@ -8,6 +8,8 @@ using Microsoft.Extensions.Configuration;
 using RequestPortal.Common.Security;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Countries;
+using RequestPortal.Domain.Fulfilment;
+using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.ReferenceData;
@@ -66,11 +68,20 @@ public sealed class DemoDataSeeder
         await EnsureUserRoleAsync(staff, PortalRoles.FfpReviewer);
         await EnsureUserRoleAsync(staff, PortalRoles.FfpAdministrator);
 
-        Organization organization = await EnsureApprovedOrganizationAsync(staff, administrator, representative, pendingRepresentative, cancellationToken);
+        Organization organization = await EnsureApprovedOrganizationAsync(
+            staff,
+            administrator,
+            representative,
+            pendingRepresentative,
+            cancellationToken);
+
         await EnsurePendingOrganizationAsync(pendingRepresentative, cancellationToken);
         await EnsureNotificationPreferencesAsync(administrator, representative, pendingRepresentative, cancellationToken);
-        await EnsureGoodsRequestAsync(organization, representative, cancellationToken);
-        await EnsureProjectRequestAsync(organization, administrator, cancellationToken);
+        await EnsureSubmittedGoodsRequestAsync(organization, representative, cancellationToken);
+        await EnsureSubmittedProjectRequestAsync(organization, administrator, cancellationToken);
+        await EnsureMoreInformationRequestAsync(organization, representative, staff, cancellationToken);
+        await EnsureApprovedRequestAsync(organization, representative, staff, cancellationToken);
+        await EnsurePendingFulfilmentRequestAsync(organization, administrator, staff, cancellationToken);
     }
 
     private async Task<Organization> EnsureApprovedOrganizationAsync(
@@ -106,15 +117,13 @@ public sealed class DemoDataSeeder
             return organization;
         }
 
-        bool representativeExists = organization.Memberships.Any(item => item.UserId == representative.Id);
-        if (!representativeExists)
+        if (!organization.Memberships.Any(item => item.UserId == representative.Id))
         {
             OrganizationMembership membership = organization.RequestMembership(Guid.NewGuid(), representative.Id, clock.UtcNow);
             membership.Approve(administrator.Id, clock.UtcNow);
         }
 
-        bool pendingExists = organization.Memberships.Any(item => item.UserId == pendingRepresentative.Id);
-        if (!pendingExists)
+        if (!organization.Memberships.Any(item => item.UserId == pendingRepresentative.Id))
         {
             organization.RequestMembership(Guid.NewGuid(), pendingRepresentative.Id, clock.UtcNow);
         }
@@ -123,7 +132,9 @@ public sealed class DemoDataSeeder
         return organization;
     }
 
-    private async Task EnsurePendingOrganizationAsync(ApplicationUser pendingRepresentative, CancellationToken cancellationToken)
+    private async Task EnsurePendingOrganizationAsync(
+        ApplicationUser pendingRepresentative,
+        CancellationToken cancellationToken)
     {
         bool exists = await dbContext.Organizations
             .AsNoTracking()
@@ -149,64 +160,48 @@ public sealed class DemoDataSeeder
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task EnsureGoodsRequestAsync(
+    private async Task EnsureSubmittedGoodsRequestAsync(
         Organization organization,
         ApplicationUser representative,
         CancellationToken cancellationToken)
     {
-        bool exists = await dbContext.AssistanceRequests
-            .AsNoTracking()
-            .AnyAsync(
-                request => request.OrganizationId == organization.Id &&
-                    request.Kind == RequestKind.GoodsAndServices &&
-                    request.Status == RequestStatus.Submitted,
-                cancellationToken);
-
-        if (exists)
+        const string summary = "School supplies for children preparing for the new school term.";
+        if (await RequestExistsAsync(organization.Id, summary, cancellationToken))
         {
             return;
         }
 
-        DateTimeOffset now = clock.UtcNow;
-        AssistanceRequest request = new(
-            Guid.NewGuid(),
-            $"RP-{now:yyyyMMdd}-DEMO01",
-            organization.Id,
-            representative.Id,
-            now);
-        request.SetSummary("School supplies for children preparing for the new school term.");
-        request.SetDetails(
-            null,
+        DateTimeOffset now = clock.UtcNow.AddDays(-3);
+        AssistanceRequest request = CreateGoodsRequest(
+            organization,
+            representative,
+            now,
+            "DEMO01",
+            summary,
             "Education",
             "School Supplies",
             "Education Support",
             RequestPriority.Normal,
-            "Spanish Town, St. Catherine",
-            "The organization is preparing 25 vulnerable students for the new school term and needs basic school supplies.");
+            "Spanish Town, St. Catherine");
         request.AddItem(new AssistanceRequestItem(Guid.NewGuid(), request.Id, "School bags", 25, eachUnitId));
         request.AddItem(new AssistanceRequestItem(Guid.NewGuid(), request.Id, "Exercise books", 50, eachUnitId));
-        request.Submit(representative.Id, now);
+        request.Submit(representative.Id, now.AddMinutes(20));
         dbContext.AssistanceRequests.Add(request);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task EnsureProjectRequestAsync(
+    private async Task EnsureSubmittedProjectRequestAsync(
         Organization organization,
         ApplicationUser administrator,
         CancellationToken cancellationToken)
     {
-        AssistanceRequest? existing = await dbContext.AssistanceRequests
-            .AsNoTracking()
-            .SingleOrDefaultAsync(
-                request => request.OrganizationId == organization.Id && request.Kind == RequestKind.Project,
-                cancellationToken);
-
-        if (existing is not null)
+        const string summary = "Rehabilitation of the Hope Community water storage and distribution system.";
+        if (await RequestExistsAsync(organization.Id, summary, cancellationToken))
         {
             return;
         }
 
-        DateTimeOffset now = clock.UtcNow;
+        DateTimeOffset now = clock.UtcNow.AddDays(-5);
         AssistanceRequest request = new(
             Guid.NewGuid(),
             $"RP-{now:yyyyMMdd}-PROJ01",
@@ -214,7 +209,7 @@ public sealed class DemoDataSeeder
             administrator.Id,
             now);
         request.SetKind(RequestKind.Project);
-        request.SetSummary("Rehabilitation of the Hope Community water storage and distribution system.");
+        request.SetSummary(summary);
         request.SetDetails(
             null,
             "Water & Sanitation",
@@ -229,7 +224,7 @@ public sealed class DemoDataSeeder
             "Hope Community Water Rehabilitation Project",
             "<h2>Executive Summary</h2><p>Hope Community Outreach proposes the rehabilitation of the community water storage and distribution system serving approximately 180 residents.</p><h2>Statement of Need</h2><p>The current tanks are deteriorated and the distribution network experiences frequent leaks. During municipal service interruptions, vulnerable households have no dependable reserve supply.</p><h2>Objectives</h2><ul><li>Restore safe water storage capacity.</li><li>Reduce distribution losses.</li><li>Improve resilience for vulnerable households.</li></ul><h2>Implementation Approach</h2><p>The project will replace two storage tanks, repair priority distribution lines, install isolation valves and complete community training for system monitoring and basic maintenance.</p><h2>Sustainability</h2><p>The organization will establish a maintenance committee and retain a small monthly maintenance reserve.</p>",
             administrator.Id,
-            now);
+            now.AddHours(2));
 
         dbContext.AssistanceRequests.Add(request);
         dbContext.ProjectProposals.Add(proposal);
@@ -241,17 +236,175 @@ public sealed class DemoDataSeeder
             new ProjectMilestone(Guid.NewGuid(), request.Id, "Procurement and site preparation", "Materials procured and installation areas prepared.", DateOnly.FromDateTime(now.UtcDateTime.Date.AddDays(30)), 1),
             new ProjectMilestone(Guid.NewGuid(), request.Id, "Tank and distribution installation", "New tanks installed and priority distribution leaks repaired.", DateOnly.FromDateTime(now.UtcDateTime.Date.AddDays(60)), 2),
             new ProjectMilestone(Guid.NewGuid(), request.Id, "Testing, training and handover", "System tested, community maintenance team trained and project handed over.", DateOnly.FromDateTime(now.UtcDateTime.Date.AddDays(75)), 3));
-        request.Submit(administrator.Id, now);
+        request.Submit(administrator.Id, now.AddHours(3));
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureMoreInformationRequestAsync(
+        Organization organization,
+        ApplicationUser representative,
+        ApplicationUser staff,
+        CancellationToken cancellationToken)
+    {
+        const string summary = "Replacement beds and mattresses for the community shelter.";
+        if (await RequestExistsAsync(organization.Id, summary, cancellationToken))
+        {
+            return;
+        }
+
+        DateTimeOffset now = clock.UtcNow.AddDays(-7);
+        AssistanceRequest request = CreateGoodsRequest(
+            organization,
+            representative,
+            now,
+            "INFO01",
+            summary,
+            "Emergency Relief",
+            "Shelter Support",
+            "Disaster Response",
+            RequestPriority.High,
+            "Spanish Town, St. Catherine");
+        request.AddItem(new AssistanceRequestItem(Guid.NewGuid(), request.Id, "Single beds", 10, eachUnitId));
+        request.AddItem(new AssistanceRequestItem(Guid.NewGuid(), request.Id, "Mattresses", 10, eachUnitId));
+        request.Submit(representative.Id, now.AddMinutes(15));
+        request.RequestMoreInformation(
+            staff.Id,
+            now.AddDays(1),
+            "Please upload the current shelter occupancy list and two recent photographs of the sleeping area.");
+        dbContext.AssistanceRequests.Add(request);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureApprovedRequestAsync(
+        Organization organization,
+        ApplicationUser representative,
+        ApplicationUser staff,
+        CancellationToken cancellationToken)
+    {
+        const string summary = "Emergency roofing materials for three vulnerable households.";
+        if (await RequestExistsAsync(organization.Id, summary, cancellationToken))
+        {
+            return;
+        }
+
+        DateTimeOffset now = clock.UtcNow.AddDays(-9);
+        AssistanceRequest request = CreateGoodsRequest(
+            organization,
+            representative,
+            now,
+            "APPR01",
+            summary,
+            "Housing",
+            "Roof Repair",
+            "Housing Support",
+            RequestPriority.High,
+            "St. Catherine",
+            "Three households have significant roof damage following severe weather.");
+        request.AddItem(new AssistanceRequestItem(Guid.NewGuid(), request.Id, "Roofing sheets", 36, eachUnitId));
+        request.Submit(representative.Id, now.AddMinutes(30));
+        request.Approve(staff.Id, now.AddDays(2));
+        dbContext.AssistanceRequests.Add(request);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsurePendingFulfilmentRequestAsync(
+        Organization organization,
+        ApplicationUser administrator,
+        ApplicationUser staff,
+        CancellationToken cancellationToken)
+    {
+        const string summary = "Hygiene kits for the Hope Community senior support programme.";
+        if (await RequestExistsAsync(organization.Id, summary, cancellationToken))
+        {
+            return;
+        }
+
+        DateTimeOffset now = clock.UtcNow.AddDays(-12);
+        AssistanceRequest request = CreateGoodsRequest(
+            organization,
+            administrator,
+            now,
+            "FULF01",
+            summary,
+            "Health",
+            "Hygiene Supplies",
+            "Health Support",
+            RequestPriority.Normal,
+            "Spanish Town, St. Catherine");
+        request.AddItem(new AssistanceRequestItem(Guid.NewGuid(), request.Id, "Personal hygiene kits", 40, eachUnitId));
+        request.Submit(administrator.Id, now.AddMinutes(20));
+        request.Approve(staff.Id, now.AddDays(1));
+        request.MarkPendingFulfilment(staff.Id, now.AddDays(2));
+
+        Fulfilment fulfilment = new(
+            Guid.NewGuid(),
+            request.Id,
+            organization.Id,
+            FulfilmentSource.LocalIcp,
+            now.AddDays(2));
+        fulfilment.MarkInProgress("ICP-DEMO-1001");
+
+        IntegrationLink integration = new(
+            Guid.NewGuid(),
+            request.Id,
+            "Local ICP",
+            now.AddDays(2));
+        integration.MarkSynchronized("ICP-DEMO-1001", now.AddDays(2).AddMinutes(5));
+
+        dbContext.AssistanceRequests.Add(request);
+        dbContext.Fulfilments.Add(fulfilment);
+        dbContext.IntegrationLinks.Add(integration);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private AssistanceRequest CreateGoodsRequest(
+        Organization organization,
+        ApplicationUser user,
+        DateTimeOffset createdUtc,
+        string referenceSuffix,
+        string summary,
+        string category,
+        string subcategory,
+        string programCategory,
+        RequestPriority priority,
+        string location,
+        string? circumstances = null)
+    {
+        AssistanceRequest request = new(
+            Guid.NewGuid(),
+            $"RP-{createdUtc:yyyyMMdd}-{referenceSuffix}",
+            organization.Id,
+            user.Id,
+            createdUtc);
+        request.SetSummary(summary);
+        request.SetDetails(
+            null,
+            category,
+            subcategory,
+            programCategory,
+            priority,
+            location,
+            circumstances ?? summary);
+        return request;
+    }
+
+    private Task<bool> RequestExistsAsync(
+        Guid organizationId,
+        string summary,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.AssistanceRequests
+            .AsNoTracking()
+            .AnyAsync(
+                request => request.OrganizationId == organizationId && request.Summary == summary,
+                cancellationToken);
     }
 
     private async Task EnsureCountryConfigurationAsync(CancellationToken cancellationToken)
     {
-        bool exists = await dbContext.CountryConfigurations
+        if (await dbContext.CountryConfigurations
             .AsNoTracking()
-            .AnyAsync(item => item.CountryCode == "JM", cancellationToken);
-
-        if (exists)
+            .AnyAsync(item => item.CountryCode == "JM", cancellationToken))
         {
             return;
         }
@@ -261,7 +414,6 @@ public sealed class DemoDataSeeder
             "Jamaica",
             "America/Jamaica",
             "en-JM");
-
         dbContext.CountryConfigurations.Add(jamaica);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -313,12 +465,19 @@ public sealed class DemoDataSeeder
         {
             bool hasEmail = await dbContext.NotificationPreferences
                 .AsNoTracking()
-                .AnyAsync(item => item.UserId == user.Id && item.Channel == NotificationChannel.Email, cancellationToken);
+                .AnyAsync(
+                    item => item.UserId == user.Id && item.Channel == NotificationChannel.Email,
+                    cancellationToken);
 
             if (!hasEmail && !string.IsNullOrWhiteSpace(user.Email))
             {
                 dbContext.NotificationPreferences.Add(
-                    new NotificationPreference(Guid.NewGuid(), user.Id, NotificationChannel.Email, user.Email, true));
+                    new NotificationPreference(
+                        Guid.NewGuid(),
+                        user.Id,
+                        NotificationChannel.Email,
+                        user.Email,
+                        true));
             }
         }
 
@@ -357,25 +516,29 @@ public sealed class DemoDataSeeder
 
     private async Task EnsureRoleAsync(string roleName)
     {
-        if (!await roleManager.RoleExistsAsync(roleName))
+        if (await roleManager.RoleExistsAsync(roleName))
         {
-            IdentityResult result = await roleManager.CreateAsync(new IdentityRole<Guid>(roleName));
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException($"Unable to create demo role '{roleName}'.");
-            }
+            return;
+        }
+
+        IdentityResult result = await roleManager.CreateAsync(new IdentityRole<Guid>(roleName));
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException($"Unable to create demo role '{roleName}'.");
         }
     }
 
     private async Task EnsureUserRoleAsync(ApplicationUser user, string roleName)
     {
-        if (!await userManager.IsInRoleAsync(user, roleName))
+        if (await userManager.IsInRoleAsync(user, roleName))
         {
-            IdentityResult result = await userManager.AddToRoleAsync(user, roleName);
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException($"Unable to assign demo role '{roleName}'.");
-            }
+            return;
+        }
+
+        IdentityResult result = await userManager.AddToRoleAsync(user, roleName);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException($"Unable to assign demo role '{roleName}'.");
         }
     }
 }
