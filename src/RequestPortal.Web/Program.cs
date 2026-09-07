@@ -93,6 +93,7 @@ builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<IStaffDirectoryAuthenticator, ActiveDirectoryStaffAuthenticator>();
 builder.Services.AddScoped<IOrganizationAccessService, OrganizationAccessService>();
 builder.Services.AddScoped<IPortalWorkflowService, PortalWorkflowService>();
+builder.Services.AddScoped<IStaffOrganizationDirectoryService, StaffOrganizationDirectoryService>();
 builder.Services.AddScoped<StaffSignInService>();
 builder.Services.AddScoped<DemoDataSeeder>();
 
