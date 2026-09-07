@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using RequestPortal.Application.Countries;
 using RequestPortal.Application.Portal;
 using RequestPortal.Infrastructure.Identity;
 
@@ -14,18 +16,23 @@ public sealed class IndexModel : PageModel
 {
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IPortalWorkflowService workflowService;
+    private readonly ICountryPolicyService countryPolicyService;
 
     public IndexModel(
         UserManager<ApplicationUser> userManager,
-        IPortalWorkflowService workflowService)
+        IPortalWorkflowService workflowService,
+        ICountryPolicyService countryPolicyService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
+        this.countryPolicyService = countryPolicyService;
     }
 
     public IReadOnlyList<OrganizationSummary> Organizations { get; private set; } = Array.Empty<OrganizationSummary>();
 
     public IReadOnlyList<OrganizationSummary> AvailableOrganizations { get; private set; } = Array.Empty<OrganizationSummary>();
+
+    public IReadOnlyList<CountryOption> RegistrationCountries { get; private set; } = Array.Empty<CountryOption>();
 
     [BindProperty]
     public RegistrationInput Registration { get; set; } = new();
@@ -42,6 +49,19 @@ public sealed class IndexModel : PageModel
 
         if (!ModelState.IsValid)
         {
+            await LoadAsync(user.Id);
+            return Page();
+        }
+
+        try
+        {
+            await countryPolicyService.EnsureOrganizationRegistrationAllowedAsync(
+                Registration.CountryCode,
+                HttpContext.RequestAborted);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(nameof(Registration.CountryCode), exception.Message);
             await LoadAsync(user.Id);
             return Page();
         }
@@ -68,6 +88,11 @@ public sealed class IndexModel : PageModel
     {
         Organizations = await workflowService.GetOrganizationsForUserAsync(userId, HttpContext.RequestAborted);
         AvailableOrganizations = await workflowService.GetAvailableOrganizationsAsync(userId, HttpContext.RequestAborted);
+
+        IReadOnlyList<CountryOption> countries = await countryPolicyService.GetActiveCountriesAsync(HttpContext.RequestAborted);
+        RegistrationCountries = countries
+            .Where(country => country.OrganizationRegistrationEnabled)
+            .ToArray();
     }
 
     private async Task<ApplicationUser> GetUserAsync()
