@@ -8,7 +8,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
@@ -69,6 +71,10 @@ if (builder.Environment.IsProduction())
 
 string connectionString = builder.Configuration.GetConnectionString("RequestPortal")
     ?? throw new InvalidOperationException("SF-CONFIG-DB-001: PostgreSQL connection string 'RequestPortal' is not configured.");
+
+long uploadMaxBytes = builder.Configuration.GetValue<long?>("Uploads:MaxBytes") ?? 25L * 1024L * 1024L;
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = uploadMaxBytes + (1024L * 1024L));
+builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = uploadMaxBytes);
 
 builder.Services.AddDbContext<RequestPortalDbContext>(options => options.UseNpgsql(connectionString));
 
@@ -269,10 +275,7 @@ static async Task HydrateProductionSecretsAsync(IConfiguration configuration)
     foreach (string key in keys)
     {
         string? value = await provider.GetSecretAsync(key);
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            configuration[key] = value;
-        }
+        if (!string.IsNullOrWhiteSpace(value)) configuration[key] = value;
     }
 }
 
@@ -280,12 +283,34 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
 {
     string storageRoot = configuration["Storage:Local:RootPath"] ?? string.Empty;
     string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
+    string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
+    bool malwareScanningEnabled = configuration.GetValue("Uploads:MalwareScanning:Enabled", false);
+    bool notificationsEnabled = configuration.GetValue("Notifications:Enabled", false);
+    string[] reviewerGroups = configuration.GetSection("Authentication:ActiveDirectory:ReviewerGroups").Get<string[]>() ?? Array.Empty<string>();
+    string[] administratorGroups = configuration.GetSection("Authentication:ActiveDirectory:AdministratorGroups").Get<string[]>() ?? Array.Empty<string>();
+    bool hasExternalProvider =
+        (!string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientSecret"])) ||
+        (!string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientSecret"])) ||
+        (!string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppSecret"]));
+
     if (string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
         throw new InvalidOperationException("SF-PROD-STORAGE-001: Production document storage must be a durable external filesystem path or network share.");
     if (string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
         throw new InvalidOperationException("SF-PROD-DP-001: Production Data Protection keys must be persisted outside the application deployment directory.");
     if (string.IsNullOrWhiteSpace(configuration["OpenBao:Address"]))
         throw new InvalidOperationException("SF-PROD-SECRETS-001: OpenBao is not configured.");
+    if (allowedHosts == "*" || string.IsNullOrWhiteSpace(allowedHosts))
+        throw new InvalidOperationException("SF-PROD-HOSTS-001: AllowedHosts must be restricted in production.");
+    if (!malwareScanningEnabled || string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]))
+        throw new InvalidOperationException("SF-PROD-UPLOAD-001: Malware scanning must be configured and enabled in production.");
+    if (string.IsNullOrWhiteSpace(configuration["Authentication:ActiveDirectory:Server"]) ||
+        string.IsNullOrWhiteSpace(configuration["Authentication:ActiveDirectory:SearchBase"]) ||
+        reviewerGroups.Length == 0 || administratorGroups.Length == 0)
+        throw new InvalidOperationException("SF-PROD-AD-001: Active Directory server, search base and staff authorization groups must be configured.");
+    if (!hasExternalProvider)
+        throw new InvalidOperationException("SF-PROD-OAUTH-001: At least one external representative identity provider must be commissioned.");
+    if (!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]))
+        throw new InvalidOperationException("SF-PROD-SMTP-001: SMTP notifications must be commissioned for production.");
 }
 
 static async Task ApplyProductionMigrationsAsync(WebApplication app)
