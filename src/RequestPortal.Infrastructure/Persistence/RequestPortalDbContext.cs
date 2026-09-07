@@ -23,35 +23,22 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     }
 
     public DbSet<Organization> Organizations => Set<Organization>();
-
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
-
     public DbSet<AssistanceRequest> AssistanceRequests => Set<AssistanceRequest>();
-
     public DbSet<AssistanceRequestItem> AssistanceRequestItems => Set<AssistanceRequestItem>();
-
     public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
-
     public DbSet<ProjectProposal> ProjectProposals => Set<ProjectProposal>();
-
+    public DbSet<ProjectBudgetItem> ProjectBudgetItems => Set<ProjectBudgetItem>();
+    public DbSet<ProjectMilestone> ProjectMilestones => Set<ProjectMilestone>();
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
-
     public DbSet<CountryConfiguration> CountryConfigurations => Set<CountryConfiguration>();
-
     public DbSet<StoredDocument> Documents => Set<StoredDocument>();
-
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
-
     public DbSet<RequestFulfilment> Fulfilments => Set<RequestFulfilment>();
-
     public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
-
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
-
     public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
-
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
-
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
