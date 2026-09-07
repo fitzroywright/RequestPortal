@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>RequestPortal.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RequestPortal.Domain\RequestPortal.Domain.csproj" />
+    <ProjectReference Include="..\RequestPortal.Common\RequestPortal.Common.csproj" />
+  </ItemGroup>
+</Project>
