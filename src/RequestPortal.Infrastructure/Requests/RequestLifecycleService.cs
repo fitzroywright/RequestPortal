@@ -11,6 +11,7 @@ using RequestPortal.Common.Time;
 using RequestPortal.Domain.Fulfilment;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Persistence;
+using RequestFulfilment = RequestPortal.Domain.Fulfilment.Fulfilment;
 
 namespace RequestPortal.Infrastructure.Requests;
 
@@ -89,7 +90,7 @@ public sealed class RequestLifecycleService : IRequestLifecycleService
         DateTimeOffset now = clock.UtcNow;
         request.MarkPendingFulfilment(staffUserId, now);
 
-        Fulfilment fulfilment = new(Guid.NewGuid(), request.Id, request.OrganizationId, source, now);
+        RequestFulfilment fulfilment = new(Guid.NewGuid(), request.Id, request.OrganizationId, source, now);
         dbContext.Fulfilments.Add(fulfilment);
         AddStatusOutbox(request, now);
 
@@ -105,7 +106,7 @@ public sealed class RequestLifecycleService : IRequestLifecycleService
         string? notes,
         CancellationToken cancellationToken = default)
     {
-        Fulfilment fulfilment = await dbContext.Fulfilments
+        RequestFulfilment fulfilment = await dbContext.Fulfilments
             .SingleAsync(item => item.Id == fulfilmentId, cancellationToken);
 
         AssistanceRequest request = await dbContext.AssistanceRequests
