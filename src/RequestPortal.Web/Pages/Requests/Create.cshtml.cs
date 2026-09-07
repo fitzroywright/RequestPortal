@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Beneficiaries;
 using RequestPortal.Application.Countries;
 using RequestPortal.Application.Portal;
+using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
@@ -23,6 +24,7 @@ public sealed class CreateModel : PageModel
     private readonly IRequestDraftService requestDraftService;
     private readonly IProjectProposalService projectProposalService;
     private readonly ICountryPolicyService countryPolicyService;
+    private readonly IRequestReferenceDataService referenceDataService;
 
     public CreateModel(
         UserManager<ApplicationUser> userManager,
@@ -30,7 +32,8 @@ public sealed class CreateModel : PageModel
         IBeneficiaryService beneficiaryService,
         IRequestDraftService requestDraftService,
         IProjectProposalService projectProposalService,
-        ICountryPolicyService countryPolicyService)
+        ICountryPolicyService countryPolicyService,
+        IRequestReferenceDataService referenceDataService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -38,9 +41,14 @@ public sealed class CreateModel : PageModel
         this.requestDraftService = requestDraftService;
         this.projectProposalService = projectProposalService;
         this.countryPolicyService = countryPolicyService;
+        this.referenceDataService = referenceDataService;
     }
 
     public IReadOnlyList<OrganizationSummary> Organizations { get; private set; } = Array.Empty<OrganizationSummary>();
+
+    public IReadOnlyList<RequestCategoryOption> Categories { get; private set; } = Array.Empty<RequestCategoryOption>();
+
+    public IReadOnlyList<ProgramClassificationOption> Programs { get; private set; } = Array.Empty<ProgramClassificationOption>();
 
     [BindProperty]
     public RequestInput Input { get; set; } = new();
@@ -48,20 +56,34 @@ public sealed class CreateModel : PageModel
     public async Task OnGetAsync()
     {
         ApplicationUser user = await GetUserAsync();
-        await LoadOrganizationsAsync(user.Id);
+        await LoadPageDataAsync(user.Id);
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
         ApplicationUser user = await GetUserAsync();
-        await LoadOrganizationsAsync(user.Id);
+        await LoadPageDataAsync(user.Id);
 
         OrganizationSummary? selectedOrganization = Organizations.FirstOrDefault(
             organization => organization.Id == Input.OrganizationId);
 
         if (selectedOrganization is null)
         {
-            ModelState.AddModelError(nameof(Input.OrganizationId), "Select an approved organization that you are authorized to represent.");
+            ModelState.AddModelError(
+                nameof(Input.OrganizationId),
+                "Select an approved organization that you are authorized to represent.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(Input.Category) &&
+            !Categories.Any(item => string.Equals(item.Name, Input.Category, StringComparison.OrdinalIgnoreCase)))
+        {
+            ModelState.AddModelError(nameof(Input.Category), "Select a valid request category.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(Input.ProgramCategory) &&
+            !Programs.Any(item => string.Equals(item.Name, Input.ProgramCategory, StringComparison.OrdinalIgnoreCase)))
+        {
+            ModelState.AddModelError(nameof(Input.ProgramCategory), "Select a valid program classification.");
         }
 
         if (!ModelState.IsValid)
@@ -82,11 +104,15 @@ public sealed class CreateModel : PageModel
         }
 
         Guid? beneficiaryId = null;
-        if (!string.IsNullOrWhiteSpace(Input.BeneficiaryFirstName) || !string.IsNullOrWhiteSpace(Input.BeneficiaryLastName))
+        if (!string.IsNullOrWhiteSpace(Input.BeneficiaryFirstName) ||
+            !string.IsNullOrWhiteSpace(Input.BeneficiaryLastName))
         {
-            if (string.IsNullOrWhiteSpace(Input.BeneficiaryFirstName) || string.IsNullOrWhiteSpace(Input.BeneficiaryLastName))
+            if (string.IsNullOrWhiteSpace(Input.BeneficiaryFirstName) ||
+                string.IsNullOrWhiteSpace(Input.BeneficiaryLastName))
             {
-                ModelState.AddModelError(string.Empty, "Both beneficiary first and last name are required when adding a beneficiary.");
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Both beneficiary first and last name are required when adding a beneficiary.");
                 return Page();
             }
 
@@ -121,13 +147,25 @@ public sealed class CreateModel : PageModel
 
         if (Input.Kind == RequestKind.Project)
         {
-            await projectProposalService.InitializeProjectAsync(user.Id, requestId, HttpContext.RequestAborted);
-            TempData["Success"] = "Project draft created. Build the narrative proposal with headings, tables and photos before submitting it.";
+            await projectProposalService.InitializeProjectAsync(
+                user.Id,
+                requestId,
+                HttpContext.RequestAborted);
+            TempData["Success"] =
+                "Project draft created. Build the narrative proposal, budget and milestones before submitting it.";
             return RedirectToPage("/Requests/Proposal", new { id = requestId });
         }
 
-        TempData["Success"] = "Draft created. Add at least one requested item and any supporting documents before submission.";
+        TempData["Success"] =
+            "Draft created. Add at least one requested item and any supporting documents before submission.";
         return RedirectToPage("/Requests/Details", new { id = requestId });
+    }
+
+    private async Task LoadPageDataAsync(Guid userId)
+    {
+        await LoadOrganizationsAsync(userId);
+        Categories = await referenceDataService.GetCategoriesAsync(HttpContext.RequestAborted);
+        Programs = await referenceDataService.GetProgramsAsync(HttpContext.RequestAborted);
     }
 
     private async Task LoadOrganizationsAsync(Guid userId)
@@ -136,7 +174,8 @@ public sealed class CreateModel : PageModel
             userId,
             HttpContext.RequestAborted);
 
-        IReadOnlyList<CountryOption> countries = await countryPolicyService.GetActiveCountriesAsync(HttpContext.RequestAborted);
+        IReadOnlyList<CountryOption> countries = await countryPolicyService.GetActiveCountriesAsync(
+            HttpContext.RequestAborted);
         HashSet<string> requestEnabledCountries = countries
             .Where(country => country.RequestSubmissionEnabled)
             .Select(country => country.CountryCode)
