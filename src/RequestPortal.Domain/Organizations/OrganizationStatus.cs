@@ -19,5 +19,8 @@ public enum MembershipStatus
 public enum OrganizationRole
 {
     Member = 0,
-    Administrator = 1
+    Administrator = 1,
+    Viewer = 2,
+    RequestCreator = 3,
+    RequestApprover = 4
 }
