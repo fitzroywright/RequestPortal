@@ -10,7 +10,7 @@
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">FFP internal</div>
             <h1>All organizations</h1>
-            <p>FFP staff can view all registered organizations and their portal activity.</p>
+            <p>FFP staff can view all registered organizations, representatives, requests and business history.</p>
         </div>
 
         <div class="card">
@@ -26,6 +26,7 @@
                             <th>Requests</th>
                             <th>Registered</th>
                             <th>Approved</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -40,6 +41,7 @@
                             <td>@organization.RequestCount</td>
                             <td>@organization.CreatedUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</td>
                             <td>@(organization.ApprovedUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—")</td>
+                            <td><a class="button button-small button-outline" asp-page="/Staff/Organization" asp-route-id="@organization.Id">Open</a></td>
                         </tr>
                     }
                     </tbody>
