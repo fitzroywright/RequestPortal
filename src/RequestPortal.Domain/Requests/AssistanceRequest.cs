@@ -24,6 +24,7 @@ public sealed class AssistanceRequest
         OrganizationId = organizationId;
         CreatedByUserId = createdByUserId;
         Status = RequestStatus.Draft;
+        Kind = RequestKind.GoodsAndServices;
         Priority = RequestPriority.Normal;
         CreatedUtc = createdUtc;
         statusHistory.Add(new RequestStatusHistory(Guid.NewGuid(), id, RequestStatus.Draft, createdByUserId, createdUtc, "Request created."));
@@ -42,6 +43,8 @@ public sealed class AssistanceRequest
     public Guid? BeneficiaryId { get; private set; }
 
     public RequestStatus Status { get; private set; }
+
+    public RequestKind Kind { get; private set; }
 
     public RequestPriority Priority { get; private set; }
 
@@ -64,6 +67,12 @@ public sealed class AssistanceRequest
     public IReadOnlyCollection<AssistanceRequestItem> Items => items.AsReadOnly();
 
     public IReadOnlyCollection<RequestStatusHistory> StatusHistory => statusHistory.AsReadOnly();
+
+    public void SetKind(RequestKind kind)
+    {
+        EnsureDraft();
+        Kind = kind;
+    }
 
     public void SetSummary(string summary)
     {
@@ -100,9 +109,9 @@ public sealed class AssistanceRequest
     {
         EnsureDraft();
 
-        if (items.Count == 0)
+        if (Kind == RequestKind.GoodsAndServices && items.Count == 0)
         {
-            throw new InvalidOperationException("A request must contain at least one requested item before submission.");
+            throw new InvalidOperationException("A goods or services request must contain at least one requested item before submission.");
         }
 
         SubmittedByUserId = userId;
