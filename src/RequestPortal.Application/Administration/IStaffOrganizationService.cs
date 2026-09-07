@@ -59,4 +59,10 @@ public interface IStaffOrganizationService
     Task<IReadOnlyList<StaffOrganizationSummary>> GetAllAsync(CancellationToken cancellationToken = default);
 
     Task<StaffOrganizationDetail?> GetAsync(Guid organizationId, CancellationToken cancellationToken = default);
+
+    Task RejectAsync(Guid staffUserId, Guid organizationId, string reason, CancellationToken cancellationToken = default);
+
+    Task SuspendAsync(Guid staffUserId, Guid organizationId, string reason, CancellationToken cancellationToken = default);
+
+    Task ReactivateAsync(Guid staffUserId, Guid organizationId, string? notes, CancellationToken cancellationToken = default);
 }
