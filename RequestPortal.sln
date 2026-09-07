@@ -12,6 +12,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Infrastructur
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Web", "src\RequestPortal.Web\RequestPortal.Web.csproj", "{66A35AF5-8836-4E84-8816-A30F5CF8DF42}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Domain.Tests", "tests\RequestPortal.Domain.Tests\RequestPortal.Domain.Tests.csproj", "{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,6 +40,10 @@ Global
 		{66A35AF5-8836-4E84-8816-A30F5CF8DF42}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{66A35AF5-8836-4E84-8816-A30F5CF8DF42}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{66A35AF5-8836-4E84-8816-A30F5CF8DF42}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
