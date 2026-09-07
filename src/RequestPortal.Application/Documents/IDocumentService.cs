@@ -14,7 +14,11 @@ public sealed record DocumentSummary(
     string ContentType,
     long SizeBytes,
     DateTimeOffset UploadedUtc,
-    bool IsArchived);
+    DocumentVerificationStatus VerificationStatus,
+    DocumentRetentionClass RetentionClass,
+    DateTimeOffset? RetainUntilUtc,
+    bool IsArchived,
+    string? VerificationNotes);
 
 public sealed record DocumentDownload(Stream Content, string ContentType, string FileName);
 
@@ -46,9 +50,39 @@ public interface IDocumentService
         bool isStaff,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<DocumentSummary>> GetOrganizationDocumentsAsync(
+        Guid userId,
+        Guid organizationId,
+        bool isStaff,
+        CancellationToken cancellationToken = default);
+
     Task<DocumentDownload?> DownloadAsync(
         Guid userId,
         Guid documentId,
         bool isStaff,
+        CancellationToken cancellationToken = default);
+
+    Task VerifyAsync(
+        Guid staffUserId,
+        Guid documentId,
+        string? notes,
+        CancellationToken cancellationToken = default);
+
+    Task RejectVerificationAsync(
+        Guid staffUserId,
+        Guid documentId,
+        string reason,
+        CancellationToken cancellationToken = default);
+
+    Task SetRetentionAsync(
+        Guid staffUserId,
+        Guid documentId,
+        DocumentRetentionClass retentionClass,
+        DateTimeOffset? retainUntilUtc,
+        CancellationToken cancellationToken = default);
+
+    Task ArchiveAsync(
+        Guid staffUserId,
+        Guid documentId,
         CancellationToken cancellationToken = default);
 }
