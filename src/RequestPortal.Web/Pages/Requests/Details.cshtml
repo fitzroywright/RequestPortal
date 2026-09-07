@@ -1,5 +1,7 @@
 @page "{id:guid}"
 @model RequestPortal.Web.Pages.Requests.DetailsModel
+@using RequestPortal.Application.Documents
+@using RequestPortal.Domain.Documents
 @{
     ViewData["Title"] = "Request Details";
 }
@@ -22,67 +24,130 @@
             </div>
 
             <div class="dashboard-grid">
-                <section class="card">
-                    <h2>Requested items</h2>
-                    @if (Model.Request.Items.Count == 0)
-                    {
-                        <p class="muted">No items have been added yet.</p>
-                    }
-                    else
-                    {
-                        <div class="table-wrap">
-                            <table>
-                                <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
-                                <tbody>
-                                @foreach (RequestItemDetail item in Model.Request.Items)
-                                {
-                                    <tr>
-                                        <td>@item.Description</td>
-                                        <td>@item.Quantity</td>
-                                        <td>Each</td>
-                                    </tr>
-                                }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-
-                    @if (Model.Request.Status == "Draft")
-                    {
-                        <hr style="border:0;border-top:1px solid #dde3e8;margin:26px 0" />
-                        <h3>Add line item</h3>
-                        <form method="post" asp-page-handler="AddItem" class="form-grid">
-                            <input type="hidden" name="id" value="@Model.Request.Id" />
-                            <div class="field">
-                                <label asp-for="Item.Description">Description</label>
-                                <input asp-for="Item.Description" placeholder="e.g. School bags" />
-                                <span asp-validation-for="Item.Description" class="validation"></span>
+                <div>
+                    <section class="card">
+                        <h2>Requested items</h2>
+                        @if (Model.Request.Items.Count == 0)
+                        {
+                            <p class="muted">No items have been added yet.</p>
+                        }
+                        else
+                        {
+                            <div class="table-wrap">
+                                <table>
+                                    <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
+                                    <tbody>
+                                    @foreach (RequestItemDetail item in Model.Request.Items)
+                                    {
+                                        <tr>
+                                            <td>@item.Description</td>
+                                            <td>@item.Quantity</td>
+                                            <td>Each</td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
                             </div>
-                            <div class="field">
-                                <label asp-for="Item.Quantity"></label>
-                                <input asp-for="Item.Quantity" type="number" step="0.001" min="0.001" />
-                                <span asp-validation-for="Item.Quantity" class="validation"></span>
+                        }
+
+                        @if (Model.Request.Status == "Draft")
+                        {
+                            <hr style="border:0;border-top:1px solid #dde3e8;margin:26px 0" />
+                            <h3>Add line item</h3>
+                            <form method="post" asp-page-handler="AddItem" class="form-grid">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <div class="field">
+                                    <label asp-for="Item.Description">Description</label>
+                                    <input asp-for="Item.Description" placeholder="e.g. School bags" />
+                                    <span asp-validation-for="Item.Description" class="validation"></span>
+                                </div>
+                                <div class="field">
+                                    <label asp-for="Item.Quantity"></label>
+                                    <input asp-for="Item.Quantity" type="number" step="0.001" min="0.001" />
+                                    <span asp-validation-for="Item.Quantity" class="validation"></span>
+                                </div>
+                                <button class="button button-outline" type="submit">Add item</button>
+                            </form>
+
+                            <form method="post" asp-page-handler="Submit" style="margin-top:18px">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <button class="button" type="submit" @(Model.Request.Items.Count == 0 ? "disabled" : null)>Submit request to FFP</button>
+                            </form>
+                        }
+
+                        @if (Model.Request.Status == "MoreInformationRequired")
+                        {
+                            <div class="flash error" style="margin-top:22px">
+                                FFP requested additional information. Review the status history below, upload any requested evidence, then resubmit.
                             </div>
-                            <button class="button button-outline" type="submit">Add item</button>
-                        </form>
+                            <form method="post" asp-page-handler="Resubmit" style="margin-top:14px">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <button class="button" type="submit">Resubmit to FFP</button>
+                            </form>
+                        }
+                    </section>
 
-                        <form method="post" asp-page-handler="Submit" style="margin-top:18px">
-                            <input type="hidden" name="id" value="@Model.Request.Id" />
-                            <button class="button" type="submit" @(Model.Request.Items.Count == 0 ? "disabled" : null)>Submit request to FFP</button>
-                        </form>
-                    }
+                    <section class="card" style="margin-top:1.5rem">
+                        <h2>Supporting documents</h2>
+                        @if (Model.Documents.Count == 0)
+                        {
+                            <p class="muted">No supporting documents have been uploaded.</p>
+                        }
+                        else
+                        {
+                            <div class="table-wrap">
+                                <table>
+                                    <thead><tr><th>File</th><th>Type</th><th>Uploaded UTC</th><th></th></tr></thead>
+                                    <tbody>
+                                    @foreach (DocumentSummary document in Model.Documents)
+                                    {
+                                        <tr>
+                                            <td>@document.OriginalFileName</td>
+                                            <td>@document.DocumentType</td>
+                                            <td>@document.UploadedUtc.ToString("u")</td>
+                                            <td><a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@document.Id">Download</a></td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
 
-                    @if (Model.Request.Status == "MoreInformationRequired")
+                        @if (Model.Request.Status == "Draft" || Model.Request.Status == "MoreInformationRequired")
+                        {
+                            <form method="post" enctype="multipart/form-data" asp-page-handler="UploadDocument" class="form-grid" style="margin-top:1rem">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <div class="field">
+                                    <label asp-for="Document.DocumentType">Document type</label>
+                                    <select asp-for="Document.DocumentType" asp-items="Html.GetEnumSelectList<DocumentType>()"></select>
+                                </div>
+                                <div class="field">
+                                    <label asp-for="Document.File">File</label>
+                                    <input asp-for="Document.File" type="file" />
+                                    <span asp-validation-for="Document.File" class="validation"></span>
+                                </div>
+                                <button class="button button-outline" type="submit">Upload document</button>
+                            </form>
+                        }
+                    </section>
+
+                    @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
                     {
-                        <div class="flash error" style="margin-top:22px">
-                            FFP requested additional information. Review the status history below before resubmitting.
-                        </div>
-                        <form method="post" asp-page-handler="Resubmit" style="margin-top:14px">
-                            <input type="hidden" name="id" value="@Model.Request.Id" />
-                            <button class="button" type="submit">Resubmit to FFP</button>
-                        </form>
+                        <section class="card" style="margin-top:1.5rem">
+                            <h2>Cancel request</h2>
+                            <p class="muted">Cancellation is permanent and is recorded in the request history.</p>
+                            <form method="post" asp-page-handler="Cancel" class="form-grid">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <div class="field">
+                                    <label asp-for="Cancellation.Reason">Reason</label>
+                                    <textarea asp-for="Cancellation.Reason" rows="3"></textarea>
+                                    <span asp-validation-for="Cancellation.Reason" class="validation"></span>
+                                </div>
+                                <button class="button button-outline" type="submit">Cancel request</button>
+                            </form>
+                        </section>
                     }
-                </section>
+                </div>
 
                 <aside class="card">
                     <h2>Status history</h2>
