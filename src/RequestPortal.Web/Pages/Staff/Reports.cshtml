@@ -1,0 +1,139 @@
+@page
+@model RequestPortal.Web.Pages.Staff.ReportsModel
+@using RequestPortal.Application.Reporting
+@using RequestPortal.Domain.Requests
+@{
+    ViewData["Title"] = "Request Reports";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">FFP internal</div>
+            <h1>Request reports & search</h1>
+            <p>Search the complete request portfolio, filter operational data, and export the current result set.</p>
+        </div>
+
+        <section class="card">
+            <form method="get" class="form-grid">
+                <div class="grid-3">
+                    <div class="field">
+                        <label asp-for="Search">Search</label>
+                        <input asp-for="Search" placeholder="Reference or request summary" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="Status">Status</label>
+                        <select asp-for="Status">
+                            <option value="">All statuses</option>
+                            @foreach (RequestStatus status in Enum.GetValues<RequestStatus>())
+                            {
+                                <option value="@status">@status</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label asp-for="CountryCode">Country</label>
+                        <input asp-for="CountryCode" maxlength="2" placeholder="JM" />
+                    </div>
+                </div>
+
+                <div class="grid-3">
+                    <div class="field">
+                        <label asp-for="Category">Category</label>
+                        <input asp-for="Category" placeholder="Education" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="Priority">Priority</label>
+                        <select asp-for="Priority">
+                            <option value="">All priorities</option>
+                            @foreach (RequestPriority priority in Enum.GetValues<RequestPriority>())
+                            {
+                                <option value="@priority">@priority</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="action-row" style="align-items:end">
+                        <button class="button" type="submit">Apply filters</button>
+                        <a class="button button-outline" asp-page="/Staff/Reports">Clear</a>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label asp-for="FromDate">From date</label>
+                        <input asp-for="FromDate" type="date" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="ToDate">To date</label>
+                        <input asp-for="ToDate" type="date" />
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <div class="grid-3" style="margin-top:18px">
+            <article class="card"><div class="muted">Total</div><div class="stat">@Model.Report.Total</div></article>
+            <article class="card"><div class="muted">Submitted</div><div class="stat">@Model.Report.Submitted</div></article>
+            <article class="card"><div class="muted">Approved / fulfilled</div><div class="stat">@(Model.Report.Approved + Model.Report.Fulfilled)</div></article>
+        </div>
+
+        <section class="card" style="margin-top:18px">
+            <div class="action-row" style="justify-content:space-between;align-items:center">
+                <div>
+                    <h2>Results</h2>
+                    <p class="muted">Up to 1,000 matching requests are shown in the demo report.</p>
+                </div>
+                <a class="button button-secondary"
+                   asp-page-handler="Export"
+                   asp-route-Search="@Model.Search"
+                   asp-route-Status="@Model.Status"
+                   asp-route-CountryCode="@Model.CountryCode"
+                   asp-route-Category="@Model.Category"
+                   asp-route-Priority="@Model.Priority"
+                   asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
+                   asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Export CSV</a>
+            </div>
+
+            @if (Model.Report.Rows.Count == 0)
+            {
+                <p class="muted">No requests match the selected filters.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Reference</th>
+                                <th>Organization</th>
+                                <th>Country</th>
+                                <th>Type</th>
+                                <th>Category</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (RequestReportRow row in Model.Report.Rows)
+                        {
+                            <tr>
+                                <td><strong>@row.Reference</strong><br /><span class="muted">@row.Summary</span></td>
+                                <td>@row.Organization</td>
+                                <td>@row.CountryCode</td>
+                                <td>@row.Kind</td>
+                                <td>@row.Category</td>
+                                <td>@row.Priority</td>
+                                <td><span class="status status-@row.Status">@row.Status</span></td>
+                                <td>@row.CreatedUtc.ToString("u")</td>
+                                <td><a asp-page="/Staff/Review" asp-route-id="@row.Id">Open</a></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</section>
