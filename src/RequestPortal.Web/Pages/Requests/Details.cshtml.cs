@@ -35,7 +35,7 @@ public sealed class DetailsModel : PageModel
         this.lifecycleService = lifecycleService;
     }
 
-    public RequestDetail? Request { get; private set; }
+    public new RequestDetail? Request { get; private set; }
 
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
 
