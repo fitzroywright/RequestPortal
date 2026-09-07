@@ -31,7 +31,7 @@ jobs:
       - name: Test
         run: |
           if find tests -name '*.csproj' -print -quit 2>/dev/null | grep -q .; then
-            find tests -name '*.csproj' -print0 | xargs -0 -n1 dotnet test --configuration Release --no-build
+            find tests -name '*.csproj' -print0 | xargs -0 -n1 dotnet test --configuration Release
           else
             echo 'No test projects yet.'
           fi
