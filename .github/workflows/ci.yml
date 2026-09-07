@@ -9,6 +9,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -28,17 +31,22 @@ jobs:
       - name: Build
         run: dotnet build src/RequestPortal.Web/RequestPortal.Web.csproj --configuration Release --no-restore
 
-      - name: Generate initial migration for review
-        if: ${{ hashFiles('src/RequestPortal.Infrastructure/Persistence/Migrations/*.cs') == '' }}
+      - name: Generate initial production migration
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/chatgpt/mvp-rescue' && hashFiles('src/RequestPortal.Infrastructure/Persistence/Migrations/*.cs') == '' }}
         run: |
           dotnet tool restore
           dotnet ef migrations add InitialProduction --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web --output-dir Persistence/Migrations
-          echo '=== BEGIN GENERATED MIGRATION FILES ==='
-          for f in src/RequestPortal.Infrastructure/Persistence/Migrations/*.cs; do
-            echo "=== FILE: $f ==="
-            cat "$f"
-          done
-          echo '=== END GENERATED MIGRATION FILES ==='
+          git config user.name "Request Portal CI"
+          git config user.email "actions@github.com"
+          git add src/RequestPortal.Infrastructure/Persistence/Migrations
+          git commit -m "Add initial production database migration"
+          git push origin HEAD:chatgpt/mvp-rescue
+
+      - name: Verify migration model is current
+        if: ${{ hashFiles('src/RequestPortal.Infrastructure/Persistence/Migrations/*.cs') != '' }}
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web
 
       - name: Test
         run: |
