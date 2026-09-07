@@ -1,0 +1,86 @@
+@page
+@model RequestPortal.Web.Pages.Dashboard.IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Representative workspace</div>
+            <h1>Hello, @Model.DisplayName</h1>
+            <p>Choose the organization you are acting for, create requests, and follow FFP decisions from one dashboard.</p>
+        </div>
+
+        <div class="grid-3">
+            <article class="card">
+                <div class="muted">Organizations</div>
+                <div class="stat">@Model.Organizations.Count</div>
+                <a class="button button-outline" asp-page="/Organizations/Index">Manage organizations</a>
+            </article>
+            <article class="card">
+                <div class="muted">Requests</div>
+                <div class="stat">@Model.Requests.Count</div>
+                <a class="button button-outline" asp-page="/Requests/Index">View requests</a>
+            </article>
+            <article class="card">
+                <div class="muted">Ready to submit</div>
+                <div class="stat">@Model.ApprovedOrganizations</div>
+                <a class="button" asp-page="/Requests/Create">New request</a>
+            </article>
+        </div>
+
+        <div class="dashboard-grid" style="margin-top:22px">
+            <section class="card">
+                <div class="action-row" style="justify-content:space-between;align-items:center">
+                    <h2>Recent requests</h2>
+                    <a asp-page="/Requests/Index">View all</a>
+                </div>
+                @if (Model.Requests.Count == 0)
+                {
+                    <p class="muted">No requests yet. Create a request once you have an approved organization membership.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Reference</th><th>Organization</th><th>Status</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                            @foreach (RequestSummary request in Model.Requests.Take(6))
+                            {
+                                <tr>
+                                    <td><strong>@request.PublicReference</strong></td>
+                                    <td>@request.OrganizationName</td>
+                                    <td><span class="status status-@request.Status">@request.Status</span></td>
+                                    <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section class="card">
+                <h2>My organizations</h2>
+                @if (Model.Organizations.Count == 0)
+                {
+                    <p class="muted">You are not yet associated with an organization.</p>
+                    <a class="button" asp-page="/Organizations/Index">Register or join one</a>
+                }
+                else
+                {
+                    @foreach (OrganizationSummary organization in Model.Organizations)
+                    {
+                        <div style="padding:14px 0;border-bottom:1px solid #e1e6ea">
+                            <strong>@organization.Name</strong><br />
+                            <span class="muted">@organization.Role · @organization.MembershipStatus</span>
+                        </div>
+                    }
+                }
+            </section>
+        </div>
+    </div>
+</section>
