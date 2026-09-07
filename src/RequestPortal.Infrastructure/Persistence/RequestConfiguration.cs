@@ -12,9 +12,16 @@ internal sealed class AssistanceRequestConfiguration : IEntityTypeConfiguration<
         builder.HasKey(request => request.Id);
         builder.Property(request => request.PublicReference).HasMaxLength(40).IsRequired();
         builder.Property(request => request.Summary).HasMaxLength(4000);
+        builder.Property(request => request.Category).HasMaxLength(150);
+        builder.Property(request => request.Subcategory).HasMaxLength(150);
+        builder.Property(request => request.ProgramCategory).HasMaxLength(150);
+        builder.Property(request => request.Location).HasMaxLength(500);
+        builder.Property(request => request.Circumstances).HasMaxLength(8000);
+        builder.Property(request => request.Priority).HasConversion<string>().HasMaxLength(24).IsRequired();
         builder.Property(request => request.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(request => request.PublicReference).IsUnique();
         builder.HasIndex(request => new { request.OrganizationId, request.Status });
+        builder.HasIndex(request => request.BeneficiaryId);
         builder.HasMany(request => request.Items)
             .WithOne()
             .HasForeignKey(item => item.RequestId)
