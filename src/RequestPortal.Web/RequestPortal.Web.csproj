@@ -7,6 +7,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RequestPortal.Application\RequestPortal.Application.csproj" />
