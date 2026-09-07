@@ -22,6 +22,7 @@ public sealed class DetailsModel : PageModel
     private readonly IDocumentService documentService;
     private readonly IRequestLifecycleService lifecycleService;
     private readonly IProjectProposalService projectProposalService;
+    private readonly IProjectPlanningService projectPlanningService;
     private readonly IRequestReferenceDataService referenceDataService;
 
     public DetailsModel(
@@ -30,6 +31,7 @@ public sealed class DetailsModel : PageModel
         IDocumentService documentService,
         IRequestLifecycleService lifecycleService,
         IProjectProposalService projectProposalService,
+        IProjectPlanningService projectPlanningService,
         IRequestReferenceDataService referenceDataService)
     {
         this.userManager = userManager;
@@ -37,12 +39,15 @@ public sealed class DetailsModel : PageModel
         this.documentService = documentService;
         this.lifecycleService = lifecycleService;
         this.projectProposalService = projectProposalService;
+        this.projectPlanningService = projectPlanningService;
         this.referenceDataService = referenceDataService;
     }
 
     public new RequestDetail? Request { get; private set; }
 
     public ProjectProposalDetail? ProjectProposal { get; private set; }
+
+    public ProjectPlanningDetail? ProjectPlanning { get; private set; }
 
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
 
@@ -187,14 +192,35 @@ public sealed class DetailsModel : PageModel
 
     private async Task<IActionResult> LoadPageAsync(ApplicationUser user, Guid id)
     {
-        Request = await workflowService.GetRequestAsync(user.Id, id, isStaff: false, HttpContext.RequestAborted);
+        Request = await workflowService.GetRequestAsync(
+            user.Id,
+            id,
+            isStaff: false,
+            HttpContext.RequestAborted);
         if (Request is null)
         {
             return NotFound();
         }
 
-        ProjectProposal = await projectProposalService.GetAsync(user.Id, id, isStaff: false, HttpContext.RequestAborted);
-        Documents = await documentService.GetRequestDocumentsAsync(user.Id, id, isStaff: false, HttpContext.RequestAborted);
+        ProjectProposal = await projectProposalService.GetAsync(
+            user.Id,
+            id,
+            isStaff: false,
+            HttpContext.RequestAborted);
+        if (ProjectProposal is not null)
+        {
+            ProjectPlanning = await projectPlanningService.GetAsync(
+                user.Id,
+                id,
+                isStaff: false,
+                HttpContext.RequestAborted);
+        }
+
+        Documents = await documentService.GetRequestDocumentsAsync(
+            user.Id,
+            id,
+            isStaff: false,
+            HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
 
         if (Item.UnitOfMeasureId == Guid.Empty && UnitsOfMeasure.Count > 0)
