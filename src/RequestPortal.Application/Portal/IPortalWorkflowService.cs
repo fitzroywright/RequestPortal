@@ -45,9 +45,7 @@ public sealed record RequestItemDetail(
     Guid Id,
     string Description,
     decimal Quantity,
-    Guid UnitOfMeasureId,
-    string UnitOfMeasureCode,
-    string UnitOfMeasureName);
+    Guid UnitOfMeasureId);
 
 public sealed record RequestHistoryDetail(
     string Status,
