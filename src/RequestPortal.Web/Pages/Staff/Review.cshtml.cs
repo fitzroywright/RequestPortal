@@ -31,7 +31,7 @@ public sealed class ReviewModel : PageModel
         this.documentService = documentService;
     }
 
-    public RequestDetail? Request { get; private set; }
+    public new RequestDetail? Request { get; private set; }
 
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
 
