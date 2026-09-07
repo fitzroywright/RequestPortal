@@ -11,8 +11,8 @@
             <div class="eyebrow" style="color:#b45b09">New assistance request</div>
             <h1>Tell FFP what is needed.</h1>
             <p>
-                The organization selected here becomes the permanent owner of this request. Only approved memberships
-                are available for request creation.
+                The organization selected here becomes the permanent owner of this request. Choose whether you are
+                requesting goods/services or proposing a project that needs a full narrative proposal.
             </p>
         </div>
 
@@ -42,19 +42,25 @@
                         </div>
 
                         <div class="field">
+                            <label asp-for="Input.Kind">Request type</label>
+                            <select asp-for="Input.Kind" asp-items="Html.GetEnumSelectList<RequestKind>()"></select>
+                            <div class="muted">Choose Project when the organization needs to submit a full proposal with narrative, tables and photos.</div>
+                        </div>
+
+                        <div class="field">
                             <label asp-for="Input.Summary">Request summary</label>
-                            <textarea asp-for="Input.Summary" placeholder="Briefly describe the need and who will benefit."></textarea>
+                            <textarea asp-for="Input.Summary" placeholder="Briefly describe the need, project or intended beneficiaries."></textarea>
                             <span asp-validation-for="Input.Summary" class="validation"></span>
                         </div>
 
                         <div class="grid-2">
                             <div class="field">
                                 <label asp-for="Input.Category">Category</label>
-                                <input asp-for="Input.Category" placeholder="e.g. Education" />
+                                <input asp-for="Input.Category" placeholder="e.g. Education, Housing, Water" />
                             </div>
                             <div class="field">
                                 <label asp-for="Input.Subcategory">Subcategory</label>
-                                <input asp-for="Input.Subcategory" placeholder="e.g. School supplies" />
+                                <input asp-for="Input.Subcategory" placeholder="e.g. School supplies, Rehabilitation" />
                             </div>
                         </div>
 
@@ -81,7 +87,7 @@
 
                         <hr style="border:0;border-top:1px solid #dde3e8;margin:24px 0" />
                         <h2>Beneficiary</h2>
-                        <p class="muted">Optional for requests that are not tied to a specific person.</p>
+                        <p class="muted">Optional for organization-wide or community projects.</p>
 
                         <div class="grid-2">
                             <div class="field">
@@ -105,19 +111,21 @@
                             </div>
                         </div>
 
-                        <button class="button" type="submit">Create draft and add items</button>
+                        <button class="button" type="submit">Create draft</button>
                     </form>
                 }
             </section>
 
             <aside class="card">
-                <h2>Before you submit</h2>
-                <p class="muted">The request stays in Draft until you add at least one requested item and submit it.</p>
+                <h2>Two request paths</h2>
+                <p><strong>Goods &amp; Services</strong></p>
+                <p class="muted">Use line items for tangible assistance, materials, equipment or services.</p>
+                <p><strong>Project</strong></p>
+                <p class="muted">Opens a Word-like proposal workspace for a long narrative with formatting, tables and inline photos. Supporting files can still be attached separately.</p>
                 <ul>
                     <li>Select the correct organization. It cannot be changed after creation.</li>
                     <li>Add a beneficiary when the request is for a specific person.</li>
                     <li>Use category, location and priority to help FFP triage the request.</li>
-                    <li>Upload supporting documents from the request detail page.</li>
                     <li>After submission, FFP can approve, reject, request more information, or mark a duplicate.</li>
                 </ul>
             </aside>
