@@ -32,6 +32,8 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
 
     public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
 
+    public DbSet<ProjectProposal> ProjectProposals => Set<ProjectProposal>();
+
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
 
     public DbSet<CountryConfiguration> CountryConfigurations => Set<CountryConfiguration>();
