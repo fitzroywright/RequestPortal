@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Storage;
@@ -30,14 +31,14 @@ public sealed class DocumentService : IDocumentService
         IFileStorage fileStorage,
         IClock clock,
         IDocumentUploadSecurity uploadSecurity,
-        IMalwareScanner malwareScanner)
+        IConfiguration configuration)
     {
         this.dbContext = dbContext;
         this.organizationAccessService = organizationAccessService;
         this.fileStorage = fileStorage;
         this.clock = clock;
         this.uploadSecurity = uploadSecurity;
-        this.malwareScanner = malwareScanner;
+        malwareScanner = new ClamAvMalwareScanner(configuration);
     }
 
     public async Task<Guid> UploadForRequestAsync(Guid userId, Guid requestId, DocumentType documentType, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default)
