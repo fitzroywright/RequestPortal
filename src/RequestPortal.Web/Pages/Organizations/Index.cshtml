@@ -1,5 +1,6 @@
 @page
 @model RequestPortal.Web.Pages.Organizations.IndexModel
+@using RequestPortal.Application.Countries
 @{
     ViewData["Title"] = "Organizations";
 }
@@ -51,24 +52,31 @@
 
             <section class="card">
                 <h2>Register a new organization</h2>
-                <form method="post" asp-page-handler="Register" class="form-grid">
-                    <div class="field">
-                        <label asp-for="Registration.Name"></label>
-                        <input asp-for="Registration.Name" />
-                        <span asp-validation-for="Registration.Name" class="validation"></span>
-                    </div>
-                    <div class="field">
-                        <label asp-for="Registration.CountryCode">Country</label>
-                        <select asp-for="Registration.CountryCode">
-                            <option value="JM">Jamaica</option>
-                            <option value="HT">Haiti</option>
-                            <option value="GT">Guatemala</option>
-                            <option value="HN">Honduras</option>
-                            <option value="SV">El Salvador</option>
-                        </select>
-                    </div>
-                    <button class="button" type="submit">Submit organization registration</button>
-                </form>
+                @if (Model.RegistrationCountries.Count == 0)
+                {
+                    <p class="muted">Organization registration is not currently open in any configured country.</p>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="Register" class="form-grid">
+                        <div class="field">
+                            <label asp-for="Registration.Name"></label>
+                            <input asp-for="Registration.Name" />
+                            <span asp-validation-for="Registration.Name" class="validation"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="Registration.CountryCode">Country</label>
+                            <select asp-for="Registration.CountryCode">
+                                @foreach (CountryOption country in Model.RegistrationCountries)
+                                {
+                                    <option value="@country.CountryCode">@country.DisplayName</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Registration.CountryCode" class="validation"></span>
+                        </div>
+                        <button class="button" type="submit">Submit organization registration</button>
+                    </form>
+                }
             </section>
         </div>
 
