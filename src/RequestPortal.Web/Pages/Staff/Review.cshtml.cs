@@ -20,6 +20,7 @@ public sealed class ReviewModel : PageModel
     private readonly IRequestLifecycleService lifecycleService;
     private readonly IDocumentService documentService;
     private readonly IProjectProposalService projectProposalService;
+    private readonly IProjectPlanningService projectPlanningService;
     private readonly IRequestReferenceDataService referenceDataService;
 
     public ReviewModel(
@@ -28,6 +29,7 @@ public sealed class ReviewModel : PageModel
         IRequestLifecycleService lifecycleService,
         IDocumentService documentService,
         IProjectProposalService projectProposalService,
+        IProjectPlanningService projectPlanningService,
         IRequestReferenceDataService referenceDataService)
     {
         this.userManager = userManager;
@@ -35,12 +37,15 @@ public sealed class ReviewModel : PageModel
         this.lifecycleService = lifecycleService;
         this.documentService = documentService;
         this.projectProposalService = projectProposalService;
+        this.projectPlanningService = projectPlanningService;
         this.referenceDataService = referenceDataService;
     }
 
     public new RequestDetail? Request { get; private set; }
 
     public ProjectProposalDetail? ProjectProposal { get; private set; }
+
+    public ProjectPlanningDetail? ProjectPlanning { get; private set; }
 
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
 
@@ -180,6 +185,15 @@ public sealed class ReviewModel : PageModel
             id,
             isStaff: true,
             HttpContext.RequestAborted);
+
+        if (ProjectProposal is not null)
+        {
+            ProjectPlanning = await projectPlanningService.GetAsync(
+                staffUser.Id,
+                id,
+                isStaff: true,
+                HttpContext.RequestAborted);
+        }
 
         Documents = await documentService.GetRequestDocumentsAsync(
             staffUser.Id,
