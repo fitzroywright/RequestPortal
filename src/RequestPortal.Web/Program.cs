@@ -13,10 +13,13 @@ using RequestPortal.Application.Administration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Beneficiaries;
 using RequestPortal.Application.Documents;
+using RequestPortal.Application.Organizations;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.Requests;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Diagnostics;
+using RequestPortal.Common.Messaging;
+using RequestPortal.Common.Secrets;
 using RequestPortal.Common.Security;
 using RequestPortal.Common.Storage;
 using RequestPortal.Common.Time;
@@ -26,13 +29,17 @@ using RequestPortal.Infrastructure.Beneficiaries;
 using RequestPortal.Infrastructure.Diagnostics;
 using RequestPortal.Infrastructure.Documents;
 using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Infrastructure.Messaging;
+using RequestPortal.Infrastructure.Organizations;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Portal;
 using RequestPortal.Infrastructure.Requests;
+using RequestPortal.Infrastructure.Secrets;
 using RequestPortal.Infrastructure.Security;
 using RequestPortal.Infrastructure.Storage;
 using RequestPortal.Web.Demo;
 using RequestPortal.Web.Security;
+using RequestPortal.Web.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -101,10 +108,19 @@ builder.Services
     .AddOptions<ActiveDirectoryOptions>()
     .Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
 
+builder.Services
+    .AddOptions<NotificationOptions>()
+    .Bind(builder.Configuration.GetSection(NotificationOptions.SectionName));
+
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
+builder.Services.AddSingleton<ISecretProvider, ConfigurationSecretProvider>();
+builder.Services.AddScoped<INotificationSender, SmtpNotificationSender>();
+builder.Services.AddScoped<OutboxDispatcher>();
+builder.Services.AddHostedService<OutboxHostedService>();
 builder.Services.AddScoped<IStaffDirectoryAuthenticator, ActiveDirectoryStaffAuthenticator>();
 builder.Services.AddScoped<IOrganizationAccessService, OrganizationAccessService>();
+builder.Services.AddScoped<IOrganizationProfileService, OrganizationProfileService>();
 builder.Services.AddScoped<IPortalWorkflowService, PortalWorkflowService>();
 builder.Services.AddScoped<IStaffOrganizationDirectoryService, StaffOrganizationDirectoryService>();
 builder.Services.AddScoped<IStaffOrganizationService, StaffOrganizationService>();
