@@ -1,0 +1,48 @@
+@page
+@model RequestPortal.Web.Pages.Staff.DiagnosticsModel
+@{
+    ViewData["Title"] = "Starfleet Diagnostics";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Starfleet Diagnostics</div>
+            <h1>Operational readiness</h1>
+            <p>Named dependency checks make failures searchable and actionable instead of surfacing as generic application errors.</p>
+        </div>
+
+        <section class="card">
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Component</th><th>State</th><th>Detail</th></tr></thead>
+                    <tbody>
+                    @foreach (RequestPortal.Common.Diagnostics.DiagnosticCheckResult result in Model.Results)
+                    {
+                        <tr>
+                            <td><strong>@result.Name</strong></td>
+                            <td>
+                                @if (result.IsHealthy)
+                                {
+                                    <span class="status status-Approved">Healthy</span>
+                                }
+                                else
+                                {
+                                    <span class="status status-Rejected">Degraded</span>
+                                }
+                            </td>
+                            <td>@result.Detail</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="grid-3" style="margin-top:22px">
+            <article class="card"><h3>Stable codes</h3><p class="muted">Failures use SF-* diagnostic codes so logs and support notes point to the same incident.</p></article>
+            <article class="card"><h3>Correlation</h3><p class="muted">Request, workflow and authentication events carry correlation identifiers where available.</p></article>
+            <article class="card"><h3>No secret leakage</h3><p class="muted">Passwords, tokens and connection strings are excluded from diagnostic detail.</p></article>
+        </div>
+    </div>
+</section>
