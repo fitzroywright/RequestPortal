@@ -84,7 +84,7 @@
                             <td>@item.OrganizationName</td>
                             <td>@item.Status</td>
                             <td>@item.AgeDays day(s)</td>
-                            <td><a asp-page="/Staff/Request" asp-route-id="@item.RequestId">Review</a></td>
+                            <td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Review</a></td>
                         </tr>
                     }
                     </tbody>
@@ -117,7 +117,7 @@
                             <td>@item.OrganizationName</td>
                             <td>@item.Status</td>
                             <td>@item.AgeDays day(s)</td>
-                            <td><a asp-page="/Staff/Request" asp-route-id="@item.RequestId">Open</a></td>
+                            <td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open</a></td>
                         </tr>
                     }
                     </tbody>
