@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RequestPortal.Domain.Auditing;
 using RequestPortal.Domain.Beneficiaries;
 using RequestPortal.Domain.Documents;
-using RequestPortal.Domain.Fulfilment;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Notifications;
+using RequestFulfilment = RequestPortal.Domain.Fulfilment.Fulfilment;
 
 namespace RequestPortal.Infrastructure.Persistence;
 
@@ -53,9 +53,9 @@ internal sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEn
     }
 }
 
-internal sealed class FulfilmentConfiguration : IEntityTypeConfiguration<Fulfilment>
+internal sealed class FulfilmentConfiguration : IEntityTypeConfiguration<RequestFulfilment>
 {
-    public void Configure(EntityTypeBuilder<Fulfilment> builder)
+    public void Configure(EntityTypeBuilder<RequestFulfilment> builder)
     {
         builder.ToTable("fulfilments");
         builder.HasKey(item => item.Id);
