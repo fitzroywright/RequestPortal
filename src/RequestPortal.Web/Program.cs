@@ -127,6 +127,7 @@ builder.Services.AddSingleton<ISecretProvider, ConfigurationSecretProvider>();
 builder.Services.AddScoped<INotificationSender, SmtpNotificationSender>();
 builder.Services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
 builder.Services.AddScoped<ICountryPolicyService, CountryPolicyService>();
+builder.Services.AddScoped<IOrganizationMembershipGovernanceService, OrganizationMembershipGovernanceService>();
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddHostedService<OutboxHostedService>();
 builder.Services.AddScoped<IStaffDirectoryAuthenticator, ActiveDirectoryStaffAuthenticator>();
