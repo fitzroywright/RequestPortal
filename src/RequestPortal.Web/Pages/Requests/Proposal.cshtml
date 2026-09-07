@@ -1,0 +1,222 @@
+@page "{id:guid}"
+@model RequestPortal.Web.Pages.Requests.ProposalModel
+@{
+    ViewData["Title"] = "Project Proposal";
+    string storedContent = Model.Proposal?.RichContentHtml ?? string.Empty;
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Project request</div>
+            <h1>Write the project proposal</h1>
+            <p>
+                Use this workspace like a lightweight word processor. Build a long narrative, add headings, lists,
+                tables and photos, save the draft, then submit the complete proposal to FFP.
+            </p>
+        </div>
+
+        <form method="post" class="form-grid" id="proposalForm">
+            <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+            <section class="card">
+                <div class="field">
+                    <label asp-for="Input.Title">Proposal title</label>
+                    <input asp-for="Input.Title" placeholder="e.g. Community Water Rehabilitation Project" />
+                    <span asp-validation-for="Input.Title" class="validation"></span>
+                </div>
+
+                <div class="proposal-toolbar" role="toolbar" aria-label="Proposal formatting">
+                    <button type="button" data-command="undo" title="Undo">Undo</button>
+                    <button type="button" data-command="redo" title="Redo">Redo</button>
+                    <span class="toolbar-divider"></span>
+                    <button type="button" data-command="bold"><strong>B</strong></button>
+                    <button type="button" data-command="italic"><em>I</em></button>
+                    <button type="button" data-command="underline"><u>U</u></button>
+                    <button type="button" data-block="h2">Heading</button>
+                    <button type="button" data-block="p">Paragraph</button>
+                    <span class="toolbar-divider"></span>
+                    <button type="button" data-command="insertUnorderedList">Bullets</button>
+                    <button type="button" data-command="insertOrderedList">Numbering</button>
+                    <button type="button" id="insertTable">Table</button>
+                    <button type="button" id="insertLink">Link</button>
+                    <button type="button" id="insertPhoto">Photo</button>
+                    <input id="photoPicker" type="file" accept="image/*" hidden />
+                </div>
+
+                <div id="proposalEditor"
+                     class="proposal-editor"
+                     contenteditable="true"
+                     spellcheck="true"
+                     aria-label="Project proposal editor">@Html.Raw(storedContent)</div>
+
+                <textarea asp-for="Input.RichContentHtml" id="proposalHtml" hidden></textarea>
+                <span asp-validation-for="Input.RichContentHtml" class="validation"></span>
+
+                <div class="action-row" style="margin-top:18px">
+                    <button class="button button-secondary" type="submit" asp-page-handler="Save">Save draft</button>
+                    <button class="button" type="submit" asp-page-handler="Submit">Save and submit to FFP</button>
+                    @if (Model.Proposal is not null)
+                    {
+                        <span class="muted">Version @Model.Proposal.Version · last saved @Model.Proposal.UpdatedUtc.ToString("u")</span>
+                    }
+                </div>
+            </section>
+        </form>
+
+        <section class="card" style="margin-top:1.5rem">
+            <h2>Proposal guidance</h2>
+            <p class="muted">A strong project proposal can include:</p>
+            <ul>
+                <li>Executive summary and statement of need.</li>
+                <li>Background on the community and beneficiaries.</li>
+                <li>Project objectives, activities and expected outcomes.</li>
+                <li>Implementation schedule and responsibilities.</li>
+                <li>Budget or resource tables.</li>
+                <li>Photos showing existing conditions or the proposed site.</li>
+                <li>Sustainability, maintenance and monitoring plans.</li>
+            </ul>
+            <p class="muted">Large original files can also be uploaded as supporting documents on the request.</p>
+        </section>
+    </div>
+</section>
+
+<style>
+    .proposal-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px;
+        border: 1px solid #d9dee3;
+        border-bottom: 0;
+        background: #f6f7f8;
+        border-radius: 8px 8px 0 0;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .proposal-toolbar button {
+        border: 1px solid #cbd2d8;
+        background: white;
+        border-radius: 5px;
+        padding: 6px 10px;
+        cursor: pointer;
+    }
+
+    .toolbar-divider {
+        width: 1px;
+        background: #d3d8dc;
+        margin: 2px 3px;
+    }
+
+    .proposal-editor {
+        min-height: 720px;
+        padding: 48px 56px;
+        border: 1px solid #d9dee3;
+        background: white;
+        color: #202428;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 17px;
+        line-height: 1.65;
+        outline: none;
+        box-shadow: 0 4px 18px rgba(0,0,0,.05);
+    }
+
+    .proposal-editor h1, .proposal-editor h2, .proposal-editor h3 {
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .proposal-editor table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 18px 0;
+    }
+
+    .proposal-editor th, .proposal-editor td {
+        border: 1px solid #87919a;
+        padding: 8px 10px;
+        min-width: 70px;
+    }
+
+    .proposal-editor img {
+        max-width: 100%;
+        height: auto;
+        margin: 14px 0;
+        border-radius: 4px;
+    }
+</style>
+
+<script>
+(() => {
+    const editor = document.getElementById('proposalEditor');
+    const htmlField = document.getElementById('proposalHtml');
+    const form = document.getElementById('proposalForm');
+    const photoPicker = document.getElementById('photoPicker');
+
+    function focusEditor() {
+        editor.focus();
+    }
+
+    document.querySelectorAll('[data-command]').forEach(button => {
+        button.addEventListener('click', () => {
+            focusEditor();
+            document.execCommand(button.dataset.command, false, null);
+        });
+    });
+
+    document.querySelectorAll('[data-block]').forEach(button => {
+        button.addEventListener('click', () => {
+            focusEditor();
+            document.execCommand('formatBlock', false, button.dataset.block);
+        });
+    });
+
+    document.getElementById('insertTable').addEventListener('click', () => {
+        const rows = Math.min(Math.max(parseInt(prompt('Rows', '3') || '0', 10), 1), 20);
+        const columns = Math.min(Math.max(parseInt(prompt('Columns', '3') || '0', 10), 1), 10);
+        let table = '<table><tbody>';
+        for (let row = 0; row < rows; row++) {
+            table += '<tr>';
+            for (let column = 0; column < columns; column++) {
+                table += row === 0 ? '<th>Heading</th>' : '<td>Value</td>';
+            }
+            table += '</tr>';
+        }
+        table += '</tbody></table><p><br></p>';
+        focusEditor();
+        document.execCommand('insertHTML', false, table);
+    });
+
+    document.getElementById('insertLink').addEventListener('click', () => {
+        const url = prompt('Link address', 'https://');
+        if (!url) return;
+        focusEditor();
+        document.execCommand('createLink', false, url);
+    });
+
+    document.getElementById('insertPhoto').addEventListener('click', () => photoPicker.click());
+
+    photoPicker.addEventListener('change', () => {
+        const file = photoPicker.files && photoPicker.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            alert('For the demo editor, inline photos must be 2 MB or smaller. Upload larger originals as supporting documents.');
+            photoPicker.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = event => {
+            focusEditor();
+            document.execCommand('insertImage', false, event.target.result);
+            photoPicker.value = '';
+        };
+        reader.readAsDataURL(file);
+    });
+
+    form.addEventListener('submit', () => {
+        htmlField.value = editor.innerHTML;
+    });
+})();
+</script>
