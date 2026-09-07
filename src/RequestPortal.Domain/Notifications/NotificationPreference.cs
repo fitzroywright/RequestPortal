@@ -17,6 +17,11 @@ public sealed class NotificationPreference
 
     public NotificationPreference(Guid id, Guid userId, NotificationChannel channel, string destination, bool enabled)
     {
+        if (string.IsNullOrWhiteSpace(destination))
+        {
+            throw new ArgumentException("Notification destination is required.", nameof(destination));
+        }
+
         Id = id;
         UserId = userId;
         Channel = channel;
@@ -33,6 +38,17 @@ public sealed class NotificationPreference
     public string Destination { get; private set; } = string.Empty;
 
     public bool Enabled { get; private set; }
+
+    public void Update(string destination, bool enabled)
+    {
+        if (string.IsNullOrWhiteSpace(destination))
+        {
+            throw new ArgumentException("Notification destination is required.", nameof(destination));
+        }
+
+        Destination = destination.Trim();
+        Enabled = enabled;
+    }
 
     public void SetEnabled(bool enabled)
     {
