@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using RequestPortal.Common.Security;
 using RequestPortal.Common.Time;
+using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
@@ -54,6 +55,8 @@ public sealed class DemoDataSeeder
         {
             await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         }
+
+        await EnsureCountryConfigurationAsync(cancellationToken);
 
         ApplicationUser staff = await EnsureUserAsync(StaffEmail, "Demo FFP Staff", true);
         ApplicationUser administrator = await EnsureUserAsync(AdministratorEmail, "Grace Brown", false);
@@ -103,6 +106,27 @@ public sealed class DemoDataSeeder
             dbContext.AssistanceRequests.Add(request);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task EnsureCountryConfigurationAsync(CancellationToken cancellationToken)
+    {
+        bool exists = await dbContext.CountryConfigurations
+            .AsNoTracking()
+            .AnyAsync(item => item.CountryCode == "JM", cancellationToken);
+
+        if (exists)
+        {
+            return;
+        }
+
+        CountryConfiguration jamaica = new(
+            "JM",
+            "Jamaica",
+            "America/Jamaica",
+            "en-JM");
+
+        dbContext.CountryConfigurations.Add(jamaica);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<ApplicationUser> EnsureUserAsync(string email, string displayName, bool isInternalStaff)
