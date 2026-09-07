@@ -2,6 +2,12 @@ using System;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using RequestPortal.Domain.Auditing;
+using RequestPortal.Domain.Beneficiaries;
+using RequestPortal.Domain.Documents;
+using RequestPortal.Domain.Fulfilment;
+using RequestPortal.Domain.Integration;
+using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
@@ -24,6 +30,18 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<AssistanceRequestItem> AssistanceRequestItems => Set<AssistanceRequestItem>();
 
     public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
+
+    public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
+
+    public DbSet<StoredDocument> Documents => Set<StoredDocument>();
+
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<Fulfilment> Fulfilments => Set<Fulfilment>();
+
+    public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
+
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
