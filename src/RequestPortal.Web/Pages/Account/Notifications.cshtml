@@ -1,0 +1,108 @@
+@page
+@model RequestPortal.Web.Pages.Account.NotificationsModel
+@using RequestPortal.Domain.Notifications
+@{
+    ViewData["Title"] = "Notifications";
+
+    NotificationPreferenceView? email = Model.FindPreference(NotificationChannel.Email);
+    NotificationPreferenceView? sms = Model.FindPreference(NotificationChannel.Sms);
+    NotificationPreferenceView? whatsapp = Model.FindPreference(NotificationChannel.WhatsApp);
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Communication preferences</div>
+            <h1>Notifications</h1>
+            <p>Choose how Request Portal should contact you about organization approvals, membership changes and request status updates.</p>
+        </div>
+
+        <div class="grid-3">
+            <article class="card">
+                <h2>Email</h2>
+                <form method="post" asp-page-handler="Save">
+                    <input type="hidden" name="Input.Channel" value="Email" />
+                    <label for="emailDestination">Email address</label>
+                    <input id="emailDestination" name="Input.Destination" value="@(email?.Destination ?? Model.DefaultEmail)" maxlength="500" required />
+                    <label class="check-row">
+                        <input type="checkbox" name="Input.Enabled" value="true" @(email?.Enabled != false ? "checked" : null) />
+                        <span>Send email notifications</span>
+                    </label>
+                    <button class="button button-small" type="submit">Save email preference</button>
+                </form>
+            </article>
+
+            <article class="card">
+                <h2>SMS</h2>
+                <form method="post" asp-page-handler="Save">
+                    <input type="hidden" name="Input.Channel" value="Sms" />
+                    <label for="smsDestination">Mobile number</label>
+                    <input id="smsDestination" name="Input.Destination" value="@(sms?.Destination ?? string.Empty)" maxlength="500" placeholder="8765551234" required />
+                    <label class="check-row">
+                        <input type="checkbox" name="Input.Enabled" value="true" @(sms?.Enabled == true ? "checked" : null) />
+                        <span>Enable SMS when a provider is configured</span>
+                    </label>
+                    <button class="button button-small" type="submit">Save SMS preference</button>
+                </form>
+            </article>
+
+            <article class="card">
+                <h2>WhatsApp</h2>
+                <form method="post" asp-page-handler="Save">
+                    <input type="hidden" name="Input.Channel" value="WhatsApp" />
+                    <label for="whatsappDestination">WhatsApp number</label>
+                    <input id="whatsappDestination" name="Input.Destination" value="@(whatsapp?.Destination ?? string.Empty)" maxlength="500" placeholder="8765551234" required />
+                    <label class="check-row">
+                        <input type="checkbox" name="Input.Enabled" value="true" @(whatsapp?.Enabled == true ? "checked" : null) />
+                        <span>Enable WhatsApp when a provider is configured</span>
+                    </label>
+                    <button class="button button-small" type="submit">Save WhatsApp preference</button>
+                </form>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="section section-muted">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Recent notification history</h2>
+            <p>This history shows what the portal attempted to send and whether delivery succeeded.</p>
+        </div>
+
+        @if (Model.History.Count == 0)
+        {
+            <div class="card">
+                <p>No notifications have been recorded for your account yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Created</th>
+                            <th>Channel</th>
+                            <th>Subject</th>
+                            <th>Status</th>
+                            <th>Destination</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (NotificationHistoryView item in Model.History)
+                    {
+                        <tr>
+                            <td>@item.CreatedUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</td>
+                            <td>@item.Channel</td>
+                            <td>@item.Subject</td>
+                            <td>@item.Status</td>
+                            <td>@item.Destination</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
