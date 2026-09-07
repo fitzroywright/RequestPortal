@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Storage;
@@ -24,6 +25,7 @@ public sealed class DocumentService : IDocumentService
     private readonly IClock clock;
     private readonly IDocumentUploadSecurity uploadSecurity;
     private readonly IMalwareScanner malwareScanner;
+    private readonly IBusinessAuditWriter auditWriter;
 
     public DocumentService(
         RequestPortalDbContext dbContext,
@@ -31,13 +33,15 @@ public sealed class DocumentService : IDocumentService
         IFileStorage fileStorage,
         IClock clock,
         IDocumentUploadSecurity uploadSecurity,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IBusinessAuditWriter auditWriter)
     {
         this.dbContext = dbContext;
         this.organizationAccessService = organizationAccessService;
         this.fileStorage = fileStorage;
         this.clock = clock;
         this.uploadSecurity = uploadSecurity;
+        this.auditWriter = auditWriter;
         malwareScanner = new ClamAvMalwareScanner(configuration);
     }
 
@@ -47,7 +51,9 @@ public sealed class DocumentService : IDocumentService
         await EnsureApprovedMemberAsync(userId, organizationId, cancellationToken);
         await uploadSecurity.ValidateAsync(originalFileName, contentType, sizeBytes, content, cancellationToken);
         await malwareScanner.ScanAsync(content, cancellationToken);
-        return await StoreMetadataAsync(userId, DocumentOwnerType.AssistanceRequest, requestId, organizationId, documentType, originalFileName, contentType, sizeBytes, content, cancellationToken);
+        Guid documentId = await StoreMetadataAsync(userId, DocumentOwnerType.AssistanceRequest, requestId, organizationId, documentType, originalFileName, contentType, sizeBytes, content, cancellationToken);
+        await AuditAsync(userId, "DocumentUploaded", documentId, organizationId, $"Request document type {documentType}; size {sizeBytes} bytes.", cancellationToken);
+        return documentId;
     }
 
     public async Task<Guid> UploadForOrganizationAsync(Guid userId, Guid organizationId, DocumentType documentType, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default)
@@ -57,7 +63,9 @@ public sealed class DocumentService : IDocumentService
         if (organization.RegisteredByUserId != userId && !isApprovedMember) throw new UnauthorizedAccessException("The current user cannot upload documents for this organization.");
         await uploadSecurity.ValidateAsync(originalFileName, contentType, sizeBytes, content, cancellationToken);
         await malwareScanner.ScanAsync(content, cancellationToken);
-        return await StoreMetadataAsync(userId, DocumentOwnerType.Organization, organizationId, organizationId, documentType, originalFileName, contentType, sizeBytes, content, cancellationToken);
+        Guid documentId = await StoreMetadataAsync(userId, DocumentOwnerType.Organization, organizationId, organizationId, documentType, originalFileName, contentType, sizeBytes, content, cancellationToken);
+        await AuditAsync(userId, "DocumentUploaded", documentId, organizationId, $"Organization document type {documentType}; size {sizeBytes} bytes.", cancellationToken);
+        return documentId;
     }
 
     public async Task<IReadOnlyList<DocumentSummary>> GetRequestDocumentsAsync(Guid userId, Guid requestId, bool isStaff, CancellationToken cancellationToken = default)
@@ -92,6 +100,7 @@ public sealed class DocumentService : IDocumentService
         StoredDocument document = await dbContext.Documents.SingleAsync(item => item.Id == documentId, cancellationToken);
         document.Verify(staffUserId, clock.UtcNow, notes);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await AuditAsync(staffUserId, "DocumentVerified", documentId, document.OrganizationId, notes, cancellationToken);
     }
 
     public async Task RejectVerificationAsync(Guid staffUserId, Guid documentId, string reason, CancellationToken cancellationToken = default)
@@ -99,22 +108,23 @@ public sealed class DocumentService : IDocumentService
         StoredDocument document = await dbContext.Documents.SingleAsync(item => item.Id == documentId, cancellationToken);
         document.RejectVerification(staffUserId, clock.UtcNow, reason);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await AuditAsync(staffUserId, "DocumentVerificationRejected", documentId, document.OrganizationId, reason, cancellationToken);
     }
 
     public async Task SetRetentionAsync(Guid staffUserId, Guid documentId, DocumentRetentionClass retentionClass, DateTimeOffset? retainUntilUtc, CancellationToken cancellationToken = default)
     {
-        _ = staffUserId;
         StoredDocument document = await dbContext.Documents.SingleAsync(item => item.Id == documentId, cancellationToken);
         document.SetRetention(retentionClass, retainUntilUtc);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await AuditAsync(staffUserId, "DocumentRetentionChanged", documentId, document.OrganizationId, $"Retention={retentionClass}; retainUntil={retainUntilUtc:O}", cancellationToken);
     }
 
     public async Task ArchiveAsync(Guid staffUserId, Guid documentId, CancellationToken cancellationToken = default)
     {
-        _ = staffUserId;
         StoredDocument document = await dbContext.Documents.SingleAsync(item => item.Id == documentId, cancellationToken);
         document.MarkArchived(clock.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await AuditAsync(staffUserId, "DocumentArchived", documentId, document.OrganizationId, null, cancellationToken);
     }
 
     private async Task<IReadOnlyList<DocumentSummary>> QueryDocumentsAsync(DocumentOwnerType ownerType, Guid ownerId, CancellationToken cancellationToken)
@@ -133,6 +143,11 @@ public sealed class DocumentService : IDocumentService
         dbContext.Documents.Add(document);
         await dbContext.SaveChangesAsync(cancellationToken);
         return documentId;
+    }
+
+    private Task AuditAsync(Guid actorUserId, string action, Guid documentId, Guid organizationId, string? detail, CancellationToken cancellationToken)
+    {
+        return auditWriter.WriteAsync(actorUserId, action, "Document", documentId, organizationId, detail, cancellationToken);
     }
 
     private async Task EnsureApprovedMemberAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken)
