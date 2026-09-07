@@ -18,20 +18,25 @@ public sealed class ReviewModel : PageModel
     private readonly IPortalWorkflowService workflowService;
     private readonly IRequestLifecycleService lifecycleService;
     private readonly IDocumentService documentService;
+    private readonly IProjectProposalService projectProposalService;
 
     public ReviewModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
         IRequestLifecycleService lifecycleService,
-        IDocumentService documentService)
+        IDocumentService documentService,
+        IProjectProposalService projectProposalService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.lifecycleService = lifecycleService;
         this.documentService = documentService;
+        this.projectProposalService = projectProposalService;
     }
 
     public new RequestDetail? Request { get; private set; }
+
+    public ProjectProposalDetail? ProjectProposal { get; private set; }
 
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
 
@@ -150,6 +155,12 @@ public sealed class ReviewModel : PageModel
         {
             return NotFound();
         }
+
+        ProjectProposal = await projectProposalService.GetAsync(
+            staffUser.Id,
+            id,
+            isStaff: true,
+            HttpContext.RequestAborted);
 
         Documents = await documentService.GetRequestDocumentsAsync(
             staffUser.Id,
