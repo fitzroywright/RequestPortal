@@ -18,6 +18,21 @@ public enum DocumentType
     FfpCorrespondence = 5
 }
 
+public enum DocumentVerificationStatus
+{
+    Pending = 0,
+    Verified = 1,
+    Rejected = 2
+}
+
+public enum DocumentRetentionClass
+{
+    Operational = 0,
+    OrganizationVerification = 1,
+    RequestEvidence = 2,
+    LegalArchive = 3
+}
+
 public sealed class StoredDocument
 {
     private StoredDocument()
@@ -53,6 +68,10 @@ public sealed class StoredDocument
         StorageKey = storageKey.Trim();
         UploadedByUserId = uploadedByUserId;
         UploadedUtc = uploadedUtc;
+        VerificationStatus = DocumentVerificationStatus.Pending;
+        RetentionClass = ownerType == DocumentOwnerType.Organization
+            ? DocumentRetentionClass.OrganizationVerification
+            : DocumentRetentionClass.RequestEvidence;
     }
 
     public Guid Id { get; private set; }
@@ -77,17 +96,62 @@ public sealed class StoredDocument
 
     public DateTimeOffset UploadedUtc { get; private set; }
 
+    public DocumentVerificationStatus VerificationStatus { get; private set; }
+
+    public Guid? VerifiedByUserId { get; private set; }
+
+    public DateTimeOffset? VerifiedUtc { get; private set; }
+
+    public string? VerificationNotes { get; private set; }
+
+    public DocumentRetentionClass RetentionClass { get; private set; }
+
     public DateTimeOffset? RetainUntilUtc { get; private set; }
 
     public bool IsArchived { get; private set; }
 
-    public void SetRetention(DateTimeOffset retainUntilUtc)
+    public DateTimeOffset? ArchivedUtc { get; private set; }
+
+    public void Verify(Guid verifiedByUserId, DateTimeOffset verifiedUtc, string? notes = null)
     {
+        if (IsArchived)
+        {
+            throw new InvalidOperationException("Archived documents cannot be verified.");
+        }
+
+        VerificationStatus = DocumentVerificationStatus.Verified;
+        VerifiedByUserId = verifiedByUserId;
+        VerifiedUtc = verifiedUtc;
+        VerificationNotes = Normalize(notes);
+    }
+
+    public void RejectVerification(Guid verifiedByUserId, DateTimeOffset verifiedUtc, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("A rejection reason is required.", nameof(reason));
+        }
+
+        VerificationStatus = DocumentVerificationStatus.Rejected;
+        VerifiedByUserId = verifiedByUserId;
+        VerifiedUtc = verifiedUtc;
+        VerificationNotes = reason.Trim();
+    }
+
+    public void SetRetention(DocumentRetentionClass retentionClass, DateTimeOffset? retainUntilUtc)
+    {
+        RetentionClass = retentionClass;
         RetainUntilUtc = retainUntilUtc;
     }
 
-    public void MarkArchived()
+    public void MarkArchived(DateTimeOffset archivedUtc)
     {
         IsArchived = true;
+        ArchivedUtc = archivedUtc;
+    }
+
+    private static string? Normalize(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
