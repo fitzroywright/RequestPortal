@@ -1,0 +1,81 @@
+@page
+@model RequestPortal.Web.Pages.Staff.IndexModel
+@{
+    ViewData["Title"] = "FFP Review";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">FFP internal</div>
+            <h1>Review workspace</h1>
+            <p>Approve organization registrations and review submitted assistance requests.</p>
+        </div>
+
+        <div class="grid-2">
+            <section class="card">
+                <div class="action-row" style="justify-content:space-between;align-items:center">
+                    <h2>Organizations awaiting approval</h2>
+                    <span class="status">@Model.PendingOrganizations.Count pending</span>
+                </div>
+                @if (Model.PendingOrganizations.Count == 0)
+                {
+                    <p class="muted">No organization registrations are awaiting review.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Organization</th><th>Country</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach (OrganizationSummary organization in Model.PendingOrganizations)
+                            {
+                                <tr>
+                                    <td><strong>@organization.Name</strong></td>
+                                    <td>@organization.CountryCode</td>
+                                    <td>
+                                        <form method="post" asp-page-handler="ApproveOrganization">
+                                            <input type="hidden" name="organizationId" value="@organization.Id" />
+                                            <button class="button button-small" type="submit">Approve</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section class="card">
+                <div class="action-row" style="justify-content:space-between;align-items:center">
+                    <h2>Submitted requests</h2>
+                    <span class="status status-Submitted">@Model.SubmittedRequests.Count waiting</span>
+                </div>
+                @if (Model.SubmittedRequests.Count == 0)
+                {
+                    <p class="muted">No assistance requests are awaiting review.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Reference</th><th>Organization</th><th>Summary</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach (RequestSummary request in Model.SubmittedRequests)
+                            {
+                                <tr>
+                                    <td><strong>@request.PublicReference</strong></td>
+                                    <td>@request.OrganizationName</td>
+                                    <td>@request.Summary</td>
+                                    <td><a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.Id">Review</a></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        </div>
+    </div>
+</section>
