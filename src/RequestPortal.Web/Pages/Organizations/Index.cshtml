@@ -1,0 +1,106 @@
+@page
+@model RequestPortal.Web.Pages.Organizations.IndexModel
+@{
+    ViewData["Title"] = "Organizations";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Organization access</div>
+            <h1>My organizations</h1>
+            <p>
+                Requests are always made on behalf of an organization. New organizations require FFP approval;
+                representatives joining an existing organization require approval by that organization's administrator.
+            </p>
+        </div>
+
+        <div class="dashboard-grid">
+            <section class="card">
+                <h2>Current memberships</h2>
+                @if (Model.Organizations.Count == 0)
+                {
+                    <p class="muted">You do not yet belong to any organizations.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Organization</th><th>Organization status</th><th>Membership</th><th>Role</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach (OrganizationSummary organization in Model.Organizations)
+                            {
+                                <tr>
+                                    <td><strong>@organization.Name</strong><br /><span class="muted">@organization.CountryCode</span></td>
+                                    <td><span class="status status-@organization.OrganizationStatus">@organization.OrganizationStatus</span></td>
+                                    <td><span class="status status-@organization.MembershipStatus">@organization.MembershipStatus</span></td>
+                                    <td>@organization.Role</td>
+                                    <td>
+                                        @if (organization.Role == "Administrator" && organization.MembershipStatus == "Approved")
+                                        {
+                                            <a asp-page="/Organizations/Members" asp-route-organizationId="@organization.Id">Representatives</a>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section class="card">
+                <h2>Register a new organization</h2>
+                <form method="post" asp-page-handler="Register" class="form-grid">
+                    <div class="field">
+                        <label asp-for="Registration.Name"></label>
+                        <input asp-for="Registration.Name" />
+                        <span asp-validation-for="Registration.Name" class="validation"></span>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Registration.CountryCode">Country</label>
+                        <select asp-for="Registration.CountryCode">
+                            <option value="JM">Jamaica</option>
+                            <option value="HT">Haiti</option>
+                            <option value="GT">Guatemala</option>
+                            <option value="HN">Honduras</option>
+                            <option value="SV">El Salvador</option>
+                        </select>
+                    </div>
+                    <button class="button" type="submit">Submit organization registration</button>
+                </form>
+            </section>
+        </div>
+
+        <section class="card" style="margin-top:22px">
+            <h2>Join an existing organization</h2>
+            @if (Model.AvailableOrganizations.Count == 0)
+            {
+                <p class="muted">There are no other approved organizations available to join.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Organization</th><th>Country</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (OrganizationSummary organization in Model.AvailableOrganizations)
+                        {
+                            <tr>
+                                <td><strong>@organization.Name</strong></td>
+                                <td>@organization.CountryCode</td>
+                                <td>
+                                    <form method="post" asp-page-handler="RequestMembership">
+                                        <input type="hidden" name="organizationId" value="@organization.Id" />
+                                        <button class="button button-small" type="submit">Request membership</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</section>
