@@ -13,6 +13,14 @@ public sealed record OrganizationSummary(
     string MembershipStatus,
     string Role);
 
+public sealed record PendingMembershipSummary(
+    Guid MembershipId,
+    Guid OrganizationId,
+    Guid UserId,
+    string UserDisplayName,
+    string UserEmail,
+    DateTimeOffset RequestedUtc);
+
 public sealed record RequestSummary(
     Guid Id,
     string PublicReference,
@@ -41,6 +49,8 @@ public interface IPortalWorkflowService
 {
     Task<IReadOnlyList<OrganizationSummary>> GetOrganizationsForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<OrganizationSummary>> GetAvailableOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default);
+
     Task<Guid> RegisterOrganizationAsync(Guid userId, string name, string countryCode, CancellationToken cancellationToken = default);
 
     Task RequestMembershipAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default);
@@ -49,7 +59,7 @@ public interface IPortalWorkflowService
 
     Task ApproveOrganizationAsync(Guid staffUserId, Guid organizationId, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<OrganizationSummary>> GetPendingMembershipsAsync(Guid administratorUserId, Guid organizationId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PendingMembershipSummary>> GetPendingMembershipsAsync(Guid administratorUserId, Guid organizationId, CancellationToken cancellationToken = default);
 
     Task ApproveMembershipAsync(Guid administratorUserId, Guid organizationId, Guid membershipId, CancellationToken cancellationToken = default);
 
@@ -58,6 +68,8 @@ public interface IPortalWorkflowService
     Task AddRequestItemAsync(Guid userId, Guid requestId, string description, decimal quantity, Guid unitOfMeasureId, CancellationToken cancellationToken = default);
 
     Task SubmitRequestAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default);
+
+    Task ResubmitRequestAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<RequestSummary>> GetRequestsForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
