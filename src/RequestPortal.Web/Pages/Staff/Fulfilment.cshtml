@@ -1,0 +1,83 @@
+@page
+@model RequestPortal.Web.Pages.Staff.FulfilmentModel
+@using RequestPortal.Application.Fulfilment
+@using RequestPortal.Domain.Fulfilment
+@{
+    ViewData["Title"] = "Fulfilment";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">FFP internal</div>
+            <h1>Fulfilment workspace</h1>
+            <p>Route approved requests to local or FFTP US fulfilment and record completion.</p>
+        </div>
+
+        <section class="card">
+            @if (Model.Items.Count == 0)
+            {
+                <p class="muted">No approved requests are awaiting fulfilment.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Reference</th><th>Organization</th><th>Request status</th><th>Fulfilment</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (FulfilmentQueueItem item in Model.Items)
+                        {
+                            <tr>
+                                <td><strong>@item.PublicReference</strong><br /><span class="muted">@item.Summary</span></td>
+                                <td>@item.OrganizationName</td>
+                                <td><span class="status status-@item.RequestStatus">@item.RequestStatus</span></td>
+                                <td>
+                                    @if (item.FulfilmentId.HasValue)
+                                    {
+                                        <strong>@item.FulfilmentSource</strong><br />
+                                        <span class="muted">@item.FulfilmentStatus</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">Not routed</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (item.RequestStatus == "Approved")
+                                    {
+                                        <div class="action-row">
+                                            <form method="post" asp-page-handler="Start">
+                                                <input type="hidden" name="requestId" value="@item.RequestId" />
+                                                <input type="hidden" name="source" value="@FulfilmentSource.LocalIcp" />
+                                                <button class="button button-small" type="submit">Route local</button>
+                                            </form>
+                                            <form method="post" asp-page-handler="Start">
+                                                <input type="hidden" name="requestId" value="@item.RequestId" />
+                                                <input type="hidden" name="source" value="@FulfilmentSource.FftpUs" />
+                                                <button class="button button-small button-outline" type="submit">Route FFTP US</button>
+                                            </form>
+                                        </div>
+                                    }
+                                    else if (item.RequestStatus == "PendingFulfilment" && item.FulfilmentId.HasValue)
+                                    {
+                                        <form method="post" asp-page-handler="Complete">
+                                            <input type="hidden" name="fulfilmentId" value="@item.FulfilmentId" />
+                                            <button class="button button-small" type="submit">Mark fulfilled</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">Completed</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</section>
