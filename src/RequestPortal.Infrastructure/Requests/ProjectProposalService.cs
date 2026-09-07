@@ -14,15 +14,15 @@ namespace RequestPortal.Infrastructure.Requests;
 public sealed class ProjectProposalService : IProjectProposalService
 {
     private static readonly Regex dangerousElementRegex = new(
-        @"<(script|style|iframe|object|embed|form)[^>]*>.*?</\1>|<(script|style|iframe|object|embed|form)[^>]*/?>",
+        "<(script|style|iframe|object|embed|form)[^>]*>.*?</\\1>|<(script|style|iframe|object|embed|form)[^>]*/?>",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
 
     private static readonly Regex eventAttributeRegex = new(
-        @"\s+on[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)",
+        "\\s+on[a-z]+\\s*=\\s*(\\\"[^\\\"]*\\\"|'[^']*'|[^\\s>]+)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex javascriptUrlRegex = new(
-        @"(href|src)\s*=\s*([\"'])\s*javascript:[^\2]*\2",
+        "(href|src)\\s*=\\s*(['\\\"])\\s*javascript:[^'\\\"]*\\2",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly RequestPortalDbContext dbContext;
