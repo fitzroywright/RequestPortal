@@ -24,6 +24,7 @@ public sealed class AssistanceRequest
         OrganizationId = organizationId;
         CreatedByUserId = createdByUserId;
         Status = RequestStatus.Draft;
+        Priority = RequestPriority.Normal;
         CreatedUtc = createdUtc;
         statusHistory.Add(new RequestStatusHistory(Guid.NewGuid(), id, RequestStatus.Draft, createdByUserId, createdUtc, "Request created."));
     }
@@ -38,9 +39,23 @@ public sealed class AssistanceRequest
 
     public Guid? SubmittedByUserId { get; private set; }
 
+    public Guid? BeneficiaryId { get; private set; }
+
     public RequestStatus Status { get; private set; }
 
+    public RequestPriority Priority { get; private set; }
+
     public string? Summary { get; private set; }
+
+    public string? Category { get; private set; }
+
+    public string? Subcategory { get; private set; }
+
+    public string? ProgramCategory { get; private set; }
+
+    public string? Location { get; private set; }
+
+    public string? Circumstances { get; private set; }
 
     public DateTimeOffset CreatedUtc { get; private set; }
 
@@ -54,6 +69,25 @@ public sealed class AssistanceRequest
     {
         EnsureDraft();
         Summary = summary.Trim();
+    }
+
+    public void SetDetails(
+        Guid? beneficiaryId,
+        string? category,
+        string? subcategory,
+        string? programCategory,
+        RequestPriority priority,
+        string? location,
+        string? circumstances)
+    {
+        EnsureDraft();
+        BeneficiaryId = beneficiaryId;
+        Category = Normalize(category);
+        Subcategory = Normalize(subcategory);
+        ProgramCategory = Normalize(programCategory);
+        Priority = priority;
+        Location = Normalize(location);
+        Circumstances = Normalize(circumstances);
     }
 
     public void AddItem(AssistanceRequestItem item)
@@ -100,6 +134,44 @@ public sealed class AssistanceRequest
         TransitionTo(RequestStatus.Rejected, staffUserId, changedUtc, reason);
     }
 
+    public void Cancel(Guid userId, DateTimeOffset changedUtc, string reason)
+    {
+        if (Status != RequestStatus.Draft && Status != RequestStatus.Submitted && Status != RequestStatus.MoreInformationRequired)
+        {
+            throw new InvalidOperationException("This request cannot be cancelled from its current status.");
+        }
+
+        TransitionTo(RequestStatus.Cancelled, userId, changedUtc, reason);
+    }
+
+    public void MarkDuplicate(Guid staffUserId, DateTimeOffset changedUtc, string reason)
+    {
+        if (Status != RequestStatus.Submitted && Status != RequestStatus.MoreInformationRequired)
+        {
+            throw new InvalidOperationException("Only submitted requests can be marked as duplicates.");
+        }
+
+        TransitionTo(RequestStatus.Duplicate, staffUserId, changedUtc, reason);
+    }
+
+    public void MarkPendingFulfilment(Guid staffUserId, DateTimeOffset changedUtc)
+    {
+        EnsureStatus(RequestStatus.Approved);
+        TransitionTo(RequestStatus.PendingFulfilment, staffUserId, changedUtc, "Request moved to fulfilment.");
+    }
+
+    public void MarkFulfilled(Guid staffUserId, DateTimeOffset changedUtc)
+    {
+        EnsureStatus(RequestStatus.PendingFulfilment);
+        TransitionTo(RequestStatus.Fulfilled, staffUserId, changedUtc, "Request fulfilled.");
+    }
+
+    public void Close(Guid staffUserId, DateTimeOffset changedUtc)
+    {
+        EnsureStatus(RequestStatus.Fulfilled);
+        TransitionTo(RequestStatus.Closed, staffUserId, changedUtc, "Request closed.");
+    }
+
     private void TransitionTo(RequestStatus status, Guid changedByUserId, DateTimeOffset changedUtc, string? reason)
     {
         Status = status;
@@ -117,5 +189,10 @@ public sealed class AssistanceRequest
         {
             throw new InvalidOperationException($"Request must be {expected} for this operation.");
         }
+    }
+
+    private static string? Normalize(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
