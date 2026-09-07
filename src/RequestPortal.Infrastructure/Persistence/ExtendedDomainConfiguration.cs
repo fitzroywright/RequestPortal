@@ -2,12 +2,27 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RequestPortal.Domain.Auditing;
 using RequestPortal.Domain.Beneficiaries;
+using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Notifications;
 using RequestFulfilment = RequestPortal.Domain.Fulfilment.Fulfilment;
 
 namespace RequestPortal.Infrastructure.Persistence;
+
+internal sealed class CountryConfigurationEntityConfiguration : IEntityTypeConfiguration<CountryConfiguration>
+{
+    public void Configure(EntityTypeBuilder<CountryConfiguration> builder)
+    {
+        builder.ToTable("country_configurations");
+        builder.HasKey(item => item.CountryCode);
+        builder.Property(item => item.CountryCode).HasMaxLength(2).IsRequired();
+        builder.Property(item => item.DisplayName).HasMaxLength(150).IsRequired();
+        builder.Property(item => item.TimeZoneId).HasMaxLength(150).IsRequired();
+        builder.Property(item => item.DefaultCulture).HasMaxLength(50).IsRequired();
+        builder.HasIndex(item => item.IsActive);
+    }
+}
 
 internal sealed class BeneficiaryConfiguration : IEntityTypeConfiguration<Beneficiary>
 {
