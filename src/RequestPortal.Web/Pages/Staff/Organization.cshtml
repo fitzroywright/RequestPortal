@@ -1,0 +1,119 @@
+@page
+@model RequestPortal.Web.Pages.Staff.OrganizationModel
+@using RequestPortal.Application.Administration
+@{
+    ViewData["Title"] = Model.Organization?.Name ?? "Organization";
+}
+
+@if (Model.Organization is not null)
+{
+    StaffOrganizationDetail organization = Model.Organization;
+
+    <section class="section">
+        <div class="shell">
+            <div class="section-heading">
+                <div class="eyebrow" style="color:#b45b09">FFP internal organization view</div>
+                <h1>@organization.Name</h1>
+                <p>@organization.CountryCode · @organization.Status</p>
+            </div>
+
+            <div class="grid-2">
+                <section class="card">
+                    <h2>Organization profile</h2>
+                    <dl class="detail-list">
+                        <dt>Registration number</dt><dd>@(organization.RegistrationNumber ?? "—")</dd>
+                        <dt>Organization type</dt><dd>@(organization.OrganizationType ?? "—")</dd>
+                        <dt>Primary contact</dt><dd>@(organization.PrimaryContactName ?? "—")</dd>
+                        <dt>Email</dt><dd>@(organization.Email ?? "—")</dd>
+                        <dt>Phone</dt><dd>@(organization.Phone ?? "—")</dd>
+                        <dt>Address</dt><dd>@(organization.Address ?? "—")</dd>
+                        <dt>Registration expires</dt><dd>@(organization.RegistrationExpiryDate?.ToString("yyyy-MM-dd") ?? "—")</dd>
+                        <dt>Registered UTC</dt><dd>@organization.CreatedUtc.ToString("u")</dd>
+                        <dt>Approved UTC</dt><dd>@(organization.ApprovedUtc?.ToString("u") ?? "—")</dd>
+                    </dl>
+                </section>
+
+                <section class="card">
+                    <h2>Representatives</h2>
+                    @if (organization.Members.Count == 0)
+                    {
+                        <p class="muted">No representatives are registered.</p>
+                    }
+                    else
+                    {
+                        <div class="table-wrap">
+                            <table>
+                                <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Role</th></tr></thead>
+                                <tbody>
+                                @foreach (StaffOrganizationMember member in organization.Members)
+                                {
+                                    <tr>
+                                        <td>@member.DisplayName</td>
+                                        <td>@member.Email</td>
+                                        <td>@member.MembershipStatus</td>
+                                        <td>@member.Role</td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </section>
+            </div>
+
+            <section class="card" style="margin-top:1.5rem">
+                <h2>Requests</h2>
+                @if (organization.Requests.Count == 0)
+                {
+                    <p class="muted">No requests have been submitted for this organization.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Reference</th><th>Status</th><th>Summary</th><th>Created UTC</th></tr></thead>
+                            <tbody>
+                            @foreach (StaffOrganizationRequest request in organization.Requests)
+                            {
+                                <tr>
+                                    <td><a asp-page="/Staff/Review" asp-route-id="@request.RequestId">@request.PublicReference</a></td>
+                                    <td>@request.Status</td>
+                                    <td>@request.Summary</td>
+                                    <td>@request.CreatedUtc.ToString("u")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section class="card" style="margin-top:1.5rem">
+                <h2>Business audit</h2>
+                @if (organization.Audit.Count == 0)
+                {
+                    <p class="muted">No business-audit entries have been recorded yet.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>UTC</th><th>Action</th><th>Entity</th><th>Detail</th></tr></thead>
+                            <tbody>
+                            @foreach (StaffAuditEntry entry in organization.Audit)
+                            {
+                                <tr>
+                                    <td>@entry.OccurredUtc.ToString("u")</td>
+                                    <td>@entry.Action</td>
+                                    <td>@entry.EntityType</td>
+                                    <td>@entry.Detail</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        </div>
+    </section>
+}
