@@ -4,22 +4,24 @@ This runbook is the minimum production commissioning checklist for Request Porta
 
 ## 1. Environment
 
-Set `ASPNETCORE_ENVIRONMENT=Production` on the application host. Production startup intentionally fails closed if durable storage, persistent data-protection keys, OpenBao, or EF migrations are not ready.
+Set `ASPNETCORE_ENVIRONMENT=Production` on the application host. Production startup intentionally fails closed if durable storage, persistent data-protection keys, OpenBao, required authentication/notification configuration, malware scanning, or EF migrations are not ready.
 
 ## 2. PostgreSQL and EF Core migrations
 
-Restore the pinned EF tool and generate/review migrations from the repository root:
+The repository now contains the reviewed initial EF Core migration and model snapshot under `src/RequestPortal.Infrastructure/Persistence/Migrations`. CI verifies that the current EF model does not have uncommitted migration changes.
+
+For each future schema change, restore the pinned EF tool and generate a named migration from the repository root:
 
 ```powershell
 dotnet tool restore
 $env:REQUESTPORTAL_MIGRATION_CONNECTION="Host=<server>;Port=5432;Database=<migration-db>;Username=<user>;Password=<password>"
-dotnet ef migrations add InitialProductionBaseline --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web --output-dir Persistence/Migrations
+dotnet ef migrations add <DescriptiveMigrationName> --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web --output-dir Persistence/Migrations
 dotnet ef migrations script --idempotent --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web -o artifacts/requestportal-migration.sql
 ```
 
-Review the generated SQL before applying it. Production startup calls `Database.MigrateAsync()` and refuses to start if the assembly contains no migrations.
+Review the generated migration and SQL before deployment. Production startup calls `Database.MigrateAsync()` and refuses to start if the assembly contains no migrations.
 
-For an existing demo database that is being promoted, do not blindly run a generated create migration against it. Create a clean production database and migrate it, or explicitly baseline the existing schema after comparing it to the generated migration.
+For an existing demo database that is being promoted, do not blindly apply the initial create migration. Prefer a clean production database created by the migration chain. If existing data must be retained, explicitly baseline that schema only after comparing it with the generated migration and taking a verified backup.
 
 ## 3. OpenBao / Common.Secrets
 
@@ -86,41 +88,40 @@ Default configuration points at `JMAD01.fftpj.local`, domain `fftpj.local`, sear
 
 ## 7. External identity providers
 
-Register the production Request Portal callback URLs with each provider that will be enabled. Store provider IDs/secrets in OpenBao. A provider is only activated when both required values are present.
+Register the production Request Portal callback URLs with each provider that will be enabled. Store provider IDs/secrets in OpenBao. A provider is only activated when both required values are present. Production startup requires at least one commissioned provider.
 
 Test new representative sign-in, returning representative sign-in, account linking by verified email, logout, callback failure, and a forged/non-local return URL.
 
 ## 8. SMTP commissioning
 
-Set the non-secret SMTP host, port, sender address and username in production configuration. Store `Notifications:SmtpPassword` in OpenBao. Send and verify:
+Set the non-secret SMTP host, port, sender address and username in production configuration. Store `Notifications:SmtpPassword` in OpenBao. Production startup requires notifications to be enabled and SMTP host/from-address to be configured.
 
-- organization approval;
-- membership approval/rejection;
-- request submission;
-- more-information request;
-- approval/rejection;
-- notification preference suppression;
-- failed-send retry/history.
+Send and verify organization approval, membership approval/rejection, request submission, more-information request, approval/rejection, notification preference suppression, and failed-send retry/history.
 
 ## 9. Upload security
 
-Production uploads are limited to PDF, PNG, JPEG, DOCX and XLSX and default to 25 MiB maximum. Extension and file signatures are checked before storage. Add malware scanning at the infrastructure edge before public go-live if an enterprise scanner/ClamAV service is available; scanning is still a mandatory production control even though signature validation is now implemented.
+Production uploads are limited to PDF, PNG, JPEG, DOCX and XLSX and default to 25 MiB maximum. The request body and multipart limits are enforced by the host, and extension plus file signatures are checked before storage.
+
+Production also requires malware scanning to be enabled. The built-in ClamAV INSTREAM client connects to `Uploads:MalwareScanning:Host` and `Port`; a detected or indeterminate result rejects the upload. Commission the actual ClamAV endpoint and test with the EICAR test file in a non-production environment before go-live.
 
 ## 10. Reverse proxy and HTTPS
 
-Terminate TLS with the approved certificate and forward `X-Forwarded-For` and `X-Forwarded-Proto`. Only trusted reverse proxies should be allowed to reach the application listener. Confirm HSTS, HTTPS redirection, CSP, frame denial, MIME sniffing protection and rate limiting.
+Terminate TLS with the approved certificate and forward `X-Forwarded-For` and `X-Forwarded-Proto`. Only trusted reverse proxies should be allowed to reach the application listener. Confirm HSTS, HTTPS redirection, CSP, frame denial, MIME sniffing protection, restrictive host filtering, cookie security and rate limiting.
+
+The current CSP retains `unsafe-inline` because the existing Razor UI contains inline styles/scripts. Removing inline code and switching to nonces/hashes should be treated as a later hardening step.
 
 ## 11. Go-live gates
 
 Before DNS cutover:
 
-1. CI green.
-2. Production database created by reviewed EF migrations.
-3. OpenBao reachable with least-privilege machine token.
-4. Durable document path and Data Protection path writable by the service identity.
-5. AD and at least one external identity provider tested.
-6. SMTP tested.
-7. Backup and restore drill completed.
-8. Organization-isolation and authorization tests green.
-9. Production Starfleet Diagnostics green.
-10. Demo mode confirmed disabled.
+1. CI green, including migration-model verification and tests.
+2. Production database created by the committed/reviewed EF migration chain.
+3. OpenBao reachable with a least-privilege machine token.
+4. Durable document path and Data Protection path writable by the service identity and backed up.
+5. ClamAV scanning reachable and tested.
+6. AD and at least one external identity provider tested.
+7. SMTP tested end to end.
+8. Backup and restore drill completed.
+9. Organization-isolation and authorization tests green.
+10. Production Starfleet Diagnostics green.
+11. Demo mode confirmed disabled.
