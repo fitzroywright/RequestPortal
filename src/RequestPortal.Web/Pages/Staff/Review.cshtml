@@ -1,6 +1,7 @@
 @page "{id:guid}"
 @model RequestPortal.Web.Pages.Staff.ReviewModel
 @using RequestPortal.Application.Documents
+@using RequestPortal.Application.Requests
 @{
     ViewData["Title"] = "Review Request";
 }
@@ -32,6 +33,71 @@
                             <div class="muted" style="margin-bottom:20px">Version @Model.ProjectProposal.Version · last updated @Model.ProjectProposal.UpdatedUtc.ToString("u")</div>
                             <article class="proposal-document">@Html.Raw(Model.ProjectProposal.RichContentHtml)</article>
                         </section>
+
+                        @if (Model.ProjectPlanning is not null)
+                        {
+                            <section class="card" style="margin-top:1.5rem">
+                                <h2>Project budget</h2>
+                                <div class="table-wrap">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Description</th>
+                                                <th>Qty</th>
+                                                <th>Unit cost</th>
+                                                <th>Total</th>
+                                                <th>FFP requested</th>
+                                                <th>Organization</th>
+                                                <th>Other funding</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        @foreach (ProjectBudgetItemDetail item in Model.ProjectPlanning.Budget)
+                                        {
+                                            <tr>
+                                                <td>@item.Description</td>
+                                                <td>@item.Quantity</td>
+                                                <td>@item.UnitCost.ToString("N2")</td>
+                                                <td>@item.TotalCost.ToString("N2")</td>
+                                                <td>@item.FfpRequested.ToString("N2")</td>
+                                                <td>@item.OrganizationContribution.ToString("N2")</td>
+                                                <td>@item.OtherFunding.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <th colspan="3">Totals</th>
+                                                <th>@Model.ProjectPlanning.TotalCost.ToString("N2")</th>
+                                                <th>@Model.ProjectPlanning.TotalFfpRequested.ToString("N2")</th>
+                                                <th>@Model.ProjectPlanning.TotalOrganizationContribution.ToString("N2")</th>
+                                                <th>@Model.ProjectPlanning.TotalOtherFunding.ToString("N2")</th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <section class="card" style="margin-top:1.5rem">
+                                <h2>Implementation milestones</h2>
+                                <div class="table-wrap">
+                                    <table>
+                                        <thead><tr><th>#</th><th>Milestone</th><th>Expected outcome</th><th>Target date</th></tr></thead>
+                                        <tbody>
+                                        @foreach (ProjectMilestoneDetail milestone in Model.ProjectPlanning.Milestones)
+                                        {
+                                            <tr>
+                                                <td>@milestone.Sequence</td>
+                                                <td>@milestone.Title</td>
+                                                <td>@milestone.ExpectedOutcome</td>
+                                                <td>@milestone.TargetDate.ToString("yyyy-MM-dd")</td>
+                                            </tr>
+                                        }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        }
                     }
 
                     @if (Model.Request.Items.Count > 0)
