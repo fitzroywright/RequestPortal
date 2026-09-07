@@ -22,19 +22,22 @@ public sealed class DocumentService : IDocumentService
     private readonly IFileStorage fileStorage;
     private readonly IClock clock;
     private readonly IDocumentUploadSecurity uploadSecurity;
+    private readonly IMalwareScanner malwareScanner;
 
     public DocumentService(
         RequestPortalDbContext dbContext,
         IOrganizationAccessService organizationAccessService,
         IFileStorage fileStorage,
         IClock clock,
-        IDocumentUploadSecurity uploadSecurity)
+        IDocumentUploadSecurity uploadSecurity,
+        IMalwareScanner malwareScanner)
     {
         this.dbContext = dbContext;
         this.organizationAccessService = organizationAccessService;
         this.fileStorage = fileStorage;
         this.clock = clock;
         this.uploadSecurity = uploadSecurity;
+        this.malwareScanner = malwareScanner;
     }
 
     public async Task<Guid> UploadForRequestAsync(Guid userId, Guid requestId, DocumentType documentType, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default)
@@ -42,6 +45,7 @@ public sealed class DocumentService : IDocumentService
         Guid organizationId = await dbContext.AssistanceRequests.AsNoTracking().Where(request => request.Id == requestId).Select(request => request.OrganizationId).SingleAsync(cancellationToken);
         await EnsureApprovedMemberAsync(userId, organizationId, cancellationToken);
         await uploadSecurity.ValidateAsync(originalFileName, contentType, sizeBytes, content, cancellationToken);
+        await malwareScanner.ScanAsync(content, cancellationToken);
         return await StoreMetadataAsync(userId, DocumentOwnerType.AssistanceRequest, requestId, organizationId, documentType, originalFileName, contentType, sizeBytes, content, cancellationToken);
     }
 
@@ -51,6 +55,7 @@ public sealed class DocumentService : IDocumentService
         bool isApprovedMember = await organizationAccessService.IsApprovedMemberAsync(userId, organizationId, cancellationToken);
         if (organization.RegisteredByUserId != userId && !isApprovedMember) throw new UnauthorizedAccessException("The current user cannot upload documents for this organization.");
         await uploadSecurity.ValidateAsync(originalFileName, contentType, sizeBytes, content, cancellationToken);
+        await malwareScanner.ScanAsync(content, cancellationToken);
         return await StoreMetadataAsync(userId, DocumentOwnerType.Organization, organizationId, organizationId, documentType, originalFileName, contentType, sizeBytes, content, cancellationToken);
     }
 
