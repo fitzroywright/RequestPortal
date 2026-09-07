@@ -1,3 +1,6 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace RequestPortal.Common.Diagnostics;
 
 public sealed record DiagnosticCheckResult(string Name, bool IsHealthy, string? Detail = null);
