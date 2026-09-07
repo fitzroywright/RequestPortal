@@ -1,222 +1,26 @@
 @page "{id:guid}"
 @model RequestPortal.Web.Pages.Requests.ProposalModel
+@using RequestPortal.Application.Requests
 @{
     ViewData["Title"] = "Project Proposal";
     string storedContent = Model.Proposal?.RichContentHtml ?? string.Empty;
 }
-
-<section class="section">
-    <div class="shell">
-        <div class="section-heading">
-            <div class="eyebrow" style="color:#b45b09">Project request</div>
-            <h1>Write the project proposal</h1>
-            <p>
-                Use this workspace like a lightweight word processor. Build a long narrative, add headings, lists,
-                tables and photos, save the draft, then submit the complete proposal to FFP.
-            </p>
-        </div>
-
-        <form method="post" class="form-grid" id="proposalForm">
-            <div asp-validation-summary="ModelOnly" class="validation"></div>
-
-            <section class="card">
-                <div class="field">
-                    <label asp-for="Input.Title">Proposal title</label>
-                    <input asp-for="Input.Title" placeholder="e.g. Community Water Rehabilitation Project" />
-                    <span asp-validation-for="Input.Title" class="validation"></span>
-                </div>
-
-                <div class="proposal-toolbar" role="toolbar" aria-label="Proposal formatting">
-                    <button type="button" data-command="undo" title="Undo">Undo</button>
-                    <button type="button" data-command="redo" title="Redo">Redo</button>
-                    <span class="toolbar-divider"></span>
-                    <button type="button" data-command="bold"><strong>B</strong></button>
-                    <button type="button" data-command="italic"><em>I</em></button>
-                    <button type="button" data-command="underline"><u>U</u></button>
-                    <button type="button" data-block="h2">Heading</button>
-                    <button type="button" data-block="p">Paragraph</button>
-                    <span class="toolbar-divider"></span>
-                    <button type="button" data-command="insertUnorderedList">Bullets</button>
-                    <button type="button" data-command="insertOrderedList">Numbering</button>
-                    <button type="button" id="insertTable">Table</button>
-                    <button type="button" id="insertLink">Link</button>
-                    <button type="button" id="insertPhoto">Photo</button>
-                    <input id="photoPicker" type="file" accept="image/*" hidden />
-                </div>
-
-                <div id="proposalEditor"
-                     class="proposal-editor"
-                     contenteditable="true"
-                     spellcheck="true"
-                     aria-label="Project proposal editor">@Html.Raw(storedContent)</div>
-
-                <textarea asp-for="Input.RichContentHtml" id="proposalHtml" hidden></textarea>
-                <span asp-validation-for="Input.RichContentHtml" class="validation"></span>
-
-                <div class="action-row" style="margin-top:18px">
-                    <button class="button button-secondary" type="submit" asp-page-handler="Save">Save draft</button>
-                    <button class="button" type="submit" asp-page-handler="Submit">Save and submit to FFP</button>
-                    @if (Model.Proposal is not null)
-                    {
-                        <span class="muted">Version @Model.Proposal.Version · last saved @Model.Proposal.UpdatedUtc.ToString("u")</span>
-                    }
-                </div>
-            </section>
-        </form>
-
-        <section class="card" style="margin-top:1.5rem">
-            <h2>Proposal guidance</h2>
-            <p class="muted">A strong project proposal can include:</p>
-            <ul>
-                <li>Executive summary and statement of need.</li>
-                <li>Background on the community and beneficiaries.</li>
-                <li>Project objectives, activities and expected outcomes.</li>
-                <li>Implementation schedule and responsibilities.</li>
-                <li>Budget or resource tables.</li>
-                <li>Photos showing existing conditions or the proposed site.</li>
-                <li>Sustainability, maintenance and monitoring plans.</li>
-            </ul>
-            <p class="muted">Large original files can also be uploaded as supporting documents on the request.</p>
-        </section>
-    </div>
-</section>
-
-<style>
-    .proposal-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        padding: 10px;
-        border: 1px solid #d9dee3;
-        border-bottom: 0;
-        background: #f6f7f8;
-        border-radius: 8px 8px 0 0;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-    }
-
-    .proposal-toolbar button {
-        border: 1px solid #cbd2d8;
-        background: white;
-        border-radius: 5px;
-        padding: 6px 10px;
-        cursor: pointer;
-    }
-
-    .toolbar-divider {
-        width: 1px;
-        background: #d3d8dc;
-        margin: 2px 3px;
-    }
-
-    .proposal-editor {
-        min-height: 720px;
-        padding: 48px 56px;
-        border: 1px solid #d9dee3;
-        background: white;
-        color: #202428;
-        font-family: Georgia, 'Times New Roman', serif;
-        font-size: 17px;
-        line-height: 1.65;
-        outline: none;
-        box-shadow: 0 4px 18px rgba(0,0,0,.05);
-    }
-
-    .proposal-editor h1, .proposal-editor h2, .proposal-editor h3 {
-        font-family: Arial, Helvetica, sans-serif;
-    }
-
-    .proposal-editor table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 18px 0;
-    }
-
-    .proposal-editor th, .proposal-editor td {
-        border: 1px solid #87919a;
-        padding: 8px 10px;
-        min-width: 70px;
-    }
-
-    .proposal-editor img {
-        max-width: 100%;
-        height: auto;
-        margin: 14px 0;
-        border-radius: 4px;
-    }
-</style>
-
-<script>
-(() => {
-    const editor = document.getElementById('proposalEditor');
-    const htmlField = document.getElementById('proposalHtml');
-    const form = document.getElementById('proposalForm');
-    const photoPicker = document.getElementById('photoPicker');
-
-    function focusEditor() {
-        editor.focus();
-    }
-
-    document.querySelectorAll('[data-command]').forEach(button => {
-        button.addEventListener('click', () => {
-            focusEditor();
-            document.execCommand(button.dataset.command, false, null);
-        });
-    });
-
-    document.querySelectorAll('[data-block]').forEach(button => {
-        button.addEventListener('click', () => {
-            focusEditor();
-            document.execCommand('formatBlock', false, button.dataset.block);
-        });
-    });
-
-    document.getElementById('insertTable').addEventListener('click', () => {
-        const rows = Math.min(Math.max(parseInt(prompt('Rows', '3') || '0', 10), 1), 20);
-        const columns = Math.min(Math.max(parseInt(prompt('Columns', '3') || '0', 10), 1), 10);
-        let table = '<table><tbody>';
-        for (let row = 0; row < rows; row++) {
-            table += '<tr>';
-            for (let column = 0; column < columns; column++) {
-                table += row === 0 ? '<th>Heading</th>' : '<td>Value</td>';
-            }
-            table += '</tr>';
-        }
-        table += '</tbody></table><p><br></p>';
-        focusEditor();
-        document.execCommand('insertHTML', false, table);
-    });
-
-    document.getElementById('insertLink').addEventListener('click', () => {
-        const url = prompt('Link address', 'https://');
-        if (!url) return;
-        focusEditor();
-        document.execCommand('createLink', false, url);
-    });
-
-    document.getElementById('insertPhoto').addEventListener('click', () => photoPicker.click());
-
-    photoPicker.addEventListener('change', () => {
-        const file = photoPicker.files && photoPicker.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-            alert('For the demo editor, inline photos must be 2 MB or smaller. Upload larger originals as supporting documents.');
-            photoPicker.value = '';
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = event => {
-            focusEditor();
-            document.execCommand('insertImage', false, event.target.result);
-            photoPicker.value = '';
-        };
-        reader.readAsDataURL(file);
-    });
-
-    form.addEventListener('submit', () => {
-        htmlField.value = editor.innerHTML;
-    });
-})();
-</script>
+<section class="section"><div class="shell">
+<div class="section-heading"><div class="eyebrow" style="color:#b45b09">Project request</div><h1>Build the project proposal</h1><p>Write the narrative, then complete the structured budget and implementation milestones before submission.</p></div>
+<div asp-validation-summary="All" class="validation"></div>
+<form method="post" class="form-grid" id="proposalForm"><section class="card">
+<div class="field"><label asp-for="Input.Title">Proposal title</label><input asp-for="Input.Title" /><span asp-validation-for="Input.Title" class="validation"></span></div>
+<div class="proposal-toolbar" role="toolbar"><button type="button" data-command="undo">Undo</button><button type="button" data-command="redo">Redo</button><button type="button" data-command="bold"><strong>B</strong></button><button type="button" data-command="italic"><em>I</em></button><button type="button" data-command="underline"><u>U</u></button><button type="button" data-block="h2">Heading</button><button type="button" data-block="p">Paragraph</button><button type="button" data-command="insertUnorderedList">Bullets</button><button type="button" data-command="insertOrderedList">Numbering</button><button type="button" id="insertTable">Table</button><button type="button" id="insertLink">Link</button><button type="button" id="insertPhoto">Photo</button><input id="photoPicker" type="file" accept="image/*" hidden /></div>
+<div id="proposalEditor" class="proposal-editor" contenteditable="true" spellcheck="true">@Html.Raw(storedContent)</div><textarea asp-for="Input.RichContentHtml" id="proposalHtml" hidden></textarea>
+<div class="action-row" style="margin-top:18px"><button class="button button-secondary" type="submit" asp-page-handler="Save">Save narrative</button><button class="button" type="submit" asp-page-handler="Submit">Save and submit to FFP</button>@if(Model.Proposal is not null){<span class="muted">Version @Model.Proposal.Version · @Model.Proposal.UpdatedUtc.ToString("u")</span>}</div>
+</section></form>
+<section class="card" style="margin-top:1.5rem"><h2>Structured project budget</h2>
+@if(Model.Planning is not null && Model.Planning.Budget.Count > 0){<div class="table-wrap"><table><thead><tr><th>Description</th><th>Qty</th><th>Unit cost</th><th>Total</th><th>FFP</th><th>Organization</th><th>Other</th><th></th></tr></thead><tbody>@foreach(ProjectBudgetItemDetail item in Model.Planning.Budget){<tr><td>@item.Description</td><td>@item.Quantity</td><td>@item.UnitCost.ToString("N2")</td><td>@item.TotalCost.ToString("N2")</td><td>@item.FfpRequested.ToString("N2")</td><td>@item.OrganizationContribution.ToString("N2")</td><td>@item.OtherFunding.ToString("N2")</td><td><form method="post" asp-page-handler="RemoveBudget"><input type="hidden" name="itemId" value="@item.Id"/><button class="button button-outline" type="submit">Remove</button></form></td></tr>}</tbody><tfoot><tr><th colspan="3">Totals</th><th>@Model.Planning.TotalCost.ToString("N2")</th><th>@Model.Planning.TotalFfpRequested.ToString("N2")</th><th>@Model.Planning.TotalOrganizationContribution.ToString("N2")</th><th>@Model.Planning.TotalOtherFunding.ToString("N2")</th><th></th></tr></tfoot></table></div>}
+<form method="post" asp-page-handler="AddBudget" class="form-grid"><div class="field"><label asp-for="Budget.Description"></label><input asp-for="Budget.Description"/></div><div class="field"><label asp-for="Budget.Quantity"></label><input asp-for="Budget.Quantity" type="number" step="0.001"/></div><div class="field"><label asp-for="Budget.UnitCost">Unit cost</label><input asp-for="Budget.UnitCost" type="number" step="0.01"/></div><div class="field"><label asp-for="Budget.FfpRequested">Requested from FFP</label><input asp-for="Budget.FfpRequested" type="number" step="0.01"/></div><div class="field"><label asp-for="Budget.OrganizationContribution">Organization contribution</label><input asp-for="Budget.OrganizationContribution" type="number" step="0.01"/></div><div class="field"><label asp-for="Budget.OtherFunding">Other funding</label><input asp-for="Budget.OtherFunding" type="number" step="0.01"/></div><button class="button button-outline" type="submit">Add budget item</button></form></section>
+<section class="card" style="margin-top:1.5rem"><h2>Implementation milestones & outcomes</h2>
+@if(Model.Planning is not null && Model.Planning.Milestones.Count > 0){<div class="table-wrap"><table><thead><tr><th>#</th><th>Milestone</th><th>Expected outcome</th><th>Target date</th><th></th></tr></thead><tbody>@foreach(ProjectMilestoneDetail item in Model.Planning.Milestones){<tr><td>@item.Sequence</td><td>@item.Title</td><td>@item.ExpectedOutcome</td><td>@item.TargetDate</td><td><form method="post" asp-page-handler="RemoveMilestone"><input type="hidden" name="milestoneId" value="@item.Id"/><button class="button button-outline" type="submit">Remove</button></form></td></tr>}</tbody></table></div>}
+<form method="post" asp-page-handler="AddMilestone" class="form-grid"><div class="field"><label asp-for="Milestone.Title"></label><input asp-for="Milestone.Title"/></div><div class="field"><label asp-for="Milestone.ExpectedOutcome">Expected outcome</label><textarea asp-for="Milestone.ExpectedOutcome"></textarea></div><div class="field"><label asp-for="Milestone.TargetDate">Target date</label><input asp-for="Milestone.TargetDate" type="date"/></div><button class="button button-outline" type="submit">Add milestone</button></form></section>
+<section class="card" style="margin-top:1.5rem"><h2>Proposal guidance</h2><p class="muted">Include executive summary, need, beneficiaries, objectives, activities, implementation approach, sustainability, risks, monitoring and maintenance. Upload large originals as supporting documents.</p></section>
+</div></section>
+<style>.proposal-toolbar{display:flex;flex-wrap:wrap;gap:6px;padding:10px;border:1px solid #d9dee3;border-bottom:0;background:#f6f7f8;position:sticky;top:0;z-index:2}.proposal-toolbar button{border:1px solid #cbd2d8;background:white;border-radius:5px;padding:6px 10px}.proposal-editor{min-height:720px;padding:48px 56px;border:1px solid #d9dee3;background:white;color:#202428;font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.65;outline:none}.proposal-editor table{width:100%;border-collapse:collapse;margin:18px 0}.proposal-editor th,.proposal-editor td{border:1px solid #87919a;padding:8px 10px}.proposal-editor img{max-width:100%;height:auto;margin:14px 0}</style>
+<script>(()=>{const editor=document.getElementById('proposalEditor'),field=document.getElementById('proposalHtml'),form=document.getElementById('proposalForm'),picker=document.getElementById('photoPicker');document.querySelectorAll('[data-command]').forEach(b=>b.addEventListener('click',()=>{editor.focus();document.execCommand(b.dataset.command,false,null);}));document.querySelectorAll('[data-block]').forEach(b=>b.addEventListener('click',()=>{editor.focus();document.execCommand('formatBlock',false,b.dataset.block);}));document.getElementById('insertTable').addEventListener('click',()=>{const r=Math.min(Math.max(parseInt(prompt('Rows','3')||'0',10),1),20),c=Math.min(Math.max(parseInt(prompt('Columns','3')||'0',10),1),10);let t='<table><tbody>';for(let i=0;i<r;i++){t+='<tr>';for(let j=0;j<c;j++)t+=i===0?'<th>Heading</th>':'<td>Value</td>';t+='</tr>';}t+='</tbody></table><p><br></p>';editor.focus();document.execCommand('insertHTML',false,t);});document.getElementById('insertLink').addEventListener('click',()=>{const u=prompt('Link address','https://');if(u){editor.focus();document.execCommand('createLink',false,u);}});document.getElementById('insertPhoto').addEventListener('click',()=>picker.click());picker.addEventListener('change',()=>{const f=picker.files&&picker.files[0];if(!f)return;if(f.size>2*1024*1024){alert('Inline photos must be 2 MB or smaller.');return;}const r=new FileReader();r.onload=e=>{editor.focus();document.execCommand('insertImage',false,e.target.result);};r.readAsDataURL(f);});form.addEventListener('submit',()=>field.value=editor.innerHTML);})();</script>
