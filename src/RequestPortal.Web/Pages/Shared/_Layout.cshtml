@@ -26,6 +26,7 @@
                     @if (User.IsInRole("FfpAdministrator") || User.IsInRole("FfpReviewer"))
                     {
                         <a asp-page="/Staff/Index">FFP Staff</a>
+                        <a asp-page="/Staff/Diagnostics">Diagnostics</a>
                     }
                     <form method="post" asp-page="/Account/Logout" class="nav-form">
                         <button type="submit" class="nav-link-button">Sign out</button>
