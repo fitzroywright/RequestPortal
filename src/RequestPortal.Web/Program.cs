@@ -142,6 +142,7 @@ builder.Services.AddScoped<IBusinessAuditWriter, BusinessAuditWriter>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
 builder.Services.AddScoped<IRequestDraftService, RequestDraftService>();
+builder.Services.AddScoped<IProjectProposalService, ProjectProposalService>();
 builder.Services.AddScoped<IRequestLifecycleService, RequestLifecycleService>();
 builder.Services.AddScoped<IFulfilmentQueueService, FulfilmentQueueService>();
 builder.Services.AddScoped<IIntegrationStatusService, IntegrationStatusService>();
