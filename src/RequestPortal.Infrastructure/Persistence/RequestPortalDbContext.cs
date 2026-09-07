@@ -5,12 +5,12 @@ using Microsoft.EntityFrameworkCore;
 using RequestPortal.Domain.Auditing;
 using RequestPortal.Domain.Beneficiaries;
 using RequestPortal.Domain.Documents;
-using RequestPortal.Domain.Fulfilment;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
+using RequestFulfilment = RequestPortal.Domain.Fulfilment.Fulfilment;
 
 namespace RequestPortal.Infrastructure.Persistence;
 
@@ -37,7 +37,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
-    public DbSet<Fulfilment> Fulfilments => Set<Fulfilment>();
+    public DbSet<RequestFulfilment> Fulfilments => Set<RequestFulfilment>();
 
     public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
 
