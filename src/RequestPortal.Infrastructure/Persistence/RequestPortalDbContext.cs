@@ -43,6 +43,8 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
 
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
+    public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
