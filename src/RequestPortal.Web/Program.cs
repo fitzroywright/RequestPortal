@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,11 +62,9 @@ using RequestPortal.Web.Services;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 string connectionString = builder.Configuration.GetConnectionString("RequestPortal")
-    ?? throw new InvalidOperationException(
-        "SF-CONFIG-DB-001: PostgreSQL connection string 'RequestPortal' is not configured.");
+    ?? throw new InvalidOperationException("SF-CONFIG-DB-001: PostgreSQL connection string 'RequestPortal' is not configured.");
 
-builder.Services.AddDbContext<RequestPortalDbContext>(options =>
-    options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<RequestPortalDbContext>(options => options.UseNpgsql(connectionString));
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
@@ -79,6 +82,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.Name = "RequestPortal.Auth";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
     options.SlidingExpiration = true;
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
 });
@@ -89,46 +93,67 @@ string? googleClientId = builder.Configuration["Authentication:Google:ClientId"]
 string? googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
 {
-    authentication.AddGoogle(options =>
-    {
-        options.ClientId = googleClientId;
-        options.ClientSecret = googleClientSecret;
-    });
+    authentication.AddGoogle(options => { options.ClientId = googleClientId; options.ClientSecret = googleClientSecret; });
 }
 
 string? microsoftClientId = builder.Configuration["Authentication:Microsoft:ClientId"];
 string? microsoftClientSecret = builder.Configuration["Authentication:Microsoft:ClientSecret"];
 if (!string.IsNullOrWhiteSpace(microsoftClientId) && !string.IsNullOrWhiteSpace(microsoftClientSecret))
 {
-    authentication.AddMicrosoftAccount(options =>
-    {
-        options.ClientId = microsoftClientId;
-        options.ClientSecret = microsoftClientSecret;
-    });
+    authentication.AddMicrosoftAccount(options => { options.ClientId = microsoftClientId; options.ClientSecret = microsoftClientSecret; });
 }
 
 string? facebookAppId = builder.Configuration["Authentication:Facebook:AppId"];
 string? facebookAppSecret = builder.Configuration["Authentication:Facebook:AppSecret"];
 if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret))
 {
-    authentication.AddFacebook(options =>
-    {
-        options.AppId = facebookAppId;
-        options.AppSecret = facebookAppSecret;
-    });
+    authentication.AddFacebook(options => { options.AppId = facebookAppId; options.AppSecret = facebookAppSecret; });
 }
 
-builder.Services
-    .AddOptions<ActiveDirectoryOptions>()
-    .Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
+builder.Services.AddOptions<ActiveDirectoryOptions>().Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
+builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection(NotificationOptions.SectionName));
 
-builder.Services
-    .AddOptions<NotificationOptions>()
-    .Bind(builder.Configuration.GetSection(NotificationOptions.SectionName));
+string dataProtectionPath = builder.Configuration["Security:DataProtectionKeysPath"] ?? "App_Data/keys";
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.GetFullPath(dataProtectionPath)))
+    .SetApplicationName("RequestPortal");
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 
 builder.Services.AddSingleton<IClock, RequestPortal.Common.Time.SystemClock>();
 builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
-builder.Services.AddSingleton<ISecretProvider, ConfigurationSecretProvider>();
+builder.Services.AddSingleton<IDocumentUploadSecurity, DocumentUploadSecurity>();
+
+if (builder.Environment.IsProduction())
+{
+    builder.Services.AddHttpClient("OpenBao");
+    builder.Services.AddSingleton<ISecretProvider>(serviceProvider =>
+        new OpenBaoSecretProvider(
+            serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("OpenBao"),
+            builder.Configuration));
+}
+else
+{
+    builder.Services.AddSingleton<ISecretProvider, ConfigurationSecretProvider>();
+}
 
 builder.Services.AddScoped<INotificationSender, SmtpNotificationSender>();
 builder.Services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
@@ -154,14 +179,11 @@ builder.Services.AddScoped<IRequestLifecycleService, RequestLifecycleService>();
 builder.Services.AddScoped<IFulfilmentQueueService, FulfilmentQueueService>();
 builder.Services.AddScoped<IIntegrationStatusService, IntegrationStatusService>();
 builder.Services.AddScoped<StaffSignInService>();
-
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddHostedService<OutboxHostedService>();
-
 builder.Services.AddScoped<DemoDatabaseBootstrapper>();
 builder.Services.AddScoped<DemoDataSeeder>();
 builder.Services.AddScoped<DemoReadinessValidator>();
-
 builder.Services.AddStarfleetDiagnostics();
 builder.Services.AddScoped<IStartupDiagnostic, PostgreSqlStartupDiagnostic>();
 builder.Services.AddScoped<IStartupDiagnostic, ActiveDirectoryStartupDiagnostic>();
@@ -169,9 +191,7 @@ builder.Services.AddScoped<StartupDiagnosticRunner>();
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy(
-        PortalPolicies.FfpStaff,
-        policy => policy.RequireRole(PortalRoles.FfpAdministrator, PortalRoles.FfpReviewer));
+    options.AddPolicy(PortalPolicies.FfpStaff, policy => policy.RequireRole(PortalRoles.FfpAdministrator, PortalRoles.FfpReviewer));
 });
 
 builder.Services.AddRazorPages(options =>
@@ -184,15 +204,32 @@ builder.Services.AddRazorPages(options =>
 
 WebApplication app = builder.Build();
 
+if (app.Environment.IsProduction())
+{
+    ValidateProductionConfiguration(app.Configuration);
+    await ApplyProductionMigrationsAsync(app);
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.XContentTypeOptions = "nosniff";
+    context.Response.Headers.XFrameOptions = "DENY";
+    context.Response.Headers.ReferrerPolicy = "strict-origin-when-cross-origin";
+    context.Response.Headers.ContentSecurityPolicy = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    context.Response.Headers.PermissionsPolicy = "camera=(), microphone=(), geolocation=()";
+    await next();
+});
 app.UseStaticFiles();
 app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
@@ -201,37 +238,44 @@ await PrepareDemoAsync(app);
 await ReportStartupDiagnosticsAsync(app);
 await app.RunAsync();
 
+static void ValidateProductionConfiguration(IConfiguration configuration)
+{
+    string storageRoot = configuration["Storage:Local:RootPath"] ?? string.Empty;
+    string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("SF-PROD-STORAGE-001: Production document storage must be a durable external filesystem path or network share.");
+    if (string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("SF-PROD-DP-001: Production Data Protection keys must be persisted outside the application deployment directory.");
+    if (string.IsNullOrWhiteSpace(configuration["OpenBao:Address"]))
+        throw new InvalidOperationException("SF-PROD-SECRETS-001: OpenBao is not configured.");
+}
+
+static async Task ApplyProductionMigrationsAsync(WebApplication app)
+{
+    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+    RequestPortalDbContext db = scope.ServiceProvider.GetRequiredService<RequestPortalDbContext>();
+    string[] migrations = db.Database.GetMigrations().ToArray();
+    if (migrations.Length == 0)
+        throw new InvalidOperationException("SF-PROD-MIGRATION-001: No EF Core migrations exist. Production startup is blocked until a baseline migration is generated and reviewed.");
+    await db.Database.MigrateAsync();
+}
+
 static async Task PrepareDemoAsync(WebApplication app)
 {
-    if (!app.Configuration.GetValue("Demo:Enabled", false))
-    {
-        return;
-    }
-
+    if (!app.Configuration.GetValue("Demo:Enabled", false)) return;
     await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
-    DemoDatabaseBootstrapper bootstrapper = scope.ServiceProvider.GetRequiredService<DemoDatabaseBootstrapper>();
-    DemoDataSeeder seeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
-    DemoReadinessValidator validator = scope.ServiceProvider.GetRequiredService<DemoReadinessValidator>();
-
-    await bootstrapper.InitializeAsync();
-    await seeder.SeedAsync();
-    await validator.ValidateAsync();
+    await scope.ServiceProvider.GetRequiredService<DemoDatabaseBootstrapper>().InitializeAsync();
+    await scope.ServiceProvider.GetRequiredService<DemoDataSeeder>().SeedAsync();
+    await scope.ServiceProvider.GetRequiredService<DemoReadinessValidator>().ValidateAsync();
 }
 
 static async Task ReportStartupDiagnosticsAsync(WebApplication app)
 {
     await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
-    StartupDiagnosticRunner runner = scope.ServiceProvider.GetRequiredService<StartupDiagnosticRunner>();
-    IReadOnlyList<DiagnosticCheckResult> results = await runner.RunAsync();
-
+    IReadOnlyList<DiagnosticCheckResult> results = await scope.ServiceProvider.GetRequiredService<StartupDiagnosticRunner>().RunAsync();
     DiagnosticCheckResult? databaseResult = results.FirstOrDefault(result => result.Name == "PostgreSQL");
     if (databaseResult is not null && !databaseResult.IsHealthy)
-    {
-        throw new InvalidOperationException(
-            $"SF-STARTUP-DB-001: PostgreSQL startup diagnostic failed. {databaseResult.Detail}");
-    }
+        throw new InvalidOperationException($"SF-STARTUP-DB-001: PostgreSQL startup diagnostic failed. {databaseResult.Detail}");
 }
 
-public partial class Program
-{
-}
+public partial class Program { }
