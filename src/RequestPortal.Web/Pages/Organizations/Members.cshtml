@@ -1,0 +1,47 @@
+@page
+@model RequestPortal.Web.Pages.Organizations.MembersModel
+@{
+    ViewData["Title"] = "Organization Representatives";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Organization administration</div>
+            <h1>Pending representatives</h1>
+            <p>Approve only people you recognize as authorized representatives of this organization.</p>
+        </div>
+
+        <section class="card">
+            @if (Model.Memberships.Count == 0)
+            {
+                <p class="muted">There are no pending membership requests.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Name</th><th>Email</th><th>Requested</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (PendingMembershipSummary membership in Model.Memberships)
+                        {
+                            <tr>
+                                <td><strong>@membership.UserDisplayName</strong></td>
+                                <td>@membership.UserEmail</td>
+                                <td>@membership.RequestedUtc.ToLocalTime().ToString("g")</td>
+                                <td>
+                                    <form method="post">
+                                        <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
+                                        <input type="hidden" name="membershipId" value="@membership.MembershipId" />
+                                        <button class="button button-small" type="submit">Approve representative</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</section>
