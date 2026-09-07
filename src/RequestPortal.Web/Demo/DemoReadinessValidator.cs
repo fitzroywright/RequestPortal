@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using RequestPortal.Common.Security;
+using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Organizations;
-using RequestPortal.Domain.ReferenceData;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
@@ -65,8 +65,14 @@ public sealed class DemoReadinessValidator
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.Name == "New Hope Youth Foundation", cancellationToken);
 
-        Require(approvedOrganization?.Status == OrganizationStatus.Approved, "Approved demo organization is missing or not approved.", failures);
-        Require(pendingOrganization?.Status == OrganizationStatus.PendingApproval, "Pending organization approval scenario is missing.", failures);
+        Require(
+            approvedOrganization?.Status == OrganizationStatus.Approved,
+            "Approved demo organization is missing or not approved.",
+            failures);
+        Require(
+            pendingOrganization?.Status == OrganizationStatus.PendingApproval,
+            "Pending organization approval scenario is missing.",
+            failures);
 
         if (approvedOrganization is not null && administrator is not null && representative is not null && pending is not null)
         {
@@ -76,49 +82,112 @@ public sealed class DemoReadinessValidator
                 .ToListAsync(cancellationToken);
 
             Require(
-                memberships.Any(item => item.UserId == administrator.Id && item.Status == MembershipStatus.Approved && item.Role == OrganizationRole.Administrator),
+                memberships.Any(item =>
+                    item.UserId == administrator.Id &&
+                    item.Status == MembershipStatus.Approved &&
+                    item.Role == OrganizationRole.Administrator),
                 "Approved organization administrator membership is missing.",
                 failures);
             Require(
-                memberships.Any(item => item.UserId == representative.Id && item.Status == MembershipStatus.Approved),
+                memberships.Any(item =>
+                    item.UserId == representative.Id &&
+                    item.Status == MembershipStatus.Approved),
                 "Approved representative membership is missing.",
                 failures);
             Require(
-                memberships.Any(item => item.UserId == pending.Id && item.Status == MembershipStatus.Pending),
+                memberships.Any(item =>
+                    item.UserId == pending.Id &&
+                    item.Status == MembershipStatus.Pending),
                 "Pending membership approval scenario is missing.",
                 failures);
         }
 
         Require(
-            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(item => item.Kind == RequestKind.GoodsAndServices && item.Status == RequestStatus.Submitted, cancellationToken),
+            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(
+                item => item.Kind == RequestKind.GoodsAndServices && item.Status == RequestStatus.Submitted,
+                cancellationToken),
             "Submitted goods/services request scenario is missing.",
+            failures);
+        Require(
+            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(
+                item => item.Status == RequestStatus.MoreInformationRequired,
+                cancellationToken),
+            "More-information-required request scenario is missing.",
+            failures);
+        Require(
+            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(
+                item => item.Status == RequestStatus.Approved,
+                cancellationToken),
+            "Approved request awaiting fulfilment scenario is missing.",
+            failures);
+        Require(
+            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(
+                item => item.Status == RequestStatus.PendingFulfilment,
+                cancellationToken),
+            "Pending fulfilment scenario is missing.",
+            failures);
+        Require(
+            await dbContext.Fulfilments.AsNoTracking().AnyAsync(cancellationToken),
+            "Fulfilment record is missing.",
+            failures);
+        Require(
+            await dbContext.IntegrationLinks.AsNoTracking().AnyAsync(
+                item => item.Status == SynchronizationStatus.Synchronized,
+                cancellationToken),
+            "Synchronized integration example is missing.",
             failures);
 
         AssistanceRequest? projectRequest = await dbContext.AssistanceRequests
             .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.Kind == RequestKind.Project && item.Status == RequestStatus.Submitted, cancellationToken);
+            .FirstOrDefaultAsync(
+                item => item.Kind == RequestKind.Project && item.Status == RequestStatus.Submitted,
+                cancellationToken);
         Require(projectRequest is not null, "Submitted project request scenario is missing.", failures);
 
         if (projectRequest is not null)
         {
             Require(
-                await dbContext.ProjectProposals.AsNoTracking().AnyAsync(item => item.RequestId == projectRequest.Id && item.RichContentHtml.Length > 100, cancellationToken),
+                await dbContext.ProjectProposals.AsNoTracking().AnyAsync(
+                    item => item.RequestId == projectRequest.Id && item.RichContentHtml.Length > 100,
+                    cancellationToken),
                 "Project proposal narrative is missing.",
                 failures);
             Require(
-                await dbContext.ProjectBudgetItems.AsNoTracking().AnyAsync(item => item.RequestId == projectRequest.Id, cancellationToken),
+                await dbContext.ProjectBudgetItems.AsNoTracking().AnyAsync(
+                    item => item.RequestId == projectRequest.Id,
+                    cancellationToken),
                 "Project budget is missing.",
                 failures);
             Require(
-                await dbContext.ProjectMilestones.AsNoTracking().AnyAsync(item => item.RequestId == projectRequest.Id, cancellationToken),
+                await dbContext.ProjectMilestones.AsNoTracking().AnyAsync(
+                    item => item.RequestId == projectRequest.Id,
+                    cancellationToken),
                 "Project milestone plan is missing.",
                 failures);
         }
 
-        Require(await dbContext.RequestCategories.AsNoTracking().AnyAsync(cancellationToken), "Request category reference data is missing.", failures);
-        Require(await dbContext.ProgramClassifications.AsNoTracking().AnyAsync(cancellationToken), "Program classification reference data is missing.", failures);
-        Require(await dbContext.UnitsOfMeasure.AsNoTracking().AnyAsync(cancellationToken), "Unit-of-measure reference data is missing.", failures);
-        Require(await dbContext.CountryConfigurations.AsNoTracking().AnyAsync(item => item.CountryCode == "JM", cancellationToken), "Jamaica country configuration is missing.", failures);
+        Require(
+            await dbContext.RequestCategories.AsNoTracking().AnyAsync(cancellationToken),
+            "Request category reference data is missing.",
+            failures);
+        Require(
+            await dbContext.ProgramClassifications.AsNoTracking().AnyAsync(cancellationToken),
+            "Program classification reference data is missing.",
+            failures);
+        Require(
+            await dbContext.UnitsOfMeasure.AsNoTracking().AnyAsync(cancellationToken),
+            "Unit-of-measure reference data is missing.",
+            failures);
+        Require(
+            await dbContext.CountryConfigurations.AsNoTracking().AnyAsync(
+                item => item.CountryCode == "JM",
+                cancellationToken),
+            "Jamaica country configuration is missing.",
+            failures);
+        Require(
+            await dbContext.NotificationPreferences.AsNoTracking().AnyAsync(cancellationToken),
+            "Notification preferences are missing.",
+            failures);
 
         if (failures.Count > 0)
         {
