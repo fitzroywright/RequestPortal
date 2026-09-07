@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Beneficiaries;
+using RequestPortal.Application.Countries;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.Requests;
 using RequestPortal.Domain.Requests;
@@ -20,17 +21,20 @@ public sealed class CreateModel : PageModel
     private readonly IPortalWorkflowService workflowService;
     private readonly IBeneficiaryService beneficiaryService;
     private readonly IRequestDraftService requestDraftService;
+    private readonly ICountryPolicyService countryPolicyService;
 
     public CreateModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
         IBeneficiaryService beneficiaryService,
-        IRequestDraftService requestDraftService)
+        IRequestDraftService requestDraftService,
+        ICountryPolicyService countryPolicyService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.beneficiaryService = beneficiaryService;
         this.requestDraftService = requestDraftService;
+        this.countryPolicyService = countryPolicyService;
     }
 
     public IReadOnlyList<OrganizationSummary> Organizations { get; private set; } = Array.Empty<OrganizationSummary>();
@@ -47,10 +51,30 @@ public sealed class CreateModel : PageModel
     public async Task<IActionResult> OnPostAsync()
     {
         ApplicationUser user = await GetUserAsync();
+        await LoadOrganizationsAsync(user.Id);
+
+        OrganizationSummary? selectedOrganization = Organizations.FirstOrDefault(
+            organization => organization.Id == Input.OrganizationId);
+
+        if (selectedOrganization is null)
+        {
+            ModelState.AddModelError(nameof(Input.OrganizationId), "Select an approved organization that you are authorized to represent.");
+        }
 
         if (!ModelState.IsValid)
         {
-            await LoadOrganizationsAsync(user.Id);
+            return Page();
+        }
+
+        try
+        {
+            await countryPolicyService.EnsureRequestSubmissionAllowedAsync(
+                selectedOrganization!.CountryCode,
+                HttpContext.RequestAborted);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(nameof(Input.OrganizationId), exception.Message);
             return Page();
         }
 
@@ -60,7 +84,6 @@ public sealed class CreateModel : PageModel
             if (string.IsNullOrWhiteSpace(Input.BeneficiaryFirstName) || string.IsNullOrWhiteSpace(Input.BeneficiaryLastName))
             {
                 ModelState.AddModelError(string.Empty, "Both beneficiary first and last name are required when adding a beneficiary.");
-                await LoadOrganizationsAsync(user.Id);
                 return Page();
             }
 
@@ -103,10 +126,17 @@ public sealed class CreateModel : PageModel
             userId,
             HttpContext.RequestAborted);
 
+        IReadOnlyList<CountryOption> countries = await countryPolicyService.GetActiveCountriesAsync(HttpContext.RequestAborted);
+        HashSet<string> requestEnabledCountries = countries
+            .Where(country => country.RequestSubmissionEnabled)
+            .Select(country => country.CountryCode)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         Organizations = organizations
             .Where(organization =>
                 organization.OrganizationStatus == "Approved" &&
-                organization.MembershipStatus == "Approved")
+                organization.MembershipStatus == "Approved" &&
+                requestEnabledCountries.Contains(organization.CountryCode))
             .ToArray();
     }
 
