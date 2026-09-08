@@ -18,5 +18,6 @@
     <ProjectReference Include="..\RequestPortal.Domain\RequestPortal.Domain.csproj" />
     <ProjectReference Include="..\RequestPortal.Common\RequestPortal.Common.csproj" />
     <ProjectReference Include="..\RequestPortal.Application\RequestPortal.Application.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Storage\src\Common.Storage\Common.Storage.csproj" />
   </ItemGroup>
 </Project>
