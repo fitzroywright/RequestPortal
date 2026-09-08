@@ -26,7 +26,13 @@ jobs:
         with:
           repository: fitzroywright/Common.Storage
           ref: development
-          path: ../Common/Common.Storage
+          path: Common/Common.Storage
+
+      - name: Mirror local sibling Common layout
+        run: |
+          sibling_common="$(dirname "$GITHUB_WORKSPACE")/Common"
+          rm -rf "$sibling_common"
+          mv "$GITHUB_WORKSPACE/Common" "$sibling_common"
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
