@@ -7,5 +7,6 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <LangVersion>latest</LangVersion>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <CommonRoot Condition="'$(CommonRoot)' == ''">$(MSBuildThisFileDirectory)..\Common</CommonRoot>
   </PropertyGroup>
 </Project>
