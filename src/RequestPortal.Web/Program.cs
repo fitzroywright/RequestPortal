@@ -33,9 +33,6 @@ using RequestPortal.Application.Requests;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Messaging;
-using RequestPortal.Common.Secrets;
-using RequestPortal.Common.Security;
-using RequestPortal.Common.Storage;
 using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Administration;
 using RequestPortal.Infrastructure.Auditing;
@@ -54,9 +51,7 @@ using RequestPortal.Infrastructure.Portal;
 using RequestPortal.Infrastructure.ReferenceData;
 using RequestPortal.Infrastructure.Reporting;
 using RequestPortal.Infrastructure.Requests;
-using RequestPortal.Infrastructure.Secrets;
 using RequestPortal.Infrastructure.Security;
-using RequestPortal.Infrastructure.Storage;
 using RequestPortal.Web.Demo;
 using RequestPortal.Web.Security;
 using RequestPortal.Web.Services;
@@ -155,7 +150,6 @@ else
     Common.Secrets.ServiceCollectionExtensions.AddCommonSecrets(builder.Services, builder.Configuration);
 }
 Common.Secrets.ServiceCollectionExtensions.AddCommonSecretsDiagnostics(builder.Services);
-builder.Services.AddSingleton<ISecretProvider, CommonSecretsAdapter>();
 
 string dataProtectionPath = builder.Configuration["Security:DataProtectionKeysPath"] ?? "App_Data/keys";
 builder.Services.AddDataProtection()
@@ -185,7 +179,6 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddSingleton<IClock, RequestPortal.Common.Time.SystemClock>();
 string storageRoot = builder.Configuration["Storage:Local:RootPath"] ?? "App_Data/storage";
 Common.Storage.StorageServiceCollectionExtensions.AddCommonStorage(builder.Services, storageRoot);
-builder.Services.AddSingleton<IFileStorage, CommonFileStorageAdapter>();
 builder.Services.AddSingleton<IDocumentUploadSecurity, DocumentUploadSecurity>();
 
 NotificationOptions notificationOptions = builder.Configuration
@@ -224,7 +217,6 @@ builder.Services.AddScoped<INotificationPreferenceService, NotificationPreferenc
 builder.Services.AddScoped<ICountryPolicyService, CountryPolicyService>();
 builder.Services.AddScoped<IRequestReferenceDataService, RequestReferenceDataService>();
 builder.Services.AddScoped<IOrganizationMembershipGovernanceService, OrganizationMembershipGovernanceService>();
-builder.Services.AddScoped<IStaffDirectoryAuthenticator, CommonSecurityStaffAuthenticator>();
 builder.Services.AddScoped<IOrganizationAccessService, OrganizationAccessService>();
 builder.Services.AddScoped<IOrganizationProfileService, OrganizationProfileService>();
 builder.Services.AddScoped<PortalWorkflowService>();
