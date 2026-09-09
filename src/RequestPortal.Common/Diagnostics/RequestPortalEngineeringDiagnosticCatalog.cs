@@ -40,6 +40,51 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 CheckStartupComponentsAsync),
 
             new EngineeringDiagnosticCheckDefinition(
+                "requestportal-l4-common-diagnostics",
+                "Common.Diagnostics",
+                EngineeringDiagnosticLevel.Level4Analysis,
+                _ => Task.FromResult(Passed(
+                    "requestportal-l4-common-diagnostics",
+                    "Common.Diagnostics",
+                    "RequestPortal is executing this diagnostic run through Common.Diagnostics."))),
+
+            new EngineeringDiagnosticCheckDefinition(
+                "requestportal-l4-common-security",
+                "Common.Security",
+                EngineeringDiagnosticLevel.Level4Analysis,
+                _ => Task.FromResult(Warning(
+                    "requestportal-l4-common-security",
+                    "Common.Security",
+                    "RequestPortal still uses RequestPortal.Common.Security and its local Active Directory authenticator; central Common.Security adoption is not complete."))),
+
+            new EngineeringDiagnosticCheckDefinition(
+                "requestportal-l4-common-secrets",
+                "Common.Secrets",
+                EngineeringDiagnosticLevel.Level4Analysis,
+                _ => Task.FromResult(Warning(
+                    "requestportal-l4-common-secrets",
+                    "Common.Secrets",
+                    "RequestPortal still uses RequestPortal.Common.Secrets/OpenBao integration; central Common.Secrets adoption is not complete."))),
+
+            new EngineeringDiagnosticCheckDefinition(
+                "requestportal-l4-common-messaging",
+                "Common.Messaging",
+                EngineeringDiagnosticLevel.Level4Analysis,
+                _ => Task.FromResult(Warning(
+                    "requestportal-l4-common-messaging",
+                    "Common.Messaging",
+                    "RequestPortal still uses its local outbox/messaging implementation; central Common.Messaging adoption is not complete."))),
+
+            new EngineeringDiagnosticCheckDefinition(
+                "requestportal-l4-common-storage",
+                "Common.Storage",
+                EngineeringDiagnosticLevel.Level4Analysis,
+                _ => Task.FromResult(Warning(
+                    "requestportal-l4-common-storage",
+                    "Common.Storage",
+                    "RequestPortal still uses RequestPortal.Common.Storage/LocalFileStorage; central Common.Storage adoption is not complete."))),
+
+            new EngineeringDiagnosticCheckDefinition(
                 "requestportal-l3-system",
                 "RequestPortal system configuration",
                 EngineeringDiagnosticLevel.Level3Verification,
@@ -58,7 +103,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 _ => Task.FromResult(Passed(
                     "requestportal-l1-full-system",
                     "RequestPortal full-system readiness",
-                    "Level 1 executes the complete cumulative RequestPortal diagnostic set and intervention gate.")))
+                    "Level 1 executes the complete cumulative RequestPortal diagnostic set; component warnings and failures determine final readiness.")))
         ];
     }
 
@@ -100,12 +145,15 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 "Storage or Active Directory configuration is incomplete.");
         }
 
-        return Passed(
-            "requestportal-l3-system",
-            "RequestPortal system configuration",
-            notificationsConfigured
-                ? "Storage, Active Directory and notifications are configured."
-                : "Storage and Active Directory are configured; notifications are currently disabled.");
+        return notificationsConfigured
+            ? Passed(
+                "requestportal-l3-system",
+                "RequestPortal system configuration",
+                "Storage, Active Directory and notifications are configured.")
+            : Warning(
+                "requestportal-l3-system",
+                "RequestPortal system configuration",
+                "Storage and Active Directory are configured, but notifications are disabled.");
     }
 
     private EngineeringDiagnosticCheckResult CheckIntegrationConfiguration()
@@ -118,15 +166,18 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
             !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"]) ||
             !string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppId"]);
 
-        return openBaoConfigured && malwareScannerConfigured && externalIdentityConfigured
-            ? Passed(
-                "requestportal-l2-integrations",
-                "RequestPortal integration readiness",
-                "OpenBao, malware scanning and at least one external identity provider are configured.")
-            : Warning(
+        if (!openBaoConfigured || !malwareScannerConfigured || !externalIdentityConfigured)
+        {
+            return Warning(
                 "requestportal-l2-integrations",
                 "RequestPortal integration readiness",
                 "One or more production integrations are not fully configured.");
+        }
+
+        return Warning(
+            "requestportal-l2-integrations",
+            "RequestPortal integration readiness",
+            "External integrations are configured, but Security, Secrets, Messaging and Storage still use RequestPortal-local implementations rather than the central Common platform.");
     }
 
     private static EngineeringDiagnosticCheckResult Passed(string id, string name, string summary) =>
