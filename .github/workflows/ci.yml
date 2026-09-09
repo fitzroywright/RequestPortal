@@ -26,6 +26,30 @@ jobs:
           repository: fitzroywright/Common.Diagnostics
           path: Common/Common.Diagnostics
 
+      - name: Checkout Common.Security
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Security
+          path: Common/Common.Security
+
+      - name: Checkout Common.Secrets
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Secrets
+          path: Common/Common.Secrets
+
+      - name: Checkout Common.Messaging
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Messaging
+          path: Common/Common.Messaging
+
+      - name: Checkout Common.Storage
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Storage
+          path: Common/Common.Storage
+
       - name: Mirror sibling Common layout
         shell: pwsh
         run: |
