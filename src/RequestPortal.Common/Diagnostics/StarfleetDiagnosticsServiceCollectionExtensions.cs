@@ -16,7 +16,7 @@ public static class EngineeringDiagnosticsServiceCollectionExtensions
         return services;
     }
 
-    [Obsolete("Use AddEngineeringDiagnostics. This compatibility shim will be removed after Program.cs migration.")]
+    // Temporary source-compatibility shim for Program.cs; new code must call AddEngineeringDiagnostics.
     public static IServiceCollection AddStarfleetDiagnostics(this IServiceCollection services)
         => services.AddEngineeringDiagnostics();
 }
