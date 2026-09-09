@@ -187,7 +187,39 @@ string storageRoot = builder.Configuration["Storage:Local:RootPath"] ?? "App_Dat
 Common.Storage.StorageServiceCollectionExtensions.AddCommonStorage(builder.Services, storageRoot);
 builder.Services.AddSingleton<IFileStorage, CommonFileStorageAdapter>();
 builder.Services.AddSingleton<IDocumentUploadSecurity, DocumentUploadSecurity>();
-builder.Services.AddScoped<INotificationSender, SmtpNotificationSender>();
+
+NotificationOptions notificationOptions = builder.Configuration
+    .GetSection(NotificationOptions.SectionName)
+    .Get<NotificationOptions>() ?? new NotificationOptions();
+string messagingQueuePath = builder.Configuration["Messaging:DurableQueuePath"]
+    ?? Path.Combine("App_Data", "common-messaging");
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingSecrets(builder.Services);
+Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddSmtpMessagingChannel(
+    builder.Services,
+    new Common.Messaging.Channels.Smtp.SmtpMessageOptions
+    {
+        Host = notificationOptions.SmtpHost ?? string.Empty,
+        Port = notificationOptions.SmtpPort,
+        EnableSsl = notificationOptions.EnableSsl,
+        FromAddress = notificationOptions.FromAddress ?? string.Empty,
+        UserName = notificationOptions.UserName ?? string.Empty,
+        PasswordSecretName = notificationOptions.PasswordSecretName
+    });
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingQueuedDelivery(
+    builder.Services,
+    new Common.Messaging.ExternalDeliveryOptions
+    {
+        DeliveryMode = Common.Messaging.ExternalDeliveryMode.ParallelByRecipient,
+        MaxConcurrency = 4,
+        MaxAttempts = 5,
+        InitialRetryDelay = TimeSpan.FromSeconds(5),
+        MaxRetryDelay = TimeSpan.FromMinutes(5),
+        DurableQueuePath = messagingQueuePath
+    },
+    durable: true);
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingDiagnostics(builder.Services);
+builder.Services.AddScoped<INotificationSender, CommonQueuedNotificationSender>();
+
 builder.Services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
 builder.Services.AddScoped<ICountryPolicyService, CountryPolicyService>();
 builder.Services.AddScoped<IRequestReferenceDataService, RequestReferenceDataService>();
@@ -339,6 +371,8 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
         throw new InvalidOperationException("SF-PROD-OAUTH-001: At least one external representative identity provider must be commissioned.");
     if (!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]))
         throw new InvalidOperationException("SF-PROD-SMTP-001: SMTP notifications must be commissioned for production.");
+    if (string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]))
+        throw new InvalidOperationException("SF-PROD-MESSAGING-001: Common.Messaging durable queue path must be configured in production.");
 }
 
 static async Task ApplyProductionMigrationsAsync(WebApplication app)
