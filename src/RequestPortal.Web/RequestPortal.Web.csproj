@@ -18,6 +18,10 @@
     <ProjectReference Include="..\RequestPortal.Common\RequestPortal.Common.csproj" />
     <ProjectReference Include="..\RequestPortal.Infrastructure\RequestPortal.Infrastructure.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Diagnostics\Common.Diagnostics.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Secrets\Common.Secrets.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Storage\Common.Storage.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.Hosting\Common.Messaging.Hosting.csproj" />
   </ItemGroup>
 </Project>
