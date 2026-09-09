@@ -17,8 +17,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout RequestPortal
         uses: actions/checkout@v4
+
+      - name: Checkout Common.Diagnostics
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Diagnostics
+          path: Common/Common.Diagnostics
+
+      - name: Mirror sibling Common layout
+        shell: pwsh
+        run: |
+          $siblingCommon = Join-Path (Split-Path $env:GITHUB_WORKSPACE -Parent) 'Common'
+          if (Test-Path $siblingCommon) { Remove-Item $siblingCommon -Recurse -Force }
+          Move-Item (Join-Path $env:GITHUB_WORKSPACE 'Common') $siblingCommon
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
