@@ -1,3 +1,4 @@
+using Common.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using RequestPortal.Common.Time;
 
@@ -10,6 +11,8 @@ public static class StarfleetDiagnosticsServiceCollectionExtensions
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IStarfleetDiagnosticSink, LoggingDiagnosticSink>();
         services.AddSingleton<IStarfleetDiagnostics, StarfleetDiagnostics>();
+        services.AddCommonDiagnostics();
+        services.AddSingleton<RequestPortalEngineeringDiagnosticCatalog>();
         return services;
     }
 }
