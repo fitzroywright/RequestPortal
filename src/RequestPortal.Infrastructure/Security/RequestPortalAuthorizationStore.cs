@@ -10,8 +10,8 @@ namespace RequestPortal.Infrastructure.Security;
 
 public static class RequestPortalRoles
 {
-    public const string Reviewer = "FfpReviewer";
-    public const string Administrator = "FfpAdministrator";
+    public const string Reviewer = "Reviewer";
+    public const string Administrator = "Administrator";
 }
 
 public static class RequestPortalPermissions
