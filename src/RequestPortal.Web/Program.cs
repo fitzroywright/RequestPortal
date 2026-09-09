@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -34,9 +33,6 @@ using RequestPortal.Application.Requests;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Messaging;
-using RequestPortal.Common.Secrets;
-using RequestPortal.Common.Security;
-using RequestPortal.Common.Storage;
 using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Administration;
 using RequestPortal.Infrastructure.Auditing;
@@ -55,18 +51,18 @@ using RequestPortal.Infrastructure.Portal;
 using RequestPortal.Infrastructure.ReferenceData;
 using RequestPortal.Infrastructure.Reporting;
 using RequestPortal.Infrastructure.Requests;
-using RequestPortal.Infrastructure.Secrets;
 using RequestPortal.Infrastructure.Security;
-using RequestPortal.Infrastructure.Storage;
 using RequestPortal.Web.Demo;
 using RequestPortal.Web.Security;
 using RequestPortal.Web.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+Common.Secrets.CommonSecretsBootstrapRuntime? secretsRuntime = null;
 
 if (builder.Environment.IsProduction())
 {
-    await HydrateProductionSecretsAsync(builder.Configuration);
+    secretsRuntime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(builder.Configuration);
+    await HydrateProductionSecretsAsync(builder.Configuration, secretsRuntime.Provider);
 }
 
 string connectionString = builder.Configuration.GetConnectionString("RequestPortal")
@@ -125,6 +121,36 @@ if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(face
 builder.Services.AddOptions<ActiveDirectoryOptions>().Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
 builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection(NotificationOptions.SectionName));
 
+ActiveDirectoryOptions requestPortalAd = builder.Configuration
+    .GetSection(ActiveDirectoryOptions.SectionName)
+    .Get<ActiveDirectoryOptions>() ?? new ActiveDirectoryOptions();
+string[] authorizationGroups = requestPortalAd.AdministratorGroups
+    .Concat(requestPortalAd.ReviewerGroups)
+    .Where(group => !string.IsNullOrWhiteSpace(group))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+Common.Security.Options.ActiveDirectoryAuthenticationOptions commonAd = new()
+{
+    Domain = requestPortalAd.Domain ?? string.Empty,
+    SearchBase = requestPortalAd.SearchBase ?? string.Empty,
+    Port = requestPortalAd.Port,
+    TimeoutSeconds = requestPortalAd.TimeoutSeconds,
+    Servers = string.IsNullOrWhiteSpace(requestPortalAd.Server) ? [] : [requestPortalAd.Server],
+    AdministrativeGroups = authorizationGroups
+};
+Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonSecurity(builder.Services, commonAd);
+Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonSecurityDiagnostics(builder.Services);
+
+if (secretsRuntime is not null)
+{
+    secretsRuntime.Register(builder.Services);
+}
+else
+{
+    Common.Secrets.ServiceCollectionExtensions.AddCommonSecrets(builder.Services, builder.Configuration);
+}
+Common.Secrets.ServiceCollectionExtensions.AddCommonSecretsDiagnostics(builder.Services);
+
 string dataProtectionPath = builder.Configuration["Security:DataProtectionKeysPath"] ?? "App_Data/keys";
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.GetFullPath(dataProtectionPath)))
@@ -151,28 +177,46 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddSingleton<IClock, RequestPortal.Common.Time.SystemClock>();
-builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
+string storageRoot = builder.Configuration["Storage:Local:RootPath"] ?? "App_Data/storage";
+Common.Storage.StorageServiceCollectionExtensions.AddCommonStorage(builder.Services, storageRoot);
 builder.Services.AddSingleton<IDocumentUploadSecurity, DocumentUploadSecurity>();
 
-if (builder.Environment.IsProduction())
-{
-    builder.Services.AddHttpClient("OpenBao");
-    builder.Services.AddSingleton<ISecretProvider>(serviceProvider =>
-        new OpenBaoSecretProvider(
-            serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("OpenBao"),
-            builder.Configuration));
-}
-else
-{
-    builder.Services.AddSingleton<ISecretProvider, ConfigurationSecretProvider>();
-}
+NotificationOptions notificationOptions = builder.Configuration
+    .GetSection(NotificationOptions.SectionName)
+    .Get<NotificationOptions>() ?? new NotificationOptions();
+string messagingQueuePath = builder.Configuration["Messaging:DurableQueuePath"]
+    ?? Path.Combine("App_Data", "common-messaging");
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingSecrets(builder.Services);
+Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddSmtpMessagingChannel(
+    builder.Services,
+    new Common.Messaging.Channels.Smtp.SmtpMessageOptions
+    {
+        Host = notificationOptions.SmtpHost ?? string.Empty,
+        Port = notificationOptions.SmtpPort,
+        EnableSsl = notificationOptions.EnableSsl,
+        FromAddress = notificationOptions.FromAddress ?? string.Empty,
+        UserName = notificationOptions.UserName ?? string.Empty,
+        PasswordSecretName = notificationOptions.PasswordSecretName
+    });
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingQueuedDelivery(
+    builder.Services,
+    new Common.Messaging.ExternalDeliveryOptions
+    {
+        DeliveryMode = Common.Messaging.ExternalDeliveryMode.ParallelByRecipient,
+        MaxConcurrency = 4,
+        MaxAttempts = 5,
+        InitialRetryDelay = TimeSpan.FromSeconds(5),
+        MaxRetryDelay = TimeSpan.FromMinutes(5),
+        DurableQueuePath = messagingQueuePath
+    },
+    durable: true);
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingDiagnostics(builder.Services);
+builder.Services.AddScoped<INotificationSender, CommonQueuedNotificationSender>();
 
-builder.Services.AddScoped<INotificationSender, SmtpNotificationSender>();
 builder.Services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
 builder.Services.AddScoped<ICountryPolicyService, CountryPolicyService>();
 builder.Services.AddScoped<IRequestReferenceDataService, RequestReferenceDataService>();
 builder.Services.AddScoped<IOrganizationMembershipGovernanceService, OrganizationMembershipGovernanceService>();
-builder.Services.AddScoped<IStaffDirectoryAuthenticator, ActiveDirectoryStaffAuthenticator>();
 builder.Services.AddScoped<IOrganizationAccessService, OrganizationAccessService>();
 builder.Services.AddScoped<IOrganizationProfileService, OrganizationProfileService>();
 builder.Services.AddScoped<PortalWorkflowService>();
@@ -248,19 +292,22 @@ app.MapRazorPages();
 
 await PrepareDemoAsync(app);
 await ReportStartupDiagnosticsAsync(app);
-await app.RunAsync();
-
-static async Task HydrateProductionSecretsAsync(IConfiguration configuration)
+try
 {
-    string? address = configuration["OpenBao:Address"];
-    string tokenEnvironmentVariable = configuration["OpenBao:TokenEnvironmentVariable"] ?? "OPENBAO_TOKEN";
-    if (string.IsNullOrWhiteSpace(address) || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(tokenEnvironmentVariable)))
+    await app.RunAsync();
+}
+finally
+{
+    if (secretsRuntime is not null)
     {
-        throw new InvalidOperationException("SF-PROD-SECRETS-BOOTSTRAP-001: OpenBao address or bootstrap token environment variable is missing.");
+        await secretsRuntime.DisposeAsync();
     }
+}
 
-    using HttpClient client = new();
-    OpenBaoSecretProvider provider = new(client, configuration);
+static async Task HydrateProductionSecretsAsync(
+    IConfiguration configuration,
+    Common.Secrets.ISecretProvider provider)
+{
     string[] keys =
     [
         "ConnectionStrings:RequestPortal",
@@ -274,8 +321,11 @@ static async Task HydrateProductionSecretsAsync(IConfiguration configuration)
 
     foreach (string key in keys)
     {
-        string? value = await provider.GetSecretAsync(key);
-        if (!string.IsNullOrWhiteSpace(value)) configuration[key] = value;
+        string? value = await provider.GetAsync(key);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            configuration[key] = value;
+        }
     }
 }
 
@@ -297,8 +347,10 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
         throw new InvalidOperationException("SF-PROD-STORAGE-001: Production document storage must be a durable external filesystem path or network share.");
     if (string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
         throw new InvalidOperationException("SF-PROD-DP-001: Production Data Protection keys must be persisted outside the application deployment directory.");
-    if (string.IsNullOrWhiteSpace(configuration["OpenBao:Address"]))
-        throw new InvalidOperationException("SF-PROD-SECRETS-001: OpenBao is not configured.");
+    if (string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]))
+        throw new InvalidOperationException("SF-PROD-SECRETS-001: Common.Secrets OpenBao is not configured.");
+    if (string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:RoleId"]))
+        throw new InvalidOperationException("SF-PROD-SECRETS-002: Common.Secrets OpenBao AppRole RoleId is not configured.");
     if (allowedHosts == "*" || string.IsNullOrWhiteSpace(allowedHosts))
         throw new InvalidOperationException("SF-PROD-HOSTS-001: AllowedHosts must be restricted in production.");
     if (!malwareScanningEnabled || string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]))
@@ -311,6 +363,8 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
         throw new InvalidOperationException("SF-PROD-OAUTH-001: At least one external representative identity provider must be commissioned.");
     if (!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]))
         throw new InvalidOperationException("SF-PROD-SMTP-001: SMTP notifications must be commissioned for production.");
+    if (string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]))
+        throw new InvalidOperationException("SF-PROD-MESSAGING-001: Common.Messaging durable queue path must be configured in production.");
 }
 
 static async Task ApplyProductionMigrationsAsync(WebApplication app)
