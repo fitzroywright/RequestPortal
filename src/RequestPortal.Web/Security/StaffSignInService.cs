@@ -54,7 +54,7 @@ public sealed class StaffSignInService
                 "Security.ActiveDirectory",
                 "SF-AUTH-AD-FAIL",
                 StarfleetSeverity.Warning,
-                "FFP staff directory authentication failed.",
+                "Directory authentication failed.",
                 "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE",
                 cancellationToken: cancellationToken);
             return new StaffSignInResult(false, "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE");
@@ -78,7 +78,7 @@ public sealed class StaffSignInService
                 "Security.Authorization",
                 "SF-AUTH-STAFF-DENIED",
                 StarfleetSeverity.Warning,
-                "Authenticated FFP staff member has no Request Portal access permission.",
+                "Authenticated staff member has no Request Portal access permission.",
                 accessDecision.Reason,
                 cancellationToken: cancellationToken);
             return new StaffSignInResult(false, "NOT_AUTHORIZED_FOR_REQUEST_PORTAL");
@@ -107,7 +107,7 @@ public sealed class StaffSignInService
                     "Security.Identity",
                     "SF-AUTH-LOCALUSER-FAIL",
                     StarfleetSeverity.Error,
-                    "Failed to create local staff identity after successful AD authentication.",
+                    "Failed to create local staff identity after successful directory authentication.",
                     detail,
                     cancellationToken: cancellationToken);
                 return new StaffSignInResult(false, "LOCAL_IDENTITY_CREATION_FAILED");
@@ -134,7 +134,7 @@ public sealed class StaffSignInService
             "Security.Authorization",
             "SF-AUTH-PERMISSION-OK",
             StarfleetSeverity.Information,
-            "FFP staff member authenticated and authorized through Common.Security.",
+            "Staff member authenticated and authorized through Common.Security.",
             string.Join(",", accessDecision.EffectiveRoles),
             cancellationToken: cancellationToken);
 
