@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>RequestPortal.Infrastructure</RootNamespace>
+    <CommonRoot Condition="'$(CommonRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\Common</CommonRoot>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
@@ -18,5 +19,9 @@
     <ProjectReference Include="..\RequestPortal.Domain\RequestPortal.Domain.csproj" />
     <ProjectReference Include="..\RequestPortal.Common\RequestPortal.Common.csproj" />
     <ProjectReference Include="..\RequestPortal.Application\RequestPortal.Application.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Secrets\Common.Secrets.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Storage\Common.Storage.csproj" />
   </ItemGroup>
 </Project>
