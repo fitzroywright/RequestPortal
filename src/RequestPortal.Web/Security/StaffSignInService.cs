@@ -2,10 +2,11 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.Security.Abstractions;
+using Common.Security.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using RequestPortal.Common.Diagnostics;
-using RequestPortal.Common.Security;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Security;
 
@@ -15,7 +16,7 @@ public sealed record StaffSignInResult(bool Succeeded, string? FailureCode = nul
 
 public sealed class StaffSignInService
 {
-    private readonly IStaffDirectoryAuthenticator directoryAuthenticator;
+    private readonly IAuthenticator authenticator;
     private readonly UserManager<ApplicationUser> userManager;
     private readonly RoleManager<IdentityRole<Guid>> roleManager;
     private readonly SignInManager<ApplicationUser> signInManager;
@@ -23,14 +24,14 @@ public sealed class StaffSignInService
     private readonly IStarfleetDiagnostics diagnostics;
 
     public StaffSignInService(
-        IStaffDirectoryAuthenticator directoryAuthenticator,
+        IAuthenticator authenticator,
         UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole<Guid>> roleManager,
         SignInManager<ApplicationUser> signInManager,
         IOptions<ActiveDirectoryOptions> directoryOptions,
         IStarfleetDiagnostics diagnostics)
     {
-        this.directoryAuthenticator = directoryAuthenticator;
+        this.authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         this.userManager = userManager;
         this.roleManager = roleManager;
         this.signInManager = signInManager;
@@ -43,27 +44,31 @@ public sealed class StaffSignInService
         string password,
         CancellationToken cancellationToken = default)
     {
-        StaffAuthenticationResult authentication = await directoryAuthenticator.AuthenticateAsync(
-            userName,
-            password,
-            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        string normalizedUserName = NormalizeUserName(userName);
+        AuthenticationResult authentication = authenticator.Authenticate(normalizedUserName, password);
 
-        if (!authentication.Succeeded || authentication.Identity is null)
+        if (!authentication.IsAuthenticated)
         {
             await diagnostics.ReportAsync(
                 "Security.ActiveDirectory",
                 "SF-AUTH-AD-FAIL",
                 StarfleetSeverity.Warning,
                 "FFP staff directory authentication failed.",
-                authentication.FailureCode,
+                "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE",
                 cancellationToken: cancellationToken);
 
-            return new StaffSignInResult(false, authentication.FailureCode ?? "AUTHENTICATION_FAILED");
+            return new StaffSignInResult(false, "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE");
         }
 
-        StaffDirectoryIdentity identity = authentication.Identity;
-        bool isAdministrator = MatchesAnyGroup(identity, directoryOptions.AdministratorGroups);
-        bool isReviewer = isAdministrator || MatchesAnyGroup(identity, directoryOptions.ReviewerGroups);
+        string displayName = authentication.UserInfo?.DisplayName?.Trim() ?? normalizedUserName;
+        string emailAddress = authentication.UserInfo?.Mail?.Trim()
+            ?? (string.IsNullOrWhiteSpace(directoryOptions.Domain)
+                ? normalizedUserName
+                : $"{normalizedUserName}@{directoryOptions.Domain}");
+
+        bool isAdministrator = MatchesAnyGroup(authentication.GroupNames, directoryOptions.AdministratorGroups);
+        bool isReviewer = isAdministrator || MatchesAnyGroup(authentication.GroupNames, directoryOptions.ReviewerGroups);
 
         if (!isReviewer)
         {
@@ -72,24 +77,24 @@ public sealed class StaffSignInService
                 "SF-AUTH-STAFF-DENIED",
                 StarfleetSeverity.Warning,
                 "Authenticated FFP staff member is not assigned to an authorized Request Portal AD group.",
-                identity.UserName,
+                normalizedUserName,
                 cancellationToken: cancellationToken);
 
             return new StaffSignInResult(false, "NOT_AUTHORIZED_FOR_REQUEST_PORTAL");
         }
 
-        ApplicationUser? user = await userManager.FindByEmailAsync(identity.EmailAddress);
+        ApplicationUser? user = await userManager.FindByEmailAsync(emailAddress);
         if (user is null)
         {
             user = new ApplicationUser
             {
                 Id = Guid.NewGuid(),
-                UserName = identity.EmailAddress,
-                Email = identity.EmailAddress,
+                UserName = emailAddress,
+                Email = emailAddress,
                 EmailConfirmed = true,
-                DisplayName = identity.DisplayName,
+                DisplayName = displayName,
                 IsInternalStaff = true,
-                DirectoryUserName = identity.UserName,
+                DirectoryUserName = normalizedUserName,
                 CreatedUtc = DateTimeOffset.UtcNow
             };
 
@@ -108,8 +113,8 @@ public sealed class StaffSignInService
             }
         }
 
-        user.DisplayName = identity.DisplayName;
-        user.DirectoryUserName = identity.UserName;
+        user.DisplayName = displayName;
+        user.DirectoryUserName = normalizedUserName;
         user.IsInternalStaff = true;
         user.LastSignInUtc = DateTimeOffset.UtcNow;
 
@@ -131,17 +136,35 @@ public sealed class StaffSignInService
             "Security.ActiveDirectory",
             "SF-AUTH-AD-OK",
             StarfleetSeverity.Information,
-            "FFP staff member authenticated through Active Directory.",
-            identity.UserName,
+            "FFP staff member authenticated through Common.Security.",
+            normalizedUserName,
             cancellationToken: cancellationToken);
 
         return new StaffSignInResult(true);
     }
 
-    private static bool MatchesAnyGroup(StaffDirectoryIdentity identity, string[] requiredGroups)
+    private static bool MatchesAnyGroup(
+        IReadOnlyCollection<string> actualGroups,
+        string[] requiredGroups)
+        => requiredGroups.Any(requiredGroup =>
+            actualGroups.Contains(requiredGroup, StringComparer.OrdinalIgnoreCase));
+
+    private static string NormalizeUserName(string userName)
     {
-        return requiredGroups.Any(requiredGroup =>
-            identity.GroupNames.Contains(requiredGroup, StringComparer.OrdinalIgnoreCase));
+        string trimmed = userName.Trim();
+        int slashIndex = trimmed.LastIndexOf('\\');
+        if (slashIndex >= 0 && slashIndex < trimmed.Length - 1)
+        {
+            trimmed = trimmed[(slashIndex + 1)..];
+        }
+
+        int atIndex = trimmed.IndexOf('@');
+        if (atIndex > 0)
+        {
+            trimmed = trimmed[..atIndex];
+        }
+
+        return trimmed;
     }
 
     private async Task EnsureRoleExistsAsync(string roleName)
