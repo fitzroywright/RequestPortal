@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Security;
 
 namespace RequestPortal.Web.Security;
@@ -23,17 +24,18 @@ public sealed class StaffSignInService
 
     public StaffSignInService(
         IAuthenticator authenticator,
-        IPermissionAuthorizer permissionAuthorizer,
+        RequestPortalDbContext dbContext,
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IOptions<ActiveDirectoryOptions> directoryOptions,
         IStarfleetDiagnostics diagnostics)
     {
         this.authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
-        this.permissionAuthorizer = permissionAuthorizer ?? throw new ArgumentNullException(nameof(permissionAuthorizer));
+        this.directoryOptions = directoryOptions?.Value ?? throw new ArgumentNullException(nameof(directoryOptions));
+        this.permissionAuthorizer = new PermissionAuthorizer(
+            new RequestPortalAuthorizationStore(dbContext, directoryOptions));
         this.userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
         this.signInManager = signInManager ?? throw new ArgumentNullException(nameof(signInManager));
-        this.directoryOptions = directoryOptions?.Value ?? throw new ArgumentNullException(nameof(directoryOptions));
         this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
     }
 
@@ -55,7 +57,6 @@ public sealed class StaffSignInService
                 "FFP staff directory authentication failed.",
                 "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE",
                 cancellationToken: cancellationToken);
-
             return new StaffSignInResult(false, "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE");
         }
 
@@ -80,7 +81,6 @@ public sealed class StaffSignInService
                 "Authenticated FFP staff member has no Request Portal access permission.",
                 accessDecision.Reason,
                 cancellationToken: cancellationToken);
-
             return new StaffSignInResult(false, "NOT_AUTHORIZED_FOR_REQUEST_PORTAL");
         }
 
