@@ -152,8 +152,7 @@ public sealed class DocumentService : IDocumentService
                     ["OwnerType"] = ownerType.ToString(),
                     ["OwnerId"] = ownerId.ToString("D"),
                     ["DocumentType"] = documentType.ToString()
-                },
-                sizeBytes),
+                }),
             cancellationToken);
         StoredDocument document = new(documentId, ownerType, ownerId, organizationId, documentType, safeFileName, stored.ContentType, stored.Length, stored.StorageKey, userId, now);
         dbContext.Documents.Add(document);
