@@ -60,10 +60,7 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        if (groupNames.Count == 0)
-        {
-            return Array.Empty<string>();
-        }
+        if (groupNames.Count == 0) return Array.Empty<string>();
 
         await using NpgsqlCommand command = await CreateCommandAsync(
             "SELECT DISTINCT role_key FROM requestportal_directory_group_roles WHERE lower(group_name) = ANY(@groups) ORDER BY role_key;",
@@ -72,11 +69,7 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
 
         List<string> results = [];
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            results.Add(reader.GetString(0));
-        }
-
+        while (await reader.ReadAsync(cancellationToken)) results.Add(reader.GetString(0));
         return results;
     }
 
@@ -85,10 +78,7 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        if (roleKeys.Count == 0)
-        {
-            return Array.Empty<RoleDefinition>();
-        }
+        if (roleKeys.Count == 0) return Array.Empty<RoleDefinition>();
 
         await using NpgsqlCommand command = await CreateCommandAsync(
             """
@@ -111,24 +101,15 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
                 values = [];
                 permissions[roleName] = values;
             }
-
-            if (!reader.IsDBNull(1))
-            {
-                values.Add(reader.GetString(1));
-            }
+            if (!reader.IsDBNull(1)) values.Add(reader.GetString(1));
         }
 
-        return permissions
-            .Select(pair => new RoleDefinition(pair.Key, pair.Key, pair.Value))
-            .ToArray();
+        return permissions.Select(pair => new RoleDefinition(pair.Key, pair.Key, pair.Value)).ToArray();
     }
 
     public async Task EnsureInitializedAsync(CancellationToken cancellationToken = default)
     {
-        if (initialized)
-        {
-            return;
-        }
+        if (initialized) return;
 
         const string schemaSql = """
             CREATE TABLE IF NOT EXISTS requestportal_permissions (
@@ -162,14 +143,10 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         await EnsureRolePermissionAsync(RequestPortalRoles.Administrator, PermissionAuthorizer.AllPermissions, cancellationToken, definePermission: true);
 
         foreach (string group in directoryOptions.ReviewerGroups.Where(group => !string.IsNullOrWhiteSpace(group)))
-        {
             await EnsureGroupRoleMappingAsync(group, RequestPortalRoles.Reviewer, cancellationToken);
-        }
 
         foreach (string group in directoryOptions.AdministratorGroups.Where(group => !string.IsNullOrWhiteSpace(group)))
-        {
             await EnsureGroupRoleMappingAsync(group, RequestPortalRoles.Administrator, cancellationToken);
-        }
 
         initialized = true;
     }
@@ -179,11 +156,13 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         await using NpgsqlCommand command = await CreateCommandAsync(
             """
             INSERT INTO "AspNetRoles" ("Id", "Name", "NormalizedName", "ConcurrencyStamp")
-            SELECT gen_random_uuid(), @name, upper(@name), gen_random_uuid()::text
+            SELECT @id, @name, upper(@name), @stamp
             WHERE NOT EXISTS (SELECT 1 FROM "AspNetRoles" WHERE lower("Name") = lower(@name));
             """,
             cancellationToken);
+        command.Parameters.AddWithValue("id", Guid.NewGuid());
         command.Parameters.AddWithValue("name", roleName);
+        command.Parameters.AddWithValue("stamp", Guid.NewGuid().ToString("N"));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -197,17 +176,9 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private async Task EnsureRolePermissionAsync(
-        string role,
-        string permission,
-        CancellationToken cancellationToken,
-        bool definePermission = false)
+    private async Task EnsureRolePermissionAsync(string role, string permission, CancellationToken cancellationToken, bool definePermission = false)
     {
-        if (definePermission)
-        {
-            await EnsurePermissionAsync(permission, "Explicit all-permissions grant.", cancellationToken);
-        }
-
+        if (definePermission) await EnsurePermissionAsync(permission, "Explicit all-permissions grant.", cancellationToken);
         await using NpgsqlCommand command = await CreateCommandAsync(
             "INSERT INTO requestportal_role_permissions(role_key, permission_key) VALUES (@role, @permission) ON CONFLICT DO NOTHING;",
             cancellationToken);
@@ -226,38 +197,20 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private async Task<IReadOnlyCollection<string>> QueryStringsAsync(
-        string sql,
-        IReadOnlyCollection<NpgsqlParameter> parameters,
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyCollection<string>> QueryStringsAsync(string sql, IReadOnlyCollection<NpgsqlParameter> parameters, CancellationToken cancellationToken)
     {
         await using NpgsqlCommand command = await CreateCommandAsync(sql, cancellationToken);
-        foreach (NpgsqlParameter parameter in parameters)
-        {
-            command.Parameters.Add(parameter);
-        }
-
+        foreach (NpgsqlParameter parameter in parameters) command.Parameters.Add(parameter);
         List<string> results = [];
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            if (!reader.IsDBNull(0))
-            {
-                results.Add(reader.GetString(0));
-            }
-        }
-
+        while (await reader.ReadAsync(cancellationToken)) if (!reader.IsDBNull(0)) results.Add(reader.GetString(0));
         return results;
     }
 
     private async Task<NpgsqlCommand> CreateCommandAsync(string sql, CancellationToken cancellationToken)
     {
         NpgsqlConnection connection = (NpgsqlConnection)dbContext.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(cancellationToken);
         return new NpgsqlCommand(sql, connection);
     }
 }
