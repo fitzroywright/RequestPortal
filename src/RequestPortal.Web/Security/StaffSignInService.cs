@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +8,7 @@ using Common.Security.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using RequestPortal.Common.Diagnostics;
+using RequestPortal.Common.Security;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Security;
 
