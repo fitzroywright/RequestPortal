@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>RequestPortal.Web</RootNamespace>
     <UserSecretsId>RequestPortal-Web-Development</UserSecretsId>
+    <CommonRoot Condition="'$(CommonRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\Common</CommonRoot>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" Version="10.0.0" />
@@ -16,5 +17,6 @@
     <ProjectReference Include="..\RequestPortal.Application\RequestPortal.Application.csproj" />
     <ProjectReference Include="..\RequestPortal.Common\RequestPortal.Common.csproj" />
     <ProjectReference Include="..\RequestPortal.Infrastructure\RequestPortal.Infrastructure.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Diagnostics\Common.Diagnostics.csproj" />
   </ItemGroup>
 </Project>
