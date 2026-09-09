@@ -4,12 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Security;
-using RequestPortal.Common.Storage;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Organizations;
@@ -138,8 +138,24 @@ public sealed class DocumentService : IDocumentService
         string safeFileName = Path.GetFileName(originalFileName);
         string storageKey = $"organizations/{organizationId:N}/{ownerType}/{ownerId:N}/{documentId:N}-{safeFileName}";
         DateTimeOffset now = clock.UtcNow;
-        StoredFile stored = await fileStorage.StoreAsync(storageKey, content, contentType, cancellationToken);
-        StoredDocument document = new(documentId, ownerType, ownerId, organizationId, documentType, safeFileName, stored.ContentType, sizeBytes, stored.StorageKey, userId, now);
+        StoredFile stored = await fileStorage.StoreAsync(
+            new StorageWriteRequest(
+                storageKey,
+                content,
+                contentType,
+                safeFileName,
+                userId.ToString("D"),
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Application"] = "RequestPortal",
+                    ["OrganizationId"] = organizationId.ToString("D"),
+                    ["OwnerType"] = ownerType.ToString(),
+                    ["OwnerId"] = ownerId.ToString("D"),
+                    ["DocumentType"] = documentType.ToString()
+                },
+                sizeBytes),
+            cancellationToken);
+        StoredDocument document = new(documentId, ownerType, ownerId, organizationId, documentType, safeFileName, stored.ContentType, stored.Length, stored.StorageKey, userId, now);
         dbContext.Documents.Add(document);
         await dbContext.SaveChangesAsync(cancellationToken);
         return documentId;
