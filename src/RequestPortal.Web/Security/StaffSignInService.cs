@@ -1,15 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Security.Claims;
 using Common.Security.Abstractions;
+using Common.Security.Authorization;
 using Common.Security.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using RequestPortal.Common.Diagnostics;
-using RequestPortal.Common.Security;
 using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Security;
 
 namespace RequestPortal.Web.Security;
@@ -19,26 +16,27 @@ public sealed record StaffSignInResult(bool Succeeded, string? FailureCode = nul
 public sealed class StaffSignInService
 {
     private readonly IAuthenticator authenticator;
+    private readonly IPermissionAuthorizer permissionAuthorizer;
     private readonly UserManager<ApplicationUser> userManager;
-    private readonly RoleManager<IdentityRole<Guid>> roleManager;
     private readonly SignInManager<ApplicationUser> signInManager;
     private readonly ActiveDirectoryOptions directoryOptions;
     private readonly IStarfleetDiagnostics diagnostics;
 
     public StaffSignInService(
         IAuthenticator authenticator,
+        RequestPortalDbContext dbContext,
         UserManager<ApplicationUser> userManager,
-        RoleManager<IdentityRole<Guid>> roleManager,
         SignInManager<ApplicationUser> signInManager,
         IOptions<ActiveDirectoryOptions> directoryOptions,
         IStarfleetDiagnostics diagnostics)
     {
         this.authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
-        this.userManager = userManager;
-        this.roleManager = roleManager;
-        this.signInManager = signInManager;
-        this.directoryOptions = directoryOptions.Value;
-        this.diagnostics = diagnostics;
+        this.directoryOptions = directoryOptions?.Value ?? throw new ArgumentNullException(nameof(directoryOptions));
+        this.permissionAuthorizer = new PermissionAuthorizer(
+            new RequestPortalAuthorizationStore(dbContext, directoryOptions));
+        this.userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
+        this.signInManager = signInManager ?? throw new ArgumentNullException(nameof(signInManager));
+        this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
     }
 
     public async Task<StaffSignInResult> SignInAsync(
@@ -56,10 +54,9 @@ public sealed class StaffSignInService
                 "Security.ActiveDirectory",
                 "SF-AUTH-AD-FAIL",
                 StarfleetSeverity.Warning,
-                "FFP staff directory authentication failed.",
+                "Directory authentication failed.",
                 "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE",
                 cancellationToken: cancellationToken);
-
             return new StaffSignInResult(false, "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE");
         }
 
@@ -69,19 +66,21 @@ public sealed class StaffSignInService
                 ? normalizedUserName
                 : $"{normalizedUserName}@{directoryOptions.Domain}");
 
-        bool isAdministrator = MatchesAnyGroup(authentication.GroupNames, directoryOptions.AdministratorGroups);
-        bool isReviewer = isAdministrator || MatchesAnyGroup(authentication.GroupNames, directoryOptions.ReviewerGroups);
+        AuthorizationSubject subject = AuthorizationSubject.Create(emailAddress, authentication.GroupNames);
+        AuthorizationDecision accessDecision = await permissionAuthorizer.AuthorizeAsync(
+            subject,
+            RequestPortalPermissions.Access,
+            cancellationToken);
 
-        if (!isReviewer)
+        if (!accessDecision.Allowed)
         {
             await diagnostics.ReportAsync(
                 "Security.Authorization",
                 "SF-AUTH-STAFF-DENIED",
                 StarfleetSeverity.Warning,
-                "Authenticated FFP staff member is not assigned to an authorized Request Portal AD group.",
-                normalizedUserName,
+                "Authenticated staff member has no Request Portal access permission.",
+                accessDecision.Reason,
                 cancellationToken: cancellationToken);
-
             return new StaffSignInResult(false, "NOT_AUTHORIZED_FOR_REQUEST_PORTAL");
         }
 
@@ -108,7 +107,7 @@ public sealed class StaffSignInService
                     "Security.Identity",
                     "SF-AUTH-LOCALUSER-FAIL",
                     StarfleetSeverity.Error,
-                    "Failed to create local staff identity after successful AD authentication.",
+                    "Failed to create local staff identity after successful directory authentication.",
                     detail,
                     cancellationToken: cancellationToken);
                 return new StaffSignInResult(false, "LOCAL_IDENTITY_CREATION_FAILED");
@@ -126,30 +125,21 @@ public sealed class StaffSignInService
             return new StaffSignInResult(false, "LOCAL_IDENTITY_UPDATE_FAILED");
         }
 
-        await EnsureRoleExistsAsync(PortalRoles.FfpReviewer);
-        await EnsureRoleExistsAsync(PortalRoles.FfpAdministrator);
-
-        await SynchronizeRoleAsync(user, PortalRoles.FfpReviewer, isReviewer);
-        await SynchronizeRoleAsync(user, PortalRoles.FfpAdministrator, isAdministrator);
-
-        await signInManager.SignInAsync(user, isPersistent: false);
+        Claim[] roleClaims = accessDecision.EffectiveRoles
+            .Select(role => new Claim(ClaimTypes.Role, role))
+            .ToArray();
+        await signInManager.SignInWithClaimsAsync(user, isPersistent: false, roleClaims);
 
         await diagnostics.ReportAsync(
-            "Security.ActiveDirectory",
-            "SF-AUTH-AD-OK",
+            "Security.Authorization",
+            "SF-AUTH-PERMISSION-OK",
             StarfleetSeverity.Information,
-            "FFP staff member authenticated through Common.Security.",
-            normalizedUserName,
+            "Staff member authenticated and authorized through Common.Security.",
+            string.Join(",", accessDecision.EffectiveRoles),
             cancellationToken: cancellationToken);
 
         return new StaffSignInResult(true);
     }
-
-    private static bool MatchesAnyGroup(
-        IReadOnlyCollection<string> actualGroups,
-        string[] requiredGroups)
-        => requiredGroups.Any(requiredGroup =>
-            actualGroups.Contains(requiredGroup, StringComparer.OrdinalIgnoreCase));
 
     private static string NormalizeUserName(string userName)
     {
@@ -167,33 +157,5 @@ public sealed class StaffSignInService
         }
 
         return trimmed;
-    }
-
-    private async Task EnsureRoleExistsAsync(string roleName)
-    {
-        if (await roleManager.RoleExistsAsync(roleName))
-        {
-            return;
-        }
-
-        IdentityResult result = await roleManager.CreateAsync(new IdentityRole<Guid>(roleName));
-        if (!result.Succeeded)
-        {
-            throw new InvalidOperationException($"Unable to create portal role '{roleName}'.");
-        }
-    }
-
-    private async Task SynchronizeRoleAsync(ApplicationUser user, string roleName, bool shouldHaveRole)
-    {
-        bool currentlyInRole = await userManager.IsInRoleAsync(user, roleName);
-
-        if (shouldHaveRole && !currentlyInRole)
-        {
-            await userManager.AddToRoleAsync(user, roleName);
-        }
-        else if (!shouldHaveRole && currentlyInRole)
-        {
-            await userManager.RemoveFromRoleAsync(user, roleName);
-        }
     }
 }
