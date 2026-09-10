@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Common.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace RequestPortal.Common.Diagnostics;
 
@@ -79,10 +80,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 "requestportal-l4-common-storage",
                 "Common.Storage",
                 EngineeringDiagnosticLevel.Level4Analysis,
-                _ => Task.FromResult(Warning(
-                    "requestportal-l4-common-storage",
-                    "Common.Storage",
-                    "RequestPortal still uses RequestPortal.Common.Storage/LocalFileStorage; central Common.Storage adoption is not complete."))),
+                CheckCommonStorageAsync),
 
             new EngineeringDiagnosticCheckDefinition(
                 "requestportal-l3-system",
@@ -131,6 +129,45 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
             evidence);
     }
 
+    private async Task<EngineeringDiagnosticCheckResult> CheckCommonStorageAsync(CancellationToken cancellationToken)
+    {
+        await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+        HealthCheckService healthChecks = scope.ServiceProvider.GetRequiredService<HealthCheckService>();
+        HealthReport report = await healthChecks.CheckHealthAsync(
+            registration => string.Equals(registration.Name, "common-storage", StringComparison.OrdinalIgnoreCase),
+            cancellationToken).ConfigureAwait(false);
+
+        if (!report.Entries.TryGetValue("common-storage", out HealthReportEntry entry))
+        {
+            return Warning(
+                "requestportal-l4-common-storage",
+                "Common.Storage",
+                "Common.Storage is referenced by RequestPortal, but its health check is not registered.");
+        }
+
+        if (entry.Status == HealthStatus.Unhealthy)
+        {
+            return Failed(
+                "requestportal-l4-common-storage",
+                "Common.Storage",
+                "Common.Storage is unavailable to RequestPortal.",
+                entry.Description ?? entry.Exception?.Message ?? "The common-storage health check reported Unhealthy.");
+        }
+
+        if (entry.Status == HealthStatus.Degraded)
+        {
+            return Warning(
+                "requestportal-l4-common-storage",
+                "Common.Storage",
+                entry.Description ?? "Common.Storage is available but degraded.");
+        }
+
+        return Passed(
+            "requestportal-l4-common-storage",
+            "Common.Storage",
+            entry.Description ?? "RequestPortal is using Common.Storage and its health check passed.");
+    }
+
     private EngineeringDiagnosticCheckResult CheckSystemConfiguration()
     {
         bool storageConfigured = !string.IsNullOrWhiteSpace(configuration["Storage:Local:RootPath"]);
@@ -177,7 +214,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
         return Warning(
             "requestportal-l2-integrations",
             "RequestPortal integration readiness",
-            "External integrations are configured, but Security, Secrets, Messaging and Storage still use RequestPortal-local implementations rather than the central Common platform.");
+            "External integrations are configured, but Security, Secrets and Messaging still retain RequestPortal-local implementation paths rather than being fully consolidated on the central Common platform.");
     }
 
     private static EngineeringDiagnosticCheckResult Passed(string id, string name, string summary) =>
