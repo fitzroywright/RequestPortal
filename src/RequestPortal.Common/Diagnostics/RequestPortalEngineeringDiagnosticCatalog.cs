@@ -195,7 +195,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
 
     private EngineeringDiagnosticCheckResult CheckIntegrationConfiguration()
     {
-        bool openBaoConfigured = !string.IsNullOrWhiteSpace(configuration["OpenBao:Address"]);
+        bool openBaoConfigured = !string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]);
         bool malwareScannerConfigured = configuration.GetValue("Uploads:MalwareScanning:Enabled", false) &&
             !string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]);
         bool externalIdentityConfigured =
