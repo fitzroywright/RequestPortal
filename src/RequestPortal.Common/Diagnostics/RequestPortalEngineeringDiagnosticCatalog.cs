@@ -56,25 +56,25 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 _ => Task.FromResult(Warning(
                     "requestportal-l4-common-security",
                     "Common.Security",
-                    "RequestPortal still uses RequestPortal.Common.Security and its local Active Directory authenticator; central Common.Security adoption is not complete."))),
+                    "Common.Security is registered, but RequestPortal's staff sign-in path still retains local Active Directory integration that needs a separate consolidation review."))),
 
             new EngineeringDiagnosticCheckDefinition(
                 "requestportal-l4-common-secrets",
                 "Common.Secrets",
                 EngineeringDiagnosticLevel.Level4Analysis,
-                _ => Task.FromResult(Warning(
+                _ => Task.FromResult(Passed(
                     "requestportal-l4-common-secrets",
                     "Common.Secrets",
-                    "RequestPortal still uses RequestPortal.Common.Secrets/OpenBao integration; central Common.Secrets adoption is not complete."))),
+                    "RequestPortal is registered with Common.Secrets; production bootstrap uses the central Common.Secrets runtime."))),
 
             new EngineeringDiagnosticCheckDefinition(
                 "requestportal-l4-common-messaging",
                 "Common.Messaging",
                 EngineeringDiagnosticLevel.Level4Analysis,
-                _ => Task.FromResult(Warning(
+                _ => Task.FromResult(Passed(
                     "requestportal-l4-common-messaging",
                     "Common.Messaging",
-                    "RequestPortal still uses its local outbox/messaging implementation; central Common.Messaging adoption is not complete."))),
+                    "RequestPortal uses Common.Messaging for queued external delivery; the RequestPortal outbox remains the application transaction boundary."))),
 
             new EngineeringDiagnosticCheckDefinition(
                 "requestportal-l4-common-storage",
@@ -214,7 +214,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
         return Warning(
             "requestportal-l2-integrations",
             "RequestPortal integration readiness",
-            "External integrations are configured, but Security, Secrets and Messaging still retain RequestPortal-local implementation paths rather than being fully consolidated on the central Common platform.");
+            "External integrations are configured; the remaining Common-platform consolidation item is the RequestPortal staff authentication path."));
     }
 
     private static EngineeringDiagnosticCheckResult Passed(string id, string name, string summary) =>
