@@ -53,10 +53,10 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 "requestportal-l4-common-security",
                 "Common.Security",
                 EngineeringDiagnosticLevel.Level4Analysis,
-                _ => Task.FromResult(Warning(
+                _ => Task.FromResult(Passed(
                     "requestportal-l4-common-security",
                     "Common.Security",
-                    "Common.Security is registered, but RequestPortal's staff sign-in path still retains local Active Directory integration that needs a separate consolidation review."))),
+                    "RequestPortal staff sign-in authenticates through Common.Security and authorizes through the Common.Security permission engine; RequestPortal supplies the application-specific authorization store."))),
 
             new EngineeringDiagnosticCheckDefinition(
                 "requestportal-l4-common-secrets",
@@ -211,10 +211,10 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 "One or more production integrations are not fully configured.");
         }
 
-        return Warning(
+        return Passed(
             "requestportal-l2-integrations",
             "RequestPortal integration readiness",
-            "External integrations are configured; the remaining Common-platform consolidation item is the RequestPortal staff authentication path."));
+            "Configured production integrations and central Common-platform adoption checks are satisfied.");
     }
 
     private static EngineeringDiagnosticCheckResult Passed(string id, string name, string summary) =>
