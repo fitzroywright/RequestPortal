@@ -156,8 +156,28 @@ public sealed class DocumentService : IDocumentService
             cancellationToken);
         StoredDocument document = new(documentId, ownerType, ownerId, organizationId, documentType, safeFileName, stored.ContentType, stored.Length, stored.StorageKey, userId, now);
         dbContext.Documents.Add(document);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return documentId;
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return documentId;
+        }
+        catch
+        {
+            dbContext.Entry(document).State = EntityState.Detached;
+            await RollBackStorageAsync(stored.StorageKey, cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task RollBackStorageAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        if (fileStorage is IStorageLifecycle lifecycle)
+        {
+            await lifecycle.PurgeAsync(storageKey, cancellationToken);
+            return;
+        }
+
+        await fileStorage.DeleteAsync(storageKey, cancellationToken);
     }
 
     private Task AuditAsync(Guid actorUserId, string action, Guid documentId, Guid organizationId, string? detail, CancellationToken cancellationToken)
