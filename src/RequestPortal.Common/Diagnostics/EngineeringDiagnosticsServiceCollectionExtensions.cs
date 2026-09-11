@@ -15,8 +15,4 @@ public static class EngineeringDiagnosticsServiceCollectionExtensions
         services.AddSingleton<IStartupFilter, EngineeringDiagnosticsStartupFilter>();
         return services;
     }
-
-    // Temporary source-compatibility shim for the existing Program.cs call.
-    public static IServiceCollection AddStarfleetDiagnostics(this IServiceCollection services)
-        => services.AddEngineeringDiagnostics();
 }
