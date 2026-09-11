@@ -12,6 +12,6 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/RequestPortal.Infrastructure/RequestPortal.Infrastructure.csproj" />
+    <ProjectReference Include="../../RequestPortal/RequestPortal.Infrastructure/RequestPortal.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
