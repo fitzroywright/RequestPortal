@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - chatgpt/mvp-rescue
   pull_request:
     branches:
       - main
@@ -63,20 +62,16 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore src/RequestPortal.Web/RequestPortal.Web.csproj
+        run: dotnet restore RequestPortal/RequestPortal.Web/RequestPortal.Web.csproj
 
       - name: Build
-        run: dotnet build src/RequestPortal.Web/RequestPortal.Web.csproj --configuration Release --no-restore
+        run: dotnet build RequestPortal/RequestPortal.Web/RequestPortal.Web.csproj --configuration Release --no-restore
 
       - name: Verify migration model is current
         run: |
           dotnet tool restore
-          dotnet ef migrations has-pending-model-changes --project src/RequestPortal.Infrastructure --startup-project src/RequestPortal.Web
+          dotnet ef migrations has-pending-model-changes --project RequestPortal/RequestPortal.Infrastructure --startup-project RequestPortal/RequestPortal.Web
 
       - name: Test
         run: |
-          if find tests -name '*.csproj' -print -quit 2>/dev/null | grep -q .; then
-            find tests -name '*.csproj' -print0 | xargs -0 -n1 dotnet test --configuration Release
-          else
-            echo 'No test projects yet.'
-          fi
+          find RequestPortal.Tests -name '*.csproj' -print0 | xargs -0 -n1 dotnet test --configuration Release
