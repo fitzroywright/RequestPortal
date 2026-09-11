@@ -1,0 +1,114 @@
+{
+  "applicationId": "RequestPortal",
+  "displayName": "Request Portal",
+  "version": "1.0.0",
+  "requirements": [
+    {
+      "id": "database-connection",
+      "displayName": "PostgreSQL connection credential",
+      "kind": "Secret",
+      "required": true,
+      "purpose": "Provides the Request Portal PostgreSQL connection string without placing credentials in source-controlled configuration.",
+      "secretName": "ConnectionStrings:RequestPortal",
+      "validator": "secret"
+    },
+    {
+      "id": "storage-root",
+      "displayName": "Document storage root",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines durable document storage used through Common.Storage.",
+      "configurationKey": "Storage:Local:RootPath"
+    },
+    {
+      "id": "data-protection-keys",
+      "displayName": "Data Protection key path",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Persists ASP.NET Core Data Protection keys outside the application deployment directory.",
+      "configurationKey": "Security:DataProtectionKeysPath"
+    },
+    {
+      "id": "secrets-address",
+      "displayName": "Secrets provider address",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Identifies the production secrets service used by Common.Secrets.",
+      "configurationKey": "CommonSecrets:OpenBao:Address"
+    },
+    {
+      "id": "secrets-role",
+      "displayName": "Secrets workload role",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Identifies the workload role used by Common.Secrets production bootstrap.",
+      "configurationKey": "CommonSecrets:OpenBao:RoleId"
+    },
+    {
+      "id": "active-directory-server",
+      "displayName": "Staff directory server",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines the directory endpoint used for staff authentication.",
+      "configurationKey": "Authentication:ActiveDirectory:Server"
+    },
+    {
+      "id": "active-directory-search-base",
+      "displayName": "Staff directory search base",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines the directory search base used for staff authentication and authorization.",
+      "configurationKey": "Authentication:ActiveDirectory:SearchBase"
+    },
+    {
+      "id": "storage-malware-scanner",
+      "displayName": "Upload malware scanner",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines the malware-scanning endpoint required before uploaded documents are accepted in production.",
+      "configurationKey": "Uploads:MalwareScanning:Host"
+    },
+    {
+      "id": "smtp-host",
+      "displayName": "Notification SMTP host",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines the SMTP endpoint used by Common.Messaging for portal notifications.",
+      "configurationKey": "Notifications:SmtpHost"
+    },
+    {
+      "id": "smtp-from",
+      "displayName": "Notification sender address",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines the sender address for portal notification messages.",
+      "configurationKey": "Notifications:FromAddress"
+    },
+    {
+      "id": "smtp-password",
+      "displayName": "Notification SMTP credential",
+      "kind": "Secret",
+      "required": true,
+      "purpose": "Provides the SMTP credential through Common.Secrets.",
+      "secretName": "Notifications:SmtpPassword",
+      "validator": "secret"
+    },
+    {
+      "id": "messaging-queue",
+      "displayName": "Durable messaging queue path",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines durable external-delivery queue storage for Common.Messaging.",
+      "configurationKey": "Messaging:DurableQueuePath"
+    },
+    {
+      "id": "diagnostics-key",
+      "displayName": "Engineering diagnostics machine credential",
+      "kind": "Secret",
+      "required": true,
+      "purpose": "Protects the machine-facing Common.Diagnostics interface.",
+      "secretName": "RequestPortal:Diagnostics:Key",
+      "validator": "secret"
+    }
+  ]
+}
