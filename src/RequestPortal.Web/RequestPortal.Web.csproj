@@ -24,4 +24,7 @@
     <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.Hosting\Common.Messaging.Hosting.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../configuration/RequestPortal.configuration-contract.json" Link="configuration/RequestPortal.configuration-contract.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
