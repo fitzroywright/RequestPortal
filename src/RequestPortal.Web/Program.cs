@@ -240,7 +240,7 @@ builder.Services.AddHostedService<OutboxHostedService>();
 builder.Services.AddScoped<DemoDatabaseBootstrapper>();
 builder.Services.AddScoped<DemoDataSeeder>();
 builder.Services.AddScoped<DemoReadinessValidator>();
-builder.Services.AddStarfleetDiagnostics();
+builder.Services.AddEngineeringDiagnostics();
 builder.Services.AddScoped<IStartupDiagnostic, PostgreSqlStartupDiagnostic>();
 builder.Services.AddScoped<IStartupDiagnostic, ActiveDirectoryStartupDiagnostic>();
 builder.Services.AddScoped<StartupDiagnosticRunner>();
