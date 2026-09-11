@@ -31,6 +31,7 @@ using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Reporting;
 using RequestPortal.Application.Requests;
 using RequestPortal.Application.Security;
+using RequestPortal.Common.Configuration;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
@@ -237,6 +238,7 @@ builder.Services.AddScoped<IIntegrationStatusService, IntegrationStatusService>(
 builder.Services.AddScoped<StaffSignInService>();
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddHostedService<OutboxHostedService>();
+builder.Services.AddHostedService<ConfigurationContractPublisher>();
 builder.Services.AddScoped<DemoDatabaseBootstrapper>();
 builder.Services.AddScoped<DemoDataSeeder>();
 builder.Services.AddScoped<DemoReadinessValidator>();
