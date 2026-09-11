@@ -1,17 +1,17 @@
 @page
 @model RequestPortal.Web.Pages.IndexModel
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "Relief Portal";
 }
 
-<section class="hero">
-    <div class="shell hero-grid">
-        <div>
+<section class="relief-hero">
+    <div class="shell relief-hero-grid">
+        <div class="relief-hero-copy">
             <div class="eyebrow">Food For The Poor Jamaica</div>
-            <h1>Request assistance through your organization.</h1>
+            <h1>Relief starts with the right connection.</h1>
             <p>
-                The Request Portal gives approved organizations one secure place to register representatives,
-                submit requests, provide supporting information and follow each request through FFP review.
+                Use the Relief Portal to request assistance through an approved organization, register or join an organization,
+                and securely follow requests through Food For The Poor Jamaica's review process.
             </p>
             <div class="hero-actions">
                 @if (User.Identity?.IsAuthenticated == true)
@@ -21,46 +21,98 @@
                 }
                 else
                 {
-                    <a class="button" asp-page="/Account/Login">Representative sign in</a>
+                    <a class="button" asp-page="/Account/Login">Register or sign in</a>
                     <a class="button button-secondary" asp-page="/Account/StaffLogin">FFP staff sign in</a>
                 }
             </div>
         </div>
-        <aside class="hero-card">
-            <h2>How it works</h2>
-            <ol>
-                <li>Register your organization or request membership.</li>
-                <li>FFP approves new organizations.</li>
-                <li>Organization administrators approve representatives.</li>
-                <li>Submit requests on behalf of an approved organization.</li>
-                <li>Track review decisions and requests for more information.</li>
-            </ol>
-        </aside>
+
+        <div class="relief-people" aria-label="Relief Portal assistance and service representatives">
+            <img class="relief-person relief-person-woman" src="~/img/leaningwoman.webp" alt="Woman representing assistance services" />
+            <img class="relief-person relief-person-worker" src="~/img/worker03.webp" alt="Service professional" />
+        </div>
     </div>
 </section>
 
-<section class="section">
+<section class="relief-access-section">
+    <div class="shell">
+        <div class="relief-section-heading">
+            <span>User Assistance &amp; Access</span>
+            <h2>Get help or access your account</h2>
+        </div>
+
+        <div class="relief-access-grid">
+            <section class="relief-info-card">
+                <article class="relief-info-row">
+                    <img src="~/img/leaningwoman.webp" alt="" aria-hidden="true" />
+                    <div>
+                        <h3>Request for Assistance</h3>
+                        <p>
+                            Assistance requests are made through approved organizations. Sign in to register an organization,
+                            request membership in an existing organization, or continue an assistance request.
+                        </p>
+                        <a class="relief-text-link" asp-page="/Account/Login">Start here →</a>
+                    </div>
+                </article>
+
+                <div class="relief-divider"></div>
+
+                <article class="relief-info-row">
+                    <img src="~/img/worker03.webp" alt="" aria-hidden="true" />
+                    <div>
+                        <h3>Organization Representatives</h3>
+                        <p>
+                            Representatives sign in as themselves and may act only for organizations that have approved their membership.
+                            Your account keeps those relationships and requests in one secure place.
+                        </p>
+                        <a class="relief-text-link" asp-page="/Account/Login">Representative access →</a>
+                    </div>
+                </article>
+            </section>
+
+            <aside class="relief-login-card">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <h3>Welcome back</h3>
+                    <p>You are signed in. Continue to your dashboard or organization workspace.</p>
+                    <a class="button relief-wide-button" asp-page="/Dashboard/Index">Open dashboard</a>
+                    <a class="button button-outline relief-wide-button" asp-page="/Organizations/Index">My organizations</a>
+                }
+                else
+                {
+                    <h3>Registered User Login</h3>
+                    <p>New here? Your first successful external sign-in creates your portal identity.</p>
+                    <a class="button relief-wide-button" asp-page="/Account/Login">Register or sign in</a>
+                    <a class="button button-outline relief-wide-button" asp-page="/Account/StaffLogin">FFP staff sign in</a>
+                    <small>Google, Microsoft, Facebook or other configured identity providers are shown on the sign-in page.</small>
+                }
+            </aside>
+        </div>
+    </div>
+</section>
+
+<section class="section relief-process-section">
     <div class="shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">One portal, clear ownership</div>
-            <h2>Built around organizations, not individual accounts.</h2>
+            <h2>Assistance requests belong to organizations.</h2>
             <p>
-                Representatives authenticate as people, but every assistance request belongs to the organization
-                they are authorized to represent. A representative may belong to more than one approved organization.
+                Representatives authenticate as people, while each request remains tied to the organization they are authorized to represent.
+                New organizations and new representative memberships follow an approval process before requests can be submitted.
             </p>
         </div>
         <div class="grid-3">
             <article class="card">
-                <h3>Organization registration</h3>
-                <p>New organizations submit their registration for FFP review before they can make requests.</p>
+                <h3>1. Register or join</h3>
+                <p>Register a new organization or request membership in an approved organization.</p>
             </article>
             <article class="card">
-                <h3>Representative approval</h3>
-                <p>Each organization controls which authenticated representatives may act on its behalf.</p>
+                <h3>2. Submit assistance</h3>
+                <p>Provide the request details and supporting documents on behalf of your organization.</p>
             </article>
             <article class="card">
-                <h3>Request tracking</h3>
-                <p>Requests keep an auditable status history from draft and submission through FFP review.</p>
+                <h3>3. Follow the request</h3>
+                <p>Track review, requests for additional information, decisions and fulfilment from your dashboard.</p>
             </article>
         </div>
     </div>
