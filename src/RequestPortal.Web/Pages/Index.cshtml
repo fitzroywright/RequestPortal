@@ -4,33 +4,19 @@
     ViewData["Title"] = "Relief Portal";
 }
 
-<section class="relief-hero">
-    <div class="shell relief-hero-grid">
-        <div class="relief-hero-copy">
-            <div class="eyebrow">Food For The Poor Jamaica</div>
-            <h1>Relief starts with the right connection.</h1>
-            <p>
-                Use the Relief Portal to request assistance through an approved organization, register or join an organization,
-                and securely follow requests through Food For The Poor Jamaica's review process.
-            </p>
-            <div class="hero-actions">
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <a class="button" asp-page="/Dashboard/Index">Open my dashboard</a>
-                    <a class="button button-secondary" asp-page="/Requests/Create">Create a request</a>
-                }
-                else
-                {
-                    <a class="button" asp-page="/Account/Login">Register or sign in</a>
-                    <a class="button button-secondary" asp-page="/Account/StaffLogin">FFP staff sign in</a>
-                }
-            </div>
+<section class="relief-carousel" data-relief-carousel>
+    <div class="relief-carousel-stage">
+        <div class="relief-carousel-image" data-carousel-image aria-hidden="true"></div>
+        <div class="relief-carousel-shade"></div>
+        <button class="relief-carousel-arrow relief-carousel-prev" type="button" data-carousel-prev aria-label="Previous slide">‹</button>
+        <button class="relief-carousel-arrow relief-carousel-next" type="button" data-carousel-next aria-label="Next slide">›</button>
+        <div class="shell relief-carousel-copy">
+            <div class="eyebrow" data-carousel-kicker>Disaster Relief</div>
+            <h1 data-carousel-title>Standing with Jamaica</h1>
+            <p data-carousel-text>Responding today. Rebuilding tomorrow. Together we bring hope.</p>
+            <a class="button" asp-page="/Account/Login">Start here →</a>
         </div>
-
-        <div class="relief-people" aria-label="Relief Portal assistance and service representatives">
-            <img class="relief-person relief-person-woman" src="~/img/leaningwoman.webp" alt="Woman representing assistance services" />
-            <img class="relief-person relief-person-worker" src="~/img/worker03.webp" alt="Service professional" />
-        </div>
+        <div class="shell relief-carousel-thumbs" data-carousel-thumbs aria-label="Relief programme slides"></div>
     </div>
 </section>
 
@@ -40,36 +26,26 @@
             <span>User Assistance &amp; Access</span>
             <h2>Get help or access your account</h2>
         </div>
-
         <div class="relief-access-grid">
             <section class="relief-info-card">
                 <article class="relief-info-row">
                     <img src="~/img/leaningwoman.webp" alt="" aria-hidden="true" />
                     <div>
                         <h3>Request for Assistance</h3>
-                        <p>
-                            Assistance requests are made through approved organizations. Sign in to register an organization,
-                            request membership in an existing organization, or continue an assistance request.
-                        </p>
+                        <p>Assistance requests are made through approved organizations. Sign in to register an organization, request membership in an existing organization, or continue an assistance request.</p>
                         <a class="relief-text-link" asp-page="/Account/Login">Start here →</a>
                     </div>
                 </article>
-
                 <div class="relief-divider"></div>
-
                 <article class="relief-info-row">
                     <img src="~/img/worker03.webp" alt="" aria-hidden="true" />
                     <div>
                         <h3>Organization Representatives</h3>
-                        <p>
-                            Representatives sign in as themselves and may act only for organizations that have approved their membership.
-                            Your account keeps those relationships and requests in one secure place.
-                        </p>
+                        <p>Representatives sign in as themselves and may act only for organizations that have approved their membership. Your account keeps those relationships and requests in one secure place.</p>
                         <a class="relief-text-link" asp-page="/Account/Login">Representative access →</a>
                     </div>
                 </article>
             </section>
-
             <aside class="relief-login-card">
                 @if (User.Identity?.IsAuthenticated == true)
                 {
@@ -96,24 +72,68 @@
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">One portal, clear ownership</div>
             <h2>Assistance requests belong to organizations.</h2>
-            <p>
-                Representatives authenticate as people, while each request remains tied to the organization they are authorized to represent.
-                New organizations and new representative memberships follow an approval process before requests can be submitted.
-            </p>
+            <p>Representatives authenticate as people, while each request remains tied to the organization they are authorized to represent. New organizations and new representative memberships follow an approval process before requests can be submitted.</p>
         </div>
         <div class="grid-3">
-            <article class="card">
-                <h3>1. Register or join</h3>
-                <p>Register a new organization or request membership in an approved organization.</p>
-            </article>
-            <article class="card">
-                <h3>2. Submit assistance</h3>
-                <p>Provide the request details and supporting documents on behalf of your organization.</p>
-            </article>
-            <article class="card">
-                <h3>3. Follow the request</h3>
-                <p>Track review, requests for additional information, decisions and fulfilment from your dashboard.</p>
-            </article>
+            <article class="card"><h3>1. Register or join</h3><p>Register a new organization or request membership in an approved organization.</p></article>
+            <article class="card"><h3>2. Submit assistance</h3><p>Provide the request details and supporting documents on behalf of your organization.</p></article>
+            <article class="card"><h3>3. Follow the request</h3><p>Track review, requests for additional information, decisions and fulfilment from your dashboard.</p></article>
         </div>
     </div>
 </section>
+
+<script>
+(() => {
+    const root = document.querySelector('[data-relief-carousel]');
+    if (!root) return;
+    const slides = [
+        ['Disaster Relief','Standing with Jamaica','Responding today. Rebuilding tomorrow. Together we bring hope.','/img/carousel/disaster.jpg'],
+        ['Housing','Building safe homes','Secure housing gives families a stronger foundation for tomorrow.','/img/carousel/Splash01.jpg'],
+        ['Health Care','Care that reaches people','Supporting healthier communities with practical, compassionate assistance.','/img/carousel/Splash02.jpg'],
+        ['Agriculture','Growing stronger communities','Agriculture programmes help families build resilient livelihoods.','/img/carousel/Splash03.jpg'],
+        ['School Construction','Places to learn and grow','Creating safer spaces where students can learn, develop and thrive.','/img/carousel/Splash04.jpg'],
+        ['Missions','Serving communities together','Working with trusted partners to reach people where help is needed.','/img/carousel/Splash05.jpg'],
+        ['Education','Opening doors through education','Education creates opportunity and strengthens communities for generations.','/img/carousel/Splash06.jpg'],
+        ['Fishing Villages','Supporting coastal livelihoods','Helping fishing communities strengthen livelihoods and local resilience.','/img/carousel/Splash07.jpg'],
+        ['Hurricane Relief','Responding when disaster strikes','Emergency support today, recovery and rebuilding for tomorrow.','/img/carousel/Splash08.jpg'],
+        ['Income Generating Projects','Creating sustainable opportunity','Practical support helps families build income and greater independence.','/img/carousel/Splash09.jpg'],
+        ['Prison Ministry','Hope and human dignity','Extending compassion, dignity and support to people and their families.','/img/carousel/Splash10.jpg'],
+        ['Water Projects','Clean water changes lives','Improving access to safe water for healthier, stronger communities.','/img/carousel/Splash11.jpg'],
+        ['Community Support','Reaching people in need','Partnership turns generosity into practical help for Jamaican communities.','/img/carousel/Splash12.jpg'],
+        ['Development','Building for the future','Long-term solutions help communities move from crisis toward stability.','/img/carousel/Splash13.jpg'],
+        ['Partnerships','Stronger when we work together','Partners, representatives and communities working together to restore hope.','/img/carousel/Splash14.jpg']
+    ];
+    const image = root.querySelector('[data-carousel-image]');
+    const kicker = root.querySelector('[data-carousel-kicker]');
+    const title = root.querySelector('[data-carousel-title]');
+    const text = root.querySelector('[data-carousel-text]');
+    const thumbs = root.querySelector('[data-carousel-thumbs]');
+    let index = 0;
+    let timer;
+    slides.forEach((slide, i) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'relief-carousel-thumb';
+        button.title = slide[0];
+        button.setAttribute('aria-label', `Show ${slide[0]} slide`);
+        button.innerHTML = `<span class="relief-carousel-thumb-image" style="background-image:url('${slide[3]}')"></span><span>${slide[0]}</span>`;
+        button.addEventListener('click', () => { show(i); restart(); });
+        thumbs.appendChild(button);
+    });
+    const buttons = [...thumbs.querySelectorAll('.relief-carousel-thumb')];
+    function show(next) {
+        index = (next + slides.length) % slides.length;
+        const slide = slides[index];
+        image.style.backgroundImage = `url('${slide[3]}')`;
+        kicker.textContent = slide[0]; title.textContent = slide[1]; text.textContent = slide[2];
+        buttons.forEach((button, i) => button.classList.toggle('active', i === index));
+        buttons[index].scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+    }
+    function restart() { clearInterval(timer); timer = setInterval(() => show(index + 1), 7000); }
+    root.querySelector('[data-carousel-prev]').addEventListener('click', () => { show(index - 1); restart(); });
+    root.querySelector('[data-carousel-next]').addEventListener('click', () => { show(index + 1); restart(); });
+    root.addEventListener('mouseenter', () => clearInterval(timer));
+    root.addEventListener('mouseleave', restart);
+    show(0); restart();
+})();
+</script>
