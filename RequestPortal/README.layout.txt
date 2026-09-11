@@ -1,1 +1,0 @@
-Application projects are rooted here.
