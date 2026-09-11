@@ -13,6 +13,8 @@ public sealed class ConfigurationContractPublisher(
     ISecretProvider secrets,
     ILogger<ConfigurationContractPublisher> logger) : BackgroundService
 {
+    private static readonly TimeSpan retryDelay = TimeSpan.FromMinutes(5);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         string? baseUrl = configuration["ConfigurationService:BaseUrl"];
@@ -25,41 +27,64 @@ public sealed class ConfigurationContractPublisher(
         string path = configuration["ConfigurationService:ContractPath"]
             ?? Path.GetFullPath(Path.Combine(environment.ContentRootPath, "..", "..", "configuration", "RequestPortal.configuration-contract.json"));
 
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            if (await TryPublishAsync(baseUrl, path, stoppingToken))
+            {
+                return;
+            }
+
+            try
+            {
+                await Task.Delay(retryDelay, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+        }
+    }
+
+    private async Task<bool> TryPublishAsync(string baseUrl, string path, CancellationToken cancellationToken)
+    {
         try
         {
             if (!File.Exists(path))
             {
-                logger.LogWarning("Configuration contract was not found at {ContractPath}; RequestPortal will continue without publishing it.", path);
-                return;
+                logger.LogWarning("Configuration contract was not found at {ContractPath}; RequestPortal remains operational and will retry publication.", path);
+                return false;
             }
 
-            string? key = await secrets.GetAsync("configuration/registration/RequestPortal", stoppingToken);
+            string? key = await secrets.GetAsync("configuration/registration/RequestPortal", cancellationToken);
             if (string.IsNullOrWhiteSpace(key))
             {
-                logger.LogWarning("Configuration registration credential is unavailable; RequestPortal will continue without publishing its contract.");
-                return;
+                logger.LogWarning("Configuration registration credential is unavailable; RequestPortal remains operational and will retry publication.");
+                return false;
             }
 
-            string json = await File.ReadAllTextAsync(path, stoppingToken);
+            string json = await File.ReadAllTextAsync(path, cancellationToken);
             using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(10) };
             using HttpRequestMessage request = new(HttpMethod.Post, $"{baseUrl.TrimEnd('/')}/api/contracts/register");
             request.Headers.TryAddWithoutValidation("X-Configuration-Registration-Key", key);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            using HttpResponseMessage response = await client.SendAsync(request, stoppingToken);
+            using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Configuration service rejected RequestPortal contract publication with HTTP {StatusCode}; RequestPortal remains operational.", (int)response.StatusCode);
-                return;
+                logger.LogWarning("Configuration service rejected RequestPortal contract publication with HTTP {StatusCode}; RequestPortal remains operational and will retry publication.", (int)response.StatusCode);
+                return false;
             }
 
-            logger.LogInformation("Published RequestPortal configuration contract.");
+            logger.LogInformation("RequestPortal configuration requirements are registered with the Configuration service.");
+            return true;
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            throw;
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Unable to publish RequestPortal configuration contract; RequestPortal remains operational.");
+            logger.LogWarning(exception, "Unable to publish RequestPortal configuration requirements; RequestPortal remains operational and will retry publication.");
+            return false;
         }
     }
 }
