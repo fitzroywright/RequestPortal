@@ -6,5 +6,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="$(CommonRoot)\Common.Diagnostics\Common.Diagnostics.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Secrets\Common.Secrets.csproj" />
   </ItemGroup>
 </Project>
