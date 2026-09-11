@@ -43,7 +43,7 @@ public sealed class ConfigurationContractPublisher(
             string json = await File.ReadAllTextAsync(path, stoppingToken);
             using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(10) };
             using HttpRequestMessage request = new(HttpMethod.Post, $"{baseUrl.TrimEnd('/')}/api/contracts/register");
-            request.Headers.TryAddWithoutValidation("X-Aegis-Configuration-Key", key);
+            request.Headers.TryAddWithoutValidation("X-Configuration-Registration-Key", key);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
             using HttpResponseMessage response = await client.SendAsync(request, stoppingToken);
             if (!response.IsSuccessStatusCode)
