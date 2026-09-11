@@ -23,7 +23,7 @@ public sealed class ConfigurationContractPublisher(
         }
 
         string path = configuration["ConfigurationService:ContractPath"]
-            ?? Path.Combine(environment.ContentRootPath, "configuration", "RequestPortal.configuration-contract.json");
+            ?? Path.GetFullPath(Path.Combine(environment.ContentRootPath, "..", "..", "configuration", "RequestPortal.configuration-contract.json"));
 
         try
         {
