@@ -1,0 +1,393 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using RequestPortal.Application.Documents;
+using RequestPortal.Application.Integration;
+using RequestPortal.Common.Messaging;
+using RequestPortal.Common.Time;
+using RequestPortal.Domain.Documents;
+using RequestPortal.Domain.Integration;
+using RequestPortal.Domain.Requests;
+using RequestPortal.Infrastructure.Persistence;
+
+namespace RequestPortal.Infrastructure.Integration;
+
+public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
+{
+    private const string ConsumerName = "FfpManagerIntegration";
+    private static readonly Guid ExternalSystemActorId = new("00000000-0000-0000-0000-00000000f001");
+
+    private readonly RequestPortalDbContext dbContext;
+    private readonly IDocumentService documentService;
+    private readonly IFfpManagerBridgeClient bridgeClient;
+    private readonly FfpManagerBridgeOptions options;
+    private readonly IClock clock;
+
+    public FfpManagerIntegrationService(
+        RequestPortalDbContext dbContext,
+        IDocumentService documentService,
+        IFfpManagerBridgeClient bridgeClient,
+        IOptions<FfpManagerBridgeOptions> options,
+        IClock clock)
+    {
+        this.dbContext = dbContext;
+        this.documentService = documentService;
+        this.bridgeClient = bridgeClient;
+        this.options = options.Value;
+        this.clock = clock;
+    }
+
+    public async Task<FfpManagerApplicationReference> SubmitRequestAsync(
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureEnabled();
+
+        AssistanceRequest request = await dbContext.AssistanceRequests
+            .Include(item => item.Items)
+            .SingleAsync(item => item.Id == requestId, cancellationToken);
+
+        if (request.Status == RequestStatus.Draft)
+        {
+            throw new InvalidOperationException("Draft requests cannot be sent to FFP Manager.");
+        }
+
+        var organization = await dbContext.Organizations
+            .AsNoTracking()
+            .Where(item => item.Id == request.OrganizationId)
+            .Select(item => new
+            {
+                item.Id,
+                item.Name,
+                item.RegistrationNumber,
+                item.Address,
+                item.Phone,
+                item.Email
+            })
+            .SingleAsync(cancellationToken);
+
+        IntegrationLink link = await GetOrCreateLinkAsync(request.Id, cancellationToken);
+        link.MarkPending(clock.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            Dictionary<Guid, string> units = await dbContext.UnitsOfMeasure
+                .AsNoTracking()
+                .Where(unit => request.Items.Select(item => item.UnitOfMeasureId).Contains(unit.Id))
+                .ToDictionaryAsync(unit => unit.Id, unit => unit.Code, cancellationToken);
+
+            List<StoredDocument> documents = await dbContext.Documents
+                .AsNoTracking()
+                .Where(document =>
+                    document.OwnerType == DocumentOwnerType.AssistanceRequest &&
+                    document.OwnerId == request.Id &&
+                    !document.IsArchived)
+                .OrderBy(document => document.UploadedUtc)
+                .ToListAsync(cancellationToken);
+
+            List<FfpManagerApplicationItem> items = request.Items
+                .Select(item => new FfpManagerApplicationItem(
+                    item.Id,
+                    item.Description,
+                    item.Quantity,
+                    units.TryGetValue(item.UnitOfMeasureId, out string? unit) ? unit : item.UnitOfMeasureId.ToString("D")))
+                .ToList();
+
+            List<FfpManagerArtifactDescriptor> artifacts = documents
+                .Select(ToArtifactDescriptor)
+                .ToList();
+
+            FfpManagerApplicationSubmission submission = new(
+                link.Id,
+                request.Id,
+                request.PublicReference,
+                organization.Id,
+                organization.Name,
+                organization.RegistrationNumber,
+                organization.Address,
+                organization.Phone,
+                organization.Email,
+                request.SubmittedByUserId ?? request.CreatedByUserId,
+                request.SubmittedUtc ?? request.CreatedUtc,
+                request.Kind.ToString(),
+                request.Priority.ToString(),
+                request.Summary,
+                request.Category,
+                request.Subcategory,
+                request.ProgramCategory,
+                request.Location,
+                request.Circumstances,
+                items,
+                artifacts);
+
+            FfpManagerApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
+
+            Guid documentAccessUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
+            foreach (StoredDocument document in documents)
+            {
+                DocumentDownload? download = await documentService.DownloadAsync(
+                    documentAccessUserId,
+                    document.Id,
+                    isStaff: true,
+                    cancellationToken);
+                if (download is null)
+                {
+                    throw new InvalidOperationException($"Request artifact {document.Id:D} could not be opened for integration transfer.");
+                }
+
+                await using Stream content = download.Content;
+                await bridgeClient.UploadArtifactAsync(
+                    reference.ApplicationId,
+                    ToArtifactDescriptor(document),
+                    content,
+                    cancellationToken);
+            }
+
+            link.MarkSynchronized(reference.ApplicationId, clock.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return reference;
+        }
+        catch (Exception exception)
+        {
+            link.MarkFailed(clock.UtcNow, exception.Message);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<FfpManagerApplicationStatus?> RefreshStatusAsync(
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureEnabled();
+        IntegrationLink? link = await dbContext.IntegrationLinks
+            .SingleOrDefaultAsync(
+                item => item.RequestId == requestId && item.SystemName == options.SystemName,
+                cancellationToken);
+
+        if (link is null || string.IsNullOrWhiteSpace(link.ExternalReference))
+        {
+            return null;
+        }
+
+        return await bridgeClient.GetStatusAsync(link.ExternalReference, cancellationToken);
+    }
+
+    public async Task ReceiveStatusAsync(
+        Guid messageId,
+        Guid requestId,
+        FfpManagerApplicationStatus status,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await BeginInboxAsync(messageId, cancellationToken))
+        {
+            return;
+        }
+
+        AssistanceRequest request = await dbContext.AssistanceRequests
+            .Include(item => item.StatusHistory)
+            .SingleAsync(item => item.Id == requestId, cancellationToken);
+
+        ApplyCanonicalStatus(request, status);
+        AddStatusOutbox(request, status.ChangedUtc);
+        await CompleteInboxAsync(messageId, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ReceiveInformationRequestAsync(
+        FfpManagerInformationRequest informationRequest,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await BeginInboxAsync(informationRequest.MessageId, cancellationToken))
+        {
+            return;
+        }
+
+        AssistanceRequest request = await dbContext.AssistanceRequests
+            .Include(item => item.StatusHistory)
+            .SingleAsync(item => item.Id == informationRequest.PortalRequestId, cancellationToken);
+
+        if (request.Status == RequestStatus.Submitted)
+        {
+            request.RequestMoreInformation(ExternalSystemActorId, informationRequest.RequestedUtc, informationRequest.Message);
+        }
+
+        FfpManagerInformationRequestedMessage message = new(
+            Guid.NewGuid(),
+            clock.UtcNow,
+            request.Id,
+            informationRequest.Message,
+            informationRequest.DueUtc);
+        AddOutbox(message);
+        await CompleteInboxAsync(informationRequest.MessageId, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RespondToInformationRequestAsync(
+        Guid requestId,
+        string applicationId,
+        Guid userId,
+        string message,
+        IReadOnlyList<Guid> documentIds,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureEnabled();
+        AssistanceRequest request = await dbContext.AssistanceRequests
+            .Include(item => item.StatusHistory)
+            .SingleAsync(item => item.Id == requestId, cancellationToken);
+
+        List<StoredDocument> documents = await dbContext.Documents
+            .AsNoTracking()
+            .Where(document => documentIds.Contains(document.Id) && document.OwnerId == requestId)
+            .ToListAsync(cancellationToken);
+
+        List<FfpManagerArtifactDescriptor> artifacts = documents.Select(ToArtifactDescriptor).ToList();
+        FfpManagerInformationResponse response = new(
+            Guid.NewGuid(),
+            requestId,
+            applicationId,
+            userId,
+            message.Trim(),
+            clock.UtcNow,
+            artifacts);
+
+        foreach (StoredDocument document in documents)
+        {
+            DocumentDownload? download = await documentService.DownloadAsync(userId, document.Id, isStaff: false, cancellationToken);
+            if (download is null)
+            {
+                throw new InvalidOperationException($"Response artifact {document.Id:D} could not be opened.");
+            }
+
+            await using Stream content = download.Content;
+            await bridgeClient.UploadArtifactAsync(applicationId, ToArtifactDescriptor(document), content, cancellationToken);
+        }
+
+        await bridgeClient.SendInformationResponseAsync(response, cancellationToken);
+        if (request.Status == RequestStatus.MoreInformationRequired)
+        {
+            request.Resubmit(userId, clock.UtcNow);
+            AddStatusOutbox(request, clock.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private async Task<IntegrationLink> GetOrCreateLinkAsync(Guid requestId, CancellationToken cancellationToken)
+    {
+        IntegrationLink? link = await dbContext.IntegrationLinks
+            .SingleOrDefaultAsync(
+                item => item.RequestId == requestId && item.SystemName == options.SystemName,
+                cancellationToken);
+        if (link is not null)
+        {
+            return link;
+        }
+
+        link = new IntegrationLink(Guid.NewGuid(), requestId, options.SystemName, clock.UtcNow);
+        dbContext.IntegrationLinks.Add(link);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return link;
+    }
+
+    private async Task<bool> BeginInboxAsync(Guid messageId, CancellationToken cancellationToken)
+    {
+        bool exists = await dbContext.InboxMessages
+            .AsNoTracking()
+            .AnyAsync(item => item.MessageId == messageId && item.Consumer == ConsumerName, cancellationToken);
+        if (exists)
+        {
+            return false;
+        }
+
+        dbContext.InboxMessages.Add(new InboxMessage
+        {
+            MessageId = messageId,
+            Consumer = ConsumerName,
+            ReceivedUtc = clock.UtcNow
+        });
+        return true;
+    }
+
+    private async Task CompleteInboxAsync(Guid messageId, CancellationToken cancellationToken)
+    {
+        InboxMessage inbox = await dbContext.InboxMessages
+            .SingleAsync(item => item.MessageId == messageId && item.Consumer == ConsumerName, cancellationToken);
+        inbox.ProcessedUtc = clock.UtcNow;
+    }
+
+    private static FfpManagerArtifactDescriptor ToArtifactDescriptor(StoredDocument document) =>
+        new(
+            document.Id,
+            document.DocumentType.ToString(),
+            document.OriginalFileName,
+            document.ContentType,
+            document.SizeBytes,
+            document.UploadedUtc);
+
+    private static void ApplyCanonicalStatus(AssistanceRequest request, FfpManagerApplicationStatus status)
+    {
+        string code = status.StatusCode.Trim().Replace('-', '_').Replace(' ', '_').ToUpperInvariant();
+        if (code is "MORE_INFORMATION_REQUIRED" or "MORE_INFORMATION" or "AWAITING_INFORMATION")
+        {
+            if (request.Status == RequestStatus.Submitted)
+                request.RequestMoreInformation(ExternalSystemActorId, status.ChangedUtc, status.Detail ?? status.StatusText);
+            return;
+        }
+
+        if (code is "APPROVED" && request.Status == RequestStatus.Submitted)
+        {
+            request.Approve(ExternalSystemActorId, status.ChangedUtc);
+            return;
+        }
+
+        if (code is "REJECTED" or "DECLINED")
+        {
+            if (request.Status == RequestStatus.Submitted)
+                request.Reject(ExternalSystemActorId, status.ChangedUtc, status.Detail ?? status.StatusText);
+            return;
+        }
+
+        if (code is "PENDING_FULFILMENT" && request.Status == RequestStatus.Approved)
+        {
+            request.MarkPendingFulfilment(ExternalSystemActorId, status.ChangedUtc);
+            return;
+        }
+
+        if (code is "FULFILLED" && request.Status == RequestStatus.PendingFulfilment)
+        {
+            request.MarkFulfilled(ExternalSystemActorId, status.ChangedUtc);
+            return;
+        }
+
+        if (code is "CLOSED" && request.Status == RequestStatus.Fulfilled)
+        {
+            request.Close(ExternalSystemActorId, status.ChangedUtc);
+        }
+    }
+
+    private void AddStatusOutbox(AssistanceRequest request, DateTimeOffset occurredUtc)
+    {
+        AddOutbox(new RequestStatusChangedMessage(Guid.NewGuid(), occurredUtc, request.Id, (int)request.Status));
+    }
+
+    private void AddOutbox<TMessage>(TMessage message) where TMessage : IMessage
+    {
+        dbContext.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = message.MessageId,
+            MessageType = typeof(TMessage).FullName ?? typeof(TMessage).Name,
+            Payload = JsonSerializer.Serialize(message),
+            OccurredUtc = message.OccurredUtc,
+            AttemptCount = 0
+        });
+    }
+
+    private void EnsureEnabled()
+    {
+        if (!options.Enabled)
+        {
+            throw new InvalidOperationException("FFP Manager integration is disabled.");
+        }
+    }
+}
