@@ -10,15 +10,20 @@ public sealed class CommonMessagingAdoptionTests
     [Fact]
     public async Task NotificationSender_Enqueues_CommonMessaging_SmtpWorkItem()
     {
+        CancellationToken testCancellationToken = TestContext.Current.CancellationToken;
         InMemoryExternalDeliveryQueue queue = new();
         CommonQueuedNotificationSender sender = new(queue);
 
-        await sender.SendAsync(new NotificationEnvelope(
-            "person@example.com",
-            "Request updated",
-            "Your request changed."));
+        await sender.SendAsync(
+            new NotificationEnvelope(
+                "person@example.com",
+                "Request updated",
+                "Your request changed."),
+            testCancellationToken);
 
-        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(2));
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(testCancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(2));
+
         await foreach (ExternalDeliveryWorkItem item in queue.ReadAllAsync(timeout.Token))
         {
             Assert.Equal(MessageChannel.Smtp, item.RequestedChannels);
