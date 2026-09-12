@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Portal;
-using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
@@ -20,16 +20,16 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IClock clock;
-    private readonly IStarfleetDiagnosticSink diagnosticSink;
+    private readonly IDiagnosticOperationsRouter diagnosticRouter;
 
     public PortalWorkflowService(
         RequestPortalDbContext dbContext,
         IClock clock,
-        IStarfleetDiagnosticSink diagnosticSink)
+        IDiagnosticOperationsRouter diagnosticRouter)
     {
         this.dbContext = dbContext;
         this.clock = clock;
-        this.diagnosticSink = diagnosticSink;
+        this.diagnosticRouter = diagnosticRouter;
     }
 
     public async Task<IReadOnlyList<OrganizationSummary>> GetOrganizationsForUserAsync(
@@ -96,8 +96,8 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
-            "SF-ORG-REGISTERED",
-            StarfleetSeverity.Information,
+            "RP-ORG-REGISTERED",
+            DiagnosticSeverity.Information,
             "Organization",
             "Organization registration created.",
             organization.Id.ToString(),
@@ -124,8 +124,8 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
-            "SF-MEMBERSHIP-REQUESTED",
-            StarfleetSeverity.Information,
+            "RP-MEMBERSHIP-REQUESTED",
+            DiagnosticSeverity.Information,
             "OrganizationMembership",
             "Organization membership requested.",
             organizationId.ToString(),
@@ -171,8 +171,8 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         await transaction.CommitAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
-            "SF-ORG-APPROVED",
-            StarfleetSeverity.Information,
+            "RP-ORG-APPROVED",
+            DiagnosticSeverity.Information,
             "Organization",
             "Organization approved by FFP staff.",
             organizationId.ToString(),
@@ -221,8 +221,8 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
-            "SF-MEMBERSHIP-APPROVED",
-            StarfleetSeverity.Information,
+            "RP-MEMBERSHIP-APPROVED",
+            DiagnosticSeverity.Information,
             "OrganizationMembership",
             "Organization representative approved.",
             membershipId.ToString(),
@@ -246,8 +246,8 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
-            "SF-REQUEST-CREATED",
-            StarfleetSeverity.Information,
+            "RP-REQUEST-CREATED",
+            DiagnosticSeverity.Information,
             "AssistanceRequest",
             "Draft assistance request created.",
             request.PublicReference,
@@ -304,8 +304,8 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         await transaction.CommitAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
-            "SF-REQUEST-SUBMITTED",
-            StarfleetSeverity.Information,
+            "RP-REQUEST-SUBMITTED",
+            DiagnosticSeverity.Information,
             "AssistanceRequest",
             "Assistance request submitted for FFP review.",
             request.PublicReference,
@@ -436,7 +436,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         request.Approve(staffUserId, now);
         AddOutboxMessage(new RequestStatusChangedMessage(Guid.NewGuid(), now, request.Id, (int)request.Status));
         await dbContext.SaveChangesAsync(cancellationToken);
-        await WriteRequestDecisionDiagnosticAsync(request, "SF-REQUEST-APPROVED", "Assistance request approved.", cancellationToken);
+        await WriteRequestDecisionDiagnosticAsync(request, "RP-REQUEST-APPROVED", "Assistance request approved.", cancellationToken);
     }
 
     public async Task RejectRequestAsync(
@@ -450,7 +450,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         request.Reject(staffUserId, now, reason);
         AddOutboxMessage(new RequestStatusChangedMessage(Guid.NewGuid(), now, request.Id, (int)request.Status));
         await dbContext.SaveChangesAsync(cancellationToken);
-        await WriteRequestDecisionDiagnosticAsync(request, "SF-REQUEST-REJECTED", "Assistance request rejected.", cancellationToken);
+        await WriteRequestDecisionDiagnosticAsync(request, "RP-REQUEST-REJECTED", "Assistance request rejected.", cancellationToken);
     }
 
     public async Task RequestMoreInformationAsync(
@@ -464,7 +464,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         request.RequestMoreInformation(staffUserId, now, reason);
         AddOutboxMessage(new RequestStatusChangedMessage(Guid.NewGuid(), now, request.Id, (int)request.Status));
         await dbContext.SaveChangesAsync(cancellationToken);
-        await WriteRequestDecisionDiagnosticAsync(request, "SF-REQUEST-MORE-INFO", "Additional information requested.", cancellationToken);
+        await WriteRequestDecisionDiagnosticAsync(request, "RP-REQUEST-MORE-INFO", "Additional information requested.", cancellationToken);
     }
 
     private async Task<AssistanceRequest> LoadSubmittedRequestAsync(
@@ -493,8 +493,8 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         if (!authorized)
         {
             await WriteDiagnosticAsync(
-                "SF-AUTH-ORG-DENIED",
-                StarfleetSeverity.Warning,
+                "RP-AUTH-ORG-DENIED",
+                DiagnosticSeverity.Warning,
                 "Security.Authorization",
                 "Organization access denied.",
                 organizationId.ToString(),
@@ -548,7 +548,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
     {
         await WriteDiagnosticAsync(
             code,
-            StarfleetSeverity.Information,
+            DiagnosticSeverity.Information,
             "AssistanceRequest",
             message,
             request.PublicReference,
@@ -557,21 +557,27 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
 
     private Task WriteDiagnosticAsync(
         string code,
-        StarfleetSeverity severity,
+        DiagnosticSeverity severity,
         string component,
         string message,
         string? detail,
         CancellationToken cancellationToken)
     {
-        StarfleetDiagnosticEvent diagnosticEvent = new(
-            Guid.NewGuid(),
+        IReadOnlyDictionary<string, string>? properties = string.IsNullOrWhiteSpace(detail)
+            ? null
+            : new Dictionary<string, string>
+            {
+                ["Detail"] = detail
+            };
+
+        DiagnosticTelemetryEvent diagnosticEvent = new(
             clock.UtcNow,
-            component,
+            $"RequestPortal.{component}",
             code,
             severity,
             message,
-            detail);
+            Properties: properties);
 
-        return diagnosticSink.WriteAsync(diagnosticEvent, cancellationToken);
+        return diagnosticRouter.RouteAsync(diagnosticEvent, cancellationToken);
     }
 }
