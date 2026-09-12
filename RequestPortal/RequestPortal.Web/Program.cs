@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
@@ -123,8 +124,68 @@ if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(face
 }
 
 builder.Services.AddOptions<ActiveDirectoryOptions>().Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
+builder.Services.AddOptions<StaffOidcOptions>().Bind(builder.Configuration.GetSection(StaffOidcOptions.SectionName));
 builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection(NotificationOptions.SectionName));
 builder.Services.AddOptions<ManagementDashboardOptions>().Bind(builder.Configuration.GetSection(ManagementDashboardOptions.SectionName));
+
+StaffOidcOptions staffOidc = builder.Configuration
+    .GetSection(StaffOidcOptions.SectionName)
+    .Get<StaffOidcOptions>() ?? new StaffOidcOptions();
+if (staffOidc.Enabled)
+{
+    authentication.AddOpenIdConnect(StaffOidcOptions.Scheme, options =>
+    {
+        options.SignInScheme = IdentityConstants.ApplicationScheme;
+        options.Authority = staffOidc.Authority;
+        options.ClientId = staffOidc.ClientId;
+        options.ClientSecret = staffOidc.ClientSecret;
+        options.CallbackPath = staffOidc.CallbackPath;
+        options.ResponseType = "code";
+        options.UsePkce = true;
+        options.RequireHttpsMetadata = staffOidc.RequireHttpsMetadata;
+        options.SaveTokens = false;
+        options.GetClaimsFromUserInfoEndpoint = true;
+        options.Scope.Clear();
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+        options.Events = new OpenIdConnectEvents
+        {
+            OnRedirectToIdentityProvider = context =>
+            {
+                context.ProtocolMessage.Prompt = "login";
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = async context =>
+            {
+                if (context.Principal is null)
+                {
+                    context.Fail("The staff identity provider returned no principal.");
+                    return;
+                }
+
+                StaffOidcPrincipalService service = context.HttpContext.RequestServices
+                    .GetRequiredService<StaffOidcPrincipalService>();
+                StaffOidcPrincipalResult result = await service.BuildPrincipalAsync(
+                    context.Principal,
+                    context.HttpContext.RequestAborted);
+                if (!result.Allowed || result.Principal is null)
+                {
+                    context.Fail(result.FailureCode ?? "FFP staff access denied.");
+                    return;
+                }
+
+                context.Principal = result.Principal;
+            },
+            OnRemoteFailure = context =>
+            {
+                context.HandleResponse();
+                context.Response.Redirect("/Account/StaffAccessDenied");
+                return Task.CompletedTask;
+            }
+        };
+    });
+}
 
 ActiveDirectoryOptions requestPortalAd = builder.Configuration
     .GetSection(ActiveDirectoryOptions.SectionName)
@@ -242,7 +303,7 @@ builder.Services.AddScoped<IRequestLifecycleService, RequestLifecycleService>();
 builder.Services.AddScoped<IFulfilmentQueueService, FulfilmentQueueService>();
 builder.Services.AddScoped<IIntegrationStatusService, IntegrationStatusService>();
 builder.Services.AddFfpManagerIntegration(builder.Configuration);
-builder.Services.AddScoped<StaffSignInService>();
+builder.Services.AddScoped<StaffOidcPrincipalService>();
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddHostedService<OutboxHostedService>();
 builder.Services.AddHostedService<ConfigurationContractPublisher>();
@@ -251,20 +312,22 @@ builder.Services.AddScoped<DemoDataSeeder>();
 builder.Services.AddScoped<DemoReadinessValidator>();
 builder.Services.AddEngineeringDiagnostics();
 builder.Services.AddScoped<IStartupDiagnostic, PostgreSqlStartupDiagnostic>();
-builder.Services.AddScoped<IStartupDiagnostic, ActiveDirectoryStartupDiagnostic>();
 builder.Services.AddScoped<StartupDiagnosticRunner>();
 
-string[] staffRoles =
-[
-    RequestPortalRoles.Administrator,
-    RequestPortalRoles.Reviewer,
-    PortalRoles.FfpAdministrator,
-    PortalRoles.FfpReviewer
-];
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy(PortalPolicies.FfpStaff, policy => policy.RequireRole(staffRoles));
-    options.AddPolicy(PortalPolicies.ManagementDashboard, policy => policy.RequireRole(staffRoles));
+    options.AddPolicy(PortalPolicies.FfpStaff, policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
+        policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.Access);
+    });
+    options.AddPolicy(PortalPolicies.ManagementDashboard, policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
+        policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ViewManagementDashboard);
+    });
 });
 
 builder.Services.AddRazorPages(options =>
@@ -336,6 +399,7 @@ static async Task HydrateProductionSecretsAsync(
         "Authentication:Microsoft:ClientSecret",
         "Authentication:Facebook:AppId",
         "Authentication:Facebook:AppSecret",
+        "Authentication:StaffOidc:ClientSecret",
         "FfpManagerIntegration:SharedSecret"
     ];
 
@@ -363,6 +427,7 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
         (!string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientSecret"])) ||
         (!string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientSecret"])) ||
         (!string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppSecret"]));
+    bool staffOidcEnabled = configuration.GetValue("Authentication:StaffOidc:Enabled", false);
 
     if (string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
         throw new InvalidOperationException("RP-PROD-STORAGE-001: Production document storage must be a durable external filesystem path or network share.");
@@ -376,10 +441,13 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
         throw new InvalidOperationException("RP-PROD-HOSTS-001: AllowedHosts must be restricted in production.");
     if (!malwareScanningEnabled || string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]))
         throw new InvalidOperationException("RP-PROD-UPLOAD-001: Malware scanning must be configured and enabled in production.");
-    if (string.IsNullOrWhiteSpace(configuration["Authentication:ActiveDirectory:Server"]) ||
-        string.IsNullOrWhiteSpace(configuration["Authentication:ActiveDirectory:SearchBase"]) ||
-        reviewerGroups.Length == 0 || administratorGroups.Length == 0)
-        throw new InvalidOperationException("RP-PROD-AD-001: Active Directory server, search base and staff authorization groups must be configured.");
+    if (reviewerGroups.Length == 0 || administratorGroups.Length == 0)
+        throw new InvalidOperationException("RP-PROD-STAFF-GROUPS-001: FFP staff directory-group mappings must be configured for Common.Security.");
+    if (!staffOidcEnabled ||
+        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:Authority"]) ||
+        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientId"]) ||
+        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientSecret"]))
+        throw new InvalidOperationException("RP-PROD-OIDC-001: FFP staff OIDC Authority, ClientId and OpenBao-backed ClientSecret must be commissioned.");
     if (!hasExternalProvider)
         throw new InvalidOperationException("RP-PROD-OAUTH-001: At least one external representative identity provider must be commissioned.");
     if (!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]))
