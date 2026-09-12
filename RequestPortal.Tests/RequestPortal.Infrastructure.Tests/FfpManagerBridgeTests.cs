@@ -36,7 +36,7 @@ public sealed class FfpManagerBridgeTests
             "Approved",
             "Approved in FFP Manager test workflow.",
             terminal: false,
-            cancellationToken);
+            cancellationToken: cancellationToken);
         FfpManagerApplicationStatus? current = await gateway.GetStatusAsync(reference.ApplicationId, cancellationToken);
 
         Assert.NotNull(current);
