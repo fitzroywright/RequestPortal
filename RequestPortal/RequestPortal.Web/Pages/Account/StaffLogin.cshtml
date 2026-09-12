@@ -10,8 +10,9 @@
         <h1>Internal review access.</h1>
         <p>
             FFP staff authenticate with their FFP Active Directory credentials. Directory authentication confirms
-            identity; Request Portal roles determine what that staff member is authorized to do.
+            identity; Common.Security maps FFP Active Directory groups to Request Portal roles and permissions.
         </p>
+        <p class="muted">Use your normal network username, for example <strong>FWright</strong>. Do not enter FFTPJ\FWright.</p>
         <a class="button button-secondary" asp-page="/Account/Login">Representative sign in</a>
     </section>
     <section class="login-panel">
@@ -26,8 +27,8 @@
         <form method="post" class="form-grid">
             <div asp-validation-summary="ModelOnly" class="validation"></div>
             <div class="field">
-                <label asp-for="Input.UserName"></label>
-                <input asp-for="Input.UserName" autocomplete="username" autofocus />
+                <label asp-for="Input.UserName">FFP network username</label>
+                <input asp-for="Input.UserName" autocomplete="username" autofocus placeholder="FWright" />
                 <span asp-validation-for="Input.UserName" class="validation"></span>
             </div>
             <div class="field">
