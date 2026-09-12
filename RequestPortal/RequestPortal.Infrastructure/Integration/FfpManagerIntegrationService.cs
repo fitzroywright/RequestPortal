@@ -79,7 +79,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
             Dictionary<Guid, string> units = await dbContext.UnitsOfMeasure
                 .AsNoTracking()
                 .Where(unit => unitIds.Contains(unit.Id))
-                .ToDictionaryAsync(unit => unit.Id, unit => unit.Code, cancellationToken);
+                .ToDictionaryAsync(unit => unit.Id, unit => unit.Name, cancellationToken);
 
             List<StoredDocument> documents = await dbContext.Documents
                 .AsNoTracking()
