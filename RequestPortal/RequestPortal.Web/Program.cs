@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
@@ -101,6 +102,17 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 AuthenticationBuilder authentication = builder.Services.AddAuthentication();
+authentication.AddCookie(StaffOidcOptions.StaffCookieScheme, options =>
+{
+    options.LoginPath = "/Account/StaffLogin";
+    options.AccessDeniedPath = "/Account/StaffAccessDenied";
+    options.Cookie.Name = "RequestPortal.FfpStaff";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.SlidingExpiration = false;
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+});
 
 string? googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 string? googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
@@ -135,7 +147,7 @@ if (staffOidc.Enabled)
 {
     authentication.AddOpenIdConnect(StaffOidcOptions.Scheme, options =>
     {
-        options.SignInScheme = IdentityConstants.ApplicationScheme;
+        options.SignInScheme = StaffOidcOptions.StaffCookieScheme;
         options.Authority = staffOidc.Authority;
         options.ClientId = staffOidc.ClientId;
         options.ClientSecret = staffOidc.ClientSecret;
@@ -187,24 +199,7 @@ if (staffOidc.Enabled)
     });
 }
 
-ActiveDirectoryOptions requestPortalAd = builder.Configuration
-    .GetSection(ActiveDirectoryOptions.SectionName)
-    .Get<ActiveDirectoryOptions>() ?? new ActiveDirectoryOptions();
-string[] authorizationGroups = requestPortalAd.AdministratorGroups
-    .Concat(requestPortalAd.ReviewerGroups)
-    .Where(group => !string.IsNullOrWhiteSpace(group))
-    .Distinct(StringComparer.OrdinalIgnoreCase)
-    .ToArray();
-Common.Security.Options.ActiveDirectoryAuthenticationOptions commonAd = new()
-{
-    Domain = requestPortalAd.Domain ?? string.Empty,
-    SearchBase = requestPortalAd.SearchBase ?? string.Empty,
-    Port = requestPortalAd.Port,
-    TimeoutSeconds = requestPortalAd.TimeoutSeconds,
-    Servers = string.IsNullOrWhiteSpace(requestPortalAd.Server) ? [] : [requestPortalAd.Server],
-    AdministrativeGroups = authorizationGroups
-};
-Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonSecurity(builder.Services, commonAd);
+Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonAuthorization<RequestPortalAuthorizationStore>(builder.Services);
 Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonSecurityDiagnostics(builder.Services);
 
 if (secretsRuntime is not null)
@@ -318,12 +313,14 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy(PortalPolicies.FfpStaff, policy =>
     {
+        policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);
         policy.RequireAuthenticatedUser();
         policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
         policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.Access);
     });
     options.AddPolicy(PortalPolicies.ManagementDashboard, policy =>
     {
+        policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);
         policy.RequireAuthenticatedUser();
         policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
         policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ViewManagementDashboard);
