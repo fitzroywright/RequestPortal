@@ -9,7 +9,19 @@ using FfpManager.Bridge;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<JsonOptions>(options => options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
 builder.Services.Configure<BridgeOptions>(builder.Configuration.GetSection(BridgeOptions.SectionName));
-builder.Services.AddSingleton<IFfpManagerGateway, FakeFfpManagerGateway>();
+
+string gatewayMode = (builder.Configuration["Bridge:Gateway"] ?? "Fake").Trim();
+if (!gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase) &&
+    !gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException("Bridge:Gateway must be either 'Fake' or 'Sql'.");
+}
+
+builder.Services.AddSingleton<IFfpManagerGateway>(_ =>
+    gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase)
+        ? new SqlFfpManagerGateway()
+        : new FakeFfpManagerGateway());
+
 builder.Services.AddHttpClient("RequestPortalCallback", client =>
 {
     string? baseUrl = builder.Configuration["Bridge:RequestPortalBaseUrl"];
@@ -21,14 +33,43 @@ builder.Services.AddHttpClient("RequestPortalCallback", client =>
 });
 
 string sharedSecret = builder.Configuration["Bridge:SharedSecret"] ?? string.Empty;
-if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(sharedSecret))
+long maxArtifactBytes = Math.Max(
+    1,
+    builder.Configuration.GetValue<long?>("Bridge:MaxArtifactBytes") ?? 25L * 1024L * 1024L);
+
+if (builder.Environment.IsProduction())
 {
-    throw new InvalidOperationException("Bridge:SharedSecret is required in production.");
+    if (string.IsNullOrWhiteSpace(sharedSecret))
+    {
+        throw new InvalidOperationException("Bridge:SharedSecret is required in production.");
+    }
+
+    if (gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("The fake FFP Manager gateway cannot be used in production.");
+    }
+
+    string? portalBaseUrl = builder.Configuration["Bridge:RequestPortalBaseUrl"];
+    if (!Uri.TryCreate(portalBaseUrl, UriKind.Absolute, out Uri? portalUri) || portalUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new InvalidOperationException("Bridge:RequestPortalBaseUrl must be an absolute HTTPS URL in production.");
+    }
+
+    string allowedHosts = builder.Configuration["AllowedHosts"] ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(allowedHosts) || allowedHosts == "*")
+    {
+        throw new InvalidOperationException("AllowedHosts must be restricted in production.");
+    }
 }
 
 WebApplication app = builder.Build();
 app.UseHttpsRedirection();
-app.MapGet("/health", () => Results.Ok(new { status = "ok", gateway = "fake" }));
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "ok",
+    gateway = gatewayMode,
+    maxArtifactBytes
+}));
 
 RouteGroupBuilder api = app.MapGroup("/api");
 api.AddEndpointFilter(async (context, next) =>
@@ -57,6 +98,11 @@ api.MapPut("/applications/{applicationId}/artifacts/{documentId:guid}", async (
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
+    if (request.ContentLength is long contentLength && contentLength > maxArtifactBytes + 1024L * 1024L)
+    {
+        return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+    }
+
     IFormCollection form = await request.ReadFormAsync(cancellationToken);
     string metadataJson = form["metadata"].ToString();
     FfpManagerArtifactDescriptor? descriptor = JsonSerializer.Deserialize<FfpManagerArtifactDescriptor>(
@@ -66,6 +112,10 @@ api.MapPut("/applications/{applicationId}/artifacts/{documentId:guid}", async (
     if (descriptor is null || file is null || descriptor.PortalDocumentId != documentId)
     {
         return Results.BadRequest("Valid artifact metadata and file are required.");
+    }
+    if (file.Length > maxArtifactBytes || descriptor.SizeBytes > maxArtifactBytes || descriptor.SizeBytes != file.Length)
+    {
+        return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
     }
 
     await using Stream stream = file.OpenReadStream();
@@ -217,6 +267,8 @@ public sealed class BridgeOptions
     public string SharedSecret { get; set; } = string.Empty;
     public string RequestPortalBaseUrl { get; set; } = string.Empty;
     public int CallbackTimeoutSeconds { get; set; } = 30;
+    public long MaxArtifactBytes { get; set; } = 25L * 1024L * 1024L;
+    public string Gateway { get; set; } = "Fake";
 }
 
 public sealed record SetStatusRequest(
