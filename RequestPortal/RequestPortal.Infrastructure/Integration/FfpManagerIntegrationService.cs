@@ -316,12 +316,13 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
 
     private async Task<bool> BeginInboxAsync(Guid messageId, CancellationToken cancellationToken)
     {
-        bool exists = await dbContext.InboxMessages
-            .AsNoTracking()
-            .AnyAsync(item => item.MessageId == messageId && item.Consumer == ConsumerName, cancellationToken);
-        if (exists)
+        InboxMessage? existing = await dbContext.InboxMessages
+            .SingleOrDefaultAsync(
+                item => item.MessageId == messageId && item.Consumer == ConsumerName,
+                cancellationToken);
+        if (existing is not null)
         {
-            return false;
+            return existing.ProcessedUtc is null;
         }
 
         dbContext.InboxMessages.Add(new InboxMessage
