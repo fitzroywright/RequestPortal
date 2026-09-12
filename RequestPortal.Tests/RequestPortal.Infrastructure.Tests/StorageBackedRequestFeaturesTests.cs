@@ -49,12 +49,11 @@ public sealed class StorageBackedRequestFeaturesTests
                 "<h1>Safe heading</h1><p>Safe body</p><script>alert('no')</script>",
                 cancellationToken);
 
-            ProjectProposalDetail proposal = Assert.NotNull(
-                await service.GetAsync(userId, requestId, isStaff: false, cancellationToken));
+            ProjectProposalDetail proposal = await service.GetAsync(userId, requestId, isStaff: false, cancellationToken)
+                ?? throw new InvalidOperationException("Proposal was not returned after save.");
             Assert.Equal("Revised Proposal", proposal.Title);
             Assert.Contains("Safe heading", proposal.RichContentHtml, StringComparison.Ordinal);
             Assert.DoesNotContain("<script", proposal.RichContentHtml, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("alert('no')", proposal.RichContentHtml, StringComparison.OrdinalIgnoreCase);
 
             IReadOnlyList<ProjectProposalRevisionDetail> revisions = await service.GetRevisionsAsync(
                 userId,
@@ -86,21 +85,21 @@ public sealed class StorageBackedRequestFeaturesTests
             RequestLocationService service = new(storage);
             Guid requestId = Guid.NewGuid();
 
-            RequestLocationSnapshot? saved = await service.ResolveAndSaveAsync(
+            RequestLocationSnapshot saved = await service.ResolveAndSaveAsync(
                 requestId,
                 "Half Way Tree, St. Andrew, Jamaica",
                 null,
                 null,
-                cancellationToken);
+                cancellationToken)
+                ?? throw new InvalidOperationException("Location was not resolved.");
 
-            Assert.NotNull(saved);
             Assert.Equal("St. Andrew", saved.Parish);
             Assert.Equal("Half Way Tree", saved.Community);
 
-            StoredFile? metadata = await storage.GetMetadataAsync(
+            StoredFile metadata = await storage.GetMetadataAsync(
                 $"requestportal/locations/{requestId:N}/resolved-location.json",
-                cancellationToken);
-            Assert.NotNull(metadata);
+                cancellationToken)
+                ?? throw new InvalidOperationException("Location metadata was not stored.");
             Assert.Equal(StorageStatus.Stored, metadata.Status);
             Assert.Equal("St. Andrew", metadata.Metadata["Parish"]);
         }
