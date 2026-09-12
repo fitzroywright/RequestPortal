@@ -27,6 +27,7 @@ public static class FfpManagerIntegrationServiceCollectionExtensions
         });
 
         services.AddScoped<IFfpManagerIntegrationService, FfpManagerIntegrationService>();
+        services.AddHostedService<FfpManagerStatusPollingWorker>();
         return services;
     }
 }
