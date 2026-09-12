@@ -27,6 +27,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
     public DbSet<RequestGeoLocation> RequestGeoLocations => Set<RequestGeoLocation>();
     public DbSet<ProjectProposal> ProjectProposals => Set<ProjectProposal>();
+    public DbSet<ProjectProposalRevision> ProjectProposalRevisions => Set<ProjectProposalRevision>();
     public DbSet<ProjectBudgetItem> ProjectBudgetItems => Set<ProjectBudgetItem>();
     public DbSet<ProjectMilestone> ProjectMilestones => Set<ProjectMilestone>();
     public DbSet<RequestCategory> RequestCategories => Set<RequestCategory>();
