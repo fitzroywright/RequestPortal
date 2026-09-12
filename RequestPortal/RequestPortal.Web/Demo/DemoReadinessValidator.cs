@@ -47,6 +47,11 @@ public sealed class DemoReadinessValidator
         Require(representative is not null, "Approved representative persona is missing.", failures);
         Require(pending is not null, "Pending representative persona is missing.", failures);
 
+        string publicDemoPassword = configuration["Demo:PublicUserPassword"] ?? "DemoUser2026!";
+        if (administrator is not null) await EnsurePasswordAsync(administrator, publicDemoPassword);
+        if (representative is not null) await EnsurePasswordAsync(representative, publicDemoPassword);
+        if (pending is not null) await EnsurePasswordAsync(pending, publicDemoPassword);
+
         if (staff is not null)
         {
             Require(await userManager.IsInRoleAsync(staff, PortalRoles.FfpReviewer), "FFP demo staff is not assigned the reviewer role.", failures);
@@ -130,6 +135,18 @@ public sealed class DemoReadinessValidator
         {
             throw new InvalidOperationException(
                 "RP-DEMO-READINESS-001: Request Portal demo readiness validation failed: " + string.Join(" | ", failures));
+        }
+    }
+
+    private async Task EnsurePasswordAsync(ApplicationUser user, string password)
+    {
+        if (await userManager.HasPasswordAsync(user)) return;
+        IdentityResult result = await userManager.AddPasswordAsync(user, password);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Unable to assign demo password to '{user.Email}'. " +
+                string.Join("; ", result.Errors.Select(error => error.Description)));
         }
     }
 
