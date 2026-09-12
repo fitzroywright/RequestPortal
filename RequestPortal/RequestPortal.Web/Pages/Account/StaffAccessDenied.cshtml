@@ -1,0 +1,6 @@
+@page
+@model RequestPortal.Web.Pages.Account.StaffAccessDeniedModel
+@{
+    ViewData["Title"] = "FFP Staff Access Denied";
+}
+<section class="section"><div class="shell"><div class="card" style="max-width:760px;margin:0 auto"><div class="eyebrow">FFP staff</div><h1>Staff access unavailable</h1><p>@Model.Message</p><p class="muted">Request Portal staff authorization is controlled by Common.Security role and permission mappings. Public Request Portal authentication is separate.</p><div class="action-row"><a class="button" asp-page="/Account/StaffLogin">Try FFP Staff Sign-In again</a><a class="button button-outline" asp-page="/Index">Return to Request Portal</a></div></div></div></section>
