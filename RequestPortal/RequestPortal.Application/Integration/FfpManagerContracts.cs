@@ -76,6 +76,11 @@ public sealed record FfpManagerInformationResponse(
     DateTimeOffset RespondedUtc,
     IReadOnlyList<FfpManagerArtifactDescriptor> Artifacts);
 
+public sealed record FfpManagerStatusCallback(
+    Guid MessageId,
+    Guid PortalRequestId,
+    FfpManagerApplicationStatus Status);
+
 public interface IFfpManagerBridgeClient
 {
     Task<FfpManagerApplicationReference> SubmitApplicationAsync(
