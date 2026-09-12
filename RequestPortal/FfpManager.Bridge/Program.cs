@@ -20,9 +20,11 @@ if (!gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase) &&
 
 builder.Services.AddSingleton<FakeFfpManagerGateway>();
 builder.Services.AddSingleton<SqlFfpManagerGateway>();
+builder.Services.AddSingleton<IFfpManagerReferenceDataCatalog, FfpManagerReferenceDataCatalog>();
+builder.Services.AddSingleton<SyncedSqlFfpManagerGateway>();
 builder.Services.AddSingleton<IFfpManagerGateway>(services =>
     gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase)
-        ? services.GetRequiredService<SqlFfpManagerGateway>()
+        ? services.GetRequiredService<SyncedSqlFfpManagerGateway>()
         : services.GetRequiredService<FakeFfpManagerGateway>());
 
 builder.Services.AddHttpClient("RequestPortalCallback", client =>
@@ -50,6 +52,11 @@ if (gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
     if (string.IsNullOrWhiteSpace(builder.Configuration["Bridge:SupportingDocumentRoot"]))
     {
         throw new InvalidOperationException("Bridge:SupportingDocumentRoot is required when Bridge:Gateway is Sql so RequestPortal artifacts can be stored for FFP Manager.");
+    }
+
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Bridge:InitialApplicationStatus"]))
+    {
+        throw new InvalidOperationException("Bridge:InitialApplicationStatus is required when Bridge:Gateway is Sql.");
     }
 }
 
@@ -80,6 +87,13 @@ if (builder.Environment.IsProduction())
 
 WebApplication app = builder.Build();
 app.UseHttpsRedirection();
+
+if (gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
+{
+    await app.Services.GetRequiredService<IFfpManagerReferenceDataCatalog>()
+        .RefreshAsync(app.Lifetime.ApplicationStopping);
+}
+
 app.MapGet("/health", () => Results.Ok(new
 {
     status = "ok",
@@ -96,6 +110,31 @@ api.AddEndpointFilter(async (context, next) =>
         return Results.Unauthorized();
     }
     return await next(context);
+});
+
+api.MapGet("/reference-data", async (
+    IFfpManagerReferenceDataCatalog catalog,
+    CancellationToken cancellationToken) =>
+{
+    if (!gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(new { error = "Reference-data synchronization is available only when Bridge:Gateway is Sql." });
+    }
+
+    return Results.Ok(await catalog.GetSnapshotAsync(cancellationToken));
+});
+
+api.MapPost("/reference-data/refresh", async (
+    IFfpManagerReferenceDataCatalog catalog,
+    CancellationToken cancellationToken) =>
+{
+    if (!gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(new { error = "Reference-data synchronization is available only when Bridge:Gateway is Sql." });
+    }
+
+    await catalog.RefreshAsync(cancellationToken);
+    return Results.Ok(await catalog.GetSnapshotAsync(cancellationToken));
 });
 
 api.MapPost("/applications", async (
@@ -292,6 +331,7 @@ public sealed class BridgeOptions
     public string InitialApplicationStatus { get; set; } = string.Empty;
     public string DefaultDocumentType { get; set; } = string.Empty;
     public string InformationResponseNoteType { get; set; } = "RequestPortal.InformationResponse";
+    public int ReferenceDataRefreshSeconds { get; set; } = 300;
     public Dictionary<string, string> DocumentTypeMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> StatusMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
