@@ -167,8 +167,13 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             .ToListAsync(cancellationToken))
             .ToHashSet();
 
-        Task<(Guid RequestId, RequestLocationSnapshot? Location)>[] locationTasks = requestIds
-            .Select(async requestId => (requestId, await ReadLocationSafeAsync(requestId, cancellationToken)))
+        Task<(Guid RequestId, RequestLocationSnapshot? Location)>[] locationTasks = baseRows
+            .Select(async row =>
+            {
+                RequestLocationSnapshot? location = await ReadLocationSafeAsync(row.Id, cancellationToken)
+                    ?? RequestLocationService.ResolveExisting(row.Id, row.Location);
+                return (row.Id, location);
+            })
             .ToArray();
         (Guid RequestId, RequestLocationSnapshot? Location)[] locations = await Task.WhenAll(locationTasks);
         Dictionary<Guid, RequestLocationSnapshot> geo = locations
