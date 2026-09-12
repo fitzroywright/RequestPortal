@@ -18,6 +18,7 @@ public static class RequestPortalPermissions
 {
     public const string Access = "requestportal.access";
     public const string ReviewRequests = "requests.review";
+    public const string ViewManagementDashboard = "management.dashboard.view";
     public const string ManageSecurity = "security.manage";
 }
 
@@ -136,10 +137,12 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         await EnsureRoleAsync(RequestPortalRoles.Administrator, cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.Access, "Access the Request Portal staff experience.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ReviewRequests, "Review and process assistance requests.", cancellationToken);
+        await EnsurePermissionAsync(RequestPortalPermissions.ViewManagementDashboard, "View management dashboards and organization-wide service metrics.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ManageSecurity, "Manage Request Portal roles and security policy.", cancellationToken);
 
         await EnsureRolePermissionAsync(RequestPortalRoles.Reviewer, RequestPortalPermissions.Access, cancellationToken);
         await EnsureRolePermissionAsync(RequestPortalRoles.Reviewer, RequestPortalPermissions.ReviewRequests, cancellationToken);
+        await EnsureRolePermissionAsync(RequestPortalRoles.Reviewer, RequestPortalPermissions.ViewManagementDashboard, cancellationToken);
         await EnsureRolePermissionAsync(RequestPortalRoles.Administrator, PermissionAuthorizer.AllPermissions, cancellationToken, definePermission: true);
 
         foreach (string group in directoryOptions.ReviewerGroups.Where(group => !string.IsNullOrWhiteSpace(group)))
