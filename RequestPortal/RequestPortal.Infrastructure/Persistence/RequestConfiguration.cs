@@ -64,6 +64,19 @@ internal sealed class ProjectProposalConfiguration : IEntityTypeConfiguration<Pr
     }
 }
 
+internal sealed class ProjectProposalRevisionConfiguration : IEntityTypeConfiguration<ProjectProposalRevision>
+{
+    public void Configure(EntityTypeBuilder<ProjectProposalRevision> builder)
+    {
+        builder.ToTable("project_proposal_revisions");
+        builder.HasKey(revision => revision.Id);
+        builder.Property(revision => revision.Title).HasMaxLength(500).IsRequired();
+        builder.Property(revision => revision.RichContentHtml).HasColumnType("text").IsRequired();
+        builder.HasIndex(revision => new { revision.RequestId, revision.SavedUtc });
+        builder.HasIndex(revision => new { revision.ProposalId, revision.Version });
+    }
+}
+
 internal sealed class ProjectBudgetItemConfiguration : IEntityTypeConfiguration<ProjectBudgetItem>
 {
     public void Configure(EntityTypeBuilder<ProjectBudgetItem> builder)
