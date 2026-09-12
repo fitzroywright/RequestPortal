@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Common.Diagnostics;
+using Common.Security.Abstractions;
 using Common.Security.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
