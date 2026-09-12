@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.Options;
 using RequestPortal.Application.Integration;
 using FfpManager.Bridge;
 
@@ -17,10 +18,12 @@ if (!gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase) &&
     throw new InvalidOperationException("Bridge:Gateway must be either 'Fake' or 'Sql'.");
 }
 
-builder.Services.AddSingleton<IFfpManagerGateway>(_ =>
+builder.Services.AddSingleton<FakeFfpManagerGateway>();
+builder.Services.AddSingleton<SqlFfpManagerGateway>();
+builder.Services.AddSingleton<IFfpManagerGateway>(services =>
     gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase)
-        ? new SqlFfpManagerGateway()
-        : new FakeFfpManagerGateway());
+        ? services.GetRequiredService<SqlFfpManagerGateway>()
+        : services.GetRequiredService<FakeFfpManagerGateway>());
 
 builder.Services.AddHttpClient("RequestPortalCallback", client =>
 {
@@ -36,6 +39,19 @@ string sharedSecret = builder.Configuration["Bridge:SharedSecret"] ?? string.Emp
 long maxArtifactBytes = Math.Max(
     1,
     builder.Configuration.GetValue<long?>("Bridge:MaxArtifactBytes") ?? 25L * 1024L * 1024L);
+
+if (gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
+{
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Bridge:SqlConnectionString"]))
+    {
+        throw new InvalidOperationException("Bridge:SqlConnectionString is required when Bridge:Gateway is Sql.");
+    }
+
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Bridge:SupportingDocumentRoot"]))
+    {
+        throw new InvalidOperationException("Bridge:SupportingDocumentRoot is required when Bridge:Gateway is Sql so RequestPortal artifacts can be stored for FFP Manager.");
+    }
+}
 
 if (builder.Environment.IsProduction())
 {
@@ -269,6 +285,15 @@ public sealed class BridgeOptions
     public int CallbackTimeoutSeconds { get; set; } = 30;
     public long MaxArtifactBytes { get; set; } = 25L * 1024L * 1024L;
     public string Gateway { get; set; } = "Fake";
+    public string SqlConnectionString { get; set; } = string.Empty;
+    public string SupportingDocumentRoot { get; set; } = string.Empty;
+    public string UserName { get; set; } = "RequestPortal";
+    public string CreatedBy { get; set; } = "RequestPortal";
+    public string InitialApplicationStatus { get; set; } = string.Empty;
+    public string DefaultDocumentType { get; set; } = string.Empty;
+    public string InformationResponseNoteType { get; set; } = "RequestPortal.InformationResponse";
+    public Dictionary<string, string> DocumentTypeMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> StatusMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed record SetStatusRequest(
