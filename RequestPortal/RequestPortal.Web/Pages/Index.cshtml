@@ -4,6 +4,28 @@
     ViewData["Title"] = "Relief Portal";
 }
 
+<div class="startup-splash" data-startup-splash aria-hidden="true"></div>
+<style>
+    .startup-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #10263f center / cover no-repeat;
+        opacity: 1;
+        transition: opacity .7s ease;
+    }
+    .startup-splash.is-hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+    .startup-splash.is-removed {
+        display: none;
+    }
+    @@media (prefers-reduced-motion: reduce) {
+        .startup-splash { transition: none; }
+    }
+</style>
+
 <section class="relief-carousel" data-relief-carousel>
     <div class="relief-carousel-stage">
         <div class="relief-carousel-image" data-carousel-image aria-hidden="true"></div>
@@ -84,8 +106,6 @@
 
 <script>
 (() => {
-    const root = document.querySelector('[data-relief-carousel]');
-    if (!root) return;
     const slides = [
         ['Disaster Relief','Standing with Jamaica','Responding today. Rebuilding tomorrow. Together we bring hope.','/img/carousel/disaster.jpg'],
         ['Housing','Building safe homes','Secure housing gives families a stronger foundation for tomorrow.','/img/carousel/Splash01.jpg'],
@@ -103,6 +123,31 @@
         ['Development','Building for the future','Long-term solutions help communities move from crisis toward stability.','/img/carousel/Splash13.jpg'],
         ['Partnerships','Stronger when we work together','Partners, representatives and communities working together to restore hope.','/img/carousel/Splash14.jpg']
     ];
+
+    const splash = document.querySelector('[data-startup-splash]');
+    if (splash) {
+        let showSplash = true;
+        try {
+            showSplash = sessionStorage.getItem('requestportal-startup-splash-seen') !== '1';
+            if (showSplash) sessionStorage.setItem('requestportal-startup-splash-seen', '1');
+        } catch {
+            // If session storage is unavailable, show the splash for this page load.
+        }
+
+        if (showSplash) {
+            const splashSlide = slides[Math.floor(Math.random() * slides.length)];
+            splash.style.backgroundImage = `url('${splashSlide[3]}')`;
+            window.setTimeout(() => {
+                splash.classList.add('is-hidden');
+                window.setTimeout(() => splash.classList.add('is-removed'), 750);
+            }, 5000);
+        } else {
+            splash.classList.add('is-removed');
+        }
+    }
+
+    const root = document.querySelector('[data-relief-carousel]');
+    if (!root) return;
     const image = root.querySelector('[data-carousel-image]');
     const kicker = root.querySelector('[data-carousel-kicker]');
     const title = root.querySelector('[data-carousel-title]');
