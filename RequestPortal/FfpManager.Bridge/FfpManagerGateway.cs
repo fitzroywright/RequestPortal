@@ -36,6 +36,13 @@ public interface IFfpManagerGateway
         CancellationToken cancellationToken = default);
 }
 
+public sealed record FakeFfpManagerApplicationSnapshot(
+    FfpManagerApplicationSubmission Submission,
+    FfpManagerApplicationReference Reference,
+    FfpManagerApplicationStatus Status,
+    IReadOnlyList<FfpManagerArtifactDescriptor> Artifacts,
+    IReadOnlyList<FfpManagerInformationResponse> Responses);
+
 public sealed class FakeFfpManagerGateway : IFfpManagerGateway
 {
     private sealed class FakeApplication
@@ -145,6 +152,17 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
             detail,
             terminal);
         return Task.FromResult(application.Status);
+    }
+
+    public FakeFfpManagerApplicationSnapshot GetSnapshot(string applicationId)
+    {
+        FakeApplication application = GetRequired(applicationId);
+        return new FakeFfpManagerApplicationSnapshot(
+            application.Submission,
+            application.Reference,
+            application.Status,
+            application.Artifacts.Values.OrderBy(item => item.UploadedUtc).ToArray(),
+            application.Responses.OrderBy(item => item.RespondedUtc).ToArray());
     }
 
     private FakeApplication GetRequired(string applicationId) =>
