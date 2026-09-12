@@ -1,5 +1,6 @@
 using System.Text;
 using FfpManager.Bridge;
+using Microsoft.Extensions.Options;
 using RequestPortal.Application.Integration;
 using Xunit;
 
@@ -132,15 +133,15 @@ public sealed class FfpManagerBridgeTests
     }
 
     [Fact]
-    public async Task SqlGateway_FailsClosedUntilSchemaIsMapped()
+    public async Task SqlGateway_RequiresConnectionString()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        SqlFfpManagerGateway gateway = new();
+        SqlFfpManagerGateway gateway = new(Options.Create(new BridgeOptions()));
 
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => gateway.CreateApplicationAsync(CreateSubmission(Guid.NewGuid()), cancellationToken));
 
-        Assert.Contains("schema", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SqlConnectionString", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static FfpManagerApplicationSubmission CreateSubmission(Guid correlationId) => new(
