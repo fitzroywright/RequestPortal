@@ -58,3 +58,10 @@ public sealed record RequestStatusChangedMessage(
     DateTimeOffset OccurredUtc,
     Guid RequestId,
     int Status) : IMessage;
+
+public sealed record FfpManagerInformationRequestedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid RequestId,
+    string Message,
+    DateTimeOffset? DueUtc) : IMessage;
