@@ -1,8 +1,8 @@
+using Common.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Management;
 using RequestPortal.Domain.Documents;
-using RequestPortal.Domain.Management;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -32,13 +32,16 @@ public sealed class ManagementDashboardService : IManagementDashboardService
     ];
 
     private readonly RequestPortalDbContext dbContext;
+    private readonly IFileStorage storage;
     private readonly ManagementDashboardOptions options;
 
     public ManagementDashboardService(
         RequestPortalDbContext dbContext,
+        IFileStorage storage,
         IOptions<ManagementDashboardOptions> options)
     {
         this.dbContext = dbContext;
+        this.storage = storage;
         this.options = options.Value;
     }
 
@@ -164,10 +167,13 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             .ToListAsync(cancellationToken))
             .ToHashSet();
 
-        Dictionary<Guid, RequestGeoLocation> geo = await dbContext.RequestGeoLocations
-            .AsNoTracking()
-            .Where(item => requestIds.Contains(item.RequestId))
-            .ToDictionaryAsync(item => item.RequestId, cancellationToken);
+        Task<(Guid RequestId, RequestLocationSnapshot? Location)>[] locationTasks = requestIds
+            .Select(async requestId => (requestId, await ReadLocationSafeAsync(requestId, cancellationToken)))
+            .ToArray();
+        (Guid RequestId, RequestLocationSnapshot? Location)[] locations = await Task.WhenAll(locationTasks);
+        Dictionary<Guid, RequestLocationSnapshot> geo = locations
+            .Where(item => item.Location is not null)
+            .ToDictionary(item => item.RequestId, item => item.Location!);
 
         DateTimeOffset overdueCutoff = now.AddDays(-Math.Max(1, options.OverdueDays));
         DateTimeOffset stalledCutoff = now.AddDays(-Math.Max(1, options.StalledDays));
@@ -180,7 +186,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             bool stalled = outstanding && activity <= stalledCutoff;
             bool missingDocuments = (row.Status == RequestStatus.Submitted || row.Status == RequestStatus.MoreInformationRequired)
                 && !requestIdsWithDocuments.Contains(row.Id);
-            geo.TryGetValue(row.Id, out RequestGeoLocation? location);
+            geo.TryGetValue(row.Id, out RequestLocationSnapshot? location);
 
             return new ManagementRequestRow(
                 row.Id,
@@ -201,6 +207,22 @@ public sealed class ManagementDashboardService : IManagementDashboardService
                 stalled,
                 missingDocuments);
         }).ToList();
+    }
+
+    private async Task<RequestLocationSnapshot?> ReadLocationSafeAsync(Guid requestId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await RequestLocationStorage.ReadAsync(storage, requestId, cancellationToken);
+        }
+        catch (StorageException)
+        {
+            return null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     private async Task<List<LifecycleTiming>> LoadLifecycleTimingsAsync(CancellationToken cancellationToken)
