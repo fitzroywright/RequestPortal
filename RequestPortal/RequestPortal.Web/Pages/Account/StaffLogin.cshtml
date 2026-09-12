@@ -7,9 +7,30 @@
 <div class="login-shell">
     <section class="login-intro">
         <div class="eyebrow">FFP internal staff</div>
-        <h1>Redirecting to FFP Staff Authentication.</h1>
-        <p>Request Portal never asks for or receives your FFP Active Directory password.</p>
-        <p class="muted">Use your normal FFP username at the staff authentication service, for example <strong>FWright</strong>.</p>
+        @if (Model.IsDemo)
+        {
+            <h1>Management demo staff sign in</h1>
+            <p>This sign-in exists only on the <strong>demo</strong> branch when demo mode is enabled. It does not contact Active Directory, Keycloak, Entra, Microsoft 365, or any external identity service.</p>
+            <form method="post" class="form-grid" autocomplete="off">
+                <div asp-validation-summary="All" class="validation"></div>
+                <div class="field">
+                    <label asp-for="UserName">Username</label>
+                    <input asp-for="UserName" autocomplete="username" autofocus />
+                </div>
+                <div class="field">
+                    <label asp-for="Password">Password</label>
+                    <input asp-for="Password" type="password" autocomplete="current-password" />
+                </div>
+                <button class="button" type="submit">Open Management Dashboard</button>
+            </form>
+            <p class="muted">Synthetic demo identity only. Production staff authentication remains OIDC-based.</p>
+        }
+        else
+        {
+            <h1>Redirecting to FFP Staff Authentication.</h1>
+            <p>Request Portal never asks for or receives your FFP Active Directory password.</p>
+            <p class="muted">Use your normal FFP username at the staff authentication service, for example <strong>FWright</strong>.</p>
+        }
         <a class="button button-secondary" asp-page="/Account/Login">Representative sign in</a>
     </section>
 </div>
