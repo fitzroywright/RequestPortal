@@ -14,6 +14,7 @@ $branch = (git branch --show-current).Trim()
 if ($branch -ne "demo") {
     throw "Request Portal management demo must run from the 'demo' branch. Current branch: '$branch'."
 }
+if ($Database -notmatch '^[A-Za-z0-9_]+$') { throw "Demo database name contains invalid characters." }
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw ".NET SDK is not available in PATH."
@@ -26,7 +27,7 @@ if (-not $psql) {
         ForEach-Object { Join-Path $_.FullName "bin\psql.exe" } |
         Where-Object { Test-Path $_ } |
         Select-Object -First 1
-    if ($candidate) { $psql = Get-Item $candidate }
+    if ($candidate) { $psql = Get-Command $candidate }
 }
 if (-not $psql) {
     throw "PostgreSQL psql.exe was not found. Install local PostgreSQL or add its bin folder to PATH."
@@ -59,7 +60,7 @@ $env:ASPNETCORE_ENVIRONMENT = "Demo"
 $env:ASPNETCORE_URLS = "https://0.0.0.0:$Port"
 $env:ConnectionStrings__RequestPortal = "Host=$PostgresHost;Port=$PostgresPort;Database=$Database;Username=$PostgresUser;Password=$pgPassword;Include Error Detail=true"
 
-$certCheck = dotnet dev-certs https --check 2>&1
+$null = dotnet dev-certs https --check 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Creating the local HTTPS development certificate..."
     dotnet dev-certs https --trust
@@ -70,14 +71,18 @@ $project = Join-Path $repoRoot "RequestPortal\RequestPortal.Web\RequestPortal.We
 Write-Host "Building demo from local sources only..."
 dotnet build $project --configuration Debug --no-restore
 if ($LASTEXITCODE -ne 0) {
-    throw "Demo build failed. Because the demo is designed for offline use, the launcher does not download NuGet packages. Restore the repository once while packages are available, then rerun Start-Demo.ps1."
+    throw "Demo build failed. The launcher never downloads packages. Restore the repository once while dependencies are available, then Start-Demo.ps1 can run completely offline."
 }
 
 Write-Host ""
 Write-Host "Request Portal Management Demo"
-Write-Host "  Laptop URL : https://localhost:$Port"
-Write-Host "  Staff user : FWright"
-Write-Host "  Password   : FFPDemo2026!"
+Write-Host "  Laptop URL       : https://localhost:$Port"
+Write-Host "  FFP staff user   : FWright"
+Write-Host "  FFP staff pass   : FFPDemo2026!"
+Write-Host "  Representative   : representative@demo.local"
+Write-Host "  Representative pw: DemoUser2026!"
+Write-Host "  Org admin         : orgadmin@demo.local"
+Write-Host "  Org admin password: DemoUser2026!"
 
 try {
     $addresses = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
@@ -88,14 +93,16 @@ try {
         } |
         Select-Object -ExpandProperty IPAddress -Unique
     foreach ($address in $addresses) {
-        Write-Host "  LAN URL    : https://${address}:$Port"
+        Write-Host "  LAN URL          : https://${address}:$Port"
     }
 } catch {
-    Write-Host "  LAN URL    : unavailable; localhost remains fully functional offline"
+    Write-Host "  LAN URL          : unavailable; localhost remains fully functional offline"
 }
 
 Write-Host ""
-Write-Host "The browser may ask you to trust the local development certificate on first use."
+Write-Host "If Windows Firewall prompts, allow Private network access for LAN viewing."
+Write-Host "A LAN browser may warn about the laptop development certificate; localhost remains trusted on this laptop."
+Write-Host "Wi-Fi/Internet may disappear after startup; https://localhost:$Port continues to work."
 Write-Host "Press Ctrl+C here when the demonstration is complete."
 Write-Host ""
 
