@@ -7,6 +7,7 @@ using RequestPortal.Domain.Beneficiaries;
 using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Integration;
+using RequestPortal.Domain.Management;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.ReferenceData;
@@ -24,6 +25,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<AssistanceRequest> AssistanceRequests => Set<AssistanceRequest>();
     public DbSet<AssistanceRequestItem> AssistanceRequestItems => Set<AssistanceRequestItem>();
     public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
+    public DbSet<RequestGeoLocation> RequestGeoLocations => Set<RequestGeoLocation>();
     public DbSet<ProjectProposal> ProjectProposals => Set<ProjectProposal>();
     public DbSet<ProjectBudgetItem> ProjectBudgetItems => Set<ProjectBudgetItem>();
     public DbSet<ProjectMilestone> ProjectMilestones => Set<ProjectMilestone>();
