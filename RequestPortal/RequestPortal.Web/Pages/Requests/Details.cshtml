@@ -169,15 +169,33 @@
                     {
                         <section class="card" style="margin-top:1.5rem">
                             <div class="flash error">
-                                FFP requested additional information. Review the status history, update the project proposal or upload the requested evidence, then resubmit.
+                                FFP requested additional information. The latest request from FFP appears in the status history. Add any supporting documents below, then send your response here.
                             </div>
                             @if (Model.ProjectProposal is not null)
                             {
                                 <a class="button button-outline" asp-page="/Requests/Proposal" asp-route-id="@Model.Request.Id">Update project proposal</a>
                             }
-                            <form method="post" asp-page-handler="Resubmit" style="margin-top:14px">
+                            <form method="post" asp-page-handler="InformationResponse" class="form-grid" style="margin-top:18px">
                                 <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <button class="button" type="submit">Resubmit to FFP</button>
+                                <div class="field">
+                                    <label asp-for="InformationResponse.Message">Response to FFP</label>
+                                    <textarea asp-for="InformationResponse.Message" rows="5" placeholder="Provide the information requested by FFP."></textarea>
+                                    <span asp-validation-for="InformationResponse.Message" class="validation"></span>
+                                </div>
+                                @if (Model.Documents.Count > 0)
+                                {
+                                    <fieldset class="field" style="border:1px solid #dde3e8;padding:14px">
+                                        <legend style="font-weight:700">Include supporting documents</legend>
+                                        @foreach (DocumentSummary document in Model.Documents)
+                                        {
+                                            <label style="display:flex;gap:8px;align-items:center;font-weight:500">
+                                                <input type="checkbox" name="InformationResponse.DocumentIds" value="@document.Id" />
+                                                <span>@document.OriginalFileName <small class="muted">(@document.DocumentType)</small></span>
+                                            </label>
+                                        }
+                                    </fieldset>
+                                }
+                                <button class="button" type="submit">Send response to FFP</button>
                             </form>
                         </section>
                     }
