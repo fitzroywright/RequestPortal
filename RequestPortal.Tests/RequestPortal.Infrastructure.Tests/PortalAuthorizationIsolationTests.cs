@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.Diagnostics;
 using Microsoft.EntityFrameworkCore;
-using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
@@ -21,7 +20,8 @@ public sealed class PortalAuthorizationIsolationTests
     [Fact]
     public async Task GetRequestsForUserAsync_ReturnsOnlyApprovedMembershipOrganizations()
     {
-        await using TestContext context = await TestContext.CreateAsync();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
         Guid userId = Guid.NewGuid();
         Guid otherUserId = Guid.NewGuid();
 
@@ -40,10 +40,10 @@ public sealed class PortalAuthorizationIsolationTests
             CreateRequest(pendingOrganization.Id, userId, "RP-PENDING"),
             CreateRequest(revokedOrganization.Id, userId, "RP-REVOKED"),
             CreateRequest(foreignOrganization.Id, otherUserId, "RP-FOREIGN"));
-        await context.Db.SaveChangesAsync();
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         IReadOnlyList<RequestPortal.Application.Portal.RequestSummary> results =
-            await context.Service.GetRequestsForUserAsync(userId);
+            await context.Service.GetRequestsForUserAsync(userId, cancellationToken);
 
         RequestPortal.Application.Portal.RequestSummary result = Assert.Single(results);
         Assert.Equal("RP-APPROVED", result.PublicReference);
@@ -52,7 +52,8 @@ public sealed class PortalAuthorizationIsolationTests
     [Fact]
     public async Task GetRequestsForUserAsync_AllowsMultipleIndependentlyApprovedOrganizations()
     {
-        await using TestContext context = await TestContext.CreateAsync();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
         Guid userId = Guid.NewGuid();
         Guid owner2 = Guid.NewGuid();
 
@@ -64,10 +65,10 @@ public sealed class PortalAuthorizationIsolationTests
         context.Db.AssistanceRequests.AddRange(
             CreateRequest(first.Id, userId, "RP-FIRST"),
             CreateRequest(second.Id, userId, "RP-SECOND"));
-        await context.Db.SaveChangesAsync();
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         IReadOnlyList<RequestPortal.Application.Portal.RequestSummary> results =
-            await context.Service.GetRequestsForUserAsync(userId);
+            await context.Service.GetRequestsForUserAsync(userId, cancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.Contains(results, item => item.PublicReference == "RP-FIRST");
@@ -77,7 +78,8 @@ public sealed class PortalAuthorizationIsolationTests
     [Fact]
     public async Task GetRequestAsync_DeniesCrossOrganizationRepresentativeAndEmitsDiagnostic()
     {
-        await using TestContext context = await TestContext.CreateAsync();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
         Guid userA = Guid.NewGuid();
         Guid userB = Guid.NewGuid();
 
@@ -87,22 +89,23 @@ public sealed class PortalAuthorizationIsolationTests
 
         context.Db.Organizations.AddRange(organizationA, organizationB);
         context.Db.AssistanceRequests.Add(requestB);
-        await context.Db.SaveChangesAsync();
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => context.Service.GetRequestAsync(userA, requestB.Id, isStaff: false));
+            () => context.Service.GetRequestAsync(userA, requestB.Id, isStaff: false, cancellationToken));
 
-        StarfleetDiagnosticEvent denied = Assert.Single(
-            context.Diagnostics.Events.Where(item => item.Code == "SF-AUTH-ORG-DENIED"));
-        Assert.Equal("Security.Authorization", denied.Component);
+        DiagnosticTelemetryEvent denied = Assert.Single(
+            context.Diagnostics.Events,
+            item => item.Code == "RP-AUTH-ORG-DENIED");
+        Assert.Equal("Security.Authorization", denied.Source);
         Assert.DoesNotContain("RP-B", denied.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("RP-B", denied.Detail ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task GetRequestAsync_AllowsStaffCrossOrganizationRead()
     {
-        await using TestContext context = await TestContext.CreateAsync();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
         Guid userA = Guid.NewGuid();
         Guid userB = Guid.NewGuid();
 
@@ -112,10 +115,10 @@ public sealed class PortalAuthorizationIsolationTests
 
         context.Db.Organizations.AddRange(organizationA, organizationB);
         context.Db.AssistanceRequests.Add(requestB);
-        await context.Db.SaveChangesAsync();
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         RequestPortal.Application.Portal.RequestDetail? result =
-            await context.Service.GetRequestAsync(userA, requestB.Id, isStaff: true);
+            await context.Service.GetRequestAsync(userA, requestB.Id, isStaff: true, cancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal(requestB.Id, result.Id);
@@ -125,25 +128,27 @@ public sealed class PortalAuthorizationIsolationTests
     [Fact]
     public async Task CreateRequestAsync_DeniesCrossOrganizationWriteAndCreatesNothing()
     {
-        await using TestContext context = await TestContext.CreateAsync();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
         Guid userA = Guid.NewGuid();
         Guid userB = Guid.NewGuid();
 
         Organization organizationA = CreateApprovedOrganization(userA, "Org A");
         Organization organizationB = CreateApprovedOrganization(userB, "Org B");
         context.Db.Organizations.AddRange(organizationA, organizationB);
-        await context.Db.SaveChangesAsync();
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => context.Service.CreateRequestAsync(userA, organizationB.Id, "Attempted cross-org request"));
+            () => context.Service.CreateRequestAsync(userA, organizationB.Id, "Attempted cross-org request", cancellationToken));
 
-        Assert.Empty(await context.Db.AssistanceRequests.ToListAsync());
+        Assert.Empty(await context.Db.AssistanceRequests.ToListAsync(cancellationToken));
     }
 
     [Fact]
     public async Task AddRequestItemAsync_DeniesCrossOrganizationMutation()
     {
-        await using TestContext context = await TestContext.CreateAsync();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
         Guid userA = Guid.NewGuid();
         Guid userB = Guid.NewGuid();
 
@@ -153,18 +158,21 @@ public sealed class PortalAuthorizationIsolationTests
 
         context.Db.Organizations.AddRange(organizationA, organizationB);
         context.Db.AssistanceRequests.Add(requestB);
-        await context.Db.SaveChangesAsync();
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => context.Service.AddRequestItemAsync(userA, requestB.Id, "Unauthorized item", 1m, Guid.NewGuid()));
+            () => context.Service.AddRequestItemAsync(userA, requestB.Id, "Unauthorized item", 1m, Guid.NewGuid(), cancellationToken));
 
-        Assert.Empty(await context.Db.AssistanceRequestItems.Where(item => item.RequestId == requestB.Id).ToListAsync());
+        Assert.Empty(await context.Db.AssistanceRequestItems
+            .Where(item => item.RequestId == requestB.Id)
+            .ToListAsync(cancellationToken));
     }
 
     [Fact]
     public async Task OrganizationAdministratorRights_DoNotCrossOrganizationBoundary()
     {
-        await using TestContext context = await TestContext.CreateAsync();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
         Guid adminA = Guid.NewGuid();
         Guid adminB = Guid.NewGuid();
         Guid pendingUser = Guid.NewGuid();
@@ -174,22 +182,24 @@ public sealed class PortalAuthorizationIsolationTests
         OrganizationMembership pendingMembershipB = organizationB.RequestMembership(Guid.NewGuid(), pendingUser, Now.AddMinutes(1));
 
         context.Db.Organizations.AddRange(organizationA, organizationB);
-        await context.Db.SaveChangesAsync();
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => context.Service.GetPendingMembershipsAsync(adminA, organizationB.Id));
+            () => context.Service.GetPendingMembershipsAsync(adminA, organizationB.Id, cancellationToken));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => context.Service.ApproveMembershipAsync(adminA, organizationB.Id, pendingMembershipB.Id));
+            () => context.Service.ApproveMembershipAsync(adminA, organizationB.Id, pendingMembershipB.Id, cancellationToken));
 
-        OrganizationMembership persisted = await context.Db.OrganizationMemberships.SingleAsync(item => item.Id == pendingMembershipB.Id);
+        OrganizationMembership persisted = await context.Db.OrganizationMemberships
+            .SingleAsync(item => item.Id == pendingMembershipB.Id, cancellationToken);
         Assert.Equal(MembershipStatus.Pending, persisted.Status);
     }
 
     [Fact]
     public async Task OrdinaryMember_CannotExerciseAdministratorRightsInOwnOrganization()
     {
-        await using TestContext context = await TestContext.CreateAsync();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
         Guid owner = Guid.NewGuid();
         Guid member = Guid.NewGuid();
         Guid pendingUser = Guid.NewGuid();
@@ -199,13 +209,13 @@ public sealed class PortalAuthorizationIsolationTests
         OrganizationMembership pending = organization.RequestMembership(Guid.NewGuid(), pendingUser, Now.AddMinutes(2));
 
         context.Db.Organizations.Add(organization);
-        await context.Db.SaveChangesAsync();
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => context.Service.GetPendingMembershipsAsync(member, organization.Id));
+            () => context.Service.GetPendingMembershipsAsync(member, organization.Id, cancellationToken));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => context.Service.ApproveMembershipAsync(member, organization.Id, pending.Id));
+            () => context.Service.ApproveMembershipAsync(member, organization.Id, pending.Id, cancellationToken));
     }
 
     private static Organization CreateApprovedOrganization(Guid ownerUserId, string name)
@@ -234,9 +244,9 @@ public sealed class PortalAuthorizationIsolationTests
         return request;
     }
 
-    private sealed class TestContext : IAsyncDisposable
+    private sealed class PortalTestContext : IAsyncDisposable
     {
-        private TestContext(RequestPortalDbContext db, CapturingDiagnosticSink diagnostics)
+        private PortalTestContext(RequestPortalDbContext db, CapturingDiagnosticRouter diagnostics)
         {
             Db = db;
             Diagnostics = diagnostics;
@@ -244,18 +254,18 @@ public sealed class PortalAuthorizationIsolationTests
         }
 
         public RequestPortalDbContext Db { get; }
-        public CapturingDiagnosticSink Diagnostics { get; }
+        public CapturingDiagnosticRouter Diagnostics { get; }
         public PortalWorkflowService Service { get; }
 
-        public static async Task<TestContext> CreateAsync()
+        public static async Task<PortalTestContext> CreateAsync(CancellationToken cancellationToken)
         {
             DbContextOptions<RequestPortalDbContext> options = new DbContextOptionsBuilder<RequestPortalDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
                 .Options;
 
             RequestPortalDbContext db = new(options);
-            await db.Database.EnsureCreatedAsync();
-            return new TestContext(db, new CapturingDiagnosticSink());
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+            return new PortalTestContext(db, new CapturingDiagnosticRouter());
         }
 
         public async ValueTask DisposeAsync()
@@ -274,13 +284,13 @@ public sealed class PortalAuthorizationIsolationTests
         public DateTimeOffset UtcNow { get; }
     }
 
-    private sealed class CapturingDiagnosticSink : IStarfleetDiagnosticSink
+    private sealed class CapturingDiagnosticRouter : IDiagnosticOperationsRouter
     {
-        public List<StarfleetDiagnosticEvent> Events { get; } = new();
+        public List<DiagnosticTelemetryEvent> Events { get; } = new();
 
-        public Task WriteAsync(StarfleetDiagnosticEvent diagnosticEvent, CancellationToken cancellationToken = default)
+        public Task RouteAsync(DiagnosticTelemetryEvent telemetryEvent, CancellationToken cancellationToken = default)
         {
-            Events.Add(diagnosticEvent);
+            Events.Add(telemetryEvent);
             return Task.CompletedTask;
         }
     }
