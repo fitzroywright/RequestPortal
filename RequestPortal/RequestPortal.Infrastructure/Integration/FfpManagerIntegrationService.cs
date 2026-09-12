@@ -72,9 +72,13 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
 
         try
         {
+            Guid[] unitIds = request.Items
+                .Select(item => item.UnitOfMeasureId)
+                .Distinct()
+                .ToArray();
             Dictionary<Guid, string> units = await dbContext.UnitsOfMeasure
                 .AsNoTracking()
-                .Where(unit => request.Items.Select(item => item.UnitOfMeasureId).Contains(unit.Id))
+                .Where(unit => unitIds.Contains(unit.Id))
                 .ToDictionaryAsync(unit => unit.Id, unit => unit.Code, cancellationToken);
 
             List<StoredDocument> documents = await dbContext.Documents
@@ -189,8 +193,13 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
             .Include(item => item.StatusHistory)
             .SingleAsync(item => item.Id == requestId, cancellationToken);
 
+        RequestStatus originalStatus = request.Status;
         ApplyCanonicalStatus(request, status);
-        AddStatusOutbox(request, status.ChangedUtc);
+        if (request.Status != originalStatus)
+        {
+            AddStatusOutbox(request, status.ChangedUtc);
+        }
+
         await CompleteInboxAsync(messageId, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -233,14 +242,28 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
         CancellationToken cancellationToken = default)
     {
         EnsureEnabled();
+        if (string.IsNullOrWhiteSpace(message) && documentIds.Count == 0)
+        {
+            throw new ArgumentException("A response message or supporting document is required.", nameof(message));
+        }
+
         AssistanceRequest request = await dbContext.AssistanceRequests
             .Include(item => item.StatusHistory)
             .SingleAsync(item => item.Id == requestId, cancellationToken);
 
         List<StoredDocument> documents = await dbContext.Documents
             .AsNoTracking()
-            .Where(document => documentIds.Contains(document.Id) && document.OwnerId == requestId)
+            .Where(document =>
+                documentIds.Contains(document.Id) &&
+                document.OwnerType == DocumentOwnerType.AssistanceRequest &&
+                document.OwnerId == requestId &&
+                !document.IsArchived)
             .ToListAsync(cancellationToken);
+
+        if (documents.Count != documentIds.Distinct().Count())
+        {
+            throw new InvalidOperationException("One or more response documents do not belong to this request.");
+        }
 
         List<FfpManagerArtifactDescriptor> artifacts = documents.Select(ToArtifactDescriptor).ToList();
         FfpManagerInformationResponse response = new(
@@ -267,8 +290,9 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
         await bridgeClient.SendInformationResponseAsync(response, cancellationToken);
         if (request.Status == RequestStatus.MoreInformationRequired)
         {
-            request.Resubmit(userId, clock.UtcNow);
-            AddStatusOutbox(request, clock.UtcNow);
+            DateTimeOffset now = clock.UtcNow;
+            request.Resubmit(userId, now);
+            AddStatusOutbox(request, now);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
@@ -306,6 +330,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
             Consumer = ConsumerName,
             ReceivedUtc = clock.UtcNow
         });
+        await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
 
@@ -331,11 +356,13 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
         if (code is "MORE_INFORMATION_REQUIRED" or "MORE_INFORMATION" or "AWAITING_INFORMATION")
         {
             if (request.Status == RequestStatus.Submitted)
+            {
                 request.RequestMoreInformation(ExternalSystemActorId, status.ChangedUtc, status.Detail ?? status.StatusText);
+            }
             return;
         }
 
-        if (code is "APPROVED" && request.Status == RequestStatus.Submitted)
+        if (code == "APPROVED" && request.Status == RequestStatus.Submitted)
         {
             request.Approve(ExternalSystemActorId, status.ChangedUtc);
             return;
@@ -344,23 +371,25 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
         if (code is "REJECTED" or "DECLINED")
         {
             if (request.Status == RequestStatus.Submitted)
+            {
                 request.Reject(ExternalSystemActorId, status.ChangedUtc, status.Detail ?? status.StatusText);
+            }
             return;
         }
 
-        if (code is "PENDING_FULFILMENT" && request.Status == RequestStatus.Approved)
+        if (code == "PENDING_FULFILMENT" && request.Status == RequestStatus.Approved)
         {
             request.MarkPendingFulfilment(ExternalSystemActorId, status.ChangedUtc);
             return;
         }
 
-        if (code is "FULFILLED" && request.Status == RequestStatus.PendingFulfilment)
+        if (code == "FULFILLED" && request.Status == RequestStatus.PendingFulfilment)
         {
             request.MarkFulfilled(ExternalSystemActorId, status.ChangedUtc);
             return;
         }
 
-        if (code is "CLOSED" && request.Status == RequestStatus.Fulfilled)
+        if (code == "CLOSED" && request.Status == RequestStatus.Fulfilled)
         {
             request.Close(ExternalSystemActorId, status.ChangedUtc);
         }
