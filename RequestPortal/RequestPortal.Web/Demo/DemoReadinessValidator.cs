@@ -33,10 +33,7 @@ public sealed class DemoReadinessValidator
 
     public async Task ValidateAsync(CancellationToken cancellationToken = default)
     {
-        if (!configuration.GetValue("Demo:Enabled", false))
-        {
-            return;
-        }
+        if (!configuration.GetValue("Demo:Enabled", false)) return;
 
         List<string> failures = new();
 
@@ -52,27 +49,29 @@ public sealed class DemoReadinessValidator
 
         if (staff is not null)
         {
-            Require(
-                await userManager.IsInRoleAsync(staff, PortalRoles.FfpReviewer),
-                "FFP demo staff is not assigned the reviewer role.",
-                failures);
+            Require(await userManager.IsInRoleAsync(staff, PortalRoles.FfpReviewer), "FFP demo staff is not assigned the reviewer role.", failures);
         }
 
         Organization? approvedOrganization = await dbContext.Organizations
-            .AsNoTracking()
+            .Include(item => item.Memberships)
             .SingleOrDefaultAsync(item => item.Name == "Hope Community Outreach", cancellationToken);
         Organization? pendingOrganization = await dbContext.Organizations
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.Name == "New Hope Youth Foundation", cancellationToken);
 
-        Require(
-            approvedOrganization?.Status == OrganizationStatus.Approved,
-            "Approved demo organization is missing or not approved.",
-            failures);
-        Require(
-            pendingOrganization?.Status == OrganizationStatus.PendingApproval,
-            "Pending organization approval scenario is missing.",
-            failures);
+        if (approvedOrganization is not null && representative is not null && staff is not null)
+        {
+            await DemoManagementDataSeeder.EnsureAsync(
+                dbContext,
+                approvedOrganization,
+                representative,
+                staff,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+        }
+
+        Require(approvedOrganization?.Status == OrganizationStatus.Approved, "Approved demo organization is missing or not approved.", failures);
+        Require(pendingOrganization?.Status == OrganizationStatus.PendingApproval, "Pending organization approval scenario is missing.", failures);
 
         if (approvedOrganization is not null && administrator is not null && representative is not null && pending is not null)
         {
@@ -82,126 +81,60 @@ public sealed class DemoReadinessValidator
                 .ToListAsync(cancellationToken);
 
             Require(
-                memberships.Any(item =>
-                    item.UserId == administrator.Id &&
-                    item.Status == MembershipStatus.Approved &&
-                    item.Role == OrganizationRole.Administrator),
-                "Approved organization administrator membership is missing.",
-                failures);
+                memberships.Any(item => item.UserId == administrator.Id && item.Status == MembershipStatus.Approved && item.Role == OrganizationRole.Administrator),
+                "Approved organization administrator membership is missing.", failures);
             Require(
-                memberships.Any(item =>
-                    item.UserId == representative.Id &&
-                    item.Status == MembershipStatus.Approved),
-                "Approved representative membership is missing.",
-                failures);
+                memberships.Any(item => item.UserId == representative.Id && item.Status == MembershipStatus.Approved),
+                "Approved representative membership is missing.", failures);
             Require(
-                memberships.Any(item =>
-                    item.UserId == pending.Id &&
-                    item.Status == MembershipStatus.Pending),
-                "Pending membership approval scenario is missing.",
-                failures);
+                memberships.Any(item => item.UserId == pending.Id && item.Status == MembershipStatus.Pending),
+                "Pending membership approval scenario is missing.", failures);
         }
 
-        Require(
-            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(
-                item => item.Kind == RequestKind.GoodsAndServices && item.Status == RequestStatus.Submitted,
-                cancellationToken),
-            "Submitted goods/services request scenario is missing.",
-            failures);
-        Require(
-            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(
-                item => item.Status == RequestStatus.MoreInformationRequired,
-                cancellationToken),
-            "More-information-required request scenario is missing.",
-            failures);
-        Require(
-            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(
-                item => item.Status == RequestStatus.Approved,
-                cancellationToken),
-            "Approved request awaiting fulfilment scenario is missing.",
-            failures);
-        Require(
-            await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(
-                item => item.Status == RequestStatus.PendingFulfilment,
-                cancellationToken),
-            "Pending fulfilment scenario is missing.",
-            failures);
-        Require(
-            await dbContext.Fulfilments.AsNoTracking().AnyAsync(cancellationToken),
-            "Fulfilment record is missing.",
-            failures);
-        Require(
-            await dbContext.IntegrationLinks.AsNoTracking().AnyAsync(
-                item => item.Status == SynchronizationStatus.Synchronized,
-                cancellationToken),
-            "Synchronized integration example is missing.",
-            failures);
+        Require(await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(item => item.Kind == RequestKind.GoodsAndServices && item.Status == RequestStatus.Submitted, cancellationToken), "Submitted goods/services request scenario is missing.", failures);
+        Require(await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(item => item.Status == RequestStatus.MoreInformationRequired, cancellationToken), "More-information-required request scenario is missing.", failures);
+        Require(await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(item => item.Status == RequestStatus.Approved, cancellationToken), "Approved request awaiting fulfilment scenario is missing.", failures);
+        Require(await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(item => item.Status == RequestStatus.PendingFulfilment, cancellationToken), "Pending fulfilment scenario is missing.", failures);
+        Require(await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(item => item.Status == RequestStatus.Rejected, cancellationToken), "Declined request scenario is missing.", failures);
+        Require(await dbContext.AssistanceRequests.AsNoTracking().AnyAsync(item => item.Status == RequestStatus.Closed || item.Status == RequestStatus.Fulfilled, cancellationToken), "Completed request scenario is missing.", failures);
+        Require(await dbContext.Fulfilments.AsNoTracking().AnyAsync(cancellationToken), "Fulfilment record is missing.", failures);
+        Require(await dbContext.IntegrationLinks.AsNoTracking().AnyAsync(item => item.Status == SynchronizationStatus.Synchronized, cancellationToken), "Synchronized integration example is missing.", failures);
+
+        int representedParishes = await dbContext.AssistanceRequests
+            .AsNoTracking()
+            .Where(item => item.Location != null && item.PublicReference.StartsWith("RP-DEMO-MG"))
+            .Select(item => item.Location!)
+            .Distinct()
+            .CountAsync(cancellationToken);
+        Require(representedParishes >= 14, "Management demo does not cover all Jamaica parishes.", failures);
 
         AssistanceRequest? projectRequest = await dbContext.AssistanceRequests
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                item => item.Kind == RequestKind.Project && item.Status == RequestStatus.Submitted,
-                cancellationToken);
+            .FirstOrDefaultAsync(item => item.Kind == RequestKind.Project && item.Status == RequestStatus.Submitted, cancellationToken);
         Require(projectRequest is not null, "Submitted project request scenario is missing.", failures);
 
         if (projectRequest is not null)
         {
-            Require(
-                await dbContext.ProjectProposals.AsNoTracking().AnyAsync(
-                    item => item.RequestId == projectRequest.Id && item.RichContentHtml.Length > 100,
-                    cancellationToken),
-                "Project proposal narrative is missing.",
-                failures);
-            Require(
-                await dbContext.ProjectBudgetItems.AsNoTracking().AnyAsync(
-                    item => item.RequestId == projectRequest.Id,
-                    cancellationToken),
-                "Project budget is missing.",
-                failures);
-            Require(
-                await dbContext.ProjectMilestones.AsNoTracking().AnyAsync(
-                    item => item.RequestId == projectRequest.Id,
-                    cancellationToken),
-                "Project milestone plan is missing.",
-                failures);
+            Require(await dbContext.ProjectProposals.AsNoTracking().AnyAsync(item => item.RequestId == projectRequest.Id && item.RichContentHtml.Length > 100, cancellationToken), "Project proposal narrative is missing.", failures);
+            Require(await dbContext.ProjectBudgetItems.AsNoTracking().AnyAsync(item => item.RequestId == projectRequest.Id, cancellationToken), "Project budget is missing.", failures);
+            Require(await dbContext.ProjectMilestones.AsNoTracking().AnyAsync(item => item.RequestId == projectRequest.Id, cancellationToken), "Project milestone plan is missing.", failures);
         }
 
-        Require(
-            await dbContext.RequestCategories.AsNoTracking().AnyAsync(cancellationToken),
-            "Request category reference data is missing.",
-            failures);
-        Require(
-            await dbContext.ProgramClassifications.AsNoTracking().AnyAsync(cancellationToken),
-            "Program classification reference data is missing.",
-            failures);
-        Require(
-            await dbContext.UnitsOfMeasure.AsNoTracking().AnyAsync(cancellationToken),
-            "Unit-of-measure reference data is missing.",
-            failures);
-        Require(
-            await dbContext.CountryConfigurations.AsNoTracking().AnyAsync(
-                item => item.CountryCode == "JM",
-                cancellationToken),
-            "Jamaica country configuration is missing.",
-            failures);
-        Require(
-            await dbContext.NotificationPreferences.AsNoTracking().AnyAsync(cancellationToken),
-            "Notification preferences are missing.",
-            failures);
+        Require(await dbContext.RequestCategories.AsNoTracking().AnyAsync(cancellationToken), "Request category reference data is missing.", failures);
+        Require(await dbContext.ProgramClassifications.AsNoTracking().AnyAsync(cancellationToken), "Program classification reference data is missing.", failures);
+        Require(await dbContext.UnitsOfMeasure.AsNoTracking().AnyAsync(cancellationToken), "Unit-of-measure reference data is missing.", failures);
+        Require(await dbContext.CountryConfigurations.AsNoTracking().AnyAsync(item => item.CountryCode == "JM", cancellationToken), "Jamaica country configuration is missing.", failures);
+        Require(await dbContext.NotificationPreferences.AsNoTracking().AnyAsync(cancellationToken), "Notification preferences are missing.", failures);
 
         if (failures.Count > 0)
         {
             throw new InvalidOperationException(
-                "SF-DEMO-READINESS-001: Request Portal demo readiness validation failed: " +
-                string.Join(" | ", failures));
+                "RP-DEMO-READINESS-001: Request Portal demo readiness validation failed: " + string.Join(" | ", failures));
         }
     }
 
     private static void Require(bool condition, string message, ICollection<string> failures)
     {
-        if (!condition)
-        {
-            failures.Add(message);
-        }
+        if (!condition) failures.Add(message);
     }
 }
