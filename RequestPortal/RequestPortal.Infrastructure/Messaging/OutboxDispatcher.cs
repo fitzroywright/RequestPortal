@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using RequestPortal.Application.Integration;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
+using RequestPortal.Infrastructure.Integration;
 using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Messaging;
@@ -19,17 +21,23 @@ public sealed class OutboxDispatcher
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly INotificationSender notificationSender;
+    private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
+    private readonly FfpManagerBridgeOptions ffpManagerOptions;
     private readonly NotificationOptions notificationOptions;
     private readonly ILogger<OutboxDispatcher> logger;
 
     public OutboxDispatcher(
         RequestPortalDbContext dbContext,
         INotificationSender notificationSender,
+        IFfpManagerIntegrationService ffpManagerIntegrationService,
+        IOptions<FfpManagerBridgeOptions> ffpManagerOptions,
         IOptions<NotificationOptions> notificationOptions,
         ILogger<OutboxDispatcher> logger)
     {
         this.dbContext = dbContext;
         this.notificationSender = notificationSender;
+        this.ffpManagerIntegrationService = ffpManagerIntegrationService;
+        this.ffpManagerOptions = ffpManagerOptions.Value;
         this.notificationOptions = notificationOptions.Value;
         this.logger = logger;
     }
@@ -96,6 +104,11 @@ public sealed class OutboxDispatcher
         if (outbox.MessageType.EndsWith(nameof(RequestSubmittedMessage), StringComparison.Ordinal))
         {
             RequestSubmittedMessage message = Deserialize<RequestSubmittedMessage>(outbox.Payload);
+            if (ffpManagerOptions.Enabled)
+            {
+                await ffpManagerIntegrationService.SubmitRequestAsync(message.RequestId, cancellationToken);
+            }
+
             await SendRequestSubmittedAsync(message, cancellationToken);
             return;
         }
@@ -104,6 +117,13 @@ public sealed class OutboxDispatcher
         {
             RequestStatusChangedMessage message = Deserialize<RequestStatusChangedMessage>(outbox.Payload);
             await SendRequestStatusChangedAsync(message, cancellationToken);
+            return;
+        }
+
+        if (outbox.MessageType.EndsWith(nameof(FfpManagerInformationRequestedMessage), StringComparison.Ordinal))
+        {
+            FfpManagerInformationRequestedMessage message = Deserialize<FfpManagerInformationRequestedMessage>(outbox.Payload);
+            await SendFfpManagerInformationRequestedAsync(message, cancellationToken);
             return;
         }
 
@@ -232,6 +252,31 @@ public sealed class OutboxDispatcher
             request.OrganizationId,
             request.Id,
             $"Request status: {request.PublicReference}",
+            body,
+            cancellationToken);
+    }
+
+    private async Task SendFfpManagerInformationRequestedAsync(
+        FfpManagerInformationRequestedMessage message,
+        CancellationToken cancellationToken)
+    {
+        AssistanceRequest request = await dbContext.AssistanceRequests
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == message.RequestId, cancellationToken);
+
+        Guid recipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
+        string body = $"FFP needs additional information for request {request.PublicReference}.\n\n{message.Message}";
+        if (message.DueUtc.HasValue)
+        {
+            body += $"\n\nPlease respond by {message.DueUtc.Value:yyyy-MM-dd}.";
+        }
+
+        body += "\n\nSign in to Request Portal to provide the requested information and supporting documents.";
+        await DeliverEmailAsync(
+            recipientUserId,
+            request.OrganizationId,
+            request.Id,
+            $"Information required: {request.PublicReference}",
             body,
             cancellationToken);
     }
