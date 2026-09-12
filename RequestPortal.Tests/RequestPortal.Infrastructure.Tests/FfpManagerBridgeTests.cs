@@ -1,3 +1,4 @@
+using System.Text;
 using FfpManager.Bridge;
 using RequestPortal.Application.Integration;
 using Xunit;
@@ -43,6 +44,103 @@ public sealed class FfpManagerBridgeTests
         Assert.Equal(reference.ApplicationId, changed.ApplicationId);
         Assert.Equal("APPROVED", current.StatusCode);
         Assert.Equal(changed, current);
+    }
+
+    [Fact]
+    public async Task SaveArtifactAsync_TracksDocumentAgainstApplication()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        FakeFfpManagerGateway gateway = new();
+        FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(
+            CreateSubmission(Guid.NewGuid()),
+            cancellationToken);
+        Guid documentId = Guid.NewGuid();
+        byte[] bytes = Encoding.UTF8.GetBytes("sample supporting document");
+        FfpManagerArtifactDescriptor descriptor = new(
+            documentId,
+            "RequestSupport",
+            "quotation.txt",
+            "text/plain",
+            bytes.Length,
+            DateTimeOffset.UtcNow);
+
+        await using MemoryStream content = new(bytes);
+        await gateway.SaveArtifactAsync(reference.ApplicationId, descriptor, content, cancellationToken);
+
+        FakeFfpManagerApplicationSnapshot snapshot = gateway.GetSnapshot(reference.ApplicationId);
+        FfpManagerArtifactDescriptor artifact = Assert.Single(snapshot.Artifacts);
+        Assert.Equal(documentId, artifact.PortalDocumentId);
+        Assert.Equal("quotation.txt", artifact.FileName);
+    }
+
+    [Fact]
+    public async Task SaveArtifactAsync_IsIdempotentByPortalDocumentId()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        FakeFfpManagerGateway gateway = new();
+        FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(
+            CreateSubmission(Guid.NewGuid()),
+            cancellationToken);
+        Guid documentId = Guid.NewGuid();
+        FfpManagerArtifactDescriptor first = new(documentId, "RequestSupport", "first.txt", "text/plain", 3, DateTimeOffset.UtcNow);
+        FfpManagerArtifactDescriptor replacement = first with { FileName = "replacement.txt" };
+
+        await using (MemoryStream content = new(Encoding.UTF8.GetBytes("one")))
+        {
+            await gateway.SaveArtifactAsync(reference.ApplicationId, first, content, cancellationToken);
+        }
+        await using (MemoryStream content = new(Encoding.UTF8.GetBytes("two")))
+        {
+            await gateway.SaveArtifactAsync(reference.ApplicationId, replacement, content, cancellationToken);
+        }
+
+        FakeFfpManagerApplicationSnapshot snapshot = gateway.GetSnapshot(reference.ApplicationId);
+        FfpManagerArtifactDescriptor artifact = Assert.Single(snapshot.Artifacts);
+        Assert.Equal("replacement.txt", artifact.FileName);
+    }
+
+    [Fact]
+    public async Task SaveInformationResponseAsync_PreservesResponseAndArtifacts()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        FakeFfpManagerGateway gateway = new();
+        FfpManagerApplicationSubmission submission = CreateSubmission(Guid.NewGuid());
+        FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(submission, cancellationToken);
+        FfpManagerArtifactDescriptor artifact = new(
+            Guid.NewGuid(),
+            "RequestSupport",
+            "beneficiary-list.pdf",
+            "application/pdf",
+            100,
+            DateTimeOffset.UtcNow);
+        FfpManagerInformationResponse response = new(
+            Guid.NewGuid(),
+            submission.PortalRequestId,
+            reference.ApplicationId,
+            Guid.NewGuid(),
+            "The requested information is attached.",
+            DateTimeOffset.UtcNow,
+            [artifact]);
+
+        await gateway.SaveInformationResponseAsync(response, cancellationToken);
+
+        FakeFfpManagerApplicationSnapshot snapshot = gateway.GetSnapshot(reference.ApplicationId);
+        FfpManagerInformationResponse captured = Assert.Single(snapshot.Responses);
+        Assert.Equal(response.MessageId, captured.MessageId);
+        Assert.Equal(submission.PortalRequestId, captured.PortalRequestId);
+        Assert.Single(captured.Artifacts);
+    }
+
+    [Fact]
+    public async Task SqlGateway_FailsClosedUntilSchemaIsMapped()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        SqlFfpManagerGateway gateway = new();
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gateway.CreateApplicationAsync(CreateSubmission(Guid.NewGuid()), cancellationToken));
+
+        Assert.Contains("schema", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static FfpManagerApplicationSubmission CreateSubmission(Guid correlationId) => new(
