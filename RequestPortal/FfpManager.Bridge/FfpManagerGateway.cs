@@ -170,16 +170,3 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
             ? application
             : throw new KeyNotFoundException($"FFP Manager application '{applicationId}' was not found.");
 }
-
-public sealed class SqlFfpManagerGateway : IFfpManagerGateway
-{
-    private static InvalidOperationException SchemaRequired() => new(
-        "The FFP Manager SQL gateway cannot be enabled until the Application Letter, Items Requested, Supporting Documents, workflow/status, and correspondence schemas have been mapped.");
-
-    public Task<FfpManagerApplicationReference> CreateApplicationAsync(FfpManagerApplicationSubmission submission, CancellationToken cancellationToken = default) => throw SchemaRequired();
-    public Task SaveArtifactAsync(string applicationId, FfpManagerArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default) => throw SchemaRequired();
-    public Task<FfpManagerApplicationStatus?> GetStatusAsync(string applicationId, CancellationToken cancellationToken = default) => throw SchemaRequired();
-    public Task SaveInformationResponseAsync(FfpManagerInformationResponse response, CancellationToken cancellationToken = default) => throw SchemaRequired();
-    public Task<FfpManagerApplicationSubmission?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken = default) => throw SchemaRequired();
-    public Task<FfpManagerApplicationStatus> SetStatusAsync(string applicationId, string statusCode, string statusText, string? detail, bool terminal, CancellationToken cancellationToken = default) => throw SchemaRequired();
-}
