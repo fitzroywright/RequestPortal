@@ -42,26 +42,14 @@ public sealed class ReviewModel : PageModel
     }
 
     public new RequestDetail? Request { get; private set; }
-
     public ProjectProposalDetail? ProjectProposal { get; private set; }
-
     public ProjectPlanningDetail? ProjectPlanning { get; private set; }
-
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
-
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
 
-    [BindProperty]
-    [StringLength(4000)]
-    public string DecisionReason { get; set; } = string.Empty;
-
-    [BindProperty]
-    [StringLength(4000)]
-    public string RejectionReason { get; set; } = string.Empty;
-
-    [BindProperty]
-    [StringLength(4000)]
-    public string DuplicateReason { get; set; } = string.Empty;
+    [BindProperty, StringLength(4000)] public string DecisionReason { get; set; } = string.Empty;
+    [BindProperty, StringLength(4000)] public string RejectionReason { get; set; } = string.Empty;
+    [BindProperty, StringLength(4000)] public string DuplicateReason { get; set; } = string.Empty;
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
@@ -78,12 +66,24 @@ public sealed class ReviewModel : PageModel
             isStaff: true,
             HttpContext.RequestAborted);
 
-        if (download is null)
-        {
-            return NotFound();
-        }
-
+        if (download is null) return NotFound();
         return File(download.Content, download.ContentType, download.FileName);
+    }
+
+    public async Task<IActionResult> OnGetProposalDocxAsync(Guid id)
+    {
+        ApplicationUser staffUser = await GetStaffUserAsync();
+        ProjectProposalExport export = await projectProposalService.ExportDocxAsync(
+            staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
+        return File(export.Content, export.ContentType, export.FileName);
+    }
+
+    public async Task<IActionResult> OnGetProposalPdfAsync(Guid id)
+    {
+        ApplicationUser staffUser = await GetStaffUserAsync();
+        ProjectProposalExport export = await projectProposalService.ExportPdfAsync(
+            staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
+        return File(export.Content, export.ContentType, export.FileName);
     }
 
     public async Task<IActionResult> OnPostApproveAsync(Guid id)
@@ -97,19 +97,13 @@ public sealed class ReviewModel : PageModel
     public async Task<IActionResult> OnPostMoreInformationAsync(Guid id)
     {
         ApplicationUser staffUser = await GetStaffUserAsync();
-
         if (string.IsNullOrWhiteSpace(DecisionReason))
         {
             ModelState.AddModelError(nameof(DecisionReason), "Explain what additional information is required.");
             return await LoadPageAsync(staffUser, id);
         }
 
-        await workflowService.RequestMoreInformationAsync(
-            staffUser.Id,
-            id,
-            DecisionReason.Trim(),
-            HttpContext.RequestAborted);
-
+        await workflowService.RequestMoreInformationAsync(staffUser.Id, id, DecisionReason.Trim(), HttpContext.RequestAborted);
         TempData["Success"] = "The organization will see that more information is required.";
         return RedirectToPage("/Staff/Index");
     }
@@ -117,19 +111,13 @@ public sealed class ReviewModel : PageModel
     public async Task<IActionResult> OnPostRejectAsync(Guid id)
     {
         ApplicationUser staffUser = await GetStaffUserAsync();
-
         if (string.IsNullOrWhiteSpace(RejectionReason))
         {
             ModelState.AddModelError(nameof(RejectionReason), "A rejection reason is required.");
             return await LoadPageAsync(staffUser, id);
         }
 
-        await workflowService.RejectRequestAsync(
-            staffUser.Id,
-            id,
-            RejectionReason.Trim(),
-            HttpContext.RequestAborted);
-
+        await workflowService.RejectRequestAsync(staffUser.Id, id, RejectionReason.Trim(), HttpContext.RequestAborted);
         TempData["Success"] = "Request rejected and status history updated.";
         return RedirectToPage("/Staff/Index");
     }
@@ -137,19 +125,13 @@ public sealed class ReviewModel : PageModel
     public async Task<IActionResult> OnPostDuplicateAsync(Guid id)
     {
         ApplicationUser staffUser = await GetStaffUserAsync();
-
         if (string.IsNullOrWhiteSpace(DuplicateReason))
         {
             ModelState.AddModelError(nameof(DuplicateReason), "Explain which request this duplicates or why it is considered a duplicate.");
             return await LoadPageAsync(staffUser, id);
         }
 
-        await lifecycleService.MarkDuplicateAsync(
-            staffUser.Id,
-            id,
-            DuplicateReason.Trim(),
-            HttpContext.RequestAborted);
-
+        await lifecycleService.MarkDuplicateAsync(staffUser.Id, id, DuplicateReason.Trim(), HttpContext.RequestAborted);
         TempData["Success"] = "Request marked as duplicate.";
         return RedirectToPage("/Staff/Index");
     }
@@ -157,57 +139,25 @@ public sealed class ReviewModel : PageModel
     public string UnitName(Guid unitId)
     {
         foreach (UnitOfMeasureOption unit in UnitsOfMeasure)
-        {
-            if (unit.Id == unitId)
-            {
-                return unit.Name;
-            }
-        }
-
+            if (unit.Id == unitId) return unit.Name;
         return "Unit";
     }
 
     private async Task<IActionResult> LoadPageAsync(ApplicationUser staffUser, Guid id)
     {
-        Request = await workflowService.GetRequestAsync(
-            staffUser.Id,
-            id,
-            isStaff: true,
-            HttpContext.RequestAborted);
+        Request = await workflowService.GetRequestAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
+        if (Request is null) return NotFound();
 
-        if (Request is null)
-        {
-            return NotFound();
-        }
-
-        ProjectProposal = await projectProposalService.GetAsync(
-            staffUser.Id,
-            id,
-            isStaff: true,
-            HttpContext.RequestAborted);
-
+        ProjectProposal = await projectProposalService.GetAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
         if (ProjectProposal is not null)
-        {
-            ProjectPlanning = await projectPlanningService.GetAsync(
-                staffUser.Id,
-                id,
-                isStaff: true,
-                HttpContext.RequestAborted);
-        }
+            ProjectPlanning = await projectPlanningService.GetAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
 
-        Documents = await documentService.GetRequestDocumentsAsync(
-            staffUser.Id,
-            id,
-            isStaff: true,
-            HttpContext.RequestAborted);
-
+        Documents = await documentService.GetRequestDocumentsAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
         return Page();
     }
 
-    private async Task<ApplicationUser> GetStaffUserAsync()
-    {
-        return await userManager.GetUserAsync(User)
-            ?? throw new InvalidOperationException("Authenticated FFP staff user could not be resolved.");
-    }
+    private async Task<ApplicationUser> GetStaffUserAsync() =>
+        await userManager.GetUserAsync(User)
+        ?? throw new InvalidOperationException("Authenticated FFP staff user could not be resolved.");
 }
