@@ -12,6 +12,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Infrastructur
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Web", "RequestPortal\RequestPortal.Web\RequestPortal.Web.csproj", "{66A35AF5-8836-4E84-8816-A30F5CF8DF42}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FfpManager.Bridge", "RequestPortal\FfpManager.Bridge\FfpManager.Bridge.csproj", "{B24E6D85-98A7-4A7B-9CEC-7D37D0E50E16}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Domain.Tests", "RequestPortal.Tests\RequestPortal.Domain.Tests\RequestPortal.Domain.Tests.csproj", "{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Infrastructure.Tests", "RequestPortal.Tests\RequestPortal.Infrastructure.Tests\RequestPortal.Infrastructure.Tests.csproj", "{B5DA9E20-7F19-4F79-9E7C-3DA2B0D8F801}"
@@ -54,6 +56,10 @@ Global
 		{66A35AF5-8836-4E84-8816-A30F5CF8DF42}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{66A35AF5-8836-4E84-8816-A30F5CF8DF42}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{66A35AF5-8836-4E84-8816-A30F5CF8DF42}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B24E6D85-98A7-4A7B-9CEC-7D37D0E50E16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B24E6D85-98A7-4A7B-9CEC-7D37D0E50E16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B24E6D85-98A7-4A7B-9CEC-7D37D0E50E16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B24E6D85-98A7-4A7B-9CEC-7D37D0E50E16}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
