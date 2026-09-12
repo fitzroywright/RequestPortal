@@ -34,7 +34,15 @@ public sealed class DemoDatabaseBootstrapper
             return;
         }
 
-        await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        if (!await dbContext.Database.CanConnectAsync(cancellationToken))
+        {
+            throw new InvalidOperationException(
+                "RP-DEMO-DB-001: The Request Portal database does not exist or is not reachable. " +
+                "Provision the PostgreSQL database once with an administrative account, grant the application account access, " +
+                "then restart Request Portal. The application account is intentionally not required to have CREATEDB permission.");
+        }
+
+        await dbContext.Database.MigrateAsync(cancellationToken);
 
         try
         {
@@ -44,21 +52,15 @@ public sealed class DemoDatabaseBootstrapper
             exception.SqlState == PostgresErrorCodes.UndefinedTable ||
             exception.SqlState == PostgresErrorCodes.UndefinedColumn)
         {
-            if (!configuration.GetValue("Demo:RecreateOnModelMismatch", false))
-            {
-                throw new InvalidOperationException(
-                    "SF-DEMO-SCHEMA-001: The demo database schema is older than the current application model. " +
-                    "Set Demo:RecreateOnModelMismatch=true for the disposable demo database, or migrate the database before starting.",
-                    exception);
-            }
-
-            logger.LogWarning(
+            logger.LogError(
                 exception,
-                "SF-DEMO-SCHEMA-RECREATE: Demo schema is stale. Recreating the disposable Request Portal demo database.");
+                "RP-DEMO-SCHEMA-001: Demo schema does not match the current Request Portal model.");
 
-            await dbContext.Database.EnsureDeletedAsync(cancellationToken);
-            await dbContext.Database.EnsureCreatedAsync(cancellationToken);
-            await ProbeCurrentModelAsync(cancellationToken);
+            throw new InvalidOperationException(
+                "RP-DEMO-SCHEMA-001: The demo database schema does not match the current application model. " +
+                "Apply the current EF Core migrations or recreate the disposable demo database with an administrative PostgreSQL account. " +
+                "Request Portal will not drop or recreate databases using the application account.",
+                exception);
         }
     }
 
