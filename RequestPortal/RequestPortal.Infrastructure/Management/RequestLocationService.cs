@@ -1,9 +1,65 @@
-using Microsoft.EntityFrameworkCore;
+using System.Text;
+using System.Text.Json;
+using Common.Storage;
 using RequestPortal.Application.Management;
-using RequestPortal.Domain.Management;
-using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Management;
+
+internal sealed record StoredRequestLocationEnvelope(
+    Guid RequestId,
+    string? SourceText,
+    string Parish,
+    string? Community,
+    decimal? Latitude,
+    decimal? Longitude,
+    LocationPrecision Precision,
+    DateTimeOffset ResolvedUtc);
+
+internal static class RequestLocationStorage
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static string Key(Guid requestId) => $"requestportal/locations/{requestId:N}/resolved-location.json";
+
+    public static byte[] Serialize(RequestLocationSnapshot snapshot) => JsonSerializer.SerializeToUtf8Bytes(
+        new StoredRequestLocationEnvelope(
+            snapshot.RequestId,
+            snapshot.SourceText,
+            snapshot.Parish,
+            snapshot.Community,
+            snapshot.Latitude,
+            snapshot.Longitude,
+            snapshot.Precision,
+            snapshot.ResolvedUtc),
+        JsonOptions);
+
+    public static async Task<RequestLocationSnapshot?> ReadAsync(
+        IFileStorage storage,
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        string key = Key(requestId);
+        StoredFile? metadata = await storage.GetMetadataAsync(key, cancellationToken);
+        if (metadata is null || metadata.Status != StorageStatus.Stored) return null;
+
+        await using Stream stream = await storage.OpenReadAsync(key, cancellationToken);
+        StoredRequestLocationEnvelope? envelope = await JsonSerializer.DeserializeAsync<StoredRequestLocationEnvelope>(
+            stream,
+            JsonOptions,
+            cancellationToken);
+        if (envelope is null || envelope.RequestId != requestId || string.IsNullOrWhiteSpace(envelope.Parish)) return null;
+
+        return new RequestLocationSnapshot(
+            envelope.RequestId,
+            envelope.SourceText,
+            envelope.Parish,
+            envelope.Community,
+            envelope.Latitude,
+            envelope.Longitude,
+            envelope.Precision,
+            envelope.ResolvedUtc);
+    }
+}
 
 public sealed class RequestLocationService : IRequestLocationService
 {
@@ -27,11 +83,11 @@ public sealed class RequestLocationService : IRequestLocationService
         new("St. Catherine", 18.0000m, -77.0000m, ["st catherine", "st. catherine", "saint catherine"])
     ];
 
-    private readonly RequestPortalDbContext dbContext;
+    private readonly IFileStorage storage;
 
-    public RequestLocationService(RequestPortalDbContext dbContext)
+    public RequestLocationService(IFileStorage storage)
     {
-        this.dbContext = dbContext;
+        this.storage = storage;
     }
 
     public async Task<RequestLocationSnapshot?> ResolveAndSaveAsync(
@@ -41,42 +97,43 @@ public sealed class RequestLocationService : IRequestLocationService
         double? longitude,
         CancellationToken cancellationToken = default)
     {
+        if (requestId == Guid.Empty) throw new ArgumentException("Request id is required.", nameof(requestId));
+
         ResolvedLocation? resolved = Resolve(locationText, latitude, longitude);
-        if (resolved is null)
-        {
-            return null;
-        }
+        if (resolved is null) return null;
 
-        RequestGeoLocation? entity = await dbContext.RequestGeoLocations
-            .SingleOrDefaultAsync(item => item.RequestId == requestId, cancellationToken);
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        if (entity is null)
-        {
-            entity = new RequestGeoLocation(
-                requestId,
-                locationText,
-                resolved.Parish.Name,
-                resolved.Community,
-                resolved.Latitude,
-                resolved.Longitude,
-                resolved.Precision,
-                now);
-            dbContext.RequestGeoLocations.Add(entity);
-        }
-        else
-        {
-            entity.Update(
-                locationText,
-                resolved.Parish.Name,
-                resolved.Community,
-                resolved.Latitude,
-                resolved.Longitude,
-                resolved.Precision,
-                now);
-        }
+        RequestLocationSnapshot snapshot = new(
+            requestId,
+            NormalizeOptional(locationText),
+            resolved.Parish.Name,
+            NormalizeOptional(resolved.Community),
+            resolved.Latitude,
+            resolved.Longitude,
+            resolved.Precision,
+            DateTimeOffset.UtcNow);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return ToSnapshot(entity);
+        byte[] payload = RequestLocationStorage.Serialize(snapshot);
+        await using MemoryStream stream = new(payload, writable: false);
+        Dictionary<string, string> metadata = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["RequestId"] = requestId.ToString("D"),
+            ["Parish"] = snapshot.Parish,
+            ["Precision"] = snapshot.Precision.ToString()
+        };
+        if (!string.IsNullOrWhiteSpace(snapshot.Community)) metadata["Community"] = snapshot.Community;
+
+        await storage.StoreAsync(
+            new StorageWriteRequest(
+                RequestLocationStorage.Key(requestId),
+                stream,
+                "application/json",
+                "resolved-location.json",
+                "RequestPortal.LocationResolver",
+                metadata,
+                MaximumBytes: 32 * 1024),
+            cancellationToken);
+
+        return snapshot;
     }
 
     private static ResolvedLocation? Resolve(string? locationText, double? latitude, double? longitude)
@@ -92,37 +149,23 @@ public sealed class RequestLocationService : IRequestLocationService
                 community,
                 decimal.Round((decimal)latitude.Value, 6),
                 decimal.Round((decimal)longitude.Value, 6),
-                GeoPrecision.Exact);
+                LocationPrecision.Exact);
         }
 
-        if (string.IsNullOrWhiteSpace(locationText))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(locationText)) return null;
 
         string normalized = Normalize(locationText);
         ParishPoint? matched = Parishes.FirstOrDefault(
             parish => parish.Aliases.Any(alias => normalized.Contains(alias, StringComparison.OrdinalIgnoreCase)));
-        if (matched is null)
-        {
-            return null;
-        }
+        if (matched is null) return null;
 
         ParsedTextLocation parsed = ParseTextLocation(locationText, matched);
-        return new ResolvedLocation(
-            matched,
-            parsed.Community,
-            null,
-            null,
-            parsed.Precision);
+        return new ResolvedLocation(matched, parsed.Community, null, null, parsed.Precision);
     }
 
     private static ParsedTextLocation ParseTextLocation(string? source, ParishPoint parish)
     {
-        if (string.IsNullOrWhiteSpace(source))
-        {
-            return new ParsedTextLocation(null, GeoPrecision.Parish);
-        }
+        if (string.IsNullOrWhiteSpace(source)) return new ParsedTextLocation(null, LocationPrecision.Parish);
 
         string[] geographicParts = source
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -134,18 +177,9 @@ public sealed class RequestLocationService : IRequestLocationService
             })
             .ToArray();
 
-        if (geographicParts.Length == 0)
-        {
-            return new ParsedTextLocation(null, GeoPrecision.Parish);
-        }
-
-        if (geographicParts.Length == 1)
-        {
-            return new ParsedTextLocation(geographicParts[0], GeoPrecision.Community);
-        }
-
-        string community = geographicParts[^1];
-        return new ParsedTextLocation(community, GeoPrecision.Address);
+        if (geographicParts.Length == 0) return new ParsedTextLocation(null, LocationPrecision.Parish);
+        if (geographicParts.Length == 1) return new ParsedTextLocation(geographicParts[0], LocationPrecision.Community);
+        return new ParsedTextLocation(geographicParts[^1], LocationPrecision.Address);
     }
 
     private static bool IsJamaica(double latitude, double longitude) =>
@@ -161,22 +195,14 @@ public sealed class RequestLocationService : IRequestLocationService
     private static string Normalize(string value) =>
         value.Trim().ToLowerInvariant().Replace("saint ", "st ").Replace("st. ", "st ");
 
-    private static RequestLocationSnapshot ToSnapshot(RequestGeoLocation entity) => new(
-        entity.RequestId,
-        entity.SourceText,
-        entity.Parish,
-        entity.Community,
-        entity.Latitude,
-        entity.Longitude,
-        (LocationPrecision)(int)entity.Precision,
-        entity.ResolvedUtc);
+    private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private sealed record ParsedTextLocation(string? Community, GeoPrecision Precision);
+    private sealed record ParsedTextLocation(string? Community, LocationPrecision Precision);
 
     private sealed record ResolvedLocation(
         ParishPoint Parish,
         string? Community,
         decimal? Latitude,
         decimal? Longitude,
-        GeoPrecision Precision);
+        LocationPrecision Precision);
 }
