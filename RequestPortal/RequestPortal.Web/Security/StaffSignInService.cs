@@ -1,13 +1,13 @@
 using System.Security.Claims;
+using Common.Diagnostics;
 using Common.Security.Abstractions;
 using Common.Security.Authorization;
-using Common.Security.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using RequestPortal.Common.Diagnostics;
-using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Security;
+using AuthenticationResult = Common.Security.Models.AuthenticationResult;
+using PortalApplicationUser = RequestPortal.Infrastructure.Identity.ApplicationUser;
 
 namespace RequestPortal.Web.Security;
 
@@ -17,18 +17,18 @@ public sealed class StaffSignInService
 {
     private readonly IAuthenticator authenticator;
     private readonly IPermissionAuthorizer permissionAuthorizer;
-    private readonly UserManager<ApplicationUser> userManager;
-    private readonly SignInManager<ApplicationUser> signInManager;
+    private readonly UserManager<PortalApplicationUser> userManager;
+    private readonly SignInManager<PortalApplicationUser> signInManager;
     private readonly ActiveDirectoryOptions directoryOptions;
-    private readonly IStarfleetDiagnostics diagnostics;
+    private readonly IDiagnosticOperationsRouter diagnostics;
 
     public StaffSignInService(
         IAuthenticator authenticator,
         RequestPortalDbContext dbContext,
-        UserManager<ApplicationUser> userManager,
-        SignInManager<ApplicationUser> signInManager,
+        UserManager<PortalApplicationUser> userManager,
+        SignInManager<PortalApplicationUser> signInManager,
         IOptions<ActiveDirectoryOptions> directoryOptions,
-        IStarfleetDiagnostics diagnostics)
+        IDiagnosticOperationsRouter diagnostics)
     {
         this.authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         this.directoryOptions = directoryOptions?.Value ?? throw new ArgumentNullException(nameof(directoryOptions));
@@ -50,13 +50,13 @@ public sealed class StaffSignInService
 
         if (!authentication.IsAuthenticated)
         {
-            await diagnostics.ReportAsync(
+            await ReportDiagnosticAsync(
                 "Security.ActiveDirectory",
-                "SF-AUTH-AD-FAIL",
-                StarfleetSeverity.Warning,
+                "RP-AUTH-AD-FAIL",
+                DiagnosticSeverity.Warning,
                 "Directory authentication failed.",
                 "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE",
-                cancellationToken: cancellationToken);
+                cancellationToken);
             return new StaffSignInResult(false, "INVALID_CREDENTIALS_OR_DIRECTORY_UNAVAILABLE");
         }
 
@@ -74,20 +74,20 @@ public sealed class StaffSignInService
 
         if (!accessDecision.Allowed)
         {
-            await diagnostics.ReportAsync(
+            await ReportDiagnosticAsync(
                 "Security.Authorization",
-                "SF-AUTH-STAFF-DENIED",
-                StarfleetSeverity.Warning,
+                "RP-AUTH-STAFF-DENIED",
+                DiagnosticSeverity.Warning,
                 "Authenticated staff member has no Request Portal access permission.",
                 accessDecision.Reason,
-                cancellationToken: cancellationToken);
+                cancellationToken);
             return new StaffSignInResult(false, "NOT_AUTHORIZED_FOR_REQUEST_PORTAL");
         }
 
-        ApplicationUser? user = await userManager.FindByEmailAsync(emailAddress);
+        PortalApplicationUser? user = await userManager.FindByEmailAsync(emailAddress);
         if (user is null)
         {
-            user = new ApplicationUser
+            user = new PortalApplicationUser
             {
                 Id = Guid.NewGuid(),
                 UserName = emailAddress,
@@ -103,13 +103,13 @@ public sealed class StaffSignInService
             if (!createResult.Succeeded)
             {
                 string detail = string.Join("; ", createResult.Errors.Select(error => error.Description));
-                await diagnostics.ReportAsync(
+                await ReportDiagnosticAsync(
                     "Security.Identity",
-                    "SF-AUTH-LOCALUSER-FAIL",
-                    StarfleetSeverity.Error,
+                    "RP-AUTH-LOCALUSER-FAIL",
+                    DiagnosticSeverity.Error,
                     "Failed to create local staff identity after successful directory authentication.",
                     detail,
-                    cancellationToken: cancellationToken);
+                    cancellationToken);
                 return new StaffSignInResult(false, "LOCAL_IDENTITY_CREATION_FAILED");
             }
         }
@@ -130,15 +130,41 @@ public sealed class StaffSignInService
             .ToArray();
         await signInManager.SignInWithClaimsAsync(user, isPersistent: false, roleClaims);
 
-        await diagnostics.ReportAsync(
+        await ReportDiagnosticAsync(
             "Security.Authorization",
-            "SF-AUTH-PERMISSION-OK",
-            StarfleetSeverity.Information,
+            "RP-AUTH-PERMISSION-OK",
+            DiagnosticSeverity.Information,
             "Staff member authenticated and authorized through Common.Security.",
             string.Join(",", accessDecision.EffectiveRoles),
-            cancellationToken: cancellationToken);
+            cancellationToken);
 
         return new StaffSignInResult(true);
+    }
+
+    private Task ReportDiagnosticAsync(
+        string source,
+        string code,
+        DiagnosticSeverity severity,
+        string message,
+        string? detail,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<string, string>? properties = string.IsNullOrWhiteSpace(detail)
+            ? null
+            : new Dictionary<string, string>
+            {
+                ["Detail"] = detail
+            };
+
+        DiagnosticTelemetryEvent telemetryEvent = new(
+            DateTimeOffset.UtcNow,
+            source,
+            code,
+            severity,
+            message,
+            Properties: properties);
+
+        return diagnostics.RouteAsync(telemetryEvent, cancellationToken);
     }
 
     private static string NormalizeUserName(string userName)
