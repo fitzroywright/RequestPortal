@@ -93,6 +93,12 @@
                         <div class="field">
                             <label asp-for="Input.Location">Location</label>
                             <input asp-for="Input.Location" placeholder="Community, parish or address" />
+                            <input asp-for="Input.Latitude" type="hidden" />
+                            <input asp-for="Input.Longitude" type="hidden" />
+                            <div class="action-row" style="margin-top:8px;align-items:center">
+                                <button class="button button-secondary button-small" type="button" id="use-location">Use device location</button>
+                                <span id="location-status" class="muted">Optional. If GPS is unavailable, the community/parish text is used at lower precision.</span>
+                            </div>
                         </div>
 
                         <div class="field">
@@ -105,25 +111,13 @@
                         <p class="muted">Optional for organization-wide or community projects.</p>
 
                         <div class="grid-2">
-                            <div class="field">
-                                <label asp-for="Input.BeneficiaryFirstName">First name</label>
-                                <input asp-for="Input.BeneficiaryFirstName" />
-                            </div>
-                            <div class="field">
-                                <label asp-for="Input.BeneficiaryLastName">Last name</label>
-                                <input asp-for="Input.BeneficiaryLastName" />
-                            </div>
+                            <div class="field"><label asp-for="Input.BeneficiaryFirstName">First name</label><input asp-for="Input.BeneficiaryFirstName" /></div>
+                            <div class="field"><label asp-for="Input.BeneficiaryLastName">Last name</label><input asp-for="Input.BeneficiaryLastName" /></div>
                         </div>
 
                         <div class="grid-2">
-                            <div class="field">
-                                <label asp-for="Input.BeneficiaryDateOfBirth">Date of birth</label>
-                                <input asp-for="Input.BeneficiaryDateOfBirth" type="date" />
-                            </div>
-                            <div class="field">
-                                <label asp-for="Input.ParentOrGuardian">Parent or guardian</label>
-                                <input asp-for="Input.ParentOrGuardian" />
-                            </div>
+                            <div class="field"><label asp-for="Input.BeneficiaryDateOfBirth">Date of birth</label><input asp-for="Input.BeneficiaryDateOfBirth" type="date" /></div>
+                            <div class="field"><label asp-for="Input.ParentOrGuardian">Parent or guardian</label><input asp-for="Input.ParentOrGuardian" /></div>
                         </div>
 
                         <button class="button" type="submit">Create draft</button>
@@ -141,9 +135,41 @@
                     <li>Select the correct organization. It cannot be changed after creation.</li>
                     <li>Add a beneficiary when the request is for a specific person.</li>
                     <li>Use category, location and priority to help FFP triage the request.</li>
+                    <li>GPS is optional and is used only to improve service-reach reporting.</li>
                     <li>After submission, FFP can approve, reject, request more information, or mark a duplicate.</li>
                 </ul>
             </aside>
         </div>
     </div>
 </section>
+
+<script>
+(() => {
+    const button = document.getElementById('use-location');
+    const status = document.getElementById('location-status');
+    const latitude = document.getElementById('Input_Latitude');
+    const longitude = document.getElementById('Input_Longitude');
+    if (!button || !status || !latitude || !longitude) return;
+
+    button.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+            status.textContent = 'Location services are not available in this browser. The typed location will be used.';
+            return;
+        }
+        button.disabled = true;
+        status.textContent = 'Getting location…';
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                latitude.value = position.coords.latitude.toFixed(6);
+                longitude.value = position.coords.longitude.toFixed(6);
+                status.textContent = 'Exact device location captured for service-reach reporting.';
+                button.disabled = false;
+            },
+            () => {
+                status.textContent = 'Location was not available. The typed community/parish will be used instead.';
+                button.disabled = false;
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 });
+    });
+})();
+</script>
