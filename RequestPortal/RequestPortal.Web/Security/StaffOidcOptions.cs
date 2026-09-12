@@ -4,6 +4,7 @@ public sealed class StaffOidcOptions
 {
     public const string SectionName = "Authentication:StaffOidc";
     public const string Scheme = "FfpStaffOidc";
+    public const string StaffCookieScheme = "FfpStaffCookie";
     public const string StaffSurfaceClaim = "requestportal_auth_surface";
     public const string StaffSurfaceValue = "ffp_staff";
     public const string PermissionClaim = "requestportal_permission";
