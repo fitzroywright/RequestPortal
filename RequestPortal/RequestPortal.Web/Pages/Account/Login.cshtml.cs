@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Common.Diagnostics;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Configuration;
-using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Web.Demo;
@@ -24,7 +24,7 @@ public sealed class LoginModel : PageModel
     private readonly IAuthenticationSchemeProvider schemeProvider;
     private readonly IConfiguration configuration;
     private readonly IClock clock;
-    private readonly IStarfleetDiagnosticSink diagnosticSink;
+    private readonly IDiagnosticOperationsRouter diagnostics;
 
     public LoginModel(
         SignInManager<ApplicationUser> signInManager,
@@ -32,14 +32,14 @@ public sealed class LoginModel : PageModel
         IAuthenticationSchemeProvider schemeProvider,
         IConfiguration configuration,
         IClock clock,
-        IStarfleetDiagnosticSink diagnosticSink)
+        IDiagnosticOperationsRouter diagnostics)
     {
         this.signInManager = signInManager;
         this.userManager = userManager;
         this.schemeProvider = schemeProvider;
         this.configuration = configuration;
         this.clock = clock;
-        this.diagnosticSink = diagnosticSink;
+        this.diagnostics = diagnostics;
     }
 
     public IReadOnlyList<string> ExternalProviders { get; private set; } = Array.Empty<string>();
@@ -99,7 +99,7 @@ public sealed class LoginModel : PageModel
 
         if (existingResult.Succeeded)
         {
-            await EmitAsync("SF-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
+            await EmitAsync("RP-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
             return LocalRedirect(ReturnUrl);
         }
 
@@ -131,7 +131,7 @@ public sealed class LoginModel : PageModel
             if (!createResult.Succeeded)
             {
                 ErrorMessage = "The Request Portal account could not be created.";
-                await EmitAsync("SF-AUTH-EXTERNAL-LOCALUSER-FAIL", "External user local account creation failed.", string.Join("; ", createResult.Errors.Select(error => error.Code)));
+                await EmitAsync("RP-AUTH-EXTERNAL-LOCALUSER-FAIL", "External user local account creation failed.", string.Join("; ", createResult.Errors.Select(error => error.Code)));
                 await LoadProvidersAsync();
                 return Page();
             }
@@ -148,7 +148,7 @@ public sealed class LoginModel : PageModel
         user.LastSignInUtc = clock.UtcNow;
         await userManager.UpdateAsync(user);
         await signInManager.SignInAsync(user, isPersistent: false);
-        await EmitAsync("SF-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
+        await EmitAsync("RP-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
 
         return LocalRedirect(ReturnUrl);
     }
@@ -179,7 +179,7 @@ public sealed class LoginModel : PageModel
         user.LastSignInUtc = clock.UtcNow;
         await userManager.UpdateAsync(user);
         await signInManager.SignInAsync(user, isPersistent: false);
-        await EmitAsync("SF-AUTH-DEMO-REP", "Demo representative signed in.", demoEmail);
+        await EmitAsync("RP-AUTH-DEMO-REP", "Demo representative signed in.", demoEmail);
 
         return LocalRedirect(LocalReturnUrl(returnUrl));
     }
@@ -209,16 +209,18 @@ public sealed class LoginModel : PageModel
 
     private Task EmitAsync(string code, string message, string detail)
     {
-        StarfleetDiagnosticEvent diagnosticEvent = new(
-            Guid.NewGuid(),
+        DiagnosticTelemetryEvent telemetryEvent = new(
             clock.UtcNow,
             "Security.Authentication",
             code,
-            StarfleetSeverity.Information,
+            DiagnosticSeverity.Information,
             message,
-            detail,
-            HttpContext.TraceIdentifier);
+            HttpContext.TraceIdentifier,
+            new Dictionary<string, string>
+            {
+                ["Detail"] = detail
+            });
 
-        return diagnosticSink.WriteAsync(diagnosticEvent, HttpContext.RequestAborted);
+        return diagnostics.RouteAsync(telemetryEvent, HttpContext.RequestAborted);
     }
 }
