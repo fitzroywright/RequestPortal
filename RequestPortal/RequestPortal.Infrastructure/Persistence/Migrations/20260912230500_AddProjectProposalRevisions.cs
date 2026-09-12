@@ -1,10 +1,14 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using RequestPortal.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace RequestPortal.Infrastructure.Persistence.Migrations;
 
+[DbContext(typeof(RequestPortalDbContext))]
+[Migration("20260912230500_AddProjectProposalRevisions")]
 public partial class AddProjectProposalRevisions : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
