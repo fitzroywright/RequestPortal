@@ -1,7 +1,7 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "requirements": [
     {
       "id": "database-connection",
@@ -45,20 +45,45 @@
       "configurationKey": "CommonSecrets:OpenBao:RoleId"
     },
     {
-      "id": "active-directory-server",
-      "displayName": "Staff directory server",
+      "id": "staff-oidc-authority",
+      "displayName": "FFP Staff OIDC authority",
       "kind": "Configuration",
       "required": true,
-      "purpose": "Defines the directory endpoint used for staff authentication.",
-      "configurationKey": "Authentication:ActiveDirectory:Server"
+      "purpose": "Defines the standards-compliant OIDC provider used only for FFP staff authentication. The provider, not Request Portal, validates fftpj.local credentials.",
+      "configurationKey": "Authentication:StaffOidc:Authority"
     },
     {
-      "id": "active-directory-search-base",
-      "displayName": "Staff directory search base",
+      "id": "staff-oidc-client-id",
+      "displayName": "FFP Staff OIDC client ID",
       "kind": "Configuration",
       "required": true,
-      "purpose": "Defines the directory search base used for staff authentication and authorization.",
-      "configurationKey": "Authentication:ActiveDirectory:SearchBase"
+      "purpose": "Identifies Request Portal to the configurable FFP staff OIDC provider.",
+      "configurationKey": "Authentication:StaffOidc:ClientId"
+    },
+    {
+      "id": "staff-oidc-client-secret",
+      "displayName": "FFP Staff OIDC client secret",
+      "kind": "Secret",
+      "required": true,
+      "purpose": "Provides the OIDC confidential-client credential through Common.Secrets/OpenBao. Request Portal never stores or receives an AD user password.",
+      "secretName": "Authentication:StaffOidc:ClientSecret",
+      "validator": "secret"
+    },
+    {
+      "id": "staff-reviewer-groups",
+      "displayName": "FFP staff reviewer group mappings",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Names the AD groups emitted by the staff identity provider that Common.Security maps to Request Portal reviewer permissions.",
+      "configurationKey": "Authentication:ActiveDirectory:ReviewerGroups"
+    },
+    {
+      "id": "staff-administrator-groups",
+      "displayName": "FFP staff administrator group mappings",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Names the AD groups emitted by the staff identity provider that Common.Security maps to Request Portal administrator permissions.",
+      "configurationKey": "Authentication:ActiveDirectory:AdministratorGroups"
     },
     {
       "id": "storage-malware-scanner",
