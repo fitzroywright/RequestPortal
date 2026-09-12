@@ -1,20 +1,21 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace RequestPortal.Common.Diagnostics;
 
 public sealed class StartupDiagnosticRunner
 {
     private readonly IReadOnlyList<IStartupDiagnostic> diagnostics;
-    private readonly IStarfleetDiagnostics starfleetDiagnostics;
+    private readonly ILogger<StartupDiagnosticRunner> logger;
 
     public StartupDiagnosticRunner(
         IEnumerable<IStartupDiagnostic> diagnostics,
-        IStarfleetDiagnostics starfleetDiagnostics)
+        ILogger<StartupDiagnosticRunner> logger)
     {
         this.diagnostics = new List<IStartupDiagnostic>(diagnostics);
-        this.starfleetDiagnostics = starfleetDiagnostics;
+        this.logger = logger;
     }
 
     public async Task<IReadOnlyList<DiagnosticCheckResult>> RunAsync(CancellationToken cancellationToken = default)
@@ -26,13 +27,20 @@ public sealed class StartupDiagnosticRunner
             DiagnosticCheckResult result = await diagnostic.CheckAsync(cancellationToken);
             results.Add(result);
 
-            await starfleetDiagnostics.ReportAsync(
-                "Startup",
-                result.IsHealthy ? "SF-STARTUP-OK" : "SF-STARTUP-FAIL",
-                result.IsHealthy ? StarfleetSeverity.Information : StarfleetSeverity.Critical,
-                $"Startup diagnostic '{result.Name}' completed.",
-                result.Detail,
-                cancellationToken: cancellationToken);
+            if (result.IsHealthy)
+            {
+                logger.LogInformation(
+                    "Startup diagnostic {DiagnosticName} completed successfully. {Detail}",
+                    result.Name,
+                    result.Detail);
+            }
+            else
+            {
+                logger.LogError(
+                    "Startup diagnostic {DiagnosticName} failed. {Detail}",
+                    result.Name,
+                    result.Detail);
+            }
         }
 
         return results;
