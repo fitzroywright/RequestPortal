@@ -38,17 +38,26 @@ public interface IFfpManagerGateway
 
 public sealed class FakeFfpManagerGateway : IFfpManagerGateway
 {
-    private sealed record FakeApplication(
-        FfpManagerApplicationSubmission Submission,
-        FfpManagerApplicationReference Reference,
-        ConcurrentDictionary<Guid, FfpManagerArtifactDescriptor> Artifacts,
-        ConcurrentBag<FfpManagerInformationResponse> Responses)
+    private sealed class FakeApplication
     {
-        public FfpManagerApplicationStatus Status { get; set; } = new(
-            Reference.ApplicationId,
-            "RECEIVED",
-            "Received by FFP Manager",
-            Reference.AcceptedUtc);
+        public FakeApplication(
+            FfpManagerApplicationSubmission submission,
+            FfpManagerApplicationReference reference)
+        {
+            Submission = submission;
+            Reference = reference;
+            Status = new FfpManagerApplicationStatus(
+                reference.ApplicationId,
+                "RECEIVED",
+                "Received by FFP Manager",
+                reference.AcceptedUtc);
+        }
+
+        public FfpManagerApplicationSubmission Submission { get; }
+        public FfpManagerApplicationReference Reference { get; }
+        public ConcurrentDictionary<Guid, FfpManagerArtifactDescriptor> Artifacts { get; } = new();
+        public ConcurrentBag<FfpManagerInformationResponse> Responses { get; } = new();
+        public FfpManagerApplicationStatus Status { get; set; }
     }
 
     private readonly ConcurrentDictionary<Guid, FakeApplication> byCorrelation = new();
@@ -69,11 +78,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
         string applicationId = $"APP-{number}";
         DateTimeOffset now = DateTimeOffset.UtcNow;
         FfpManagerApplicationReference reference = new(applicationId, applicationId, now);
-        FakeApplication created = new(
-            submission,
-            reference,
-            new ConcurrentDictionary<Guid, FfpManagerArtifactDescriptor>(),
-            new ConcurrentBag<FfpManagerInformationResponse>());
+        FakeApplication created = new(submission, reference);
 
         FakeApplication actual = byCorrelation.GetOrAdd(submission.CorrelationId, created);
         byApplicationId.TryAdd(actual.Reference.ApplicationId, actual);
