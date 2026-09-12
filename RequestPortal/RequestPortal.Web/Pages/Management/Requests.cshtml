@@ -1,0 +1,80 @@
+@page
+@model RequestPortal.Web.Pages.Management.RequestsModel
+@using RequestPortal.Application.Management
+@{
+    ViewData["Title"] = "Management Requests";
+}
+
+<section class="section">
+    <div class="shell" style="max-width:1440px">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Management drill-down</div>
+            <h1>Requests</h1>
+            <p>Filtered operational request list. Open any request in the existing staff review workflow.</p>
+            <div class="action-row">
+                <a class="button button-secondary" asp-page="/Management/Index">Management dashboard</a>
+                <a class="button button-secondary" asp-page="/Management/Requests">Clear filters</a>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Period) || !string.IsNullOrWhiteSpace(Model.Status) || !string.IsNullOrWhiteSpace(Model.Attention) || !string.IsNullOrWhiteSpace(Model.Category) || !string.IsNullOrWhiteSpace(Model.Program) || !string.IsNullOrWhiteSpace(Model.Parish) || !string.IsNullOrWhiteSpace(Model.Community))
+        {
+            <div class="card" style="margin-bottom:16px;padding:14px 18px">
+                <strong>Filters:</strong>
+                @if (!string.IsNullOrWhiteSpace(Model.Period)) { <span class="status">period: @Model.Period</span> }
+                @if (!string.IsNullOrWhiteSpace(Model.Status)) { <span class="status">status: @Model.Status</span> }
+                @if (!string.IsNullOrWhiteSpace(Model.Attention)) { <span class="status">attention: @Model.Attention</span> }
+                @if (!string.IsNullOrWhiteSpace(Model.Category)) { <span class="status">category: @Model.Category</span> }
+                @if (!string.IsNullOrWhiteSpace(Model.Program)) { <span class="status">program: @Model.Program</span> }
+                @if (!string.IsNullOrWhiteSpace(Model.Parish)) { <span class="status">parish: @Model.Parish</span> }
+                @if (!string.IsNullOrWhiteSpace(Model.Community)) { <span class="status">community: @Model.Community</span> }
+            </div>
+        }
+
+        <section class="card">
+            <div class="action-row" style="justify-content:space-between;align-items:center">
+                <h2 style="margin:0">@Model.Requests.Count request(s)</h2>
+            </div>
+            @if (Model.Requests.Count == 0)
+            {
+                <p class="muted">No requests match this filter.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Reference</th><th>Organization</th><th>Management status</th><th>Category / program</th><th>Location</th><th>Age / attention</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (ManagementRequestRow request in Model.Requests)
+                        {
+                            <tr>
+                                <td><strong>@request.PublicReference</strong><br /><span class="muted">@request.Status</span></td>
+                                <td>@request.OrganizationName</td>
+                                <td><span class="status">@request.ManagementStatus</span></td>
+                                <td>@(request.Category ?? "—")<br /><span class="muted">@(request.Program ?? "")</span></td>
+                                <td>
+                                    @(request.Community ?? request.Location ?? "—")
+                                    @if (!string.IsNullOrWhiteSpace(request.Parish))
+                                    {
+                                        <br /><a asp-page="/Management/Parish" asp-route-parish="@request.Parish">@request.Parish</a>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(request.Precision)) { <br /><span class="muted">@request.Precision precision</span> }
+                                </td>
+                                <td>
+                                    @if (request.Overdue) { <span class="status" style="border-color:#c96b18">Overdue</span> }
+                                    @if (request.Stalled) { <span class="status">Stalled</span> }
+                                    @if (request.MissingDocuments) { <span class="status">Missing docs</span> }
+                                    <br /><span class="muted">Last activity @request.LastActivityUtc.ToLocalTime().ToString("d MMM yyyy")</span>
+                                </td>
+                                <td><a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.Id">Open</a></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</section>
