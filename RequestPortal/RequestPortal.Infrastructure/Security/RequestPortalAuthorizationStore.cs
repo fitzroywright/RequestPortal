@@ -19,7 +19,6 @@ public static class RequestPortalPermissions
     public const string Access = "requestportal.access";
     public const string ReviewRequests = "requests.review";
     public const string ViewManagementDashboard = "ManagementDashboard.View";
-    public const string LegacyViewManagementDashboard = "management.dashboard.view";
     public const string ManageSecurity = "security.manage";
 }
 
@@ -139,7 +138,6 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         await EnsurePermissionAsync(RequestPortalPermissions.Access, "Access the Request Portal staff experience.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ReviewRequests, "Review and process assistance requests.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ViewManagementDashboard, "View management dashboards and organization-wide service metrics.", cancellationToken);
-        await EnsurePermissionAsync(RequestPortalPermissions.LegacyViewManagementDashboard, "Legacy management dashboard permission alias.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ManageSecurity, "Manage Request Portal roles and security policy.", cancellationToken);
 
         await EnsureRolePermissionAsync(RequestPortalRoles.Reviewer, RequestPortalPermissions.Access, cancellationToken);
