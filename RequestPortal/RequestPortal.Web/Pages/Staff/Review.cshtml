@@ -29,8 +29,16 @@
                     {
                         <section class="card proposal-review">
                             <div class="eyebrow" style="color:#b45b09">Project proposal</div>
-                            <h2>@Model.ProjectProposal.Title</h2>
-                            <div class="muted" style="margin-bottom:20px">Version @Model.ProjectProposal.Version · last updated @Model.ProjectProposal.UpdatedUtc.ToString("u")</div>
+                            <div class="action-row" style="justify-content:space-between;align-items:start">
+                                <div>
+                                    <h2>@Model.ProjectProposal.Title</h2>
+                                    <div class="muted" style="margin-bottom:20px">Version @Model.ProjectProposal.Version · last updated @Model.ProjectProposal.UpdatedUtc.ToString("u")</div>
+                                </div>
+                                <div class="action-row">
+                                    <a class="button button-outline" asp-page-handler="ProposalDocx" asp-route-id="@Model.Request.Id">Word (.docx)</a>
+                                    <a class="button button-outline" asp-page-handler="ProposalPdf" asp-route-id="@Model.Request.Id">PDF</a>
+                                </div>
+                            </div>
                             <article class="proposal-document">@Html.Raw(Model.ProjectProposal.RichContentHtml)</article>
                         </section>
 
@@ -40,62 +48,26 @@
                                 <h2>Project budget</h2>
                                 <div class="table-wrap">
                                     <table>
-                                        <thead>
-                                            <tr>
-                                                <th>Description</th>
-                                                <th>Qty</th>
-                                                <th>Unit cost</th>
-                                                <th>Total</th>
-                                                <th>FFP requested</th>
-                                                <th>Organization</th>
-                                                <th>Other funding</th>
-                                            </tr>
-                                        </thead>
+                                        <thead><tr><th>Description</th><th>Qty</th><th>Unit cost</th><th>Total</th><th>FFP requested</th><th>Organization</th><th>Other funding</th></tr></thead>
                                         <tbody>
                                         @foreach (ProjectBudgetItemDetail item in Model.ProjectPlanning.Budget)
                                         {
-                                            <tr>
-                                                <td>@item.Description</td>
-                                                <td>@item.Quantity</td>
-                                                <td>@item.UnitCost.ToString("N2")</td>
-                                                <td>@item.TotalCost.ToString("N2")</td>
-                                                <td>@item.FfpRequested.ToString("N2")</td>
-                                                <td>@item.OrganizationContribution.ToString("N2")</td>
-                                                <td>@item.OtherFunding.ToString("N2")</td>
-                                            </tr>
+                                            <tr><td>@item.Description</td><td>@item.Quantity</td><td>@item.UnitCost.ToString("N2")</td><td>@item.TotalCost.ToString("N2")</td><td>@item.FfpRequested.ToString("N2")</td><td>@item.OrganizationContribution.ToString("N2")</td><td>@item.OtherFunding.ToString("N2")</td></tr>
                                         }
                                         </tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <th colspan="3">Totals</th>
-                                                <th>@Model.ProjectPlanning.TotalCost.ToString("N2")</th>
-                                                <th>@Model.ProjectPlanning.TotalFfpRequested.ToString("N2")</th>
-                                                <th>@Model.ProjectPlanning.TotalOrganizationContribution.ToString("N2")</th>
-                                                <th>@Model.ProjectPlanning.TotalOtherFunding.ToString("N2")</th>
-                                            </tr>
-                                        </tfoot>
+                                        <tfoot><tr><th colspan="3">Totals</th><th>@Model.ProjectPlanning.TotalCost.ToString("N2")</th><th>@Model.ProjectPlanning.TotalFfpRequested.ToString("N2")</th><th>@Model.ProjectPlanning.TotalOrganizationContribution.ToString("N2")</th><th>@Model.ProjectPlanning.TotalOtherFunding.ToString("N2")</th></tr></tfoot>
                                     </table>
                                 </div>
                             </section>
 
                             <section class="card" style="margin-top:1.5rem">
                                 <h2>Implementation milestones</h2>
-                                <div class="table-wrap">
-                                    <table>
-                                        <thead><tr><th>#</th><th>Milestone</th><th>Expected outcome</th><th>Target date</th></tr></thead>
-                                        <tbody>
-                                        @foreach (ProjectMilestoneDetail milestone in Model.ProjectPlanning.Milestones)
-                                        {
-                                            <tr>
-                                                <td>@milestone.Sequence</td>
-                                                <td>@milestone.Title</td>
-                                                <td>@milestone.ExpectedOutcome</td>
-                                                <td>@milestone.TargetDate.ToString("yyyy-MM-dd")</td>
-                                            </tr>
-                                        }
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <div class="table-wrap"><table><thead><tr><th>#</th><th>Milestone</th><th>Expected outcome</th><th>Target date</th></tr></thead><tbody>
+                                @foreach (ProjectMilestoneDetail milestone in Model.ProjectPlanning.Milestones)
+                                {
+                                    <tr><td>@milestone.Sequence</td><td>@milestone.Title</td><td>@milestone.ExpectedOutcome</td><td>@milestone.TargetDate.ToString("yyyy-MM-dd")</td></tr>
+                                }
+                                </tbody></table></div>
                             </section>
                         }
                     }
@@ -104,17 +76,12 @@
                     {
                         <section class="card" style="margin-top:1.5rem">
                             <h2>Requested items</h2>
-                            <div class="table-wrap">
-                                <table>
-                                    <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
-                                    <tbody>
-                                    @foreach (RequestItemDetail item in Model.Request.Items)
-                                    {
-                                        <tr><td>@item.Description</td><td>@item.Quantity</td><td>@Model.UnitName(item.UnitOfMeasureId)</td></tr>
-                                    }
-                                    </tbody>
-                                </table>
-                            </div>
+                            <div class="table-wrap"><table><thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>
+                            @foreach (RequestItemDetail item in Model.Request.Items)
+                            {
+                                <tr><td>@item.Description</td><td>@item.Quantity</td><td>@Model.UnitName(item.UnitOfMeasureId)</td></tr>
+                            }
+                            </tbody></table></div>
                         </section>
                     }
 
@@ -126,22 +93,12 @@
                         }
                         else
                         {
-                            <div class="table-wrap">
-                                <table>
-                                    <thead><tr><th>File</th><th>Type</th><th>Uploaded UTC</th><th></th></tr></thead>
-                                    <tbody>
-                                    @foreach (DocumentSummary document in Model.Documents)
-                                    {
-                                        <tr>
-                                            <td>@document.OriginalFileName</td>
-                                            <td>@document.DocumentType</td>
-                                            <td>@document.UploadedUtc.ToString("u")</td>
-                                            <td><a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@document.Id">Download</a></td>
-                                        </tr>
-                                    }
-                                    </tbody>
-                                </table>
-                            </div>
+                            <div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Uploaded UTC</th><th></th></tr></thead><tbody>
+                            @foreach (DocumentSummary document in Model.Documents)
+                            {
+                                <tr><td>@document.OriginalFileName</td><td>@document.DocumentType</td><td>@document.UploadedUtc.ToString("u")</td><td><a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@document.Id">Download</a></td></tr>
+                            }
+                            </tbody></table></div>
                         }
                     </section>
 
@@ -149,90 +106,25 @@
                     {
                         <section class="card" style="margin-top:1.5rem">
                             <h2>Decision</h2>
-                            <div class="action-row">
-                                <form method="post" asp-page-handler="Approve">
-                                    <input type="hidden" name="id" value="@Model.Request.Id" />
-                                    <button class="button" type="submit">Approve request</button>
-                                </form>
-                            </div>
-
-                            <form method="post" asp-page-handler="MoreInformation" class="form-grid" style="margin-top:22px">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <div class="field">
-                                    <label asp-for="DecisionReason">Request more information</label>
-                                    <textarea asp-for="DecisionReason" placeholder="Explain exactly what the organization should provide."></textarea>
-                                    <span asp-validation-for="DecisionReason" class="validation"></span>
-                                </div>
-                                <button class="button button-outline" type="submit">Request more information</button>
-                            </form>
-
-                            <form method="post" asp-page-handler="Reject" class="form-grid" style="margin-top:22px">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <div class="field">
-                                    <label asp-for="RejectionReason">Rejection reason</label>
-                                    <textarea asp-for="RejectionReason" placeholder="Record the reason for rejection."></textarea>
-                                    <span asp-validation-for="RejectionReason" class="validation"></span>
-                                </div>
-                                <button class="button button-danger" type="submit">Reject request</button>
-                            </form>
-
-                            <form method="post" asp-page-handler="Duplicate" class="form-grid" style="margin-top:22px">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <div class="field">
-                                    <label asp-for="DuplicateReason">Duplicate reason/reference</label>
-                                    <textarea asp-for="DuplicateReason" placeholder="Identify the existing request or explain why this is a duplicate."></textarea>
-                                    <span asp-validation-for="DuplicateReason" class="validation"></span>
-                                </div>
-                                <button class="button button-outline" type="submit">Mark as duplicate</button>
-                            </form>
+                            <div class="action-row"><form method="post" asp-page-handler="Approve"><input type="hidden" name="id" value="@Model.Request.Id" /><button class="button" type="submit">Approve request</button></form></div>
+                            <form method="post" asp-page-handler="MoreInformation" class="form-grid" style="margin-top:22px"><input type="hidden" name="id" value="@Model.Request.Id" /><div class="field"><label asp-for="DecisionReason">Request more information</label><textarea asp-for="DecisionReason" placeholder="Explain exactly what the organization should provide."></textarea><span asp-validation-for="DecisionReason" class="validation"></span></div><button class="button button-outline" type="submit">Request more information</button></form>
+                            <form method="post" asp-page-handler="Reject" class="form-grid" style="margin-top:22px"><input type="hidden" name="id" value="@Model.Request.Id" /><div class="field"><label asp-for="RejectionReason">Rejection reason</label><textarea asp-for="RejectionReason" placeholder="Record the reason for rejection."></textarea><span asp-validation-for="RejectionReason" class="validation"></span></div><button class="button button-danger" type="submit">Reject request</button></form>
+                            <form method="post" asp-page-handler="Duplicate" class="form-grid" style="margin-top:22px"><input type="hidden" name="id" value="@Model.Request.Id" /><div class="field"><label asp-for="DuplicateReason">Duplicate reason/reference</label><textarea asp-for="DuplicateReason" placeholder="Identify the existing request or explain why this is a duplicate."></textarea><span asp-validation-for="DuplicateReason" class="validation"></span></div><button class="button button-outline" type="submit">Mark as duplicate</button></form>
                         </section>
                     }
                 </div>
 
-                <aside class="card">
-                    <h2>Status history</h2>
-                    <div class="timeline">
-                        @foreach (RequestHistoryDetail history in Model.Request.History)
-                        {
-                            <div class="timeline-item">
-                                <strong>@history.Status</strong>
-                                @if (!string.IsNullOrWhiteSpace(history.Reason))
-                                {
-                                    <span>@history.Reason</span>
-                                }
-                                <small>@history.ChangedUtc.ToLocalTime().ToString("f")</small>
-                            </div>
-                        }
-                    </div>
-                </aside>
+                <aside class="card"><h2>Status history</h2><div class="timeline">
+                    @foreach (RequestHistoryDetail history in Model.Request.History)
+                    {
+                        <div class="timeline-item"><strong>@history.Status</strong>@if (!string.IsNullOrWhiteSpace(history.Reason)){<span>@history.Reason</span>}<small>@history.ChangedUtc.ToLocalTime().ToString("f")</small></div>
+                    }
+                </div></aside>
             </div>
         }
     </div>
 </section>
 
 <style>
-    .proposal-document {
-        background: #fff;
-        border: 1px solid #e0e4e7;
-        padding: 36px 42px;
-        font-family: Georgia, 'Times New Roman', serif;
-        line-height: 1.65;
-        overflow-wrap: anywhere;
-    }
-
-    .proposal-document table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 16px 0;
-    }
-
-    .proposal-document th, .proposal-document td {
-        border: 1px solid #8b949c;
-        padding: 8px;
-    }
-
-    .proposal-document img {
-        max-width: 100%;
-        height: auto;
-    }
+.proposal-document{background:#fff;border:1px solid #e0e4e7;padding:36px 42px;font-family:Georgia,'Times New Roman',serif;line-height:1.65;overflow-wrap:anywhere}.proposal-document table{width:100%;border-collapse:collapse;margin:16px 0}.proposal-document th,.proposal-document td{border:1px solid #8b949c;padding:8px}.proposal-document img{max-width:100%;height:auto}
 </style>
