@@ -86,7 +86,7 @@ public sealed class RequestLocationService : IRequestLocationService
             ParishPoint nearest = Parishes
                 .OrderBy(parish => DistanceSquared((decimal)latitude.Value, (decimal)longitude.Value, parish.Latitude, parish.Longitude))
                 .First();
-            string? community = ExtractCommunity(locationText, nearest);
+            string? community = ParseTextLocation(locationText, nearest).Community;
             return new ResolvedLocation(
                 nearest,
                 community,
@@ -108,27 +108,44 @@ public sealed class RequestLocationService : IRequestLocationService
             return null;
         }
 
-        string? communityName = ExtractCommunity(locationText, matched);
+        ParsedTextLocation parsed = ParseTextLocation(locationText, matched);
         return new ResolvedLocation(
             matched,
-            communityName,
-            matched.Latitude,
-            matched.Longitude,
-            GeoPrecision.Parish);
+            parsed.Community,
+            null,
+            null,
+            parsed.Precision);
     }
 
-    private static string? ExtractCommunity(string? source, ParishPoint parish)
+    private static ParsedTextLocation ParseTextLocation(string? source, ParishPoint parish)
     {
-        if (string.IsNullOrWhiteSpace(source)) return null;
-        string[] parts = source.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (string part in parts)
+        if (string.IsNullOrWhiteSpace(source))
         {
-            string normalized = Normalize(part);
-            if (parish.Aliases.Any(alias => normalized.Equals(alias, StringComparison.OrdinalIgnoreCase))) continue;
-            if (normalized.Equals("jamaica", StringComparison.OrdinalIgnoreCase)) continue;
-            return part.Trim();
+            return new ParsedTextLocation(null, GeoPrecision.Parish);
         }
-        return null;
+
+        string[] geographicParts = source
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(part =>
+            {
+                string normalized = Normalize(part);
+                return !parish.Aliases.Any(alias => normalized.Equals(alias, StringComparison.OrdinalIgnoreCase))
+                    && !normalized.Equals("jamaica", StringComparison.OrdinalIgnoreCase);
+            })
+            .ToArray();
+
+        if (geographicParts.Length == 0)
+        {
+            return new ParsedTextLocation(null, GeoPrecision.Parish);
+        }
+
+        if (geographicParts.Length == 1)
+        {
+            return new ParsedTextLocation(geographicParts[0], GeoPrecision.Community);
+        }
+
+        string community = geographicParts[^1];
+        return new ParsedTextLocation(community, GeoPrecision.Address);
     }
 
     private static bool IsJamaica(double latitude, double longitude) =>
@@ -154,10 +171,12 @@ public sealed class RequestLocationService : IRequestLocationService
         (LocationPrecision)(int)entity.Precision,
         entity.ResolvedUtc);
 
+    private sealed record ParsedTextLocation(string? Community, GeoPrecision Precision);
+
     private sealed record ResolvedLocation(
         ParishPoint Parish,
         string? Community,
-        decimal Latitude,
-        decimal Longitude,
+        decimal? Latitude,
+        decimal? Longitude,
         GeoPrecision Precision);
 }
