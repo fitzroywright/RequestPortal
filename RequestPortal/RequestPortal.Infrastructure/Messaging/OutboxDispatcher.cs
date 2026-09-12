@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -106,10 +108,20 @@ public sealed class OutboxDispatcher
             RequestSubmittedMessage message = Deserialize<RequestSubmittedMessage>(outbox.Payload);
             if (ffpManagerOptions.Enabled)
             {
-                await ffpManagerIntegrationService.SubmitRequestAsync(message.RequestId, cancellationToken);
+                await EnsureFfpManagerSubmissionQueuedAsync(message, cancellationToken);
             }
 
             await SendRequestSubmittedAsync(message, cancellationToken);
+            return;
+        }
+
+        if (outbox.MessageType.EndsWith(nameof(FfpManagerSubmissionRequestedMessage), StringComparison.Ordinal))
+        {
+            FfpManagerSubmissionRequestedMessage message = Deserialize<FfpManagerSubmissionRequestedMessage>(outbox.Payload);
+            if (ffpManagerOptions.Enabled)
+            {
+                await ffpManagerIntegrationService.SubmitRequestAsync(message.RequestId, cancellationToken);
+            }
             return;
         }
 
@@ -130,6 +142,39 @@ public sealed class OutboxDispatcher
         logger.LogInformation(
             "No notification projector registered for outbox type {MessageType}.",
             outbox.MessageType);
+    }
+
+    private async Task EnsureFfpManagerSubmissionQueuedAsync(
+        RequestSubmittedMessage source,
+        CancellationToken cancellationToken)
+    {
+        Guid integrationMessageId = CreateDeterministicGuid(source.RequestId, "FFPManagerSubmission");
+        bool alreadyTracked = dbContext.OutboxMessages.Local.Any(message => message.Id == integrationMessageId);
+        if (!alreadyTracked)
+        {
+            alreadyTracked = await dbContext.OutboxMessages
+                .AsNoTracking()
+                .AnyAsync(message => message.Id == integrationMessageId, cancellationToken);
+        }
+
+        if (alreadyTracked)
+        {
+            return;
+        }
+
+        FfpManagerSubmissionRequestedMessage message = new(
+            integrationMessageId,
+            source.OccurredUtc,
+            source.RequestId);
+        dbContext.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = message.MessageId,
+            MessageType = typeof(FfpManagerSubmissionRequestedMessage).FullName
+                ?? nameof(FfpManagerSubmissionRequestedMessage),
+            Payload = JsonSerializer.Serialize(message),
+            OccurredUtc = message.OccurredUtc,
+            AttemptCount = 0
+        });
     }
 
     private async Task SendOrganizationApprovedAsync(
@@ -343,6 +388,14 @@ public sealed class OutboxDispatcher
             history.MarkFailed(exception.Message);
             throw;
         }
+    }
+
+    private static Guid CreateDeterministicGuid(Guid requestId, string purpose)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{requestId:D}|{purpose}"));
+        Span<byte> guidBytes = stackalloc byte[16];
+        hash.AsSpan(0, 16).CopyTo(guidBytes);
+        return new Guid(guidBytes);
     }
 
     private static TMessage Deserialize<TMessage>(string payload)
