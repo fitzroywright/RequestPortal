@@ -124,7 +124,6 @@ public interface IFfpManagerIntegrationService
 
     Task RespondToInformationRequestAsync(
         Guid requestId,
-        string applicationId,
         Guid userId,
         string message,
         IReadOnlyList<Guid> documentIds,
