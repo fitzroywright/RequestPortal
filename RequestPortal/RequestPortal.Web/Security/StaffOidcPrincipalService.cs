@@ -4,7 +4,6 @@ using Common.Security.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using RequestPortal.Infrastructure.Identity;
-using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Security;
 
 namespace RequestPortal.Web.Security;
@@ -20,16 +19,16 @@ public sealed class StaffOidcPrincipalService
     private readonly IDiagnosticOperationsRouter diagnostics;
 
     public StaffOidcPrincipalService(
-        RequestPortalDbContext dbContext,
         UserManager<ApplicationUser> userManager,
+        IPermissionAuthorizer permissionAuthorizer,
         IOptions<StaffOidcOptions> oidcOptions,
         IOptions<ActiveDirectoryOptions> directoryOptions,
         IDiagnosticOperationsRouter diagnostics)
     {
         this.userManager = userManager;
+        this.permissionAuthorizer = permissionAuthorizer;
         this.oidcOptions = oidcOptions.Value;
         this.directoryOptions = directoryOptions.Value;
-        this.permissionAuthorizer = new PermissionAuthorizer(new RequestPortalAuthorizationStore(dbContext, directoryOptions));
         this.diagnostics = diagnostics;
     }
 
@@ -94,7 +93,7 @@ public sealed class StaffOidcPrincipalService
 
         ClaimsIdentity identity = new(
             claims,
-            IdentityConstants.ApplicationScheme,
+            StaffOidcOptions.StaffCookieScheme,
             ClaimTypes.Name,
             ClaimTypes.Role);
 
@@ -165,7 +164,7 @@ public sealed class StaffOidcPrincipalService
         principal.FindFirst(claimType)?.Value?.Trim();
 
     private static IEnumerable<string> SplitGroupClaim(string value) =>
-        value.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        value.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private static string NormalizeUserName(string value)
     {
