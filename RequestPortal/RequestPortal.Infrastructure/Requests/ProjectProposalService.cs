@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using Common.Storage;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Ganss.Xss;
@@ -16,7 +18,19 @@ namespace RequestPortal.Infrastructure.Requests;
 
 public sealed class ProjectProposalService : IProjectProposalService
 {
+    private sealed record StoredProposalRevision(
+        Guid RevisionId,
+        Guid RequestId,
+        Guid ProposalId,
+        int ProposalVersion,
+        string Title,
+        string RichContentHtml,
+        Guid EditedByUserId,
+        DateTimeOffset SavedUtc,
+        bool Automatic);
+
     private static readonly HtmlSanitizer sanitizer = CreateSanitizer();
+    private static readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Regex htmlTagRegex = new("<[^>]+>", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex blockEndRegex = new("</(p|div|h1|h2|h3|h4|li|tr|blockquote)>", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly IReadOnlyList<LongFormTemplate> templates =
@@ -53,17 +67,20 @@ public sealed class ProjectProposalService : IProjectProposalService
     private readonly IOrganizationAccessService organizationAccessService;
     private readonly IClock clock;
     private readonly IBusinessAuditWriter auditWriter;
+    private readonly IVersionedFileStorage revisionStorage;
 
     public ProjectProposalService(
         RequestPortalDbContext dbContext,
         IOrganizationAccessService organizationAccessService,
         IClock clock,
-        IBusinessAuditWriter auditWriter)
+        IBusinessAuditWriter auditWriter,
+        IVersionedFileStorage revisionStorage)
     {
         this.dbContext = dbContext;
         this.organizationAccessService = organizationAccessService;
         this.clock = clock;
         this.auditWriter = auditWriter;
+        this.revisionStorage = revisionStorage;
     }
 
     public async Task InitializeProjectAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default)
@@ -78,8 +95,8 @@ public sealed class ProjectProposalService : IProjectProposalService
             ProjectProposal proposal = new(Guid.NewGuid(), requestId, userId, clock.UtcNow);
             dbContext.ProjectProposals.Add(proposal);
             LongFormTemplate initial = templates[0];
-            proposal.Update(initial.Title, initial.RichContentHtml, userId, clock.UtcNow);
-            AddRevision(proposal, userId, automatic: false);
+            proposal.Update(initial.Title, Sanitize(initial.RichContentHtml), userId, clock.UtcNow);
+            await StoreRevisionAsync(proposal, userId, automatic: false, cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -113,28 +130,47 @@ public sealed class ProjectProposalService : IProjectProposalService
         AssistanceRequest request = await dbContext.AssistanceRequests.AsNoTracking().SingleAsync(item => item.Id == requestId, cancellationToken);
         if (!isStaff) await EnsureAccessAsync(userId, request.OrganizationId, cancellationToken);
 
-        return await dbContext.ProjectProposalRevisions.AsNoTracking()
-            .Where(item => item.RequestId == requestId)
+        IReadOnlyList<StoredFile> versions = await revisionStorage.GetVersionsAsync(RevisionStorageKey(requestId), cancellationToken);
+        List<ProjectProposalRevisionDetail> results = [];
+        foreach (StoredFile version in versions.Take(100))
+        {
+            if (!TryParseRevisionMetadata(version, out ProjectProposalRevisionDetail? detail) || detail is null) continue;
+            results.Add(detail);
+        }
+
+        return results
             .OrderByDescending(item => item.SavedUtc)
-            .Take(100)
-            .Select(item => new ProjectProposalRevisionDetail(item.Id, item.Version, item.Title, item.SavedUtc, item.Automatic, item.EditedByUserId))
-            .ToListAsync(cancellationToken);
+            .ThenByDescending(item => item.Version)
+            .ToArray();
     }
 
     public async Task RestoreRevisionAsync(Guid userId, Guid requestId, Guid revisionId, CancellationToken cancellationToken = default)
     {
         AssistanceRequest request = await dbContext.AssistanceRequests.SingleAsync(item => item.Id == requestId, cancellationToken);
         await EnsureEditableAsync(userId, request, cancellationToken);
-        ProjectProposal proposal = await dbContext.ProjectProposals.SingleAsync(item => item.RequestId == requestId, cancellationToken);
-        ProjectProposalRevision revision = await dbContext.ProjectProposalRevisions.AsNoTracking()
-            .SingleAsync(item => item.Id == revisionId && item.RequestId == requestId, cancellationToken);
 
-        AddRevision(proposal, userId, automatic: false);
-        proposal.Update(revision.Title, revision.RichContentHtml, userId, clock.UtcNow);
-        AddRevision(proposal, userId, automatic: false);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await auditWriter.WriteAsync(userId, "ProjectProposalRevisionRestored", nameof(ProjectProposal), proposal.Id, request.OrganizationId,
-            $"Restored proposal revision {revision.Id} (version {revision.Version}).", cancellationToken);
+        IReadOnlyList<StoredFile> versions = await revisionStorage.GetVersionsAsync(RevisionStorageKey(requestId), cancellationToken);
+        StoredFile? stored = versions.FirstOrDefault(item =>
+            item.Metadata.TryGetValue("RevisionId", out string? value) &&
+            Guid.TryParse(value, out Guid parsed) &&
+            parsed == revisionId);
+        if (stored is null) throw new InvalidOperationException("The selected proposal revision could not be found.");
+
+        await using Stream stream = await revisionStorage.OpenVersionAsync(RevisionStorageKey(requestId), stored.Version, cancellationToken);
+        StoredProposalRevision? revision = await JsonSerializer.DeserializeAsync<StoredProposalRevision>(stream, jsonOptions, cancellationToken);
+        if (revision is null || revision.RequestId != requestId || revision.RevisionId != revisionId)
+            throw new InvalidOperationException("The selected proposal revision is invalid.");
+
+        await SaveInternalAsync(userId, requestId, revision.Title, revision.RichContentHtml, automatic: false, cancellationToken);
+        ProjectProposal proposal = await dbContext.ProjectProposals.AsNoTracking().SingleAsync(item => item.RequestId == requestId, cancellationToken);
+        await auditWriter.WriteAsync(
+            userId,
+            "ProjectProposalRevisionRestored",
+            nameof(ProjectProposal),
+            proposal.Id,
+            request.OrganizationId,
+            $"Restored proposal revision {revision.RevisionId} (version {revision.ProposalVersion}).",
+            cancellationToken);
     }
 
     public IReadOnlyList<LongFormTemplate> GetTemplates(string requestType = "Project") =>
@@ -157,15 +193,20 @@ public sealed class ProjectProposalService : IProjectProposalService
             main.Document = new Document(new Body());
             AlternativeFormatImportPart htmlPart = main.AddAlternativeFormatImportPart(AlternativeFormatImportPartType.Html);
             string html = $"<!doctype html><html><head><meta charset=\"utf-8\"><title>{WebUtility.HtmlEncode(proposal.Title)}</title></head><body><h1>{WebUtility.HtmlEncode(proposal.Title)}</h1>{proposal.RichContentHtml}</body></html>";
-            using Stream partStream = htmlPart.GetStream(FileMode.Create, FileAccess.Write);
-            byte[] htmlBytes = Encoding.UTF8.GetBytes(html);
-            partStream.Write(htmlBytes, 0, htmlBytes.Length);
+            await using (Stream partStream = htmlPart.GetStream(FileMode.Create, FileAccess.Write))
+            {
+                byte[] htmlBytes = Encoding.UTF8.GetBytes(html);
+                await partStream.WriteAsync(htmlBytes, cancellationToken);
+            }
             string relationshipId = main.GetIdOfPart(htmlPart);
             main.Document.Body!.Append(new AltChunk { Id = relationshipId });
             main.Document.Save();
         }
 
-        return new ProjectProposalExport(SafeFileName(proposal.Title) + ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", stream.ToArray());
+        return new ProjectProposalExport(
+            SafeFileName(proposal.Title) + ".docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            stream.ToArray());
     }
 
     public async Task<ProjectProposalExport> ExportPdfAsync(Guid userId, Guid requestId, bool isStaff, CancellationToken cancellationToken = default)
@@ -192,8 +233,8 @@ public sealed class ProjectProposalService : IProjectProposalService
         string cleanTitle = string.IsNullOrWhiteSpace(title) ? "Project Proposal" : title.Trim();
         if (proposal.Title == cleanTitle && proposal.RichContentHtml == sanitizedHtml) return;
 
-        AddRevision(proposal, userId, automatic);
         proposal.Update(cleanTitle, sanitizedHtml, userId, clock.UtcNow);
+        await StoreRevisionAsync(proposal, userId, automatic, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await auditWriter.WriteAsync(
@@ -206,12 +247,67 @@ public sealed class ProjectProposalService : IProjectProposalService
             cancellationToken);
     }
 
-    private void AddRevision(ProjectProposal proposal, Guid editedByUserId, bool automatic)
+    private async Task StoreRevisionAsync(
+        ProjectProposal proposal,
+        Guid editedByUserId,
+        bool automatic,
+        CancellationToken cancellationToken)
     {
-        dbContext.ProjectProposalRevisions.Add(new ProjectProposalRevision(
-            Guid.NewGuid(), proposal.Id, proposal.RequestId, proposal.Version, proposal.Title,
-            proposal.RichContentHtml, editedByUserId, clock.UtcNow, automatic));
+        Guid revisionId = Guid.NewGuid();
+        DateTimeOffset savedUtc = clock.UtcNow;
+        StoredProposalRevision revision = new(
+            revisionId,
+            proposal.RequestId,
+            proposal.Id,
+            proposal.Version,
+            proposal.Title,
+            proposal.RichContentHtml,
+            editedByUserId,
+            savedUtc,
+            automatic);
+
+        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(revision, jsonOptions);
+        await using MemoryStream stream = new(payload, writable: false);
+        Dictionary<string, string> metadata = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["RevisionId"] = revisionId.ToString("D"),
+            ["RequestId"] = proposal.RequestId.ToString("D"),
+            ["ProposalId"] = proposal.Id.ToString("D"),
+            ["ProposalVersion"] = proposal.Version.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["Title"] = proposal.Title,
+            ["EditedByUserId"] = editedByUserId.ToString("D"),
+            ["SavedUtc"] = savedUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            ["Automatic"] = automatic.ToString()
+        };
+
+        await revisionStorage.StoreAsync(
+            new StorageWriteRequest(
+                RevisionStorageKey(proposal.RequestId),
+                stream,
+                "application/json",
+                "proposal-revision.json",
+                editedByUserId.ToString("D"),
+                metadata,
+                MaximumBytes: 600_000),
+            cancellationToken);
     }
+
+    private static bool TryParseRevisionMetadata(StoredFile stored, out ProjectProposalRevisionDetail? detail)
+    {
+        detail = null;
+        if (!stored.Metadata.TryGetValue("RevisionId", out string? revisionIdText) || !Guid.TryParse(revisionIdText, out Guid revisionId)) return false;
+        if (!stored.Metadata.TryGetValue("ProposalVersion", out string? versionText) || !int.TryParse(versionText, out int proposalVersion)) return false;
+        if (!stored.Metadata.TryGetValue("EditedByUserId", out string? editorText) || !Guid.TryParse(editorText, out Guid editedByUserId)) return false;
+        if (!stored.Metadata.TryGetValue("SavedUtc", out string? savedText) || !DateTimeOffset.TryParse(savedText, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out DateTimeOffset savedUtc)) return false;
+        bool automatic = stored.Metadata.TryGetValue("Automatic", out string? automaticText) && bool.TryParse(automaticText, out bool parsedAutomatic) && parsedAutomatic;
+        string title = stored.Metadata.TryGetValue("Title", out string? titleText) && !string.IsNullOrWhiteSpace(titleText)
+            ? titleText
+            : "Project Proposal";
+        detail = new ProjectProposalRevisionDetail(revisionId, proposalVersion, title, savedUtc, automatic, editedByUserId);
+        return true;
+    }
+
+    private static string RevisionStorageKey(Guid requestId) => $"requestportal/proposals/{requestId:N}/proposal-history.json";
 
     private string Sanitize(string richContentHtml)
     {
@@ -311,8 +407,8 @@ public sealed class ProjectProposalService : IProjectProposalService
                 WriteObject(writer, output, offsets, pageObject,
                     $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 {fontObject} 0 R >> >> /Contents {contentObject} 0 R >>");
 
-                string stream = BuildPageStream(pages[i]);
-                byte[] streamBytes = Encoding.ASCII.GetBytes(stream);
+                string pageStream = BuildPageStream(pages[i]);
+                byte[] streamBytes = Encoding.ASCII.GetBytes(pageStream);
                 writer.Flush();
                 offsets.Add(output.Position);
                 writer.WriteLine($"{contentObject} 0 obj");
