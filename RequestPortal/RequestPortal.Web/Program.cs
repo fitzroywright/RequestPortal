@@ -67,7 +67,7 @@ if (builder.Environment.IsProduction())
 }
 
 string connectionString = builder.Configuration.GetConnectionString("RequestPortal")
-    ?? throw new InvalidOperationException("SF-CONFIG-DB-001: PostgreSQL connection string 'RequestPortal' is not configured.");
+    ?? throw new InvalidOperationException("RP-CONFIG-DB-001: PostgreSQL connection string 'RequestPortal' is not configured.");
 
 long uploadMaxBytes = builder.Configuration.GetValue<long?>("Uploads:MaxBytes") ?? 25L * 1024L * 1024L;
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = uploadMaxBytes + (1024L * 1024L));
@@ -235,6 +235,7 @@ builder.Services.AddScoped<IProjectPlanningService, ProjectPlanningService>();
 builder.Services.AddScoped<IRequestLifecycleService, RequestLifecycleService>();
 builder.Services.AddScoped<IFulfilmentQueueService, FulfilmentQueueService>();
 builder.Services.AddScoped<IIntegrationStatusService, IntegrationStatusService>();
+builder.Services.AddFfpManagerIntegration(builder.Configuration);
 builder.Services.AddScoped<StaffSignInService>();
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddHostedService<OutboxHostedService>();
@@ -291,6 +292,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
+app.MapFfpManagerIntegrationEndpoints();
 
 await PrepareDemoAsync(app);
 await ReportStartupDiagnosticsAsync(app);
@@ -318,7 +320,8 @@ static async Task HydrateProductionSecretsAsync(
         "Authentication:Microsoft:ClientId",
         "Authentication:Microsoft:ClientSecret",
         "Authentication:Facebook:AppId",
-        "Authentication:Facebook:AppSecret"
+        "Authentication:Facebook:AppSecret",
+        "FfpManagerIntegration:SharedSecret"
     ];
 
     foreach (string key in keys)
@@ -338,6 +341,7 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
     string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
     bool malwareScanningEnabled = configuration.GetValue("Uploads:MalwareScanning:Enabled", false);
     bool notificationsEnabled = configuration.GetValue("Notifications:Enabled", false);
+    bool ffpManagerEnabled = configuration.GetValue("FfpManagerIntegration:Enabled", false);
     string[] reviewerGroups = configuration.GetSection("Authentication:ActiveDirectory:ReviewerGroups").Get<string[]>() ?? Array.Empty<string>();
     string[] administratorGroups = configuration.GetSection("Authentication:ActiveDirectory:AdministratorGroups").Get<string[]>() ?? Array.Empty<string>();
     bool hasExternalProvider =
@@ -346,27 +350,31 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
         (!string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppSecret"]));
 
     if (string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException("SF-PROD-STORAGE-001: Production document storage must be a durable external filesystem path or network share.");
+        throw new InvalidOperationException("RP-PROD-STORAGE-001: Production document storage must be a durable external filesystem path or network share.");
     if (string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException("SF-PROD-DP-001: Production Data Protection keys must be persisted outside the application deployment directory.");
+        throw new InvalidOperationException("RP-PROD-DP-001: Production Data Protection keys must be persisted outside the application deployment directory.");
     if (string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]))
-        throw new InvalidOperationException("SF-PROD-SECRETS-001: Common.Secrets OpenBao is not configured.");
+        throw new InvalidOperationException("RP-PROD-SECRETS-001: Common.Secrets OpenBao is not configured.");
     if (string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:RoleId"]))
-        throw new InvalidOperationException("SF-PROD-SECRETS-002: Common.Secrets OpenBao AppRole RoleId is not configured.");
+        throw new InvalidOperationException("RP-PROD-SECRETS-002: Common.Secrets OpenBao AppRole RoleId is not configured.");
     if (allowedHosts == "*" || string.IsNullOrWhiteSpace(allowedHosts))
-        throw new InvalidOperationException("SF-PROD-HOSTS-001: AllowedHosts must be restricted in production.");
+        throw new InvalidOperationException("RP-PROD-HOSTS-001: AllowedHosts must be restricted in production.");
     if (!malwareScanningEnabled || string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]))
-        throw new InvalidOperationException("SF-PROD-UPLOAD-001: Malware scanning must be configured and enabled in production.");
+        throw new InvalidOperationException("RP-PROD-UPLOAD-001: Malware scanning must be configured and enabled in production.");
     if (string.IsNullOrWhiteSpace(configuration["Authentication:ActiveDirectory:Server"]) ||
         string.IsNullOrWhiteSpace(configuration["Authentication:ActiveDirectory:SearchBase"]) ||
         reviewerGroups.Length == 0 || administratorGroups.Length == 0)
-        throw new InvalidOperationException("SF-PROD-AD-001: Active Directory server, search base and staff authorization groups must be configured.");
+        throw new InvalidOperationException("RP-PROD-AD-001: Active Directory server, search base and staff authorization groups must be configured.");
     if (!hasExternalProvider)
-        throw new InvalidOperationException("SF-PROD-OAUTH-001: At least one external representative identity provider must be commissioned.");
+        throw new InvalidOperationException("RP-PROD-OAUTH-001: At least one external representative identity provider must be commissioned.");
     if (!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]))
-        throw new InvalidOperationException("SF-PROD-SMTP-001: SMTP notifications must be commissioned for production.");
+        throw new InvalidOperationException("RP-PROD-SMTP-001: SMTP notifications must be commissioned for production.");
     if (string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]))
-        throw new InvalidOperationException("SF-PROD-MESSAGING-001: Common.Messaging durable queue path must be configured in production.");
+        throw new InvalidOperationException("RP-PROD-MESSAGING-001: Common.Messaging durable queue path must be configured in production.");
+    if (ffpManagerEnabled &&
+        (string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:BaseUrl"]) ||
+         string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:SharedSecret"])))
+        throw new InvalidOperationException("RP-PROD-FFPMANAGER-001: FFP Manager integration requires BaseUrl and SharedSecret when enabled.");
 }
 
 static async Task ApplyProductionMigrationsAsync(WebApplication app)
@@ -375,7 +383,7 @@ static async Task ApplyProductionMigrationsAsync(WebApplication app)
     RequestPortalDbContext db = scope.ServiceProvider.GetRequiredService<RequestPortalDbContext>();
     string[] migrations = db.Database.GetMigrations().ToArray();
     if (migrations.Length == 0)
-        throw new InvalidOperationException("SF-PROD-MIGRATION-001: No EF Core migrations exist. Production startup is blocked until a baseline migration is generated and reviewed.");
+        throw new InvalidOperationException("RP-PROD-MIGRATION-001: No EF Core migrations exist. Production startup is blocked until a baseline migration is generated and reviewed.");
     await db.Database.MigrateAsync();
 }
 
@@ -394,7 +402,7 @@ static async Task ReportStartupDiagnosticsAsync(WebApplication app)
     IReadOnlyList<DiagnosticCheckResult> results = await scope.ServiceProvider.GetRequiredService<StartupDiagnosticRunner>().RunAsync();
     DiagnosticCheckResult? databaseResult = results.FirstOrDefault(result => result.Name == "PostgreSQL");
     if (databaseResult is not null && !databaseResult.IsHealthy)
-        throw new InvalidOperationException($"SF-STARTUP-DB-001: PostgreSQL startup diagnostic failed. {databaseResult.Detail}");
+        throw new InvalidOperationException($"RP-STARTUP-DB-001: PostgreSQL startup diagnostic failed. {databaseResult.Detail}");
 }
 
 public partial class Program { }
