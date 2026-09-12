@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using Common.Storage;
 using RequestPortal.Application.Management;
@@ -88,6 +87,23 @@ public sealed class RequestLocationService : IRequestLocationService
     public RequestLocationService(IFileStorage storage)
     {
         this.storage = storage;
+    }
+
+    internal static RequestLocationSnapshot? ResolveExisting(Guid requestId, string? locationText)
+    {
+        if (requestId == Guid.Empty || string.IsNullOrWhiteSpace(locationText)) return null;
+        ResolvedLocation? resolved = Resolve(locationText, null, null);
+        return resolved is null
+            ? null
+            : new RequestLocationSnapshot(
+                requestId,
+                NormalizeOptional(locationText),
+                resolved.Parish.Name,
+                NormalizeOptional(resolved.Community),
+                resolved.Latitude,
+                resolved.Longitude,
+                resolved.Precision,
+                DateTimeOffset.MinValue);
     }
 
     public async Task<RequestLocationSnapshot?> ResolveAndSaveAsync(
