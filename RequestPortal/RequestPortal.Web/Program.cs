@@ -24,6 +24,7 @@ using RequestPortal.Application.Countries;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Fulfilment;
 using RequestPortal.Application.Integration;
+using RequestPortal.Application.Management;
 using RequestPortal.Application.Notifications;
 using RequestPortal.Application.Organizations;
 using RequestPortal.Application.Portal;
@@ -34,6 +35,7 @@ using RequestPortal.Application.Security;
 using RequestPortal.Common.Configuration;
 using RequestPortal.Common.Diagnostics;
 using RequestPortal.Common.Messaging;
+using RequestPortal.Common.Security;
 using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Administration;
 using RequestPortal.Infrastructure.Auditing;
@@ -44,6 +46,7 @@ using RequestPortal.Infrastructure.Documents;
 using RequestPortal.Infrastructure.Fulfilment;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Integration;
+using RequestPortal.Infrastructure.Management;
 using RequestPortal.Infrastructure.Messaging;
 using RequestPortal.Infrastructure.Notifications;
 using RequestPortal.Infrastructure.Organizations;
@@ -121,6 +124,7 @@ if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(face
 
 builder.Services.AddOptions<ActiveDirectoryOptions>().Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
 builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection(NotificationOptions.SectionName));
+builder.Services.AddOptions<ManagementDashboardOptions>().Bind(builder.Configuration.GetSection(ManagementDashboardOptions.SectionName));
 
 ActiveDirectoryOptions requestPortalAd = builder.Configuration
     .GetSection(ActiveDirectoryOptions.SectionName)
@@ -226,6 +230,8 @@ builder.Services.AddScoped<IStaffOrganizationDirectoryService, StaffOrganization
 builder.Services.AddScoped<IStaffOrganizationService, StaffOrganizationService>();
 builder.Services.AddScoped<IStaffOperationsService, StaffOperationsService>();
 builder.Services.AddScoped<IStaffReportingService, StaffReportingService>();
+builder.Services.AddScoped<IManagementDashboardService, ManagementDashboardService>();
+builder.Services.AddScoped<IRequestLocationService, RequestLocationService>();
 builder.Services.AddScoped<IBusinessAuditWriter, BusinessAuditWriter>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
@@ -248,15 +254,24 @@ builder.Services.AddScoped<IStartupDiagnostic, PostgreSqlStartupDiagnostic>();
 builder.Services.AddScoped<IStartupDiagnostic, ActiveDirectoryStartupDiagnostic>();
 builder.Services.AddScoped<StartupDiagnosticRunner>();
 
+string[] staffRoles =
+[
+    RequestPortalRoles.Administrator,
+    RequestPortalRoles.Reviewer,
+    PortalRoles.FfpAdministrator,
+    PortalRoles.FfpReviewer
+];
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy(PortalPolicies.FfpStaff, policy => policy.RequireRole(PortalRoles.FfpAdministrator, PortalRoles.FfpReviewer));
+    options.AddPolicy(PortalPolicies.FfpStaff, policy => policy.RequireRole(staffRoles));
+    options.AddPolicy(PortalPolicies.ManagementDashboard, policy => policy.RequireRole(staffRoles));
 });
 
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/Dashboard");
     options.Conventions.AuthorizeFolder("/Staff", PortalPolicies.FfpStaff);
+    options.Conventions.AuthorizeFolder("/Management", PortalPolicies.ManagementDashboard);
     options.Conventions.AuthorizeFolder("/Organizations");
     options.Conventions.AuthorizeFolder("/Requests");
 });
@@ -283,7 +298,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
-    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
     await next();
 });
 app.UseStaticFiles();
