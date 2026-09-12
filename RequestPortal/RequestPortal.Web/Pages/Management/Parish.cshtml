@@ -1,0 +1,84 @@
+@page
+@model RequestPortal.Web.Pages.Management.ParishModel
+@using RequestPortal.Application.Management
+@{
+    ViewData["Title"] = $"{Model.Data.Parish} Service Reach";
+}
+
+<section class="section">
+    <div class="shell" style="max-width:1320px">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Service Reach Across Jamaica</div>
+            <h1>@Model.Data.Parish</h1>
+            <p>Drill-down from parish to communities and the requests being served.</p>
+            <div class="action-row">
+                <a class="button button-secondary" asp-page="/Management/Index">Management dashboard</a>
+                <a class="button button-secondary" asp-page="/Management/Requests" asp-route-parish="@Model.Data.Parish">Filtered request list</a>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <section class="card">
+                <h2>Communities</h2>
+                @if (Model.Data.Communities.Count == 0)
+                {
+                    <p class="muted">No community-level labels have been captured for this parish yet.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Community</th><th>Requests</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach (CommunityReachSummary community in Model.Data.Communities)
+                            {
+                                <tr>
+                                    <td><strong>@community.Community</strong></td>
+                                    <td>@community.Requests</td>
+                                    <td><a class="button button-small" asp-page="/Management/Requests" asp-route-parish="@Model.Data.Parish" asp-route-community="@community.Community">View requests</a></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section class="card">
+                <h2>Parish summary</h2>
+                <div style="font-size:2.2rem;font-weight:750">@Model.Data.Requests.Count</div>
+                <div class="muted">requests represented in @Model.Data.Parish</div>
+                <p style="margin-top:20px">GPS-backed requests retain exact coordinates. Address/community text is deliberately labelled with its actual precision so management reporting never implies more geographic certainty than the data supports.</p>
+            </section>
+        </div>
+
+        <section class="card" style="margin-top:16px">
+            <h2>Requests in @Model.Data.Parish</h2>
+            @if (Model.Data.Requests.Count == 0)
+            {
+                <p class="muted">No requests are currently mapped to this parish.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Reference</th><th>Organization</th><th>Status</th><th>Community / location</th><th>Precision</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (ManagementRequestRow request in Model.Data.Requests)
+                        {
+                            <tr>
+                                <td><strong>@request.PublicReference</strong></td>
+                                <td>@request.OrganizationName</td>
+                                <td>@request.ManagementStatus</td>
+                                <td>@(request.Community ?? request.Location ?? "—")</td>
+                                <td>@(request.Precision ?? "Unresolved")</td>
+                                <td><a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.Id">Open</a></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</section>
