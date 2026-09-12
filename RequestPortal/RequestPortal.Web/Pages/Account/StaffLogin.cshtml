@@ -7,45 +7,9 @@
 <div class="login-shell">
     <section class="login-intro">
         <div class="eyebrow">FFP internal staff</div>
-        <h1>Internal review access.</h1>
-        <p>
-            FFP staff authenticate with their FFP Active Directory credentials. Directory authentication confirms
-            identity; Common.Security maps FFP Active Directory groups to Request Portal roles and permissions.
-        </p>
-        <p class="muted">Use your normal network username, for example <strong>FWright</strong>. Do not enter FFTPJ\FWright.</p>
+        <h1>Redirecting to FFP Staff Authentication.</h1>
+        <p>Request Portal never asks for or receives your FFP Active Directory password.</p>
+        <p class="muted">Use your normal FFP username at the staff authentication service, for example <strong>FWright</strong>.</p>
         <a class="button button-secondary" asp-page="/Account/Login">Representative sign in</a>
-    </section>
-    <section class="login-panel">
-        <h2>FFP staff sign in</h2>
-        <p class="muted">Credentials are validated against FFP Active Directory and are never stored by the portal.</p>
-
-        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-        {
-            <div class="flash error">@Model.ErrorMessage</div>
-        }
-
-        <form method="post" class="form-grid">
-            <div asp-validation-summary="ModelOnly" class="validation"></div>
-            <div class="field">
-                <label asp-for="Input.UserName">FFP network username</label>
-                <input asp-for="Input.UserName" autocomplete="username" autofocus placeholder="FWright" />
-                <span asp-validation-for="Input.UserName" class="validation"></span>
-            </div>
-            <div class="field">
-                <label asp-for="Input.Password"></label>
-                <input asp-for="Input.Password" autocomplete="current-password" />
-                <span asp-validation-for="Input.Password" class="validation"></span>
-            </div>
-            <button type="submit" class="button">Sign in with FFP Active Directory</button>
-        </form>
-
-        @if (Model.DemoEnabled)
-        {
-            <div class="divider">Demo only</div>
-            <form method="post" asp-page-handler="Demo">
-                <button type="submit" class="button button-outline" style="width:100%">Sign in as demo FFP reviewer</button>
-            </form>
-            <p class="muted" style="font-size:.85rem">This bypass exists only when Demo:Enabled is true and must be disabled in production.</p>
-        }
     </section>
 </div>
