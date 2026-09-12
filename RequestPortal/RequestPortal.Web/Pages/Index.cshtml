@@ -4,25 +4,144 @@
     ViewData["Title"] = "Relief Portal";
 }
 
-<div class="startup-splash" data-startup-splash aria-hidden="true"></div>
+<div class="startup-splash" data-startup-splash aria-hidden="true">
+    <div class="startup-splash-image" data-startup-splash-image></div>
+    <div class="startup-splash-fog"></div>
+    <div class="startup-splash-vignette"></div>
+    <div class="startup-splash-content">
+        <img class="startup-splash-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor" />
+        <div class="startup-splash-kicker" data-startup-splash-kicker>Disaster Relief</div>
+        <h1 data-startup-splash-title>Standing with Jamaica</h1>
+        <p data-startup-splash-text>Responding today. Rebuilding tomorrow. Together we bring hope.</p>
+        <div class="startup-splash-scripture">“As often as you did it for one of the least of my brothers and sisters, you did it for me.”</div>
+        <div class="startup-splash-scripture-ref">Matthew 25:40</div>
+        <div class="startup-splash-progress" aria-hidden="true"><span></span></div>
+        <div class="startup-splash-tagline">A brighter tomorrow is possible</div>
+    </div>
+</div>
 <style>
     .startup-splash {
         position: fixed;
         inset: 0;
         z-index: 9999;
-        background: #10263f center / cover no-repeat;
+        overflow: hidden;
+        background: #071421;
+        color: #fff;
         opacity: 1;
-        transition: opacity .7s ease;
+        transition: opacity .85s ease;
     }
-    .startup-splash.is-hidden {
-        opacity: 0;
-        pointer-events: none;
+    .startup-splash.is-hidden { opacity: 0; pointer-events: none; }
+    .startup-splash.is-removed { display: none; }
+    .startup-splash-image {
+        position: absolute;
+        inset: -2%;
+        background-position: center;
+        background-size: cover;
+        transform: scale(1.04);
+        filter: brightness(.45) saturate(.76) contrast(1.08) sepia(.08) hue-rotate(170deg);
     }
-    .startup-splash.is-removed {
-        display: none;
+    .startup-splash-fog {
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 78% 38%, rgba(244,156,52,.18), transparent 25%),
+            linear-gradient(180deg, rgba(5,14,24,.48), rgba(8,18,29,.78)),
+            linear-gradient(90deg, rgba(7,17,28,.84) 0%, rgba(14,28,41,.52) 48%, rgba(8,18,30,.72) 100%);
+        backdrop-filter: blur(1.5px);
+    }
+    .startup-splash-vignette {
+        position: absolute;
+        inset: 0;
+        box-shadow: inset 0 0 180px 70px rgba(1,7,13,.72);
+        background: linear-gradient(0deg, rgba(5,13,22,.78) 0%, transparent 38%);
+    }
+    .startup-splash-content {
+        position: relative;
+        z-index: 2;
+        width: min(760px, calc(100% - 48px));
+        margin: 0 auto;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 48px 0;
+        text-shadow: 0 3px 18px rgba(0,0,0,.68);
+    }
+    .startup-splash-logo {
+        width: min(320px, 64vw);
+        max-height: 150px;
+        object-fit: contain;
+        margin-bottom: 28px;
+        filter: drop-shadow(0 8px 24px rgba(0,0,0,.45));
+    }
+    .startup-splash-kicker {
+        color: #f49b2f;
+        font-size: .8rem;
+        font-weight: 800;
+        letter-spacing: .18em;
+        text-transform: uppercase;
+        margin-bottom: 9px;
+    }
+    .startup-splash-content h1 {
+        margin: 0 0 12px;
+        max-width: 720px;
+        font-size: clamp(2.5rem, 6vw, 5.6rem);
+        line-height: .98;
+        letter-spacing: -.035em;
+    }
+    .startup-splash-content > p {
+        max-width: 650px;
+        margin: 0 0 30px;
+        font-size: clamp(1rem, 2vw, 1.32rem);
+        line-height: 1.55;
+        color: #e7edf2;
+    }
+    .startup-splash-scripture {
+        max-width: 620px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(1rem, 2vw, 1.25rem);
+        line-height: 1.45;
+        color: #f5f6f7;
+    }
+    .startup-splash-scripture-ref {
+        margin-top: 8px;
+        font-size: .74rem;
+        font-weight: 800;
+        letter-spacing: .22em;
+        text-transform: uppercase;
+        color: #d6dde3;
+    }
+    .startup-splash-progress {
+        width: min(300px, 66vw);
+        height: 3px;
+        margin: 42px auto 12px;
+        background: rgba(255,255,255,.3);
+        overflow: hidden;
+    }
+    .startup-splash-progress span {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #f49b2f;
+        animation: startupSplashProgress 7s linear forwards;
+    }
+    .startup-splash-tagline {
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .24em;
+        text-transform: uppercase;
+        color: #dce3e9;
+    }
+    @@keyframes startupSplashProgress { to { width: 100%; } }
+    @@media (max-width: 640px) {
+        .startup-splash-content { width: min(92vw, 560px); }
+        .startup-splash-logo { width: min(260px, 70vw); }
     }
     @@media (prefers-reduced-motion: reduce) {
         .startup-splash { transition: none; }
+        .startup-splash-progress span { animation: none; width: 100%; }
     }
 </style>
 
@@ -136,11 +255,18 @@
 
         if (showSplash) {
             const splashSlide = slides[Math.floor(Math.random() * slides.length)];
-            splash.style.backgroundImage = `url('${splashSlide[3]}')`;
+            const splashImage = splash.querySelector('[data-startup-splash-image]');
+            if (splashImage) splashImage.style.backgroundImage = `url('${splashSlide[3]}')`;
+            const splashKicker = splash.querySelector('[data-startup-splash-kicker]');
+            const splashTitle = splash.querySelector('[data-startup-splash-title]');
+            const splashText = splash.querySelector('[data-startup-splash-text]');
+            if (splashKicker) splashKicker.textContent = splashSlide[0];
+            if (splashTitle) splashTitle.textContent = splashSlide[1];
+            if (splashText) splashText.textContent = splashSlide[2];
             window.setTimeout(() => {
                 splash.classList.add('is-hidden');
-                window.setTimeout(() => splash.classList.add('is-removed'), 750);
-            }, 5000);
+                window.setTimeout(() => splash.classList.add('is-removed'), 900);
+            }, 7000);
         } else {
             splash.classList.add('is-removed');
         }
