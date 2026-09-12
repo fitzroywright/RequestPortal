@@ -1,17 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Documents;
+using RequestPortal.Application.Integration;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Web.Pages.Requests;
 
@@ -24,6 +28,8 @@ public sealed class DetailsModel : PageModel
     private readonly IProjectProposalService projectProposalService;
     private readonly IProjectPlanningService projectPlanningService;
     private readonly IRequestReferenceDataService referenceDataService;
+    private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
+    private readonly RequestPortalDbContext dbContext;
 
     public DetailsModel(
         UserManager<ApplicationUser> userManager,
@@ -32,7 +38,9 @@ public sealed class DetailsModel : PageModel
         IRequestLifecycleService lifecycleService,
         IProjectProposalService projectProposalService,
         IProjectPlanningService projectPlanningService,
-        IRequestReferenceDataService referenceDataService)
+        IRequestReferenceDataService referenceDataService,
+        IFfpManagerIntegrationService ffpManagerIntegrationService,
+        RequestPortalDbContext dbContext)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -41,16 +49,14 @@ public sealed class DetailsModel : PageModel
         this.projectProposalService = projectProposalService;
         this.projectPlanningService = projectPlanningService;
         this.referenceDataService = referenceDataService;
+        this.ffpManagerIntegrationService = ffpManagerIntegrationService;
+        this.dbContext = dbContext;
     }
 
     public new RequestDetail? Request { get; private set; }
-
     public ProjectProposalDetail? ProjectProposal { get; private set; }
-
     public ProjectPlanningDetail? ProjectPlanning { get; private set; }
-
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
-
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
 
     [BindProperty]
@@ -61,6 +67,9 @@ public sealed class DetailsModel : PageModel
 
     [BindProperty]
     public CancelInput Cancellation { get; set; } = new();
+
+    [BindProperty]
+    public InformationResponseInput InformationResponse { get; set; } = new();
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
@@ -73,16 +82,7 @@ public sealed class DetailsModel : PageModel
         ApplicationUser user = await GetUserAsync();
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
 
-        bool validUnit = false;
-        foreach (UnitOfMeasureOption unit in UnitsOfMeasure)
-        {
-            if (unit.Id == Item.UnitOfMeasureId)
-            {
-                validUnit = true;
-                break;
-            }
-        }
-
+        bool validUnit = UnitsOfMeasure.Any(unit => unit.Id == Item.UnitOfMeasureId);
         if (!validUnit)
         {
             ModelState.AddModelError(nameof(Item.UnitOfMeasureId), "Select a valid unit of measure.");
@@ -163,6 +163,54 @@ public sealed class DetailsModel : PageModel
         return RedirectToPage(new { id });
     }
 
+    public async Task<IActionResult> OnPostInformationResponseAsync(Guid id)
+    {
+        ApplicationUser user = await GetUserAsync();
+        RequestDetail? request = await workflowService.GetRequestAsync(
+            user.Id,
+            id,
+            isStaff: false,
+            HttpContext.RequestAborted);
+        if (request is null)
+        {
+            return NotFound();
+        }
+
+        if (!string.Equals(request.Status, "MoreInformationRequired", StringComparison.Ordinal))
+        {
+            TempData["Error"] = "This request is not waiting for additional information.";
+            return RedirectToPage(new { id });
+        }
+
+        if (string.IsNullOrWhiteSpace(InformationResponse.Message) && InformationResponse.DocumentIds.Count == 0)
+        {
+            ModelState.AddModelError("InformationResponse.Message", "Enter a response or select at least one supporting document.");
+            return await LoadPageAsync(user, id);
+        }
+
+        string? applicationId = await dbContext.IntegrationLinks
+            .AsNoTracking()
+            .Where(link => link.RequestId == id && link.SystemName == "FFPManager")
+            .Select(link => link.ExternalReference)
+            .SingleOrDefaultAsync(HttpContext.RequestAborted);
+        if (string.IsNullOrWhiteSpace(applicationId))
+        {
+            TempData["Error"] = "The FFP Manager application reference is not available yet.";
+            return RedirectToPage(new { id });
+        }
+
+        await ffpManagerIntegrationService.RespondToInformationRequestAsync(
+            id,
+            applicationId,
+            user.Id,
+            InformationResponse.Message,
+            InformationResponse.DocumentIds,
+            HttpContext.RequestAborted);
+
+        TempData["Success"] = "Your additional information was sent to FFP.";
+        return RedirectToPage(new { id });
+    }
+
     public async Task<IActionResult> OnPostCancelAsync(Guid id)
     {
         ApplicationUser user = await GetUserAsync();
@@ -179,15 +227,8 @@ public sealed class DetailsModel : PageModel
 
     public string UnitName(Guid unitId)
     {
-        foreach (UnitOfMeasureOption unit in UnitsOfMeasure)
-        {
-            if (unit.Id == unitId)
-            {
-                return unit.Name;
-            }
-        }
-
-        return "Unit";
+        UnitOfMeasureOption? unit = UnitsOfMeasure.FirstOrDefault(item => item.Id == unitId);
+        return unit?.Name ?? "Unit";
     }
 
     private async Task<IActionResult> LoadPageAsync(ApplicationUser user, Guid id)
@@ -253,7 +294,6 @@ public sealed class DetailsModel : PageModel
     public sealed class DocumentInput
     {
         public DocumentType DocumentType { get; set; } = DocumentType.RequestSupport;
-
         public IFormFile? File { get; set; }
     }
 
@@ -261,5 +301,13 @@ public sealed class DetailsModel : PageModel
     {
         [StringLength(1000)]
         public string Reason { get; set; } = string.Empty;
+    }
+
+    public sealed class InformationResponseInput
+    {
+        [StringLength(4000)]
+        public string Message { get; set; } = string.Empty;
+
+        public List<Guid> DocumentIds { get; set; } = new();
     }
 }
