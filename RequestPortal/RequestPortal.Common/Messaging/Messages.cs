@@ -53,6 +53,11 @@ public sealed record RequestSubmittedMessage(
     Guid RequestId,
     Guid OrganizationId) : IMessage;
 
+public sealed record FfpManagerSubmissionRequestedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid RequestId) : IMessage;
+
 public sealed record RequestStatusChangedMessage(
     Guid MessageId,
     DateTimeOffset OccurredUtc,
