@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Common.Storage;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Auditing;
@@ -85,16 +86,34 @@ public sealed class StorageBackedRequestFeaturesTests
             LocalFileStorage storage = new(root);
             RequestLocationService service = new(storage);
             Guid requestId = Guid.NewGuid();
+            const string sourceText = "Half Way Tree, St. Andrew, Jamaica";
 
             RequestLocationSnapshot saved = await service.ResolveAndSaveAsync(
                 requestId,
-                "Half Way Tree, St. Andrew, Jamaica",
-                cancellationToken);
+                sourceText,
+                latitude: null,
+                longitude: null,
+                cancellationToken)
+                ?? throw new InvalidOperationException("Location was not resolved.");
 
-            RequestLocationSnapshot? loaded = await service.GetAsync(requestId, cancellationToken);
-            Assert.NotNull(loaded);
-            Assert.Equal(saved.RequestId, loaded!.RequestId);
-            Assert.Equal(saved.LocationText, loaded.LocationText);
+            Assert.Equal(requestId, saved.RequestId);
+            Assert.Equal(sourceText, saved.SourceText);
+            Assert.Equal("St. Andrew", saved.Parish);
+            Assert.Equal("Half Way Tree", saved.Community);
+
+            string key = $"requestportal/locations/{requestId:N}/resolved-location.json";
+            StoredFile? metadata = await storage.GetMetadataAsync(key, cancellationToken);
+            Assert.NotNull(metadata);
+            Assert.Equal(StorageStatus.Stored, metadata!.Status);
+            Assert.Equal("application/json", metadata.ContentType);
+
+            await using Stream stream = await storage.OpenReadAsync(key, cancellationToken);
+            using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            JsonElement rootElement = document.RootElement;
+            Assert.Equal(requestId, rootElement.GetProperty("requestId").GetGuid());
+            Assert.Equal(sourceText, rootElement.GetProperty("sourceText").GetString());
+            Assert.Equal("St. Andrew", rootElement.GetProperty("parish").GetString());
+            Assert.Equal("Half Way Tree", rootElement.GetProperty("community").GetString());
         }
         finally
         {
@@ -124,7 +143,10 @@ public sealed class StorageBackedRequestFeaturesTests
 
     private sealed class AllowAllOrganizationAccess : IOrganizationAccessService
     {
-        public Task<bool> CanAccessOrganizationAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) =>
+        public Task<bool> IsApprovedMemberAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+
+        public Task<bool> IsAdministratorAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
     }
 
@@ -134,8 +156,9 @@ public sealed class StorageBackedRequestFeaturesTests
             Guid actorUserId,
             string action,
             string entityType,
-            string entityId,
-            string? details = null,
+            Guid entityId,
+            Guid? organizationId,
+            string? detail = null,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }
