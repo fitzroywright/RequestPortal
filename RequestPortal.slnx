@@ -1,0 +1,16 @@
+<Solution>
+  <Project Path="RequestPortal.Common/RequestPortal.Common.csproj" />
+  <Project Path="RequestPortal.Domain/RequestPortal.Domain.csproj" />
+  <Project Path="RequestPortal.Application/RequestPortal.Application.csproj" />
+  <Project Path="RequestPortal.Infrastructure/RequestPortal.Infrastructure.csproj" />
+  <Project Path="RequestPortal.Web/RequestPortal.Web.csproj" />
+  <Project Path="FfpManager.Bridge/FfpManager.Bridge.csproj" />
+  <Project Path="RequestPortal.Tests/RequestPortal.Domain.Tests/RequestPortal.Domain.Tests.csproj" />
+  <Project Path="RequestPortal.Tests/RequestPortal.Infrastructure.Tests/RequestPortal.Infrastructure.Tests.csproj" />
+  <Project Path="../Common/Common.Security/Common.Security.csproj" />
+  <Project Path="../Common/Common.Secrets/Common.Secrets.csproj" />
+  <Project Path="../Common/Common.Messaging/Common.Messaging.csproj" />
+  <Project Path="../Common/Common.Storage/Common.Storage.csproj" />
+  <Project Path="../Common/Common.Diagnostics/Common.Diagnostics.csproj" />
+  <Project Path="../Common/Common.Messaging/Common.Messaging.Hosting/Common.Messaging.Hosting.csproj" />
+</Solution>
