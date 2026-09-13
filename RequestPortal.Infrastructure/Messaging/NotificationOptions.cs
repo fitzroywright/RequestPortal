@@ -6,6 +6,10 @@ public sealed class NotificationOptions
 
     public bool Enabled { get; set; }
 
+    public bool SmsEnabled { get; set; }
+
+    public bool WhatsAppEnabled { get; set; }
+
     public string SmtpHost { get; set; } = string.Empty;
 
     public int SmtpPort { get; set; } = 587;
@@ -19,4 +23,16 @@ public sealed class NotificationOptions
     public string? UserName { get; set; }
 
     public string PasswordSecretName { get; set; } = "Notifications:SmtpPassword";
+
+    public string SmsEndpoint { get; set; } = string.Empty;
+
+    public string SmsEndpointSecretName { get; set; } = "messaging/sms/endpoint";
+
+    public string SmsApiTokenSecretName { get; set; } = "messaging/sms/api-token";
+
+    public string WhatsAppEndpoint { get; set; } = string.Empty;
+
+    public string WhatsAppEndpointSecretName { get; set; } = "messaging/whatsapp/endpoint";
+
+    public string WhatsAppApiTokenSecretName { get; set; } = "messaging/whatsapp/api-token";
 }

@@ -1,7 +1,7 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "requirements": [
     {
       "id": "database-connection",
@@ -125,6 +125,50 @@
       "required": true,
       "purpose": "Defines durable external-delivery queue storage for Common.Messaging.",
       "configurationKey": "Messaging:DurableQueuePath"
+    },
+    {
+      "id": "sms-endpoint",
+      "displayName": "Optional SMS gateway endpoint",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Commissioning value for the provider-neutral Common.Messaging SMS adapter. SMS remains disabled when Notifications:SmsEnabled is false.",
+      "secretName": "messaging/sms/endpoint",
+      "validator": "secret"
+    },
+    {
+      "id": "sms-api-token",
+      "displayName": "Optional SMS gateway API token",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Credential for the SMS gateway when SMS is commissioned.",
+      "secretName": "messaging/sms/api-token",
+      "validator": "secret"
+    },
+    {
+      "id": "whatsapp-endpoint",
+      "displayName": "Optional WhatsApp gateway endpoint",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Commissioning value for the provider-neutral Common.Messaging WhatsApp adapter. WhatsApp remains disabled when Notifications:WhatsAppEnabled is false.",
+      "secretName": "messaging/whatsapp/endpoint",
+      "validator": "secret"
+    },
+    {
+      "id": "whatsapp-api-token",
+      "displayName": "Optional WhatsApp gateway API token",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Credential for the WhatsApp gateway when WhatsApp is commissioned.",
+      "secretName": "messaging/whatsapp/api-token",
+      "validator": "secret"
+    },
+    {
+      "id": "organization-renewal-warning-days",
+      "displayName": "Organization registration renewal warning windows",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines the day thresholds used for organization registration renewal reminders and the staff re-verification queue. Request Portal defaults to 60, 30 and 7 days when this setting is omitted.",
+      "configurationKey": "Organizations:RenewalWarningDays"
     },
     {
       "id": "diagnostics-key",

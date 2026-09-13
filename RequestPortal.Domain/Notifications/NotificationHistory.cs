@@ -7,7 +7,8 @@ public enum NotificationDeliveryStatus
     Pending = 0,
     Sent = 1,
     Failed = 2,
-    Skipped = 3
+    Skipped = 3,
+    DeadLettered = 4
 }
 
 public sealed class NotificationHistory
@@ -70,6 +71,12 @@ public sealed class NotificationHistory
     {
         Status = NotificationDeliveryStatus.Failed;
         LastError = string.IsNullOrWhiteSpace(error) ? "Unknown delivery error." : error.Trim();
+    }
+
+    public void MarkDeadLettered(string error)
+    {
+        Status = NotificationDeliveryStatus.DeadLettered;
+        LastError = string.IsNullOrWhiteSpace(error) ? "Delivery attempts exhausted." : error.Trim();
     }
 
     public void MarkSkipped(string reason)

@@ -5,156 +5,45 @@
     ViewData["Title"] = "Operations";
 }
 
-<section class="section">
-    <div class="shell">
-        <div class="section-heading">
-            <div class="eyebrow" style="color:#b45b09">FFP operations</div>
-            <h1>Action & aging queues</h1>
-            <p>Work the oldest items first: organization approvals, submitted requests, requests waiting on additional information, and documents awaiting verification.</p>
-        </div>
+<section class="section"><div class="shell">
+<div class="section-heading"><div class="eyebrow" style="color:#b45b09">FFP operations</div><h1>Action & aging queues</h1><p>Work the oldest and highest-risk items first and resolve failed delivery/integration messages deliberately.</p></div>
+<div class="grid-3">
+<article class="card"><h2>@Model.Snapshot.PendingOrganizations.Count</h2><p>Organizations awaiting approval</p></article>
+<article class="card"><h2>@Model.Snapshot.ReverificationOrganizations.Count</h2><p>Registration renewals / re-verification</p></article>
+<article class="card"><h2>@Model.Snapshot.DeadLetters.Count</h2><p>Dead-letter messages</p></article>
+</div></div></section>
 
-        <div class="grid-3">
-            <article class="card">
-                <h2>@Model.Snapshot.PendingOrganizations.Count</h2>
-                <p>Organizations awaiting approval</p>
-            </article>
-            <article class="card">
-                <h2>@Model.Snapshot.OpenReviewRequests.Count</h2>
-                <p>Requests awaiting FFP review</p>
-            </article>
-            <article class="card">
-                <h2>@Model.Snapshot.DocumentsAwaitingVerification.Count</h2>
-                <p>Documents awaiting verification</p>
-            </article>
-        </div>
-    </div>
-</section>
+<section class="section section-muted"><div class="shell"><div class="section-heading"><h2>Registration renewal & re-verification</h2><p>Approved or suspended organizations inside the configured registration-renewal warning window, including already-expired registrations.</p></div>
+@if (Model.Snapshot.ReverificationOrganizations.Count == 0){<div class="card"><p>No organizations currently require registration renewal review.</p></div>}else{<div class="table-wrap"><table><thead><tr><th>Organization</th><th>Country</th><th>Status</th><th>Expiry</th><th>Timing</th><th></th></tr></thead><tbody>
+@foreach(OrganizationReverificationWorkItem item in Model.Snapshot.ReverificationOrganizations){<tr><td>@item.OrganizationName</td><td>@item.CountryCode</td><td>@item.Status</td><td>@item.ExpiryDate.ToString("yyyy-MM-dd")</td><td>@(item.DaysUntilExpiry < 0 ? $"Expired {-item.DaysUntilExpiry} day(s) ago" : $"{item.DaysUntilExpiry} day(s) remaining")</td><td><a asp-page="/Staff/Organization" asp-route-id="@item.OrganizationId">Review</a></td></tr>}
+</tbody></table></div>}</div></section>
 
-<section class="section section-muted">
-    <div class="shell">
-        <div class="section-heading">
-            <h2>Organizations awaiting approval</h2>
-        </div>
-        @if (Model.Snapshot.PendingOrganizations.Count == 0)
-        {
-            <div class="card"><p>No pending organizations.</p></div>
-        }
-        else
-        {
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Organization</th><th>Country</th><th>Registered</th><th>Age</th><th></th></tr></thead>
-                    <tbody>
-                    @foreach (PendingOrganizationWorkItem item in Model.Snapshot.PendingOrganizations)
-                    {
-                        <tr>
-                            <td>@item.OrganizationName</td>
-                            <td>@item.CountryCode</td>
-                            <td>@item.CreatedUtc.ToString("yyyy-MM-dd")</td>
-                            <td>@item.AgeDays day(s)</td>
-                            <td><a asp-page="/Staff/Organization" asp-route-id="@item.OrganizationId">Open</a></td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
-</section>
+<section class="section"><div class="shell"><div class="section-heading"><h2>Dead-letter messages</h2><p>Messages appear here only after bounded automatic retries are exhausted. Manual replay is audited and resets the retry budget.</p></div>
+@if (Model.Snapshot.DeadLetters.Count == 0){<div class="card"><p>No dead-letter messages.</p></div>}else{<div class="table-wrap"><table><thead><tr><th>Occurred</th><th>Message type</th><th>Attempts</th><th>Last error</th><th></th></tr></thead><tbody>
+@foreach(DeadLetterWorkItem item in Model.Snapshot.DeadLetters){<tr><td>@item.OccurredUtc.ToString("u")</td><td>@item.MessageType</td><td>@item.AttemptCount</td><td>@item.LastError</td><td><form method="post" asp-page-handler="ReplayDeadLetter"><input type="hidden" name="messageId" value="@item.MessageId"/><button class="button button-small" type="submit">Replay</button></form></td></tr>}
+</tbody></table></div>}</div></section>
 
-<section class="section">
-    <div class="shell">
-        <div class="section-heading">
-            <h2>Requests awaiting review</h2>
-        </div>
-        @if (Model.Snapshot.OpenReviewRequests.Count == 0)
-        {
-            <div class="card"><p>No requests are waiting for review.</p></div>
-        }
-        else
-        {
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Reference</th><th>Organization</th><th>Status</th><th>Age</th><th></th></tr></thead>
-                    <tbody>
-                    @foreach (RequestWorkItem item in Model.Snapshot.OpenReviewRequests)
-                    {
-                        <tr>
-                            <td>@item.PublicReference</td>
-                            <td>@item.OrganizationName</td>
-                            <td>@item.Status</td>
-                            <td>@item.AgeDays day(s)</td>
-                            <td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Review</a></td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
-</section>
+<section class="section section-muted"><div class="shell"><div class="section-heading"><h2>Failed notification deliveries</h2><p>Recent failed and terminal notification attempts are retained here for staff visibility. Terminal outbox messages are replayed from the dead-letter queue above.</p></div>
+@if (Model.Snapshot.FailedNotificationDeliveries.Count == 0){<div class="card"><p>No failed notification deliveries.</p></div>}else{<div class="table-wrap"><table><thead><tr><th>Created</th><th>Channel</th><th>Destination</th><th>Subject</th><th>Status</th><th>Last error</th></tr></thead><tbody>
+@foreach(NotificationDeliveryWorkItem item in Model.Snapshot.FailedNotificationDeliveries){<tr><td>@item.CreatedUtc.ToString("u")</td><td>@item.Channel</td><td>@item.Destination</td><td>@item.Subject</td><td>@item.Status</td><td>@item.LastError</td></tr>}
+</tbody></table></div>}</div></section>
 
-<section class="section section-muted">
-    <div class="shell">
-        <div class="section-heading">
-            <h2>Waiting on requester action</h2>
-            <p>These requests are in More Information Required and remain visible so FFP can follow up on aging cases.</p>
-        </div>
-        @if (Model.Snapshot.ActionRequiredRequests.Count == 0)
-        {
-            <div class="card"><p>No requests are currently waiting on additional information.</p></div>
-        }
-        else
-        {
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Reference</th><th>Organization</th><th>Status</th><th>Age</th><th></th></tr></thead>
-                    <tbody>
-                    @foreach (RequestWorkItem item in Model.Snapshot.ActionRequiredRequests)
-                    {
-                        <tr>
-                            <td>@item.PublicReference</td>
-                            <td>@item.OrganizationName</td>
-                            <td>@item.Status</td>
-                            <td>@item.AgeDays day(s)</td>
-                            <td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open</a></td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
-</section>
+<section class="section"><div class="shell"><div class="section-heading"><h2>Organizations awaiting approval</h2></div>
+@if (Model.Snapshot.PendingOrganizations.Count == 0){<div class="card"><p>No pending organizations.</p></div>}else{<div class="table-wrap"><table><thead><tr><th>Organization</th><th>Country</th><th>Registered</th><th>Age</th><th></th></tr></thead><tbody>
+@foreach(PendingOrganizationWorkItem item in Model.Snapshot.PendingOrganizations){<tr><td>@item.OrganizationName</td><td>@item.CountryCode</td><td>@item.CreatedUtc.ToString("yyyy-MM-dd")</td><td>@item.AgeDays day(s)</td><td><a asp-page="/Staff/Organization" asp-route-id="@item.OrganizationId">Open</a></td></tr>}
+</tbody></table></div>}</div></section>
 
-<section class="section">
-    <div class="shell">
-        <div class="section-heading">
-            <h2>Documents awaiting verification</h2>
-        </div>
-        @if (Model.Snapshot.DocumentsAwaitingVerification.Count == 0)
-        {
-            <div class="card"><p>No documents are waiting for verification.</p></div>
-        }
-        else
-        {
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Organization</th><th>Type</th><th>File</th><th>Age</th><th></th></tr></thead>
-                    <tbody>
-                    @foreach (DocumentWorkItem item in Model.Snapshot.DocumentsAwaitingVerification)
-                    {
-                        <tr>
-                            <td>@item.OrganizationName</td>
-                            <td>@item.DocumentType</td>
-                            <td>@item.OriginalFileName</td>
-                            <td>@item.AgeDays day(s)</td>
-                            <td><a asp-page="/Staff/Organization" asp-route-id="@item.OrganizationId">Open organization</a></td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
-</section>
+<section class="section section-muted"><div class="shell"><div class="section-heading"><h2>Requests awaiting review</h2></div>
+@if(Model.Snapshot.OpenReviewRequests.Count==0){<div class="card"><p>No requests are waiting for review.</p></div>}else{<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Organization</th><th>Status</th><th>Age</th><th></th></tr></thead><tbody>
+@foreach(RequestWorkItem item in Model.Snapshot.OpenReviewRequests){<tr><td>@item.PublicReference</td><td>@item.OrganizationName</td><td>@item.Status</td><td>@item.AgeDays day(s)</td><td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Review</a></td></tr>}
+</tbody></table></div>}</div></section>
+
+<section class="section"><div class="shell"><div class="section-heading"><h2>Waiting on requester action</h2><p>Requests in More Information Required remain visible for follow-up.</p></div>
+@if(Model.Snapshot.ActionRequiredRequests.Count==0){<div class="card"><p>No requests are currently waiting on additional information.</p></div>}else{<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Organization</th><th>Status</th><th>Age</th><th></th></tr></thead><tbody>
+@foreach(RequestWorkItem item in Model.Snapshot.ActionRequiredRequests){<tr><td>@item.PublicReference</td><td>@item.OrganizationName</td><td>@item.Status</td><td>@item.AgeDays day(s)</td><td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open</a></td></tr>}
+</tbody></table></div>}</div></section>
+
+<section class="section section-muted"><div class="shell"><div class="section-heading"><h2>Documents awaiting verification</h2></div>
+@if(Model.Snapshot.DocumentsAwaitingVerification.Count==0){<div class="card"><p>No documents are waiting for verification.</p></div>}else{<div class="table-wrap"><table><thead><tr><th>Organization</th><th>Type</th><th>File</th><th>Age</th><th></th></tr></thead><tbody>
+@foreach(DocumentWorkItem item in Model.Snapshot.DocumentsAwaitingVerification){<tr><td>@item.OrganizationName</td><td>@item.DocumentType</td><td>@item.OriginalFileName</td><td>@item.AgeDays day(s)</td><td><a asp-page="/Staff/Organization" asp-route-id="@item.OrganizationId">Open organization</a></td></tr>}
+</tbody></table></div>}</div></section>

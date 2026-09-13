@@ -5,79 +5,33 @@
 @{
     ViewData["Title"] = "Fulfilment";
 }
-
-<section class="section">
-    <div class="shell">
-        <div class="section-heading">
-            <div class="eyebrow" style="color:#b45b09">FFP internal</div>
-            <h1>Fulfilment workspace</h1>
-            <p>Route approved requests to local or FFTP US fulfilment and record completion.</p>
-        </div>
-
-        <section class="card">
-            @if (Model.Items.Count == 0)
-            {
-                <p class="muted">No approved requests are awaiting fulfilment.</p>
-            }
-            else
-            {
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr><th>Reference</th><th>Organization</th><th>Request status</th><th>Fulfilment</th><th>Action</th></tr>
-                        </thead>
-                        <tbody>
-                        @foreach (FulfilmentQueueItem item in Model.Items)
-                        {
-                            <tr>
-                                <td><strong>@item.PublicReference</strong><br /><span class="muted">@item.Summary</span></td>
-                                <td>@item.OrganizationName</td>
-                                <td><span class="status status-@item.RequestStatus">@item.RequestStatus</span></td>
-                                <td>
-                                    @if (item.FulfilmentId.HasValue)
-                                    {
-                                        <strong>@item.FulfilmentSource</strong><br />
-                                        <span class="muted">@item.FulfilmentStatus</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="muted">Not routed</span>
-                                    }
-                                </td>
-                                <td>
-                                    @if (item.RequestStatus == "Approved")
-                                    {
-                                        <div class="action-row">
-                                            <form method="post" asp-page-handler="Start">
-                                                <input type="hidden" name="requestId" value="@item.RequestId" />
-                                                <input type="hidden" name="source" value="@FulfilmentSource.LocalIcp" />
-                                                <button class="button button-small" type="submit">Route local</button>
-                                            </form>
-                                            <form method="post" asp-page-handler="Start">
-                                                <input type="hidden" name="requestId" value="@item.RequestId" />
-                                                <input type="hidden" name="source" value="@FulfilmentSource.FftpUs" />
-                                                <button class="button button-small button-outline" type="submit">Route FFTP US</button>
-                                            </form>
-                                        </div>
-                                    }
-                                    else if (item.RequestStatus == "PendingFulfilment" && item.FulfilmentId.HasValue)
-                                    {
-                                        <form method="post" asp-page-handler="Complete">
-                                            <input type="hidden" name="fulfilmentId" value="@item.FulfilmentId" />
-                                            <button class="button button-small" type="submit">Mark fulfilled</button>
-                                        </form>
-                                    }
-                                    else
-                                    {
-                                        <span class="muted">Completed</span>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </section>
-    </div>
+<section class="section"><div class="shell">
+<div class="section-heading"><div class="eyebrow" style="color:#b45b09">FFP internal</div><h1>Fulfilment workspace</h1><p>Route approved requests, record partial quantities and value, and complete only when all line quantities are satisfied.</p></div>
+@if (Model.Items.Count == 0) { <section class="card"><p class="muted">No approved requests are awaiting fulfilment.</p></section> }
+@foreach (FulfilmentQueueItem item in Model.Items)
+{
+<section class="card" style="margin-bottom:18px">
+<h2>@item.PublicReference — @item.OrganizationName</h2><p class="muted">@item.Summary</p>
+<p><span class="status status-@item.RequestStatus">@item.RequestStatus</span> @if(item.FulfilmentId.HasValue){<span> · @item.FulfilmentSource / @item.FulfilmentStatus</span>}</p>
+@if (item.RequestStatus == "Approved")
+{
+<div class="action-row">
+<form method="post" asp-page-handler="Start"><input type="hidden" name="requestId" value="@item.RequestId"/><input type="hidden" name="source" value="@FulfilmentSource.LocalIcp"/><input name="externalReference" placeholder="External reference (optional)"/><button class="button button-small" type="submit">Route local</button></form>
+<form method="post" asp-page-handler="Start"><input type="hidden" name="requestId" value="@item.RequestId"/><input type="hidden" name="source" value="@FulfilmentSource.FftpUs"/><input name="externalReference" placeholder="External reference (optional)"/><button class="button button-small button-outline" type="submit">Route FFTP US</button></form>
+</div>
+}
+else if (item.RequestStatus == "PendingFulfilment" && item.FulfilmentId.HasValue)
+{
+    IReadOnlyList<FulfilmentLineView> lines = Model.GetLines(item.RequestId);
+    @if (lines.Count > 0)
+    {
+    <div class="table-wrap"><table><thead><tr><th>Item</th><th>Requested</th><th>Fulfilled</th><th>Remaining</th><th>Value</th><th>Record progress</th></tr></thead><tbody>
+    @foreach(FulfilmentLineView line in lines){<tr><td>@line.Description</td><td>@line.RequestedQuantity</td><td>@line.FulfilledQuantity</td><td>@line.RemainingQuantity</td><td>@line.FulfilledValue</td><td>@if(line.RemainingQuantity > 0){<form method="post" asp-page-handler="Progress"><input type="hidden" name="requestId" value="@item.RequestId"/><input type="hidden" name="requestItemId" value="@line.RequestItemId"/><input name="quantity" type="number" step="0.0001" min="0.0001" max="@line.RemainingQuantity" placeholder="Qty" required/><input name="value" type="number" step="0.01" min="0" value="0" placeholder="Value"/><input name="notes" placeholder="Notes"/><button class="button button-small" type="submit">Add</button></form>}else{<span class="muted">Complete</span>}</td></tr>}
+    </tbody></table></div>
+    }
+    <div class="action-row" style="margin-top:12px"><form method="post" asp-page-handler="Complete"><input type="hidden" name="requestId" value="@item.RequestId"/><input name="notes" placeholder="Completion notes"/><button class="button button-small" type="submit">Mark fulfilled</button></form><form method="post" asp-page-handler="Cancel"><input type="hidden" name="requestId" value="@item.RequestId"/><input name="reason" placeholder="Cancellation reason" required/><button class="button button-small button-outline" type="submit">Cancel fulfilment</button></form></div>
+}
+else { <span class="muted">Completed</span> }
 </section>
+}
+</div></section>

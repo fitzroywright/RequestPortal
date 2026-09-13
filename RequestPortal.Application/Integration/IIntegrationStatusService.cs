@@ -20,16 +20,11 @@ public sealed record IntegrationStatusSummary(
 
 public interface IIntegrationStatusService
 {
-    Task<Guid> EnsureLinkAsync(
-        Guid requestId,
-        string systemName,
-        CancellationToken cancellationToken = default);
-
+    Task<Guid> EnsureLinkAsync(Guid requestId, string systemName, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<IntegrationStatusSummary>> GetAllAsync(CancellationToken cancellationToken = default);
-
     Task MarkPendingAsync(Guid linkId, CancellationToken cancellationToken = default);
-
     Task MarkSynchronizedAsync(Guid linkId, string externalReference, CancellationToken cancellationToken = default);
-
     Task MarkFailedAsync(Guid linkId, string error, CancellationToken cancellationToken = default);
+    Task RetryAsync(Guid staffUserId, Guid linkId, CancellationToken cancellationToken = default);
+    Task ReconcileAsync(Guid staffUserId, Guid linkId, CancellationToken cancellationToken = default);
 }

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Common.Storage;
@@ -10,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Security;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Organizations;
@@ -99,6 +103,33 @@ public sealed class DocumentService : IDocumentService
     {
         StoredDocument document = await dbContext.Documents.SingleAsync(item => item.Id == documentId, cancellationToken);
         document.Verify(staffUserId, clock.UtcNow, notes);
+
+        if (document.OwnerType == DocumentOwnerType.Organization &&
+            document.DocumentType == DocumentType.OrganizationRegistrationCertificate)
+        {
+            Guid messageId = CreateDeterministicGuid(document.Id, "OrganizationRegistrationVerified");
+            bool alreadyQueued = await dbContext.OutboxMessages
+                .AsNoTracking()
+                .AnyAsync(message => message.Id == messageId, cancellationToken);
+            if (!alreadyQueued)
+            {
+                OrganizationRegistrationVerifiedMessage message = new(
+                    messageId,
+                    clock.UtcNow,
+                    document.OrganizationId,
+                    document.Id);
+                dbContext.OutboxMessages.Add(new OutboxMessage
+                {
+                    Id = message.MessageId,
+                    MessageType = typeof(OrganizationRegistrationVerifiedMessage).FullName
+                        ?? nameof(OrganizationRegistrationVerifiedMessage),
+                    Payload = JsonSerializer.Serialize(message),
+                    OccurredUtc = message.OccurredUtc,
+                    AttemptCount = 0
+                });
+            }
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         await AuditAsync(staffUserId, "DocumentVerified", documentId, document.OrganizationId, notes, cancellationToken);
     }
@@ -189,5 +220,13 @@ public sealed class DocumentService : IDocumentService
     {
         bool allowed = await organizationAccessService.IsApprovedMemberAsync(userId, organizationId, cancellationToken);
         if (!allowed) throw new UnauthorizedAccessException("The current user cannot access documents for this organization.");
+    }
+
+    private static Guid CreateDeterministicGuid(Guid id, string purpose)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{id:D}|{purpose}"));
+        Span<byte> guidBytes = stackalloc byte[16];
+        hash.AsSpan(0, 16).CopyTo(guidBytes);
+        return new Guid(guidBytes);
     }
 }

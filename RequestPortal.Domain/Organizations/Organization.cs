@@ -66,6 +66,24 @@ public sealed class Organization
 
     public IReadOnlyCollection<OrganizationMembership> Memberships => memberships.AsReadOnly();
 
+    public bool IsRegistrationExpired(DateOnly asOfDate)
+    {
+        return RegistrationExpiryDate.HasValue && RegistrationExpiryDate.Value < asOfDate;
+    }
+
+    public void EnsureEligibleForSubmission(DateOnly asOfDate)
+    {
+        if (Status != OrganizationStatus.Approved)
+        {
+            throw new InvalidOperationException("Only approved organizations can submit requests.");
+        }
+
+        if (IsRegistrationExpired(asOfDate))
+        {
+            throw new InvalidOperationException("The organization's registration has expired and must be re-verified before new requests can be submitted.");
+        }
+    }
+
     public void UpdateProfile(
         string? registrationNumber,
         string? organizationType,

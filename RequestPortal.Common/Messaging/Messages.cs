@@ -17,11 +17,19 @@ public interface IMessagePublisher
         where TMessage : IMessage;
 }
 
+public enum NotificationTransport
+{
+    Email = 0,
+    Sms = 1,
+    WhatsApp = 2
+}
+
 public sealed record NotificationEnvelope(
     string Recipient,
     string Subject,
     string Body,
-    bool IsHtml = false);
+    bool IsHtml = false,
+    NotificationTransport Transport = NotificationTransport.Email);
 
 public interface INotificationSender
 {
@@ -32,6 +40,19 @@ public sealed record OrganizationApprovedMessage(
     Guid MessageId,
     DateTimeOffset OccurredUtc,
     Guid OrganizationId) : IMessage;
+
+public sealed record OrganizationRegistrationReminderMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid OrganizationId,
+    DateOnly ExpiryDate,
+    string ReminderKind) : IMessage;
+
+public sealed record OrganizationRegistrationVerifiedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid OrganizationId,
+    Guid DocumentId) : IMessage;
 
 public sealed record MembershipRequestedMessage(
     Guid MessageId,

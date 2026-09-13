@@ -4,8 +4,9 @@
 @using RequestPortal.Domain.Notifications
 @{
     ViewData["Title"] = "Notifications";
-
     NotificationPreferenceView? email = Model.FindPreference(NotificationChannel.Email);
+    NotificationPreferenceView? sms = Model.FindPreference(NotificationChannel.Sms);
+    NotificationPreferenceView? whatsapp = Model.FindPreference(NotificationChannel.WhatsApp);
 }
 
 <section class="section">
@@ -18,32 +19,65 @@
 
         <div asp-validation-summary="ModelOnly" class="validation"></div>
 
-        <div class="grid-2">
+        <div class="grid-3">
             <article class="card">
                 <h2>Email</h2>
-                <p class="muted">Email is the active notification channel in the current demo.</p>
-                <form method="post" asp-page-handler="Save">
-                    <input type="hidden" name="Input.Channel" value="Email" />
-                    <label for="emailDestination">Email address</label>
-                    <input id="emailDestination" name="Input.Destination" value="@(email?.Destination ?? Model.DefaultEmail)" maxlength="500" required />
-                    <label class="check-row">
-                        <input type="checkbox" name="Input.Enabled" value="true" @(email?.Enabled != false ? "checked" : null) />
-                        <span>Send email notifications</span>
-                    </label>
-                    <button class="button button-small" type="submit">Save email preference</button>
-                </form>
-            </article>
-
-            <article class="card">
-                <h2>Other channels</h2>
-                @if (Model.DemoMode)
+                @if (Model.EmailAvailable)
                 {
-                    <p>SMS and WhatsApp are intentionally not exposed as working controls in this demo.</p>
-                    <p class="muted">The domain supports those channels, but they will only be enabled when a real delivery provider is configured and verified.</p>
+                    <p class="muted">Email delivery is commissioned in this environment.</p>
+                    <form method="post" asp-page-handler="Save">
+                        <input type="hidden" name="Input.Channel" value="Email" />
+                        <label for="emailDestination">Email address</label>
+                        <input id="emailDestination" name="Input.Destination" value="@(email?.Destination ?? Model.DefaultEmail)" maxlength="500" required />
+                        <label class="check-row">
+                            <input type="checkbox" name="Input.Enabled" value="true" @(email?.Enabled != false ? "checked" : null) />
+                            <span>Send email notifications</span>
+                        </label>
+                        <button class="button button-small" type="submit">Save email preference</button>
+                    </form>
                 }
                 else
                 {
-                    <p class="muted">Additional notification channels can be enabled when their delivery providers are configured.</p>
+                    <p><strong>Not commissioned</strong></p>
+                    <p class="muted">Email delivery is unavailable in this environment.</p>
+                }
+            </article>
+
+            <article class="card">
+                <h2>SMS</h2>
+                @if (Model.SmsAvailable)
+                {
+                    <form method="post" asp-page-handler="Save">
+                        <input type="hidden" name="Input.Channel" value="Sms" />
+                        <label for="smsDestination">Mobile number</label>
+                        <input id="smsDestination" name="Input.Destination" value="@(sms?.Destination ?? string.Empty)" maxlength="500" required />
+                        <label class="check-row"><input type="checkbox" name="Input.Enabled" value="true" @(sms?.Enabled == true ? "checked" : null) /><span>Send SMS notifications</span></label>
+                        <button class="button button-small" type="submit">Save SMS preference</button>
+                    </form>
+                }
+                else
+                {
+                    <p><strong>Not commissioned</strong></p>
+                    <p class="muted">SMS will remain unavailable until a real delivery provider is configured, secured and verified.</p>
+                }
+            </article>
+
+            <article class="card">
+                <h2>WhatsApp</h2>
+                @if (Model.WhatsAppAvailable)
+                {
+                    <form method="post" asp-page-handler="Save">
+                        <input type="hidden" name="Input.Channel" value="WhatsApp" />
+                        <label for="whatsappDestination">WhatsApp number</label>
+                        <input id="whatsappDestination" name="Input.Destination" value="@(whatsapp?.Destination ?? string.Empty)" maxlength="500" required />
+                        <label class="check-row"><input type="checkbox" name="Input.Enabled" value="true" @(whatsapp?.Enabled == true ? "checked" : null) /><span>Send WhatsApp notifications</span></label>
+                        <button class="button button-small" type="submit">Save WhatsApp preference</button>
+                    </form>
+                }
+                else
+                {
+                    <p><strong>Not commissioned</strong></p>
+                    <p class="muted">WhatsApp will remain unavailable until a real provider is commissioned and verified.</p>
                 }
             </article>
         </div>
@@ -54,38 +88,22 @@
     <div class="shell">
         <div class="section-heading">
             <h2>Recent notification history</h2>
-            <p>This history shows what the portal attempted to send and whether delivery succeeded or was intentionally skipped.</p>
+            <p>This history shows what the portal attempted to send and whether delivery succeeded, failed, dead-lettered or was intentionally skipped.</p>
         </div>
 
         @if (Model.History.Count == 0)
         {
-            <div class="card">
-                <p>No notifications have been recorded for your account yet.</p>
-            </div>
+            <div class="card"><p>No notifications have been recorded for your account yet.</p></div>
         }
         else
         {
             <div class="table-wrap">
                 <table>
-                    <thead>
-                        <tr>
-                            <th>Created</th>
-                            <th>Channel</th>
-                            <th>Subject</th>
-                            <th>Status</th>
-                            <th>Destination</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Created</th><th>Channel</th><th>Subject</th><th>Status</th><th>Destination</th></tr></thead>
                     <tbody>
                     @foreach (NotificationHistoryView item in Model.History)
                     {
-                        <tr>
-                            <td>@item.CreatedUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</td>
-                            <td>@item.Channel</td>
-                            <td>@item.Subject</td>
-                            <td>@item.Status</td>
-                            <td>@item.Destination</td>
-                        </tr>
+                        <tr><td>@item.CreatedUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</td><td>@item.Channel</td><td>@item.Subject</td><td>@item.Status</td><td>@item.Destination</td></tr>
                     }
                     </tbody>
                 </table>

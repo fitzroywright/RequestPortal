@@ -4,6 +4,8 @@
 @using RequestPortal.Domain.Requests
 @{
     ViewData["Title"] = "Request Reports";
+    string? fromDateRoute = Model.FromDate?.ToString("yyyy-MM-dd");
+    string? toDateRoute = Model.ToDate?.ToString("yyyy-MM-dd");
 }
 
 <section class="section">
@@ -19,7 +21,7 @@
                 <div class="grid-3">
                     <div class="field">
                         <label asp-for="Search">Search</label>
-                        <input asp-for="Search" placeholder="Reference or request summary" />
+                        <input asp-for="Search" placeholder="Reference, organization or request summary" />
                     </div>
                     <div class="field">
                         <label asp-for="Status">Status</label>
@@ -81,17 +83,38 @@
             <div class="action-row" style="justify-content:space-between;align-items:center">
                 <div>
                     <h2>Results</h2>
-                    <p class="muted">Up to 1,000 matching requests are shown in the demo report.</p>
+                    <p class="muted">Page @Model.Report.Page of @Model.Report.TotalPages. @Model.Report.Total matching requests.</p>
                 </div>
-                <a class="button button-secondary"
-                   asp-page-handler="Export"
-                   asp-route-Search="@Model.Search"
-                   asp-route-Status="@Model.Status"
-                   asp-route-CountryCode="@Model.CountryCode"
-                   asp-route-Category="@Model.Category"
-                   asp-route-Priority="@Model.Priority"
-                   asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
-                   asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Export CSV</a>
+                <div class="action-row">
+                    <a class="button button-outline"
+                       asp-page-handler="Export"
+                       asp-route-Search="@Model.Search"
+                       asp-route-Status="@Model.Status"
+                       asp-route-CountryCode="@Model.CountryCode"
+                       asp-route-Category="@Model.Category"
+                       asp-route-Priority="@Model.Priority"
+                       asp-route-FromDate="@fromDateRoute"
+                       asp-route-ToDate="@toDateRoute">Export CSV</a>
+                    <a class="button button-secondary"
+                       asp-page-handler="ExportXlsx"
+                       asp-route-Search="@Model.Search"
+                       asp-route-Status="@Model.Status"
+                       asp-route-CountryCode="@Model.CountryCode"
+                       asp-route-Category="@Model.Category"
+                       asp-route-Priority="@Model.Priority"
+                       asp-route-FromDate="@fromDateRoute"
+                       asp-route-ToDate="@toDateRoute">Export Excel</a>
+                    <a class="button button-secondary"
+                       asp-page-handler="Print"
+                       target="_blank"
+                       asp-route-Search="@Model.Search"
+                       asp-route-Status="@Model.Status"
+                       asp-route-CountryCode="@Model.CountryCode"
+                       asp-route-Category="@Model.Category"
+                       asp-route-Priority="@Model.Priority"
+                       asp-route-FromDate="@fromDateRoute"
+                       asp-route-ToDate="@toDateRoute">Print / Save PDF</a>
+                </div>
             </div>
 
             @if (Model.Report.Rows.Count == 0)
@@ -133,6 +156,41 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if (Model.Report.TotalPages > 1)
+                {
+                    <div class="action-row" style="justify-content:space-between;margin-top:14px">
+                        @if (Model.Report.Page > 1)
+                        {
+                            <a class="button button-outline"
+                               asp-route-PageNumber="@(Model.Report.Page - 1)"
+                               asp-route-Search="@Model.Search"
+                               asp-route-Status="@Model.Status"
+                               asp-route-CountryCode="@Model.CountryCode"
+                               asp-route-Category="@Model.Category"
+                               asp-route-Priority="@Model.Priority"
+                               asp-route-FromDate="@fromDateRoute"
+                               asp-route-ToDate="@toDateRoute">Previous</a>
+                        }
+                        else
+                        {
+                            <span></span>
+                        }
+
+                        @if (Model.Report.Page < Model.Report.TotalPages)
+                        {
+                            <a class="button button-outline"
+                               asp-route-PageNumber="@(Model.Report.Page + 1)"
+                               asp-route-Search="@Model.Search"
+                               asp-route-Status="@Model.Status"
+                               asp-route-CountryCode="@Model.CountryCode"
+                               asp-route-Category="@Model.Category"
+                               asp-route-Priority="@Model.Priority"
+                               asp-route-FromDate="@fromDateRoute"
+                               asp-route-ToDate="@toDateRoute">Next</a>
+                        }
+                    </div>
+                }
             }
         </section>
     </div>
