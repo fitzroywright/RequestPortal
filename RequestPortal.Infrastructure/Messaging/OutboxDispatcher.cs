@@ -193,7 +193,7 @@ public sealed class OutboxDispatcher
     private async Task SendOrganizationApprovedAsync(OrganizationApprovedMessage message, CancellationToken cancellationToken)
     {
         Organization organization = await dbContext.Organizations.AsNoTracking().SingleAsync(item => item.Id == message.OrganizationId, cancellationToken);
-        await DeliverMandatoryEmailAsync(
+        await DeliverMandatoryNotificationsAsync(
             organization.RegisteredByUserId,
             organization.Id,
             null,
@@ -218,7 +218,7 @@ public sealed class OutboxDispatcher
             body = $"The registration on file for {organization.Name} expires on {message.ExpiryDate:yyyy-MM-dd}. Please upload current registration evidence before the expiry date to avoid interruption to new request submissions.";
         }
 
-        await DeliverMandatoryEmailAsync(
+        await DeliverMandatoryNotificationsAsync(
             organization.RegisteredByUserId,
             organization.Id,
             null,
@@ -230,7 +230,7 @@ public sealed class OutboxDispatcher
     private async Task SendOrganizationRegistrationVerifiedAsync(OrganizationRegistrationVerifiedMessage message, CancellationToken cancellationToken)
     {
         Organization organization = await dbContext.Organizations.AsNoTracking().SingleAsync(item => item.Id == message.OrganizationId, cancellationToken);
-        await DeliverMandatoryEmailAsync(
+        await DeliverMandatoryNotificationsAsync(
             organization.RegisteredByUserId,
             organization.Id,
             null,
@@ -247,14 +247,14 @@ public sealed class OutboxDispatcher
             .Select(membership => membership.UserId).Distinct().ToListAsync(cancellationToken);
         foreach (Guid administratorUserId in administratorUserIds)
         {
-            await DeliverMandatoryEmailAsync(administratorUserId, message.OrganizationId, null, $"Representative approval required: {organizationName}", $"A representative has requested access to {organizationName}. Sign in to Request Portal to approve or reject the membership request.", cancellationToken);
+            await DeliverMandatoryNotificationsAsync(administratorUserId, message.OrganizationId, null, $"Representative approval required: {organizationName}", $"A representative has requested access to {organizationName}. Sign in to Request Portal to approve or reject the membership request.", cancellationToken);
         }
     }
 
     private async Task SendMembershipApprovedAsync(MembershipApprovedMessage message, CancellationToken cancellationToken)
     {
         string organizationName = await dbContext.Organizations.AsNoTracking().Where(item => item.Id == message.OrganizationId).Select(item => item.Name).SingleAsync(cancellationToken);
-        await DeliverMandatoryEmailAsync(message.UserId, message.OrganizationId, null, $"Membership approved: {organizationName}", $"Your representative membership for {organizationName} has been approved.", cancellationToken);
+        await DeliverMandatoryNotificationsAsync(message.UserId, message.OrganizationId, null, $"Membership approved: {organizationName}", $"Your representative membership for {organizationName} has been approved.", cancellationToken);
     }
 
     private async Task SendRequestSubmittedAsync(RequestSubmittedMessage message, CancellationToken cancellationToken)
@@ -262,7 +262,7 @@ public sealed class OutboxDispatcher
         var request = await dbContext.AssistanceRequests.AsNoTracking().Where(item => item.Id == message.RequestId)
             .Select(item => new { item.PublicReference, item.SubmittedByUserId, item.CreatedByUserId, item.OrganizationId }).SingleAsync(cancellationToken);
         Guid recipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
-        await DeliverMandatoryEmailAsync(recipientUserId, request.OrganizationId, message.RequestId, $"Request submitted: {request.PublicReference}", $"Your request {request.PublicReference} has been submitted to FFP for review.", cancellationToken);
+        await DeliverMandatoryNotificationsAsync(recipientUserId, request.OrganizationId, message.RequestId, $"Request submitted: {request.PublicReference}", $"Your request {request.PublicReference} has been submitted to FFP for review.", cancellationToken);
     }
 
     private async Task SendRequestStatusChangedAsync(RequestStatusChangedMessage message, CancellationToken cancellationToken)
@@ -272,7 +272,7 @@ public sealed class OutboxDispatcher
         string? reason = request.StatusHistory.OrderByDescending(item => item.ChangedUtc).Select(item => item.Reason).FirstOrDefault();
         string body = $"Request {request.PublicReference} is now {request.Status}.";
         if (!string.IsNullOrWhiteSpace(reason)) body += $"\n\n{reason}";
-        await DeliverMandatoryEmailAsync(recipientUserId, request.OrganizationId, request.Id, $"Request status: {request.PublicReference}", body, cancellationToken);
+        await DeliverMandatoryNotificationsAsync(recipientUserId, request.OrganizationId, request.Id, $"Request status: {request.PublicReference}", body, cancellationToken);
     }
 
     private async Task SendFfpManagerInformationRequestedAsync(FfpManagerInformationRequestedMessage message, CancellationToken cancellationToken)
@@ -282,10 +282,10 @@ public sealed class OutboxDispatcher
         string body = $"FFP needs additional information for request {request.PublicReference}.\n\n{message.Message}";
         if (message.DueUtc.HasValue) body += $"\n\nPlease respond by {message.DueUtc.Value:yyyy-MM-dd}.";
         body += "\n\nSign in to Request Portal to provide the requested information and supporting documents.";
-        await DeliverMandatoryEmailAsync(recipientUserId, request.OrganizationId, request.Id, $"Information required: {request.PublicReference}", body, cancellationToken);
+        await DeliverMandatoryNotificationsAsync(recipientUserId, request.OrganizationId, request.Id, $"Information required: {request.PublicReference}", body, cancellationToken);
     }
 
-    private Task DeliverMandatoryEmailAsync(
+    private async Task DeliverMandatoryNotificationsAsync(
         Guid userId,
         Guid? organizationId,
         Guid? requestId,
@@ -293,7 +293,7 @@ public sealed class OutboxDispatcher
         string body,
         CancellationToken cancellationToken)
     {
-        return DeliverEmailAsync(
+        await DeliverEmailAsync(
             userId,
             organizationId,
             requestId,
@@ -301,6 +301,77 @@ public sealed class OutboxDispatcher
             body,
             mandatory: true,
             cancellationToken: cancellationToken);
+
+        await DeliverSupplementalChannelAsync(
+            userId,
+            organizationId,
+            requestId,
+            NotificationChannel.WhatsApp,
+            NotificationTransport.WhatsApp,
+            notificationOptions.WhatsAppEnabled,
+            subject,
+            body,
+            cancellationToken);
+
+        await DeliverSupplementalChannelAsync(
+            userId,
+            organizationId,
+            requestId,
+            NotificationChannel.Sms,
+            NotificationTransport.Sms,
+            notificationOptions.SmsEnabled,
+            subject,
+            BuildSmsBody(subject, body),
+            cancellationToken);
+    }
+
+    private async Task DeliverSupplementalChannelAsync(
+        Guid userId,
+        Guid? organizationId,
+        Guid? requestId,
+        NotificationChannel channel,
+        NotificationTransport transport,
+        bool commissioned,
+        string subject,
+        string body,
+        CancellationToken cancellationToken)
+    {
+        if (!commissioned)
+        {
+            return;
+        }
+
+        NotificationPreference? preference = await dbContext.NotificationPreferences
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.UserId == userId && item.Channel == channel, cancellationToken);
+        if (preference is null || !preference.Enabled || string.IsNullOrWhiteSpace(preference.Destination))
+        {
+            return;
+        }
+
+        NotificationHistory history = new(
+            Guid.NewGuid(),
+            userId,
+            organizationId,
+            requestId,
+            channel,
+            preference.Destination,
+            subject,
+            DateTimeOffset.UtcNow);
+        dbContext.NotificationHistory.Add(history);
+
+        try
+        {
+            await notificationSender.SendAsync(
+                new NotificationEnvelope(preference.Destination, subject, body, false, transport),
+                cancellationToken);
+            history.MarkSent(DateTimeOffset.UtcNow);
+        }
+        catch (Exception exception)
+        {
+            history.MarkFailed(exception.Message);
+            throw;
+        }
     }
 
     private async Task DeliverEmailAsync(
@@ -344,6 +415,18 @@ public sealed class OutboxDispatcher
             history.MarkFailed(exception.Message);
             throw;
         }
+    }
+
+    private static string BuildSmsBody(string subject, string body)
+    {
+        string compact = $"{subject}. {body}".Replace("\r", " ").Replace("\n", " ");
+        while (compact.Contains("  ", StringComparison.Ordinal))
+        {
+            compact = compact.Replace("  ", " ", StringComparison.Ordinal);
+        }
+
+        const int maxLength = 480;
+        return compact.Length <= maxLength ? compact : compact[..(maxLength - 3)] + "...";
     }
 
     private static bool IsDue(OutboxMessage message, DateTimeOffset now)
