@@ -124,7 +124,10 @@ public sealed class StorageBackedRequestFeaturesTests
 
     private sealed class AllowAllOrganizationAccess : IOrganizationAccessService
     {
-        public Task<bool> CanAccessOrganizationAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) =>
+        public Task<bool> IsApprovedMemberAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+
+        public Task<bool> IsAdministratorAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
     }
 
@@ -134,8 +137,9 @@ public sealed class StorageBackedRequestFeaturesTests
             Guid actorUserId,
             string action,
             string entityType,
-            string entityId,
-            string? details = null,
+            Guid entityId,
+            Guid? organizationId,
+            string? detail = null,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }
