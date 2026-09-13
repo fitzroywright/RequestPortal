@@ -43,4 +43,31 @@ public sealed class OrganizationGovernanceTests
         organization.DemoteAdministrator(first.Id);
         Assert.Equal(OrganizationRole.Member, first.Role);
     }
+
+    [Fact]
+    public void ExpiredRegistrationCannotSubmitNewRequest()
+    {
+        Guid userId = Guid.NewGuid();
+        Organization organization = new(Guid.NewGuid(), "Expired Organization", "JM", userId, DateTimeOffset.UtcNow);
+        organization.RequestMembership(Guid.NewGuid(), userId, DateTimeOffset.UtcNow);
+        organization.UpdateProfile("REG-1", null, null, null, null, null, new DateOnly(2026, 9, 1));
+        organization.Approve(Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => organization.EnsureEligibleForSubmission(new DateOnly(2026, 9, 12)));
+
+        Assert.Contains("expired", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CurrentApprovedRegistrationCanSubmitNewRequest()
+    {
+        Guid userId = Guid.NewGuid();
+        Organization organization = new(Guid.NewGuid(), "Current Organization", "JM", userId, DateTimeOffset.UtcNow);
+        organization.RequestMembership(Guid.NewGuid(), userId, DateTimeOffset.UtcNow);
+        organization.UpdateProfile("REG-2", null, null, null, null, null, new DateOnly(2027, 9, 1));
+        organization.Approve(Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        organization.EnsureEligibleForSubmission(new DateOnly(2026, 9, 12));
+    }
 }
