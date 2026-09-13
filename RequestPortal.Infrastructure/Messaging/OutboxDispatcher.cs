@@ -60,6 +60,11 @@ public sealed class OutboxDispatcher
         int processed = 0;
         foreach (OutboxMessage message in messages)
         {
+            HashSet<Guid> failedHistoryBeforeDispatch = dbContext.NotificationHistory.Local
+                .Where(item => item.Status == NotificationDeliveryStatus.Failed)
+                .Select(item => item.Id)
+                .ToHashSet();
+
             try
             {
                 await DispatchAsync(message, cancellationToken);
@@ -75,7 +80,9 @@ public sealed class OutboxDispatcher
                 if (exhausted)
                 {
                     message.LastError = $"DEAD LETTER: {exception.Message}";
-                    foreach (NotificationHistory history in dbContext.NotificationHistory.Local.Where(item => item.Status == NotificationDeliveryStatus.Failed))
+                    foreach (NotificationHistory history in dbContext.NotificationHistory.Local.Where(item =>
+                        item.Status == NotificationDeliveryStatus.Failed &&
+                        !failedHistoryBeforeDispatch.Contains(item.Id)))
                     {
                         history.MarkDeadLettered(exception.Message);
                     }
@@ -286,7 +293,14 @@ public sealed class OutboxDispatcher
         string body,
         CancellationToken cancellationToken)
     {
-        return DeliverEmailAsync(userId, organizationId, requestId, subject, body, mandatory: true, cancellationToken);
+        return DeliverEmailAsync(
+            userId,
+            organizationId,
+            requestId,
+            subject,
+            body,
+            mandatory: true,
+            cancellationToken: cancellationToken);
     }
 
     private async Task DeliverEmailAsync(
