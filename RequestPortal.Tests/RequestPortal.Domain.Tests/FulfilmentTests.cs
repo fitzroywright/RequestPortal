@@ -1,5 +1,6 @@
 using System;
 using RequestPortal.Domain.Fulfilment;
+using FulfilmentEntity = RequestPortal.Domain.Fulfilment.Fulfilment;
 using Xunit;
 
 namespace RequestPortal.Domain.Tests;
@@ -9,7 +10,7 @@ public sealed class FulfilmentTests
     [Fact]
     public void StartIsIdempotentForSameReference()
     {
-        Fulfilment fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
+        FulfilmentEntity fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
         fulfilment.MarkInProgress("ICP-123");
         fulfilment.MarkInProgress("ICP-123");
         Assert.Equal(FulfilmentStatus.InProgress, fulfilment.Status);
@@ -19,7 +20,7 @@ public sealed class FulfilmentTests
     [Fact]
     public void CancelledFulfilmentCanRestartWithNewSourceAndReference()
     {
-        Fulfilment fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
+        FulfilmentEntity fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
         fulfilment.MarkInProgress("ICP-123");
         fulfilment.Cancel("Routing changed");
 
@@ -35,14 +36,14 @@ public sealed class FulfilmentTests
     [Fact]
     public void NonCancelledFulfilmentCannotUseRestartPath()
     {
-        Fulfilment fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
+        FulfilmentEntity fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
         Assert.Throws<InvalidOperationException>(() => fulfilment.Restart(FulfilmentSource.FftpUs, "US-456"));
     }
 
     [Fact]
     public void CompletingFulfilmentTwiceIsIdempotent()
     {
-        Fulfilment fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.FftpUs, DateTimeOffset.UtcNow);
+        FulfilmentEntity fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.FftpUs, DateTimeOffset.UtcNow);
         DateTimeOffset completedUtc = DateTimeOffset.UtcNow;
         fulfilment.Complete(completedUtc, "Completed");
         fulfilment.Complete(completedUtc.AddMinutes(1), "Ignored duplicate completion");
@@ -54,7 +55,7 @@ public sealed class FulfilmentTests
     [Fact]
     public void FulfilledFulfilmentCannotBeCancelled()
     {
-        Fulfilment fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
+        FulfilmentEntity fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
         fulfilment.Complete(DateTimeOffset.UtcNow, null);
         Assert.Throws<InvalidOperationException>(() => fulfilment.Cancel("cancel"));
     }
