@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using RequestPortal.Infrastructure.Persistence;
@@ -14,22 +15,35 @@ public sealed class DemoDatabaseBootstrapper
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IConfiguration configuration;
+    private readonly IHostEnvironment environment;
     private readonly ILogger<DemoDatabaseBootstrapper> logger;
 
     public DemoDatabaseBootstrapper(
         RequestPortalDbContext dbContext,
         IConfiguration configuration,
+        IHostEnvironment environment,
         ILogger<DemoDatabaseBootstrapper> logger)
     {
         this.dbContext = dbContext;
         this.configuration = configuration;
+        this.environment = environment;
         this.logger = logger;
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        if (!configuration.GetValue("Demo:Enabled", false) ||
-            !configuration.GetValue("Demo:EnsureDatabase", false))
+        if (!configuration.GetValue("Demo:Enabled", false))
+        {
+            return;
+        }
+
+        if (environment.IsProduction())
+        {
+            throw new InvalidOperationException(
+                "RP-PROD-DEMO-001: Demo mode is forbidden in Production. Disable Demo:Enabled and restart Request Portal.");
+        }
+
+        if (!configuration.GetValue("Demo:EnsureDatabase", false))
         {
             return;
         }
@@ -52,26 +66,17 @@ public sealed class DemoDatabaseBootstrapper
             exception.SqlState == PostgresErrorCodes.UndefinedTable ||
             exception.SqlState == PostgresErrorCodes.UndefinedColumn)
         {
-            logger.LogError(
-                exception,
-                "RP-DEMO-SCHEMA-001: Demo schema does not match the current Request Portal model.");
-
+            logger.LogError(exception, "RP-DEMO-SCHEMA-001: Demo schema does not match the current Request Portal model.");
             throw new InvalidOperationException(
                 "RP-DEMO-SCHEMA-001: The demo database schema does not match the current application model. " +
                 "Apply the current EF Core migrations or recreate the disposable demo database with an administrative PostgreSQL account. " +
-                "Request Portal will not drop or recreate databases using the application account.",
-                exception);
+                "Request Portal will not drop or recreate databases using the application account.", exception);
         }
     }
 
     private async Task ProbeCurrentModelAsync(CancellationToken cancellationToken)
     {
-        await dbContext.AssistanceRequests
-            .AsNoTracking()
-            .Select(item => new { item.Id, item.Kind, item.Priority, item.Status })
-            .Take(1)
-            .ToListAsync(cancellationToken);
-
+        await dbContext.AssistanceRequests.AsNoTracking().Select(item => new { item.Id, item.Kind, item.Priority, item.Status }).Take(1).ToListAsync(cancellationToken);
         await dbContext.ProjectProposals.AsNoTracking().Take(1).ToListAsync(cancellationToken);
         await dbContext.ProjectBudgetItems.AsNoTracking().Take(1).ToListAsync(cancellationToken);
         await dbContext.ProjectMilestones.AsNoTracking().Take(1).ToListAsync(cancellationToken);
