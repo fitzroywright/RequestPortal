@@ -33,6 +33,13 @@ public sealed record OrganizationApprovedMessage(
     DateTimeOffset OccurredUtc,
     Guid OrganizationId) : IMessage;
 
+public sealed record OrganizationRegistrationReminderMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid OrganizationId,
+    DateOnly ExpiryDate,
+    string ReminderKind) : IMessage;
+
 public sealed record MembershipRequestedMessage(
     Guid MessageId,
     DateTimeOffset OccurredUtc,
