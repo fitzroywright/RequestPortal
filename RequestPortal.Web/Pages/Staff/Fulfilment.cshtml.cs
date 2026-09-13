@@ -36,6 +36,13 @@ public sealed class FulfilmentModel : PageModel
         }
     }
 
+    public IReadOnlyList<FulfilmentLineView> GetLines(Guid requestId)
+    {
+        return LinesByRequest.TryGetValue(requestId, out IReadOnlyList<FulfilmentLineView>? lines)
+            ? lines
+            : Array.Empty<FulfilmentLineView>();
+    }
+
     public async Task<IActionResult> OnPostStartAsync(Guid requestId, FulfilmentSource source, string? externalReference)
     {
         ApplicationUser staffUser = await GetStaffUserAsync();
