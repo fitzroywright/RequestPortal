@@ -22,7 +22,7 @@
 }
 else if (item.RequestStatus == "PendingFulfilment" && item.FulfilmentId.HasValue)
 {
-    IReadOnlyList<FulfilmentLineView> lines = Model.LinesByRequest.TryGetValue(item.RequestId, out IReadOnlyList<FulfilmentLineView>? found) ? found : Array.Empty<FulfilmentLineView>();
+    IReadOnlyList<FulfilmentLineView> lines = Model.GetLines(item.RequestId);
     @if (lines.Count > 0)
     {
     <div class="table-wrap"><table><thead><tr><th>Item</th><th>Requested</th><th>Fulfilled</th><th>Remaining</th><th>Value</th><th>Record progress</th></tr></thead><tbody>
