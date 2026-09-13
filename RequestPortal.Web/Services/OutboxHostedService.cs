@@ -1,6 +1,8 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,13 +15,16 @@ namespace RequestPortal.Web.Services;
 public sealed class OutboxHostedService : BackgroundService
 {
     private readonly IServiceScopeFactory scopeFactory;
+    private readonly IConfiguration configuration;
     private readonly ILogger<OutboxHostedService> logger;
 
     public OutboxHostedService(
         IServiceScopeFactory scopeFactory,
+        IConfiguration configuration,
         ILogger<OutboxHostedService> logger)
     {
         this.scopeFactory = scopeFactory;
+        this.configuration = configuration;
         this.logger = logger;
     }
 
@@ -37,7 +42,12 @@ public sealed class OutboxHostedService : BackgroundService
                 if (DateTimeOffset.UtcNow >= nextRegistrationReminderProjectionUtc)
                 {
                     RequestPortalDbContext dbContext = services.GetRequiredService<RequestPortalDbContext>();
-                    OrganizationRegistrationReminderService reminderService = new(dbContext);
+                    int[] warningDays = configuration
+                        .GetSection("Organizations:RenewalWarningDays")
+                        .Get<int[]>() ?? [60, 30, 7];
+                    warningDays = warningDays.Where(day => day > 0).Distinct().ToArray();
+
+                    OrganizationRegistrationReminderService reminderService = new(dbContext, warningDays);
                     int queued = await reminderService.QueueDueRemindersAsync(stoppingToken);
                     if (queued > 0)
                     {
