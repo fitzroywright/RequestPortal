@@ -1,183 +1,24 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.3.0",
+  "version": "1.1.0",
+  "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
-    {
-      "id": "database-connection",
-      "displayName": "PostgreSQL connection credential",
-      "kind": "Secret",
-      "required": true,
-      "purpose": "Provides the Request Portal PostgreSQL connection string without placing credentials in source-controlled configuration.",
-      "secretName": "ConnectionStrings:RequestPortal",
-      "validator": "secret"
-    },
-    {
-      "id": "storage-root",
-      "displayName": "Document storage root",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines durable document storage used through Common.Storage.",
-      "configurationKey": "Storage:Local:RootPath"
-    },
-    {
-      "id": "data-protection-keys",
-      "displayName": "Data Protection key path",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Persists ASP.NET Core Data Protection keys outside the application deployment directory.",
-      "configurationKey": "Security:DataProtectionKeysPath"
-    },
-    {
-      "id": "secrets-address",
-      "displayName": "Secrets provider address",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Identifies the production secrets service used by Common.Secrets.",
-      "configurationKey": "CommonSecrets:OpenBao:Address"
-    },
-    {
-      "id": "secrets-role",
-      "displayName": "Secrets workload role",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Identifies the workload role used by Common.Secrets production bootstrap.",
-      "configurationKey": "CommonSecrets:OpenBao:RoleId"
-    },
-    {
-      "id": "staff-oidc-authority",
-      "displayName": "FFP Staff OIDC authority",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines the standards-compliant OIDC provider used only for FFP staff authentication. The provider, not Request Portal, validates fftpj.local credentials.",
-      "configurationKey": "Authentication:StaffOidc:Authority"
-    },
-    {
-      "id": "staff-oidc-client-id",
-      "displayName": "FFP Staff OIDC client ID",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Identifies Request Portal to the configurable FFP staff OIDC provider.",
-      "configurationKey": "Authentication:StaffOidc:ClientId"
-    },
-    {
-      "id": "staff-oidc-client-secret",
-      "displayName": "FFP Staff OIDC client secret",
-      "kind": "Secret",
-      "required": true,
-      "purpose": "Provides the OIDC confidential-client credential through Common.Secrets/OpenBao. Request Portal never stores or receives an AD user password.",
-      "secretName": "Authentication:StaffOidc:ClientSecret",
-      "validator": "secret"
-    },
-    {
-      "id": "staff-reviewer-groups",
-      "displayName": "FFP staff reviewer group mappings",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Names the AD groups emitted by the staff identity provider that Common.Security maps to Request Portal reviewer permissions.",
-      "configurationKey": "Authentication:ActiveDirectory:ReviewerGroups"
-    },
-    {
-      "id": "staff-administrator-groups",
-      "displayName": "FFP staff administrator group mappings",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Names the AD groups emitted by the staff identity provider that Common.Security maps to Request Portal administrator permissions.",
-      "configurationKey": "Authentication:ActiveDirectory:AdministratorGroups"
-    },
-    {
-      "id": "storage-malware-scanner",
-      "displayName": "Upload malware scanner",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines the malware-scanning endpoint required before uploaded documents are accepted in production.",
-      "configurationKey": "Uploads:MalwareScanning:Host"
-    },
-    {
-      "id": "smtp-host",
-      "displayName": "Notification SMTP host",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines the SMTP endpoint used by Common.Messaging for portal notifications.",
-      "configurationKey": "Notifications:SmtpHost"
-    },
-    {
-      "id": "smtp-from",
-      "displayName": "Notification sender address",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines the sender address for portal notification messages.",
-      "configurationKey": "Notifications:FromAddress"
-    },
-    {
-      "id": "smtp-password",
-      "displayName": "Notification SMTP credential",
-      "kind": "Secret",
-      "required": true,
-      "purpose": "Provides the SMTP credential through Common.Secrets.",
-      "secretName": "Notifications:SmtpPassword",
-      "validator": "secret"
-    },
-    {
-      "id": "messaging-queue",
-      "displayName": "Durable messaging queue path",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines durable external-delivery queue storage for Common.Messaging.",
-      "configurationKey": "Messaging:DurableQueuePath"
-    },
-    {
-      "id": "sms-endpoint",
-      "displayName": "Optional SMS gateway endpoint",
-      "kind": "Secret",
-      "required": false,
-      "purpose": "Commissioning value for the provider-neutral Common.Messaging SMS adapter. SMS remains disabled when Notifications:SmsEnabled is false.",
-      "secretName": "messaging/sms/endpoint",
-      "validator": "secret"
-    },
-    {
-      "id": "sms-api-token",
-      "displayName": "Optional SMS gateway API token",
-      "kind": "Secret",
-      "required": false,
-      "purpose": "Credential for the SMS gateway when SMS is commissioned.",
-      "secretName": "messaging/sms/api-token",
-      "validator": "secret"
-    },
-    {
-      "id": "whatsapp-endpoint",
-      "displayName": "Optional WhatsApp gateway endpoint",
-      "kind": "Secret",
-      "required": false,
-      "purpose": "Commissioning value for the provider-neutral Common.Messaging WhatsApp adapter. WhatsApp remains disabled when Notifications:WhatsAppEnabled is false.",
-      "secretName": "messaging/whatsapp/endpoint",
-      "validator": "secret"
-    },
-    {
-      "id": "whatsapp-api-token",
-      "displayName": "Optional WhatsApp gateway API token",
-      "kind": "Secret",
-      "required": false,
-      "purpose": "Credential for the WhatsApp gateway when WhatsApp is commissioned.",
-      "secretName": "messaging/whatsapp/api-token",
-      "validator": "secret"
-    },
-    {
-      "id": "organization-renewal-warning-days",
-      "displayName": "Organization registration renewal warning windows",
-      "kind": "Configuration",
-      "required": false,
-      "purpose": "Defines the day thresholds used for organization registration renewal reminders and the staff re-verification queue. Request Portal defaults to 60, 30 and 7 days when this setting is omitted.",
-      "configurationKey": "Organizations:RenewalWarningDays"
-    },
-    {
-      "id": "diagnostics-key",
-      "displayName": "Engineering diagnostics machine credential",
-      "kind": "Secret",
-      "required": true,
-      "purpose": "Protects the machine-facing Common.Diagnostics interface.",
-      "secretName": "RequestPortal:Diagnostics:Key",
-      "validator": "secret"
-    }
+    {"id":"database-connection","displayName":"PostgreSQL connection credential","kind":"Secret","required":true,"purpose":"Provides the Request Portal PostgreSQL connection string through Common.Secrets/OpenBao.","secretName":"ConnectionStrings:RequestPortal","isConfigured":false,"sensitive":true},
+    {"id":"storage-root","displayName":"Document storage root","kind":"Configuration","required":true,"purpose":"Defines durable document storage used through Common.Storage.","configurationKey":"Storage:Local:RootPath","isConfigured":false},
+    {"id":"data-protection-keys","displayName":"Data Protection key path","kind":"Configuration","required":true,"purpose":"Persists ASP.NET Core Data Protection keys outside the application deployment directory.","configurationKey":"Security:DataProtectionKeysPath","isConfigured":false},
+    {"id":"openbao-address","displayName":"OpenBao address","kind":"ExternalService","required":true,"purpose":"Identifies the OpenBao service used by Common.Secrets.","configurationKey":"CommonSecrets:OpenBao:Address","isConfigured":false,"example":"https://openbao.example.internal"},
+    {"id":"openbao-role","displayName":"OpenBao workload role","kind":"Secret","required":true,"purpose":"Provides the workload authentication material used by Common.Secrets to access OpenBao.","secretName":"CommonSecrets:OpenBao:RoleId","isConfigured":false,"sensitive":true},
+    {"id":"staff-oidc-authority","displayName":"FFP Staff OIDC authority","kind":"ExternalService","required":true,"purpose":"Defines the standards-compliant OIDC provider used for FFP staff authentication.","configurationKey":"Authentication:StaffOidc:Authority","isConfigured":false},
+    {"id":"staff-oidc-client-id","displayName":"FFP Staff OIDC client ID","kind":"Configuration","required":true,"purpose":"Identifies Request Portal to the FFP staff OIDC provider.","configurationKey":"Authentication:StaffOidc:ClientId","isConfigured":false},
+    {"id":"staff-oidc-client-secret","displayName":"FFP Staff OIDC client secret","kind":"Secret","required":true,"purpose":"Provides the OIDC confidential-client credential through Common.Secrets/OpenBao.","secretName":"Authentication:StaffOidc:ClientSecret","isConfigured":false,"sensitive":true},
+    {"id":"staff-reviewer-groups","displayName":"FFP staff reviewer group mappings","kind":"Configuration","required":true,"purpose":"Names the identity-provider groups that Common.Security maps to reviewer permissions.","configurationKey":"Authentication:ActiveDirectory:ReviewerGroups","isConfigured":false},
+    {"id":"staff-administrator-groups","displayName":"FFP staff administrator group mappings","kind":"Configuration","required":true,"purpose":"Names the identity-provider groups that Common.Security maps to administrator permissions.","configurationKey":"Authentication:ActiveDirectory:AdministratorGroups","isConfigured":false},
+    {"id":"storage-malware-scanner","displayName":"Upload malware scanner","kind":"ExternalService","required":true,"purpose":"Defines the malware-scanning endpoint required before uploaded documents are accepted in production.","configurationKey":"Uploads:MalwareScanning:Host","isConfigured":false},
+    {"id":"smtp-host","displayName":"Notification SMTP host","kind":"ExternalService","required":true,"purpose":"Defines the SMTP endpoint used by Common.Messaging for portal notifications.","configurationKey":"Notifications:SmtpHost","isConfigured":false},
+    {"id":"smtp-from","displayName":"Notification sender address","kind":"Configuration","required":true,"purpose":"Defines the sender address for portal notification messages.","configurationKey":"Notifications:FromAddress","isConfigured":false},
+    {"id":"smtp-password","displayName":"Notification SMTP credential","kind":"Secret","required":true,"purpose":"Provides the SMTP credential through Common.Secrets/OpenBao.","secretName":"Notifications:SmtpPassword","isConfigured":false,"sensitive":true},
+    {"id":"messaging-queue","displayName":"Durable messaging queue path","kind":"Configuration","required":true,"purpose":"Defines durable external-delivery queue storage for Common.Messaging.","configurationKey":"Messaging:DurableQueuePath","isConfigured":false},
+    {"id":"site-id","displayName":"Site ID","kind":"Configuration","required":true,"purpose":"Identifies the deployment site represented by this Request Portal instance.","configurationKey":"Site:Id","isConfigured":false,"example":"FFP-JM"}
   ]
 }
