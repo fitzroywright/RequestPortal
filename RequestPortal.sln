@@ -2,17 +2,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Common", "RequestPortal\RequestPortal.Common\RequestPortal.Common.csproj", "{C1058F8A-BE08-4E08-8EE3-65F319CBFDE7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Common", "RequestPortal.Common\RequestPortal.Common.csproj", "{C1058F8A-BE08-4E08-8EE3-65F319CBFDE7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Domain", "RequestPortal\RequestPortal.Domain\RequestPortal.Domain.csproj", "{FA12C111-4A6F-4E04-B232-B1A6D44E61B5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Domain", "RequestPortal.Domain\RequestPortal.Domain.csproj", "{FA12C111-4A6F-4E04-B232-B1A6D44E61B5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Application", "RequestPortal\RequestPortal.Application\RequestPortal.Application.csproj", "{AC5A2A8D-1DCF-48A0-B258-A8B6F0D05669}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Application", "RequestPortal.Application\RequestPortal.Application.csproj", "{AC5A2A8D-1DCF-48A0-B258-A8B6F0D05669}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Infrastructure", "RequestPortal\RequestPortal.Infrastructure\RequestPortal.Infrastructure.csproj", "{5C3DB954-7D70-4E21-8D2D-A55B6BE9202C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Infrastructure", "RequestPortal.Infrastructure\RequestPortal.Infrastructure.csproj", "{5C3DB954-7D70-4E21-8D2D-A55B6BE9202C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Web", "RequestPortal\RequestPortal.Web\RequestPortal.Web.csproj", "{66A35AF5-8836-4E84-8816-A30F5CF8DF42}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Web", "RequestPortal.Web\RequestPortal.Web.csproj", "{66A35AF5-8836-4E84-8816-A30F5CF8DF42}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FfpManager.Bridge", "RequestPortal\FfpManager.Bridge\FfpManager.Bridge.csproj", "{B24E6D85-98A7-4A7B-9CEC-7D37D0E50E16}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FfpManager.Bridge", "FfpManager.Bridge\FfpManager.Bridge.csproj", "{B24E6D85-98A7-4A7B-9CEC-7D37D0E50E16}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestPortal.Domain.Tests", "RequestPortal.Tests\RequestPortal.Domain.Tests\RequestPortal.Domain.Tests.csproj", "{D1F777F5-A6A4-4B69-B7D7-B9F17D376BA1}"
 EndProject

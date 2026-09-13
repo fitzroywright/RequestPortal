@@ -102,8 +102,8 @@ if ($LASTEXITCODE -ne 0) {
     if ($LASTEXITCODE -ne 0) { throw "Unable to create/trust the local HTTPS certificate." }
 }
 
-$project = Join-Path $repoRoot "RequestPortal\RequestPortal.Web\RequestPortal.Web.csproj"
-$assets = Join-Path $repoRoot "RequestPortal\RequestPortal.Web\obj\project.assets.json"
+$project = Join-Path $repoRoot "RequestPortal.Web\RequestPortal.Web.csproj"
+$assets = Join-Path $repoRoot "RequestPortal.Web\obj\project.assets.json"
 
 if (-not (Test-Path $assets)) {
     Write-Host "This is the first run from this clone. Restoring NuGet packages once..."
