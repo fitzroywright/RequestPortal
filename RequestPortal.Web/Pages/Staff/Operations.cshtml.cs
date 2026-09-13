@@ -21,6 +21,7 @@ public sealed class OperationsModel : PageModel
 
     public StaffOperationsSnapshot Snapshot { get; private set; } = new(
         Array.Empty<PendingOrganizationWorkItem>(),
+        Array.Empty<OrganizationReverificationWorkItem>(),
         Array.Empty<RequestWorkItem>(),
         Array.Empty<RequestWorkItem>(),
         Array.Empty<DocumentWorkItem>(),
