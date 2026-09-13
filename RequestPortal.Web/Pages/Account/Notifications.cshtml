@@ -22,17 +22,25 @@
         <div class="grid-3">
             <article class="card">
                 <h2>Email</h2>
-                <p class="muted">@(Model.EmailAvailable ? "Email delivery is commissioned in this environment." : "Email delivery is currently unavailable.")</p>
-                <form method="post" asp-page-handler="Save">
-                    <input type="hidden" name="Input.Channel" value="Email" />
-                    <label for="emailDestination">Email address</label>
-                    <input id="emailDestination" name="Input.Destination" value="@(email?.Destination ?? Model.DefaultEmail)" maxlength="500" required />
-                    <label class="check-row">
-                        <input type="checkbox" name="Input.Enabled" value="true" @(email?.Enabled != false && Model.EmailAvailable ? "checked" : null) disabled="@(!Model.EmailAvailable)" />
-                        <span>Send email notifications</span>
-                    </label>
-                    <button class="button button-small" type="submit" disabled="@(!Model.EmailAvailable)">Save email preference</button>
-                </form>
+                @if (Model.EmailAvailable)
+                {
+                    <p class="muted">Email delivery is commissioned in this environment.</p>
+                    <form method="post" asp-page-handler="Save">
+                        <input type="hidden" name="Input.Channel" value="Email" />
+                        <label for="emailDestination">Email address</label>
+                        <input id="emailDestination" name="Input.Destination" value="@(email?.Destination ?? Model.DefaultEmail)" maxlength="500" required />
+                        <label class="check-row">
+                            <input type="checkbox" name="Input.Enabled" value="true" @(email?.Enabled != false ? "checked" : null) />
+                            <span>Send email notifications</span>
+                        </label>
+                        <button class="button button-small" type="submit">Save email preference</button>
+                    </form>
+                }
+                else
+                {
+                    <p><strong>Not commissioned</strong></p>
+                    <p class="muted">Email delivery is unavailable in this environment.</p>
+                }
             </article>
 
             <article class="card">
