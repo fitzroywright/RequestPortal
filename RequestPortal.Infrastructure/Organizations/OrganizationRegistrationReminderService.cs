@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,18 +15,30 @@ namespace RequestPortal.Infrastructure.Organizations;
 
 public sealed class OrganizationRegistrationReminderService
 {
+    private static readonly int[] DefaultWarningDays = [60, 30, 7];
     private readonly RequestPortalDbContext dbContext;
+    private readonly int[] warningDays;
 
-    public OrganizationRegistrationReminderService(RequestPortalDbContext dbContext)
+    public OrganizationRegistrationReminderService(RequestPortalDbContext dbContext, IEnumerable<int>? warningDays = null)
     {
         this.dbContext = dbContext;
+        this.warningDays = (warningDays ?? DefaultWarningDays)
+            .Where(day => day > 0)
+            .Distinct()
+            .OrderByDescending(day => day)
+            .ToArray();
+
+        if (this.warningDays.Length == 0)
+        {
+            this.warningDays = DefaultWarningDays;
+        }
     }
 
     public async Task<int> QueueDueRemindersAsync(CancellationToken cancellationToken = default)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
-        DateOnly warningThrough = today.AddDays(60);
+        DateOnly warningThrough = today.AddDays(warningDays.Max());
 
         var organizations = await dbContext.Organizations
             .AsNoTracking()
@@ -43,8 +56,8 @@ public sealed class OrganizationRegistrationReminderService
         int queued = 0;
         foreach (var organization in organizations)
         {
-            int days = organization.ExpiryDate.DayNumber - today.DayNumber;
-            string reminderKind = days <= 0 ? "Expired" : days <= 7 ? "7Days" : days <= 30 ? "30Days" : "60Days";
+            int daysUntilExpiry = organization.ExpiryDate.DayNumber - today.DayNumber;
+            string reminderKind = GetReminderKind(daysUntilExpiry);
             Guid messageId = CreateDeterministicGuid(organization.Id, organization.ExpiryDate, reminderKind);
 
             bool exists = await dbContext.OutboxMessages
@@ -80,6 +93,20 @@ public sealed class OrganizationRegistrationReminderService
         }
 
         return queued;
+    }
+
+    private string GetReminderKind(int daysUntilExpiry)
+    {
+        if (daysUntilExpiry <= 0)
+        {
+            return "Expired";
+        }
+
+        int threshold = warningDays
+            .Where(day => daysUntilExpiry <= day)
+            .DefaultIfEmpty(warningDays.Max())
+            .Min();
+        return $"{threshold}Days";
     }
 
     private static Guid CreateDeterministicGuid(Guid organizationId, DateOnly expiryDate, string reminderKind)
