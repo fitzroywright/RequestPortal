@@ -32,12 +32,11 @@ public sealed class NotificationsModel : PageModel
     }
 
     public IReadOnlyList<NotificationPreferenceView> Preferences { get; private set; } = Array.Empty<NotificationPreferenceView>();
-
     public IReadOnlyList<NotificationHistoryView> History { get; private set; } = Array.Empty<NotificationHistoryView>();
-
     public string DefaultEmail { get; private set; } = string.Empty;
-
-    public bool DemoMode { get; private set; }
+    public bool EmailAvailable { get; private set; }
+    public bool SmsAvailable { get; private set; }
+    public bool WhatsAppAvailable { get; private set; }
 
     [BindProperty]
     public PreferenceInput Input { get; set; } = new();
@@ -51,11 +50,11 @@ public sealed class NotificationsModel : PageModel
     public async Task<IActionResult> OnPostSaveAsync()
     {
         ApplicationUser user = await GetUserAsync();
-        DemoMode = configuration.GetValue("Demo:Enabled", false);
+        LoadAvailability();
 
-        if (DemoMode && Input.Channel != NotificationChannel.Email)
+        if (Input.Enabled && !IsAvailable(Input.Channel))
         {
-            ModelState.AddModelError(string.Empty, "Only email delivery is enabled in this demo build.");
+            ModelState.AddModelError(string.Empty, $"{Input.Channel} notifications are not commissioned in this environment.");
         }
 
         if (!ModelState.IsValid)
@@ -64,12 +63,21 @@ public sealed class NotificationsModel : PageModel
             return Page();
         }
 
-        await notificationPreferenceService.SavePreferenceAsync(
-            user.Id,
-            Input.Channel,
-            Input.Destination,
-            Input.Enabled,
-            HttpContext.RequestAborted);
+        try
+        {
+            await notificationPreferenceService.SavePreferenceAsync(
+                user.Id,
+                Input.Channel,
+                Input.Destination,
+                Input.Enabled,
+                HttpContext.RequestAborted);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(string.Empty, exception.Message);
+            await LoadAsync(user);
+            return Page();
+        }
 
         TempData["Success"] = $"{Input.Channel} notification preference saved.";
         return RedirectToPage();
@@ -83,15 +91,28 @@ public sealed class NotificationsModel : PageModel
 
     private async Task LoadAsync(ApplicationUser user)
     {
-        DemoMode = configuration.GetValue("Demo:Enabled", false);
+        LoadAvailability();
         DefaultEmail = user.Email ?? string.Empty;
-        Preferences = await notificationPreferenceService.GetPreferencesAsync(
-            user.Id,
-            HttpContext.RequestAborted);
-        History = await notificationPreferenceService.GetRecentHistoryAsync(
-            user.Id,
-            25,
-            HttpContext.RequestAborted);
+        Preferences = await notificationPreferenceService.GetPreferencesAsync(user.Id, HttpContext.RequestAborted);
+        History = await notificationPreferenceService.GetRecentHistoryAsync(user.Id, 25, HttpContext.RequestAborted);
+    }
+
+    private void LoadAvailability()
+    {
+        EmailAvailable = configuration.GetValue("Notifications:Enabled", false);
+        SmsAvailable = configuration.GetValue("Notifications:SmsEnabled", false);
+        WhatsAppAvailable = configuration.GetValue("Notifications:WhatsAppEnabled", false);
+    }
+
+    private bool IsAvailable(NotificationChannel channel)
+    {
+        return channel switch
+        {
+            NotificationChannel.Email => EmailAvailable,
+            NotificationChannel.Sms => SmsAvailable,
+            NotificationChannel.WhatsApp => WhatsAppAvailable,
+            _ => false
+        };
     }
 
     public NotificationPreferenceView? FindPreference(NotificationChannel channel)
