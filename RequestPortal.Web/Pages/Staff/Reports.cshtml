@@ -4,6 +4,8 @@
 @using RequestPortal.Domain.Requests
 @{
     ViewData["Title"] = "Request Reports";
+    string? fromDateRoute = Model.FromDate?.ToString("yyyy-MM-dd");
+    string? toDateRoute = Model.ToDate?.ToString("yyyy-MM-dd");
 }
 
 <section class="section">
@@ -91,8 +93,8 @@
                        asp-route-CountryCode="@Model.CountryCode"
                        asp-route-Category="@Model.Category"
                        asp-route-Priority="@Model.Priority"
-                       asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
-                       asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Export CSV</a>
+                       asp-route-FromDate="@fromDateRoute"
+                       asp-route-ToDate="@toDateRoute">Export CSV</a>
                     <a class="button button-secondary"
                        asp-page-handler="ExportXlsx"
                        asp-route-Search="@Model.Search"
@@ -100,8 +102,8 @@
                        asp-route-CountryCode="@Model.CountryCode"
                        asp-route-Category="@Model.Category"
                        asp-route-Priority="@Model.Priority"
-                       asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
-                       asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Export Excel</a>
+                       asp-route-FromDate="@fromDateRoute"
+                       asp-route-ToDate="@toDateRoute">Export Excel</a>
                     <a class="button button-secondary"
                        asp-page-handler="Print"
                        target="_blank"
@@ -110,8 +112,8 @@
                        asp-route-CountryCode="@Model.CountryCode"
                        asp-route-Category="@Model.Category"
                        asp-route-Priority="@Model.Priority"
-                       asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
-                       asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Print / Save PDF</a>
+                       asp-route-FromDate="@fromDateRoute"
+                       asp-route-ToDate="@toDateRoute">Print / Save PDF</a>
                 </div>
             </div>
 
@@ -167,8 +169,8 @@
                                asp-route-CountryCode="@Model.CountryCode"
                                asp-route-Category="@Model.Category"
                                asp-route-Priority="@Model.Priority"
-                               asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
-                               asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Previous</a>
+                               asp-route-FromDate="@fromDateRoute"
+                               asp-route-ToDate="@toDateRoute">Previous</a>
                         }
                         else
                         {
@@ -184,8 +186,8 @@
                                asp-route-CountryCode="@Model.CountryCode"
                                asp-route-Category="@Model.Category"
                                asp-route-Priority="@Model.Priority"
-                               asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
-                               asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Next</a>
+                               asp-route-FromDate="@fromDateRoute"
+                               asp-route-ToDate="@toDateRoute">Next</a>
                         }
                     </div>
                 }
