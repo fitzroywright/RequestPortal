@@ -105,6 +105,11 @@ public sealed class OutboxDispatcher
             await SendOrganizationRegistrationReminderAsync(Deserialize<OrganizationRegistrationReminderMessage>(outbox.Payload), cancellationToken);
             return;
         }
+        if (outbox.MessageType.EndsWith(nameof(OrganizationRegistrationVerifiedMessage), StringComparison.Ordinal))
+        {
+            await SendOrganizationRegistrationVerifiedAsync(Deserialize<OrganizationRegistrationVerifiedMessage>(outbox.Payload), cancellationToken);
+            return;
+        }
         if (outbox.MessageType.EndsWith(nameof(MembershipRequestedMessage), StringComparison.Ordinal))
         {
             await SendMembershipRequestedAsync(Deserialize<MembershipRequestedMessage>(outbox.Payload), cancellationToken);
@@ -203,6 +208,18 @@ public sealed class OutboxDispatcher
             null,
             subject,
             body,
+            cancellationToken);
+    }
+
+    private async Task SendOrganizationRegistrationVerifiedAsync(OrganizationRegistrationVerifiedMessage message, CancellationToken cancellationToken)
+    {
+        Organization organization = await dbContext.Organizations.AsNoTracking().SingleAsync(item => item.Id == message.OrganizationId, cancellationToken);
+        await DeliverEmailAsync(
+            organization.RegisteredByUserId,
+            organization.Id,
+            null,
+            $"Registration evidence verified: {organization.Name}",
+            $"FFP has verified the current registration evidence submitted for {organization.Name}. The verification is now recorded in Request Portal.",
             cancellationToken);
     }
 
