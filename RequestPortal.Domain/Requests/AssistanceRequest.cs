@@ -169,6 +169,15 @@ public sealed class AssistanceRequest
         TransitionTo(RequestStatus.PendingFulfilment, staffUserId, changedUtc, "Request moved to fulfilment.");
     }
 
+    public void ReturnToApproved(Guid staffUserId, DateTimeOffset changedUtc, string reason)
+    {
+        EnsureStatus(RequestStatus.PendingFulfilment);
+        string detail = string.IsNullOrWhiteSpace(reason)
+            ? "Fulfilment cancelled; request returned to approved status."
+            : $"Fulfilment cancelled; request returned to approved status. {reason.Trim()}";
+        TransitionTo(RequestStatus.Approved, staffUserId, changedUtc, detail);
+    }
+
     public void MarkFulfilled(Guid staffUserId, DateTimeOffset changedUtc)
     {
         EnsureStatus(RequestStatus.PendingFulfilment);
