@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Reporting;
 using RequestPortal.Domain.Requests;
@@ -24,6 +28,120 @@ public sealed class StaffReportingService : IStaffReportingService
         RequestReportFilter filter,
         CancellationToken cancellationToken = default)
     {
+        IQueryable<AssistanceRequest> query = BuildQuery(filter);
+        int total = await query.CountAsync(cancellationToken);
+        int pageSize = Math.Clamp(filter.PageSize, 1, 500);
+        int totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+        int page = Math.Clamp(filter.Page, 1, totalPages);
+
+        int draft = await query.CountAsync(item => item.Status == RequestStatus.Draft, cancellationToken);
+        int submitted = await query.CountAsync(item => item.Status == RequestStatus.Submitted, cancellationToken);
+        int approved = await query.CountAsync(item => item.Status == RequestStatus.Approved, cancellationToken);
+        int fulfilled = await query.CountAsync(item => item.Status == RequestStatus.Fulfilled, cancellationToken);
+
+        List<RequestReportRow> rows = await ProjectRows(query)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new RequestReportResult(
+            rows,
+            total,
+            draft,
+            submitted,
+            approved,
+            fulfilled,
+            page,
+            pageSize,
+            totalPages);
+    }
+
+    public async Task<byte[]> ExportCsvAsync(
+        RequestReportFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        List<RequestReportRow> rows = await ProjectRows(BuildQuery(filter)).ToListAsync(cancellationToken);
+        StringBuilder csv = new();
+        csv.AppendLine("Reference,Organization,Country,Summary,Kind,Category,Priority,Status,Created UTC,Submitted UTC");
+
+        foreach (RequestReportRow row in rows)
+        {
+            csv.AppendLine(string.Join(
+                ',',
+                Escape(row.Reference),
+                Escape(row.Organization),
+                Escape(row.CountryCode),
+                Escape(row.Summary),
+                Escape(row.Kind),
+                Escape(row.Category),
+                Escape(row.Priority),
+                Escape(row.Status),
+                Escape(row.CreatedUtc.ToString("u")),
+                Escape(row.SubmittedUtc?.ToString("u") ?? string.Empty)));
+        }
+
+        return Encoding.UTF8.GetBytes(csv.ToString());
+    }
+
+    public async Task<byte[]> ExportXlsxAsync(
+        RequestReportFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        List<RequestReportRow> rows = await ProjectRows(BuildQuery(filter)).ToListAsync(cancellationToken);
+
+        using MemoryStream stream = new();
+        using (SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook, true))
+        {
+            WorkbookPart workbookPart = document.AddWorkbookPart();
+            workbookPart.Workbook = new Workbook();
+
+            WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+            SheetData sheetData = new();
+            worksheetPart.Worksheet = new Worksheet(sheetData);
+
+            Sheets sheets = workbookPart.Workbook.AppendChild(new Sheets());
+            sheets.Append(new Sheet
+            {
+                Id = workbookPart.GetIdOfPart(worksheetPart),
+                SheetId = 1,
+                Name = "Requests"
+            });
+
+            sheetData.Append(CreateRow(
+                "Reference",
+                "Organization",
+                "Country",
+                "Summary",
+                "Kind",
+                "Category",
+                "Priority",
+                "Status",
+                "Created UTC",
+                "Submitted UTC"));
+
+            foreach (RequestReportRow row in rows)
+            {
+                sheetData.Append(CreateRow(
+                    row.Reference,
+                    row.Organization,
+                    row.CountryCode,
+                    row.Summary,
+                    row.Kind,
+                    row.Category,
+                    row.Priority,
+                    row.Status,
+                    row.CreatedUtc.ToString("u"),
+                    row.SubmittedUtc?.ToString("u") ?? string.Empty));
+            }
+
+            workbookPart.Workbook.Save();
+        }
+
+        return stream.ToArray();
+    }
+
+    private IQueryable<AssistanceRequest> BuildQuery(RequestReportFilter filter)
+    {
         IQueryable<AssistanceRequest> query = dbContext.AssistanceRequests.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
@@ -31,7 +149,10 @@ public sealed class StaffReportingService : IStaffReportingService
             string term = filter.Search.Trim().ToLowerInvariant();
             query = query.Where(item =>
                 item.PublicReference.ToLower().Contains(term) ||
-                (item.Summary != null && item.Summary.ToLower().Contains(term)));
+                (item.Summary != null && item.Summary.ToLower().Contains(term)) ||
+                dbContext.Organizations.Any(organization =>
+                    organization.Id == item.OrganizationId &&
+                    organization.Name.ToLower().Contains(term)));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Status) &&
@@ -64,16 +185,17 @@ public sealed class StaffReportingService : IStaffReportingService
         if (!string.IsNullOrWhiteSpace(filter.CountryCode))
         {
             string countryCode = filter.CountryCode.Trim().ToUpperInvariant();
-            Guid[] organizationIds = await dbContext.Organizations
-                .AsNoTracking()
-                .Where(item => item.CountryCode == countryCode)
-                .Select(item => item.Id)
-                .ToArrayAsync(cancellationToken);
-
-            query = query.Where(item => organizationIds.Contains(item.OrganizationId));
+            query = query.Where(item => dbContext.Organizations.Any(organization =>
+                organization.Id == item.OrganizationId &&
+                organization.CountryCode == countryCode));
         }
 
-        List<RequestReportRow> rows = await (
+        return query;
+    }
+
+    private IQueryable<RequestReportRow> ProjectRows(IQueryable<AssistanceRequest> query)
+    {
+        return
             from request in query
             join organization in dbContext.Organizations.AsNoTracking()
                 on request.OrganizationId equals organization.Id
@@ -89,44 +211,22 @@ public sealed class StaffReportingService : IStaffReportingService
                 request.Priority.ToString(),
                 request.Status.ToString(),
                 request.CreatedUtc,
-                request.SubmittedUtc))
-            .Take(1000)
-            .ToListAsync(cancellationToken);
-
-        return new RequestReportResult(
-            rows,
-            rows.Count,
-            rows.Count(row => row.Status == RequestStatus.Draft.ToString()),
-            rows.Count(row => row.Status == RequestStatus.Submitted.ToString()),
-            rows.Count(row => row.Status == RequestStatus.Approved.ToString()),
-            rows.Count(row => row.Status == RequestStatus.Fulfilled.ToString()));
+                request.SubmittedUtc);
     }
 
-    public async Task<byte[]> ExportCsvAsync(
-        RequestReportFilter filter,
-        CancellationToken cancellationToken = default)
+    private static Row CreateRow(params string[] values)
     {
-        RequestReportResult report = await SearchRequestsAsync(filter, cancellationToken);
-        StringBuilder csv = new();
-        csv.AppendLine("Reference,Organization,Country,Summary,Kind,Category,Priority,Status,Created UTC,Submitted UTC");
-
-        foreach (RequestReportRow row in report.Rows)
+        Row row = new();
+        foreach (string value in values)
         {
-            csv.AppendLine(string.Join(
-                ',',
-                Escape(row.Reference),
-                Escape(row.Organization),
-                Escape(row.CountryCode),
-                Escape(row.Summary),
-                Escape(row.Kind),
-                Escape(row.Category),
-                Escape(row.Priority),
-                Escape(row.Status),
-                Escape(row.CreatedUtc.ToString("u")),
-                Escape(row.SubmittedUtc?.ToString("u") ?? string.Empty)));
+            row.Append(new Cell
+            {
+                DataType = CellValues.InlineString,
+                InlineString = new InlineString(new Text(value ?? string.Empty))
+            });
         }
 
-        return Encoding.UTF8.GetBytes(csv.ToString());
+        return row;
     }
 
     private static string Escape(string value)
