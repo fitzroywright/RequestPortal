@@ -23,31 +23,41 @@ public sealed class CommonQueuedNotificationSender : INotificationSender
         ArgumentNullException.ThrowIfNull(notification);
         ArgumentException.ThrowIfNullOrWhiteSpace(notification.Recipient);
 
+        MessageChannel channel = notification.Transport switch
+        {
+            NotificationTransport.Email => MessageChannel.Smtp,
+            NotificationTransport.Sms => MessageChannel.Sms,
+            NotificationTransport.WhatsApp => MessageChannel.WhatsApp,
+            _ => throw new InvalidOperationException($"Unsupported notification transport '{notification.Transport}'.")
+        };
+
         Guid notificationId = Guid.NewGuid();
+        bool usesMobile = channel is MessageChannel.Sms or MessageChannel.WhatsApp;
         RecipientSnapshot recipient = new(
             notification.Recipient,
             notification.Recipient,
-            notification.Recipient,
+            usesMobile ? null : notification.Recipient,
             null,
-            null,
-            MessageChannel.Smtp);
+            usesMobile ? notification.Recipient : null,
+            channel);
         MessageRequest request = new()
         {
             RecipientIds = [notification.Recipient],
             Title = notification.Subject,
             Body = notification.Body,
-            Channels = MessageChannel.Smtp,
+            Channels = channel,
             Source = "RequestPortal",
             CorrelationId = notificationId.ToString("N"),
             Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["ContentType"] = notification.IsHtml ? "text/html" : "text/plain"
+                ["ContentType"] = notification.IsHtml ? "text/html" : "text/plain",
+                ["Transport"] = notification.Transport.ToString()
             }
         };
         ExternalDeliveryWorkItem workItem = new(
             notificationId,
             [recipient],
-            MessageChannel.Smtp,
+            channel,
             request,
             null,
             "RequestPortal notification",
