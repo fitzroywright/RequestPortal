@@ -87,12 +87,15 @@
     .reach-panel { padding-bottom:10px; }
     .reach-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
     .reach-head h2 { margin-bottom:1px; }
-    .reach-content { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr); gap:10px; margin-top:8px; align-items:start; }
-    .jamaica-map { width:100%; height:205px; background:#f8fafb; border:1px solid #e2e7ea; border-radius:7px; }
-    .jamaica-map .island { fill:#e8eef1; stroke:#9eabb5; stroke-width:1; }
-    .jamaica-map a circle { fill:var(--mg-teal); stroke:#fff; stroke-width:1.5; transition:.15s ease; }
-    .jamaica-map a:hover circle { stroke:var(--mg-ink); stroke-width:2.5; }
-    .jamaica-map text { font-size:2.7px; fill:#273542; pointer-events:none; }
+    .reach-content { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(300px,.55fr); gap:10px; margin-top:8px; align-items:start; }
+    .jamaica-map-real { position:relative; height:238px; border:1px solid #dfe6ea; border-radius:7px; background:#f5f8f9; overflow:hidden; }
+    .jamaica-map-real img { width:100%; height:100%; display:block; object-fit:contain; object-position:center; filter:saturate(.45) contrast(.96) brightness(1.05); }
+    .map-point { position:absolute; transform:translate(-50%,-50%); border-radius:50%; background:var(--mg-teal); color:#fff; border:2px solid rgba(255,255,255,.94); box-shadow:0 1px 5px rgba(20,43,54,.3); display:flex; align-items:center; justify-content:center; text-decoration:none; font-size:.68rem; font-weight:800; transition:.12s ease; z-index:2; }
+    .map-point:hover { transform:translate(-50%,-50%) scale(1.12); background:var(--mg-blue); color:#fff; z-index:3; }
+    .map-point:focus-visible { outline:3px solid #fff; box-shadow:0 0 0 5px var(--mg-blue); }
+    .map-credit { margin:4px 2px 0; font-size:.62rem; color:#74818b; }
+    .reach-legend { display:flex; gap:10px; align-items:center; margin-top:4px; font-size:.69rem; color:#63717d; }
+    .reach-dot { width:10px; height:10px; border-radius:50%; background:var(--mg-teal); display:inline-block; margin-right:4px; vertical-align:-1px; }
     .parish-list { display:grid; grid-template-columns:repeat(2,1fr); gap:5px; }
     .parish-list a { text-decoration:none; color:inherit; padding:6px 8px; background:#f7f9fa; border-radius:5px; display:flex; justify-content:space-between; font-size:.73rem; border-left:2px solid var(--mg-teal); }
     .parish-list strong { color:var(--mg-teal); }
@@ -110,7 +113,7 @@
         .mg-grid-5 { grid-template-columns:repeat(2,1fr); overflow:visible; }
         .mg-grid-3,.performance,.attention,.parish-list { grid-template-columns:1fr; }
         .mg-panel { margin-top:9px; }
-        .jamaica-map { height:240px; margin-bottom:9px; }
+        .jamaica-map-real { height:230px; margin-bottom:9px; }
     }
 </style>
 
@@ -197,22 +200,28 @@
 
     <section class="mg-panel reach-panel mg-section-gap">
         <div class="reach-head">
-            <div><h2>Service Reach Across Jamaica</h2><div class="muted">Select a parish to drill into communities and requests.</div></div>
+            <div><h2>Service Reach Across Jamaica</h2><div class="muted">Real parish map with Request Portal service intensity. Select a marker or parish to drill into communities and requests.</div></div>
             <a class="button button-secondary compact-button" asp-page="/Management/Requests">All requests</a>
         </div>
         <div class="reach-content">
-            <svg class="jamaica-map" viewBox="0 0 100 80" role="img" aria-label="Jamaica service reach by parish">
-                <path class="island" d="M4,41 C10,32 22,27 35,28 C47,28 58,24 70,27 C80,28 90,34 96,42 C91,48 80,51 69,51 C58,55 47,61 34,60 C23,59 13,54 6,48 Z" />
-                @foreach (ParishReachSummary parish in Model.Dashboard.Parishes)
-                {
-                    double radius = 2.8 + (5.7 * parish.Requests / maxParish);
-                    double opacity = 0.35 + (0.6 * parish.Requests / maxParish);
-                    <a asp-page="/Management/Parish" asp-route-parish="@parish.Parish">
-                        <circle cx="@parish.MapX.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)" cy="@parish.MapY.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)" r="@radius.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)" opacity="@opacity.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)"><title>@parish.Parish: @parish.Requests requests</title></circle>
-                        <text x="@parish.MapX.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)" y="@((parish.MapY + radius + 3).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))" text-anchor="middle">@parish.Parish</text>
-                    </a>
-                }
-            </svg>
+            <div>
+                <div class="jamaica-map-real" role="img" aria-label="Map of Jamaica parishes with Request Portal service reach">
+                    <img src="~/img/maps/jamaica-parishes.svg" alt="Map of the parishes of Jamaica" />
+                    @foreach (ParishReachSummary parish in Model.Dashboard.Parishes)
+                    {
+                        double diameter = 18d + (18d * parish.Requests / maxParish);
+                        double opacity = 0.62d + (0.34d * parish.Requests / maxParish);
+                        <a class="map-point"
+                           asp-page="/Management/Parish"
+                           asp-route-parish="@parish.Parish"
+                           aria-label="@parish.Parish: @parish.Requests requests"
+                           title="@parish.Parish — @parish.Requests requests, @parish.Communities communities"
+                           style="left:@parish.MapX.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%;top:@parish.MapY.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%;width:@diameter.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)px;height:@diameter.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)px;opacity:@opacity.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">@parish.Requests</a>
+                    }
+                </div>
+                <div class="reach-legend"><span><span class="reach-dot"></span>Marker size = request volume</span><span>Click for parish drill-down</span></div>
+                <div class="map-credit">Parish map: TUBS / MacedonianBoy, Wikimedia Commons, CC BY-SA 3.0. Cached locally for the offline demo.</div>
+            </div>
             <div>
                 <div class="parish-list">
                     @foreach (ParishReachSummary parish in Model.Dashboard.Parishes)
@@ -222,7 +231,7 @@
                 </div>
                 @if (Model.Dashboard.Parishes.Count == 0)
                 {
-                    <p class="muted">Service reach will populate as requests record parish or GPS data.</p>
+                    <p class="muted">Service reach will populate as requests record parish or GPS location data.</p>
                 }
             </div>
         </div>
