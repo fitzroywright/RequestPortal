@@ -53,7 +53,7 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
     {
         if (enabled && !IsCommissioned(channel))
         {
-            throw new InvalidOperationException($"{channel} notifications are not commissioned in this Request Portal build.");
+            throw new InvalidOperationException($"{channel} notifications are not commissioned in this Request Portal deployment.");
         }
 
         NotificationPreference? preference = await dbContext.NotificationPreferences
@@ -117,8 +117,8 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
         return channel switch
         {
             NotificationChannel.Email => notificationOptions.Enabled,
-            NotificationChannel.Sms => false,
-            NotificationChannel.WhatsApp => false,
+            NotificationChannel.Sms => notificationOptions.SmsEnabled,
+            NotificationChannel.WhatsApp => notificationOptions.WhatsAppEnabled,
             _ => false
         };
     }
