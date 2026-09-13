@@ -102,6 +102,16 @@
                        asp-route-Priority="@Model.Priority"
                        asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
                        asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Export Excel</a>
+                    <a class="button button-secondary"
+                       asp-page-handler="Print"
+                       target="_blank"
+                       asp-route-Search="@Model.Search"
+                       asp-route-Status="@Model.Status"
+                       asp-route-CountryCode="@Model.CountryCode"
+                       asp-route-Category="@Model.Category"
+                       asp-route-Priority="@Model.Priority"
+                       asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")"
+                       asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")">Print / Save PDF</a>
                 </div>
             </div>
 
