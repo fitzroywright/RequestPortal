@@ -41,7 +41,7 @@ Production uses Common.Secrets with the OpenBao provider. The non-secret product
 
 The bootstrap Secret ID must be supplied through the configured protected file or environment variable and must never be committed to source control. The Request Portal AppRole policy should have least-privilege read access only to the Request Portal secret subtree.
 
-Expected secrets include the RequestPortal PostgreSQL connection string, commissioned external identity provider credentials, SMTP password, and any enabled integration credentials.
+Expected secrets include the RequestPortal PostgreSQL connection string, commissioned external identity provider credentials, SMTP password, and any enabled integration or mobile-messaging credentials.
 
 ## 4. Durable document storage
 
@@ -61,7 +61,7 @@ Commission at least one supported external identity provider. Store secrets in O
 
 ## 8. Notifications
 
-Email is the currently commissioned production notification channel. Configure SMTP host/port/from address/username in production configuration and keep the password in OpenBao.
+Email is the required baseline production notification channel. Configure SMTP host/port/from address/username in production configuration and keep the password in OpenBao.
 
 Production defaults explicitly set:
 
@@ -73,9 +73,31 @@ Production defaults explicitly set:
 }
 ```
 
-SMS and WhatsApp remain visible as product concepts but cannot be enabled by the user or by a crafted request until a real provider is commissioned. Do not set either flag true merely to expose UI controls; a real sender adapter, credentials, diagnostics and end-to-end delivery test are required first.
+Request Portal now contains the application plumbing for SMS and WhatsApp, and Common.Messaging contains provider-neutral adapters for both channels. They remain optional and disabled by default. Email continues to carry mandatory workflow notices; an enabled user preference may add WhatsApp and/or SMS delivery for the same event.
 
-Email delivery uses bounded retries and a terminal dead-letter state. Staff Operations exposes dead-letter messages and audited manual replay. Verify successful email, preference suppression, provider failure, automatic retry, terminal dead-lettering, and manual replay.
+The mobile adapters deliberately target a normalized gateway contract rather than coupling Request Portal to Meta, Twilio, or another BSP. Commissioning therefore requires only deployment/provider work, not another Request Portal feature rewrite.
+
+For SMS, configure the gateway endpoint and API token through Common.Secrets/OpenBao using the default secret names:
+
+- `messaging/sms/endpoint`
+- `messaging/sms/api-token`
+
+Then set `Notifications:SmsEnabled=true` and verify that the gateway translates the normalized Common.Messaging envelope to the selected SMS provider.
+
+For WhatsApp, configure:
+
+- `messaging/whatsapp/endpoint`
+- `messaging/whatsapp/api-token`
+
+Then set `Notifications:WhatsAppEnabled=true` and verify the gateway/provider setup end to end. The selected WhatsApp Business provider may additionally require approved sender identity, recipient opt-in, and approved message templates for business-initiated conversations; those are provider/account commissioning concerns rather than Request Portal code.
+
+Do not enable either mobile channel until its endpoint, credential handling, provider account, diagnostics and test delivery are verified. If a channel is disabled, users cannot enable that preference through the portal.
+
+Email delivery uses bounded retries and a terminal dead-letter state. Staff Operations exposes dead-letter messages and audited manual replay. Mobile notifications use the same durable Common.Messaging queue, retry/idempotency infrastructure and Request Portal notification history. Verify successful delivery, preference behavior, provider failure, automatic retry, terminal dead-lettering and manual recovery for every commissioned channel.
+
+### Do we require SMS?
+
+No. SMS is an optional fallback channel, not a Request Portal production dependency. A production deployment is valid with email only, or with email plus WhatsApp. SMS is useful when a recipient lacks WhatsApp/data service or when FFP deliberately wants a short fallback channel, but `SmsEnabled=false` does not make the portal incomplete.
 
 ## 9. Upload security
 
@@ -116,7 +138,7 @@ Terminate TLS with the approved certificate and forward only trusted proxy heade
 
 ## 14. Monitoring and diagnostics
 
-Commission Starfleet Diagnostics/monitoring for database, durable storage, malware scanner, OpenBao, SMTP, staff authentication, notification dead letters, integration failures and repeated fulfilment/integration errors. Preserve correlation IDs through request and asynchronous processing paths.
+Commission Starfleet Diagnostics/monitoring for database, durable storage, malware scanner, OpenBao, SMTP, staff authentication, notification dead letters, integration failures and repeated fulfilment/integration errors. Add gateway/provider monitoring for each commissioned SMS or WhatsApp channel. Preserve correlation IDs through request and asynchronous processing paths.
 
 ## 15. Backup and recovery
 
@@ -133,7 +155,7 @@ Before DNS cutover:
 5. ClamAV is reachable and failure-path tested.
 6. Staff authentication/authorization and at least one representative identity provider are tested.
 7. SMTP is tested end to end, including dead-letter/replay behavior.
-8. SMS/WhatsApp remain explicitly Not Commissioned unless real adapters have been commissioned.
+8. SMS and WhatsApp remain disabled unless their provider/gateway, secrets and end-to-end delivery have been commissioned. Neither is required for production release.
 9. Organization-isolation and authorization regression tests are green.
 10. Partial fulfilment and integration retry/reconciliation tests are green.
 11. XLSX and Print / Save PDF reports are verified.
