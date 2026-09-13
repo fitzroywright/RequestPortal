@@ -171,50 +171,81 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
     private EngineeringDiagnosticCheckResult CheckSystemConfiguration()
     {
         bool storageConfigured = !string.IsNullOrWhiteSpace(configuration["Storage:Local:RootPath"]);
-        bool notificationsConfigured = configuration.GetValue("Notifications:Enabled", false);
-        bool activeDirectoryConfigured = !string.IsNullOrWhiteSpace(configuration["Authentication:ActiveDirectory:Server"]);
+        bool durableMessagingConfigured = !string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]);
+        bool notificationsConfigured =
+            configuration.GetValue("Notifications:Enabled", false) &&
+            !string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) &&
+            !string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]);
 
-        if (!storageConfigured || !activeDirectoryConfigured)
+        string[] reviewerGroups = configuration.GetSection("Authentication:ActiveDirectory:ReviewerGroups").Get<string[]>() ?? Array.Empty<string>();
+        string[] administratorGroups = configuration.GetSection("Authentication:ActiveDirectory:AdministratorGroups").Get<string[]>() ?? Array.Empty<string>();
+        bool staffOidcConfigured =
+            configuration.GetValue("Authentication:StaffOidc:Enabled", false) &&
+            !string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:Authority"]) &&
+            !string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientId"]) &&
+            reviewerGroups.Length > 0 &&
+            administratorGroups.Length > 0;
+
+        List<string> missing = [];
+        if (!storageConfigured) missing.Add("durable storage");
+        if (!durableMessagingConfigured) missing.Add("durable messaging");
+        if (!notificationsConfigured) missing.Add("SMTP notifications");
+        if (!staffOidcConfigured) missing.Add("staff OIDC/group mapping");
+
+        if (missing.Count > 0)
         {
             return Warning(
                 "requestportal-l3-system",
                 "RequestPortal system configuration",
-                "Storage or Active Directory configuration is incomplete.");
+                $"Production configuration is incomplete: {string.Join(", ", missing)}.");
         }
 
-        return notificationsConfigured
-            ? Passed(
-                "requestportal-l3-system",
-                "RequestPortal system configuration",
-                "Storage, Active Directory and notifications are configured.")
-            : Warning(
-                "requestportal-l3-system",
-                "RequestPortal system configuration",
-                "Storage and Active Directory are configured, but notifications are disabled.");
+        return Passed(
+            "requestportal-l3-system",
+            "RequestPortal system configuration",
+            "Durable storage, durable messaging, SMTP notifications and staff OIDC/group mappings are configured.");
     }
 
     private EngineeringDiagnosticCheckResult CheckIntegrationConfiguration()
     {
-        bool openBaoConfigured = !string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]);
+        bool openBaoConfigured =
+            !string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]) &&
+            !string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:RoleId"]);
         bool malwareScannerConfigured = configuration.GetValue("Uploads:MalwareScanning:Enabled", false) &&
             !string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]);
         bool externalIdentityConfigured =
-            !string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientId"]) ||
-            !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"]) ||
-            !string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppId"]);
+            HasPair("Authentication:Microsoft:ClientId", "Authentication:Microsoft:ClientSecret") ||
+            HasPair("Authentication:Google:ClientId", "Authentication:Google:ClientSecret") ||
+            HasPair("Authentication:Facebook:AppId", "Authentication:Facebook:AppSecret");
 
-        if (!openBaoConfigured || !malwareScannerConfigured || !externalIdentityConfigured)
+        bool ffpManagerEnabled = configuration.GetValue("FfpManagerIntegration:Enabled", false);
+        bool ffpManagerConfigured = !ffpManagerEnabled ||
+            (HasPair("FfpManagerIntegration:BaseUrl", "FfpManagerIntegration:SharedSecret"));
+
+        List<string> missing = [];
+        if (!openBaoConfigured) missing.Add("OpenBao workload credentials");
+        if (!malwareScannerConfigured) missing.Add("malware scanner");
+        if (!externalIdentityConfigured) missing.Add("representative identity provider");
+        if (!ffpManagerConfigured) missing.Add("FFP Manager adapter");
+
+        if (missing.Count > 0)
         {
             return Warning(
                 "requestportal-l2-integrations",
                 "RequestPortal integration readiness",
-                "One or more production integrations are not fully configured.");
+                $"One or more production integrations are not fully configured: {string.Join(", ", missing)}.");
         }
 
         return Passed(
             "requestportal-l2-integrations",
             "RequestPortal integration readiness",
-            "Configured production integrations and central Common-platform adoption checks are satisfied.");
+            "OpenBao, malware scanning, representative identity and commissioned adapter configuration checks are satisfied.");
+    }
+
+    private bool HasPair(string firstKey, string secondKey)
+    {
+        return !string.IsNullOrWhiteSpace(configuration[firstKey]) &&
+               !string.IsNullOrWhiteSpace(configuration[secondKey]);
     }
 
     private static EngineeringDiagnosticCheckResult Passed(string id, string name, string summary) =>
