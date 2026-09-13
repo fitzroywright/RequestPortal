@@ -17,6 +17,29 @@ public sealed class FulfilmentTests
     }
 
     [Fact]
+    public void CancelledFulfilmentCanRestartWithNewSourceAndReference()
+    {
+        Fulfilment fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
+        fulfilment.MarkInProgress("ICP-123");
+        fulfilment.Cancel("Routing changed");
+
+        fulfilment.Restart(FulfilmentSource.FftpUs, "US-456");
+
+        Assert.Equal(FulfilmentStatus.InProgress, fulfilment.Status);
+        Assert.Equal(FulfilmentSource.FftpUs, fulfilment.Source);
+        Assert.Equal("US-456", fulfilment.ExternalReference);
+        Assert.Null(fulfilment.FulfilledUtc);
+        Assert.Null(fulfilment.Notes);
+    }
+
+    [Fact]
+    public void NonCancelledFulfilmentCannotUseRestartPath()
+    {
+        Fulfilment fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.LocalIcp, DateTimeOffset.UtcNow);
+        Assert.Throws<InvalidOperationException>(() => fulfilment.Restart(FulfilmentSource.FftpUs, "US-456"));
+    }
+
+    [Fact]
     public void CompletingFulfilmentTwiceIsIdempotent()
     {
         Fulfilment fulfilment = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), FulfilmentSource.FftpUs, DateTimeOffset.UtcNow);
