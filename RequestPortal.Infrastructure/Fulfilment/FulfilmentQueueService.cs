@@ -62,6 +62,8 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
         if (!Enum.TryParse(source, true, out FulfilmentSource fulfilmentSource)) throw new ArgumentException("Unknown fulfilment source.", nameof(source));
 
         await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await LockRequestAsync(requestId, cancellationToken);
+
         AssistanceRequest request = await dbContext.AssistanceRequests.Include(item => item.StatusHistory).Include(item => item.Items).SingleAsync(item => item.Id == requestId, cancellationToken);
         if (request.Status != RequestStatus.Approved && request.Status != RequestStatus.PendingFulfilment) throw new InvalidOperationException("Only approved requests can enter fulfilment.");
 
@@ -124,6 +126,10 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
     {
         if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity));
         if (value < 0) throw new ArgumentOutOfRangeException(nameof(value));
+
+        await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await LockRequestAsync(requestId, cancellationToken);
+
         AssistanceRequest request = await dbContext.AssistanceRequests.AsNoTracking().SingleAsync(item => item.Id == requestId, cancellationToken);
         if (request.Status != RequestStatus.PendingFulfilment) throw new InvalidOperationException("Progress can only be recorded while a request is pending fulfilment.");
         Fulfilment fulfilment = await dbContext.Fulfilments.AsNoTracking().SingleAsync(item => item.RequestId == requestId, cancellationToken);
@@ -142,14 +148,22 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
             """, cancellationToken);
         if (affected != 1) throw new InvalidOperationException("Progress was not recorded. The line may be missing or the quantity would exceed the request.");
 
+        await transaction.CommitAsync(cancellationToken);
         await auditWriter.WriteAsync(staffUserId, "FulfilmentProgressRecorded", "Fulfilment", fulfilment.Id, request.OrganizationId, $"item={requestItemId:D}; quantity={quantity}; value={value}", cancellationToken);
     }
 
     public async Task CompleteAsync(Guid staffUserId, Guid requestId, string? notes, CancellationToken cancellationToken = default)
     {
+        await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await LockRequestAsync(requestId, cancellationToken);
+
         AssistanceRequest request = await dbContext.AssistanceRequests.Include(item => item.StatusHistory).SingleAsync(item => item.Id == requestId, cancellationToken);
         Fulfilment fulfilment = await dbContext.Fulfilments.SingleAsync(item => item.RequestId == requestId, cancellationToken);
-        if (request.Status == RequestStatus.Fulfilled && fulfilment.Status == FulfilmentStatus.Fulfilled) return;
+        if (request.Status == RequestStatus.Fulfilled && fulfilment.Status == FulfilmentStatus.Fulfilled)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
         if (request.Status != RequestStatus.PendingFulfilment) throw new InvalidOperationException("The request is not pending fulfilment.");
 
         int incomplete = await dbContext.Database.SqlQuery<int>($"""
@@ -164,17 +178,32 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
         fulfilment.Complete(now, notes);
         request.MarkFulfilled(staffUserId, now);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await auditWriter.WriteAsync(staffUserId, "FulfilmentCompleted", "Fulfilment", fulfilment.Id, request.OrganizationId, notes, cancellationToken);
     }
 
     public async Task CancelAsync(Guid staffUserId, Guid requestId, string reason, CancellationToken cancellationToken = default)
     {
+        await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await LockRequestAsync(requestId, cancellationToken);
+
         AssistanceRequest request = await dbContext.AssistanceRequests.Include(item => item.StatusHistory).SingleAsync(item => item.Id == requestId, cancellationToken);
         Fulfilment fulfilment = await dbContext.Fulfilments.SingleAsync(item => item.RequestId == requestId, cancellationToken);
         fulfilment.Cancel(reason);
         if (request.Status == RequestStatus.PendingFulfilment) request.ReturnToApproved(staffUserId, DateTimeOffset.UtcNow, reason);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await auditWriter.WriteAsync(staffUserId, "FulfilmentCancelled", "Fulfilment", fulfilment.Id, request.OrganizationId, reason, cancellationToken);
+    }
+
+    private Task<int> LockRequestAsync(Guid requestId, CancellationToken cancellationToken)
+    {
+        return dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT 1
+            FROM assistance_requests
+            WHERE "Id" = {requestId}
+            FOR UPDATE
+            """, cancellationToken);
     }
 
     private sealed class FulfilmentProgressRow
