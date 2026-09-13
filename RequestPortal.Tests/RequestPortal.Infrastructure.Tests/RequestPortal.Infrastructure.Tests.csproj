@@ -12,7 +12,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../RequestPortal/RequestPortal.Infrastructure/RequestPortal.Infrastructure.csproj" />
-    <ProjectReference Include="../../RequestPortal/FfpManager.Bridge/FfpManager.Bridge.csproj" />
+    <ProjectReference Include="../../RequestPortal.Infrastructure/RequestPortal.Infrastructure.csproj" />
+    <ProjectReference Include="../../FfpManager.Bridge/FfpManager.Bridge.csproj" />
   </ItemGroup>
 </Project>
