@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RequestPortal.Infrastructure.Messaging;
+using RequestPortal.Infrastructure.Organizations;
+using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Web.Services;
 
@@ -23,12 +25,28 @@ public sealed class OutboxHostedService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        DateTimeOffset nextRegistrationReminderProjectionUtc = DateTimeOffset.MinValue;
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-                OutboxDispatcher dispatcher = scope.ServiceProvider.GetRequiredService<OutboxDispatcher>();
+                IServiceProvider services = scope.ServiceProvider;
+
+                if (DateTimeOffset.UtcNow >= nextRegistrationReminderProjectionUtc)
+                {
+                    RequestPortalDbContext dbContext = services.GetRequiredService<RequestPortalDbContext>();
+                    OrganizationRegistrationReminderService reminderService = new(dbContext);
+                    int queued = await reminderService.QueueDueRemindersAsync(stoppingToken);
+                    if (queued > 0)
+                    {
+                        logger.LogInformation("Queued {ReminderCount} organization registration reminder(s).", queued);
+                    }
+                    nextRegistrationReminderProjectionUtc = DateTimeOffset.UtcNow.AddHours(6);
+                }
+
+                OutboxDispatcher dispatcher = services.GetRequiredService<OutboxDispatcher>();
                 await dispatcher.DispatchBatchAsync(cancellationToken: stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
