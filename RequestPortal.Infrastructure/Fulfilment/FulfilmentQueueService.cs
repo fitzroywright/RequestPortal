@@ -67,17 +67,28 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
 
         Fulfilment? fulfilment = await dbContext.Fulfilments.SingleOrDefaultAsync(item => item.RequestId == requestId, cancellationToken);
         bool created = fulfilment is null;
+        bool restarted = false;
         if (fulfilment is null)
         {
             fulfilment = new Fulfilment(Guid.NewGuid(), request.Id, request.OrganizationId, fulfilmentSource, DateTimeOffset.UtcNow);
             dbContext.Fulfilments.Add(fulfilment);
+            fulfilment.MarkInProgress(externalReference);
         }
-        else if (fulfilment.Source != fulfilmentSource)
+        else if (fulfilment.Status == FulfilmentStatus.Cancelled)
         {
-            throw new InvalidOperationException("The request already has a fulfilment with a different source.");
+            fulfilment.Restart(fulfilmentSource, externalReference);
+            restarted = true;
+        }
+        else
+        {
+            if (fulfilment.Source != fulfilmentSource)
+            {
+                throw new InvalidOperationException("The request already has a fulfilment with a different source.");
+            }
+
+            fulfilment.MarkInProgress(externalReference);
         }
 
-        fulfilment.MarkInProgress(externalReference);
         if (request.Status == RequestStatus.Approved) request.MarkPendingFulfilment(staffUserId, DateTimeOffset.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -92,9 +103,20 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
                     """, cancellationToken);
             }
         }
+        else if (restarted)
+        {
+            await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE fulfilment_lines
+                SET "FulfilledQuantity" = 0,
+                    "FulfilledValue" = 0,
+                    "LastProgressUtc" = NULL,
+                    "Notes" = NULL
+                WHERE "FulfilmentId" = {fulfilment.Id}
+                """, cancellationToken);
+        }
 
         await transaction.CommitAsync(cancellationToken);
-        await auditWriter.WriteAsync(staffUserId, "FulfilmentStarted", "Fulfilment", fulfilment.Id, request.OrganizationId, fulfilmentSource.ToString(), cancellationToken);
+        await auditWriter.WriteAsync(staffUserId, restarted ? "FulfilmentRestarted" : "FulfilmentStarted", "Fulfilment", fulfilment.Id, request.OrganizationId, fulfilmentSource.ToString(), cancellationToken);
         return fulfilment.Id;
     }
 
