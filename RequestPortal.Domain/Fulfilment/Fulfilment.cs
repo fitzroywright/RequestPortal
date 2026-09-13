@@ -24,6 +24,21 @@ public sealed class Fulfilment
 
     public Fulfilment(Guid id, Guid requestId, Guid organizationId, FulfilmentSource source, DateTimeOffset createdUtc)
     {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Fulfilment id is required.", nameof(id));
+        }
+
+        if (requestId == Guid.Empty)
+        {
+            throw new ArgumentException("Request id is required.", nameof(requestId));
+        }
+
+        if (organizationId == Guid.Empty)
+        {
+            throw new ArgumentException("Organization id is required.", nameof(organizationId));
+        }
+
         Id = id;
         RequestId = requestId;
         OrganizationId = organizationId;
@@ -52,17 +67,30 @@ public sealed class Fulfilment
 
     public void MarkInProgress(string? externalReference)
     {
+        string? normalizedReference = Normalize(externalReference);
+
+        if (Status == FulfilmentStatus.InProgress &&
+            string.Equals(ExternalReference, normalizedReference, StringComparison.Ordinal))
+        {
+            return;
+        }
+
         if (Status != FulfilmentStatus.Pending)
         {
             throw new InvalidOperationException("Only pending fulfilments can start processing.");
         }
 
         Status = FulfilmentStatus.InProgress;
-        ExternalReference = string.IsNullOrWhiteSpace(externalReference) ? null : externalReference.Trim();
+        ExternalReference = normalizedReference;
     }
 
     public void Complete(DateTimeOffset fulfilledUtc, string? notes)
     {
+        if (Status == FulfilmentStatus.Fulfilled)
+        {
+            return;
+        }
+
         if (Status != FulfilmentStatus.Pending && Status != FulfilmentStatus.InProgress)
         {
             throw new InvalidOperationException("This fulfilment cannot be completed from its current status.");
@@ -70,6 +98,32 @@ public sealed class Fulfilment
 
         Status = FulfilmentStatus.Fulfilled;
         FulfilledUtc = fulfilledUtc;
-        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        Notes = Normalize(notes);
+    }
+
+    public void Cancel(string reason)
+    {
+        if (Status == FulfilmentStatus.Cancelled)
+        {
+            return;
+        }
+
+        if (Status == FulfilmentStatus.Fulfilled)
+        {
+            throw new InvalidOperationException("A fulfilled fulfilment cannot be cancelled.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("A cancellation reason is required.", nameof(reason));
+        }
+
+        Status = FulfilmentStatus.Cancelled;
+        Notes = reason.Trim();
+    }
+
+    private static string? Normalize(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
