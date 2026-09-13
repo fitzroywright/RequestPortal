@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Notifications;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Infrastructure.Messaging;
@@ -16,13 +17,16 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly NotificationOptions notificationOptions;
+    private readonly IBusinessAuditWriter auditWriter;
 
     public NotificationPreferenceService(
         RequestPortalDbContext dbContext,
-        IOptions<NotificationOptions> notificationOptions)
+        IOptions<NotificationOptions> notificationOptions,
+        IBusinessAuditWriter auditWriter)
     {
         this.dbContext = dbContext;
         this.notificationOptions = notificationOptions.Value;
+        this.auditWriter = auditWriter;
     }
 
     public async Task<IReadOnlyList<NotificationPreferenceView>> GetPreferencesAsync(
@@ -74,6 +78,14 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(
+            userId,
+            "NotificationPreferenceChanged",
+            "NotificationPreference",
+            preference.Id,
+            null,
+            $"channel={channel}; enabled={enabled}",
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<NotificationHistoryView>> GetRecentHistoryAsync(
