@@ -84,8 +84,28 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
     {
         IntegrationLink link = await GetLinkAsync(linkId, cancellationToken);
         EnsureSupported(link);
-        await ffpManagerIntegrationService.SubmitRequestAsync(link.RequestId, cancellationToken);
-        await auditWriter.WriteAsync(staffUserId, "IntegrationRetried", "IntegrationLink", link.Id, null, link.SystemName, cancellationToken);
+
+        try
+        {
+            await ffpManagerIntegrationService.SubmitRequestAsync(link.RequestId, cancellationToken);
+            await auditWriter.WriteAsync(staffUserId, "IntegrationRetried", "IntegrationLink", link.Id, null, link.SystemName, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            await auditWriter.WriteAsync(
+                staffUserId,
+                "IntegrationRetryFailed",
+                "IntegrationLink",
+                link.Id,
+                null,
+                $"system={link.SystemName}; failureType={exception.GetType().Name}",
+                cancellationToken);
+            throw;
+        }
     }
 
     public async Task ReconcileAsync(Guid staffUserId, Guid linkId, CancellationToken cancellationToken = default)
@@ -97,15 +117,34 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
             throw new InvalidOperationException("The integration has no external reference to reconcile. Retry the submission first.");
         }
 
-        FfpManagerApplicationStatus? status = await ffpManagerIntegrationService.RefreshStatusAsync(link.RequestId, cancellationToken);
-        if (status is null)
+        try
         {
-            throw new InvalidOperationException("The external system did not return a status for this request.");
-        }
+            FfpManagerApplicationStatus? status = await ffpManagerIntegrationService.RefreshStatusAsync(link.RequestId, cancellationToken);
+            if (status is null)
+            {
+                throw new InvalidOperationException("The external system did not return a status for this request.");
+            }
 
-        Guid messageId = CreateDeterministicMessageId(link.ExternalReference, status.StatusCode, status.ChangedUtc);
-        await ffpManagerIntegrationService.ReceiveStatusAsync(messageId, link.RequestId, status, cancellationToken);
-        await auditWriter.WriteAsync(staffUserId, "IntegrationReconciled", "IntegrationLink", link.Id, null, $"{link.SystemName}:{status.StatusCode}", cancellationToken);
+            Guid messageId = CreateDeterministicMessageId(link.ExternalReference, status.StatusCode, status.ChangedUtc);
+            await ffpManagerIntegrationService.ReceiveStatusAsync(messageId, link.RequestId, status, cancellationToken);
+            await auditWriter.WriteAsync(staffUserId, "IntegrationReconciled", "IntegrationLink", link.Id, null, $"{link.SystemName}:{status.StatusCode}", cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            await auditWriter.WriteAsync(
+                staffUserId,
+                "IntegrationReconciliationFailed",
+                "IntegrationLink",
+                link.Id,
+                null,
+                $"system={link.SystemName}; failureType={exception.GetType().Name}",
+                cancellationToken);
+            throw;
+        }
     }
 
     private void EnsureSupported(IntegrationLink link)
