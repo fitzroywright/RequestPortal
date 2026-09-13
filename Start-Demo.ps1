@@ -19,6 +19,41 @@ if ($Database -notmatch '^[A-Za-z0-9_]+$') { throw "Demo database name contains 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw ".NET SDK is not available in PATH."
 }
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    throw "Git is not available in PATH."
+}
+
+$commonRoot = Join-Path (Split-Path $repoRoot -Parent) "Common"
+$commonRepositories = @(
+    @{ Name = "Common.Diagnostics"; Url = "https://github.com/fitzroywright/Common.Diagnostics.git" },
+    @{ Name = "Common.Security"; Url = "https://github.com/fitzroywright/Common.Security.git" },
+    @{ Name = "Common.Secrets"; Url = "https://github.com/fitzroywright/Common.Secrets.git" },
+    @{ Name = "Common.Messaging"; Url = "https://github.com/fitzroywright/Common.Messaging.git" },
+    @{ Name = "Common.Storage"; Url = "https://github.com/fitzroywright/Common.Storage.git" }
+)
+
+$missingCommon = @($commonRepositories | Where-Object { -not (Test-Path (Join-Path $commonRoot $_.Name)) })
+if ($missingCommon.Count -gt 0) {
+    Write-Host "This clone is missing sibling Common.* source repositories required by Request Portal."
+    Write-Host "Bootstrapping them once. Internet access is required only for this initial clone/restore step."
+    New-Item -ItemType Directory -Path $commonRoot -Force | Out-Null
+
+    foreach ($repo in $missingCommon) {
+        $target = Join-Path $commonRoot $repo.Name
+        Write-Host "  Cloning $($repo.Name)..."
+        git clone --depth 1 $repo.Url $target
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to clone $($repo.Name). Restore Internet/GitHub access, remove any incomplete folder at '$target', and rerun Start-Demo.ps1."
+        }
+    }
+}
+
+foreach ($repo in $commonRepositories) {
+    $projectFile = Join-Path (Join-Path $commonRoot $repo.Name) "$($repo.Name).csproj"
+    if (-not (Test-Path $projectFile)) {
+        throw "Required Common project is missing: $projectFile"
+    }
+}
 
 $psql = Get-Command psql -ErrorAction SilentlyContinue
 if (-not $psql) {
@@ -112,7 +147,7 @@ try {
 Write-Host ""
 Write-Host "If Windows Firewall prompts, allow Private network access for LAN viewing."
 Write-Host "A LAN browser may warn about the laptop development certificate; localhost remains trusted on this laptop."
-Write-Host "After the first successful restore, Wi-Fi/Internet may disappear and https://localhost:$Port continues to work."
+Write-Host "After the first successful bootstrap/restore, Wi-Fi/Internet may disappear and https://localhost:$Port continues to work."
 Write-Host "Press Ctrl+C here when the demonstration is complete."
 Write-Host ""
 
