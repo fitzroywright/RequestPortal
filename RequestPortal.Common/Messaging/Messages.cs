@@ -40,6 +40,12 @@ public sealed record OrganizationRegistrationReminderMessage(
     DateOnly ExpiryDate,
     string ReminderKind) : IMessage;
 
+public sealed record OrganizationRegistrationVerifiedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid OrganizationId,
+    Guid DocumentId) : IMessage;
+
 public sealed record MembershipRequestedMessage(
     Guid MessageId,
     DateTimeOffset OccurredUtc,
