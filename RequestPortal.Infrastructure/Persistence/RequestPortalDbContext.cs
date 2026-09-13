@@ -6,7 +6,6 @@ using RequestPortal.Domain.Auditing;
 using RequestPortal.Domain.Beneficiaries;
 using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Documents;
-using RequestPortal.Domain.Fulfilment;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
@@ -36,7 +35,6 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<StoredDocument> Documents => Set<StoredDocument>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RequestFulfilment> Fulfilments => Set<RequestFulfilment>();
-    public DbSet<FulfilmentLine> FulfilmentLines => Set<FulfilmentLine>();
     public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
