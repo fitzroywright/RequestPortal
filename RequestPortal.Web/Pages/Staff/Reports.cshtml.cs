@@ -36,6 +36,9 @@ public sealed class ReportsModel : PageModel
     [BindProperty(SupportsGet = true)]
     public DateTime? ToDate { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public int PageNumber { get; set; } = 1;
+
     public RequestReportResult Report { get; private set; } =
         new(Array.Empty<RequestReportRow>(), 0, 0, 0, 0, 0);
 
@@ -58,6 +61,18 @@ public sealed class ReportsModel : PageModel
             $"request-portal-report-{DateTime.UtcNow:yyyyMMdd-HHmm}.csv");
     }
 
+    public async Task<IActionResult> OnGetExportXlsxAsync()
+    {
+        byte[] content = await reportingService.ExportXlsxAsync(
+            BuildFilter(),
+            HttpContext.RequestAborted);
+
+        return File(
+            content,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"request-portal-report-{DateTime.UtcNow:yyyyMMdd-HHmm}.xlsx");
+    }
+
     private RequestReportFilter BuildFilter()
     {
         DateTimeOffset? fromUtc = FromDate.HasValue
@@ -75,6 +90,8 @@ public sealed class ReportsModel : PageModel
             Category,
             Priority,
             fromUtc,
-            toUtc);
+            toUtc,
+            PageNumber,
+            100);
     }
 }
