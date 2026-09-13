@@ -21,4 +21,23 @@ public sealed record FulfilmentQueueItem(
 public interface IFulfilmentQueueService
 {
     Task<IReadOnlyList<FulfilmentQueueItem>> GetQueueAsync(CancellationToken cancellationToken = default);
+
+    Task<Guid> StartAsync(
+        Guid staffUserId,
+        Guid requestId,
+        string source,
+        string? externalReference,
+        CancellationToken cancellationToken = default);
+
+    Task CompleteAsync(
+        Guid staffUserId,
+        Guid requestId,
+        string? notes,
+        CancellationToken cancellationToken = default);
+
+    Task CancelAsync(
+        Guid staffUserId,
+        Guid requestId,
+        string reason,
+        CancellationToken cancellationToken = default);
 }
