@@ -16,7 +16,6 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -79,19 +78,7 @@ long uploadMaxBytes = builder.Configuration.GetValue<long?>("Uploads:MaxBytes") 
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = uploadMaxBytes + (1024L * 1024L));
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = uploadMaxBytes);
 
-builder.Services.AddDbContext<RequestPortalDbContext>(options =>
-{
-    options.UseNpgsql(connectionString);
-    if (builder.Environment.IsEnvironment("Demo"))
-    {
-        // Demo bootstrap and ASP.NET Identity perform a number of unique-key First/Single
-        // lookups. EF translates those to LIMIT without ORDER BY and logs a warning even
-        // though the predicate is deterministic. Suppress only this warning in Demo mode;
-        // all other EF warnings remain enabled and production behavior is unchanged.
-        options.ConfigureWarnings(warnings =>
-            warnings.Ignore(CoreEventId.RowLimitingOperationWithoutOrderByWarning));
-    }
-});
+builder.Services.AddDbContext<RequestPortalDbContext>(options => options.UseNpgsql(connectionString));
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
@@ -191,21 +178,311 @@ if (staffOidc.Enabled)
 
                 StaffOidcPrincipalService service = context.HttpContext.RequestServices
                     .GetRequiredService<StaffOidcPrincipalService>();
-
                 StaffOidcPrincipalResult result = await service.BuildPrincipalAsync(
                     context.Principal,
                     context.HttpContext.RequestAborted);
-
                 if (!result.Allowed || result.Principal is null)
                 {
-                    context.Fail(result.FailureCode ?? "Staff access denied.");
+                    context.Fail(result.FailureCode ?? "FFP staff access denied.");
                     return;
                 }
 
                 context.Principal = result.Principal;
+            },
+            OnRemoteFailure = context =>
+            {
+                context.HandleResponse();
+                context.Response.Redirect("/Account/StaffAccessDenied");
+                return Task.CompletedTask;
             }
         };
     });
 }
 
-// Remainder of Program.cs is unchanged on this branch and retained below.
+Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonAuthorization<RequestPortalAuthorizationStore>(builder.Services);
+Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonSecurityDiagnostics(builder.Services);
+
+if (secretsRuntime is not null)
+{
+    secretsRuntime.Register(builder.Services);
+}
+else
+{
+    Common.Secrets.ServiceCollectionExtensions.AddCommonSecrets(builder.Services, builder.Configuration);
+}
+Common.Secrets.ServiceCollectionExtensions.AddCommonSecretsDiagnostics(builder.Services);
+
+string dataProtectionPath = builder.Configuration["Security:DataProtectionKeysPath"] ?? "App_Data/keys";
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.GetFullPath(dataProtectionPath)))
+    .SetApplicationName("RequestPortal");
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
+
+builder.Services.AddSingleton<IClock, RequestPortal.Common.Time.SystemClock>();
+string storageRoot = builder.Configuration["Storage:Local:RootPath"] ?? "App_Data/storage";
+Common.Storage.StorageServiceCollectionExtensions.AddCommonStorage(builder.Services, storageRoot);
+builder.Services.AddSingleton<IDocumentUploadSecurity, DocumentUploadSecurity>();
+
+NotificationOptions notificationOptions = builder.Configuration
+    .GetSection(NotificationOptions.SectionName)
+    .Get<NotificationOptions>() ?? new NotificationOptions();
+string messagingQueuePath = builder.Configuration["Messaging:DurableQueuePath"]
+    ?? Path.Combine("App_Data", "common-messaging");
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingSecrets(builder.Services);
+Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddSmtpMessagingChannel(
+    builder.Services,
+    new Common.Messaging.Channels.Smtp.SmtpMessageOptions
+    {
+        Host = notificationOptions.SmtpHost ?? string.Empty,
+        Port = notificationOptions.SmtpPort,
+        EnableSsl = notificationOptions.EnableSsl,
+        FromAddress = notificationOptions.FromAddress ?? string.Empty,
+        UserName = notificationOptions.UserName ?? string.Empty,
+        PasswordSecretName = notificationOptions.PasswordSecretName
+    });
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingQueuedDelivery(
+    builder.Services,
+    new Common.Messaging.ExternalDeliveryOptions
+    {
+        DeliveryMode = Common.Messaging.ExternalDeliveryMode.ParallelByRecipient,
+        MaxConcurrency = 4,
+        MaxAttempts = 5,
+        InitialRetryDelay = TimeSpan.FromSeconds(5),
+        MaxRetryDelay = TimeSpan.FromMinutes(5),
+        DurableQueuePath = messagingQueuePath
+    },
+    durable: true);
+Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingDiagnostics(builder.Services);
+builder.Services.AddScoped<INotificationSender, CommonQueuedNotificationSender>();
+
+builder.Services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
+builder.Services.AddScoped<ICountryPolicyService, CountryPolicyService>();
+builder.Services.AddScoped<IRequestReferenceDataService, RequestReferenceDataService>();
+builder.Services.AddScoped<IOrganizationMembershipGovernanceService, OrganizationMembershipGovernanceService>();
+builder.Services.AddScoped<IOrganizationAccessService, OrganizationAccessService>();
+builder.Services.AddScoped<IOrganizationProfileService, OrganizationProfileService>();
+builder.Services.AddScoped<PortalWorkflowService>();
+builder.Services.AddScoped<IPortalWorkflowService, AuditedPortalWorkflowService>();
+builder.Services.AddScoped<IStaffOrganizationDirectoryService, StaffOrganizationDirectoryService>();
+builder.Services.AddScoped<IStaffOrganizationService, StaffOrganizationService>();
+builder.Services.AddScoped<IStaffOperationsService, StaffOperationsService>();
+builder.Services.AddScoped<IStaffReportingService, StaffReportingService>();
+builder.Services.AddScoped<IManagementDashboardService, ManagementDashboardService>();
+builder.Services.AddScoped<IRequestLocationService, RequestLocationService>();
+builder.Services.AddScoped<IBusinessAuditWriter, BusinessAuditWriter>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
+builder.Services.AddScoped<IRequestDraftService, RequestDraftService>();
+builder.Services.AddScoped<IProjectProposalService, ProjectProposalService>();
+builder.Services.AddScoped<IProjectPlanningService, ProjectPlanningService>();
+builder.Services.AddScoped<IRequestLifecycleService, RequestLifecycleService>();
+builder.Services.AddScoped<IFulfilmentQueueService, FulfilmentQueueService>();
+builder.Services.AddScoped<IIntegrationStatusService, IntegrationStatusService>();
+builder.Services.AddFfpManagerIntegration(builder.Configuration);
+builder.Services.AddScoped<StaffOidcPrincipalService>();
+builder.Services.AddScoped<OutboxDispatcher>();
+builder.Services.AddHostedService<OutboxHostedService>();
+builder.Services.AddHostedService<ConfigurationContractPublisher>();
+builder.Services.AddScoped<DemoDatabaseBootstrapper>();
+builder.Services.AddScoped<DemoDataSeeder>();
+builder.Services.AddScoped<DemoReadinessValidator>();
+builder.Services.AddEngineeringDiagnostics();
+builder.Services.AddScoped<IStartupDiagnostic, PostgreSqlStartupDiagnostic>();
+builder.Services.AddScoped<StartupDiagnosticRunner>();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(PortalPolicies.FfpStaff, policy =>
+    {
+        policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
+        policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.Access);
+    });
+    options.AddPolicy(PortalPolicies.ManagementDashboard, policy =>
+    {
+        policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
+        policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ViewManagementDashboard);
+    });
+});
+
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AuthorizeFolder("/Dashboard");
+    options.Conventions.AuthorizeFolder("/Staff", PortalPolicies.FfpStaff);
+    options.Conventions.AuthorizeFolder("/Management", PortalPolicies.ManagementDashboard);
+    options.Conventions.AuthorizeFolder("/Organizations");
+    options.Conventions.AuthorizeFolder("/Requests");
+});
+
+WebApplication app = builder.Build();
+
+if (app.Environment.IsProduction())
+{
+    ValidateProductionConfiguration(app.Configuration);
+    await ApplyProductionMigrationsAsync(app);
+}
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseForwardedHeaders();
+app.UseHttpsRedirection();
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
+    await next();
+});
+app.UseStaticFiles();
+app.UseRouting();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapRazorPages();
+app.MapFfpManagerIntegrationEndpoints();
+
+await PrepareDemoAsync(app);
+await ReportStartupDiagnosticsAsync(app);
+try
+{
+    await app.RunAsync();
+}
+finally
+{
+    if (secretsRuntime is not null)
+    {
+        await secretsRuntime.DisposeAsync();
+    }
+}
+
+static async Task HydrateProductionSecretsAsync(
+    IConfiguration configuration,
+    Common.Secrets.ISecretProvider provider)
+{
+    string[] keys =
+    [
+        "ConnectionStrings:RequestPortal",
+        "Authentication:Google:ClientId",
+        "Authentication:Google:ClientSecret",
+        "Authentication:Microsoft:ClientId",
+        "Authentication:Microsoft:ClientSecret",
+        "Authentication:Facebook:AppId",
+        "Authentication:Facebook:AppSecret",
+        "Authentication:StaffOidc:ClientSecret",
+        "FfpManagerIntegration:SharedSecret"
+    ];
+
+    foreach (string key in keys)
+    {
+        string? value = await provider.GetAsync(key);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            configuration[key] = value;
+        }
+    }
+}
+
+static void ValidateProductionConfiguration(IConfiguration configuration)
+{
+    string storageRoot = configuration["Storage:Local:RootPath"] ?? string.Empty;
+    string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
+    string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
+    bool malwareScanningEnabled = configuration.GetValue("Uploads:MalwareScanning:Enabled", false);
+    bool notificationsEnabled = configuration.GetValue("Notifications:Enabled", false);
+    bool ffpManagerEnabled = configuration.GetValue("FfpManagerIntegration:Enabled", false);
+    string[] reviewerGroups = configuration.GetSection("Authentication:ActiveDirectory:ReviewerGroups").Get<string[]>() ?? Array.Empty<string>();
+    string[] administratorGroups = configuration.GetSection("Authentication:ActiveDirectory:AdministratorGroups").Get<string[]>() ?? Array.Empty<string>();
+    bool hasExternalProvider =
+        (!string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientSecret"])) ||
+        (!string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientSecret"])) ||
+        (!string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppSecret"]));
+    bool staffOidcEnabled = configuration.GetValue("Authentication:StaffOidc:Enabled", false);
+
+    if (string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("RP-PROD-STORAGE-001: Production document storage must be a durable external filesystem path or network share.");
+    if (string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("RP-PROD-DP-001: Production Data Protection keys must be persisted outside the application deployment directory.");
+    if (string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]))
+        throw new InvalidOperationException("RP-PROD-SECRETS-001: Common.Secrets OpenBao is not configured.");
+    if (string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:RoleId"]))
+        throw new InvalidOperationException("RP-PROD-SECRETS-002: Common.Secrets OpenBao AppRole RoleId is not configured.");
+    if (allowedHosts == "*" || string.IsNullOrWhiteSpace(allowedHosts))
+        throw new InvalidOperationException("RP-PROD-HOSTS-001: AllowedHosts must be restricted in production.");
+    if (!malwareScanningEnabled || string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]))
+        throw new InvalidOperationException("RP-PROD-UPLOAD-001: Malware scanning must be configured and enabled in production.");
+    if (reviewerGroups.Length == 0 || administratorGroups.Length == 0)
+        throw new InvalidOperationException("RP-PROD-STAFF-GROUPS-001: FFP staff directory-group mappings must be configured for Common.Security.");
+    if (!staffOidcEnabled ||
+        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:Authority"]) ||
+        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientId"]) ||
+        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientSecret"]))
+        throw new InvalidOperationException("RP-PROD-OIDC-001: FFP staff OIDC Authority, ClientId and OpenBao-backed ClientSecret must be commissioned.");
+    if (!hasExternalProvider)
+        throw new InvalidOperationException("RP-PROD-OAUTH-001: At least one external representative identity provider must be commissioned.");
+    if (!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]))
+        throw new InvalidOperationException("RP-PROD-SMTP-001: SMTP notifications must be commissioned for production.");
+    if (string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]))
+        throw new InvalidOperationException("RP-PROD-MESSAGING-001: Common.Messaging durable queue path must be configured in production.");
+    if (ffpManagerEnabled &&
+        (string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:BaseUrl"]) ||
+         string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:SharedSecret"])))
+        throw new InvalidOperationException("RP-PROD-FFPMANAGER-001: FFP Manager integration requires BaseUrl and SharedSecret when enabled.");
+}
+
+static async Task ApplyProductionMigrationsAsync(WebApplication app)
+{
+    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+    RequestPortalDbContext db = scope.ServiceProvider.GetRequiredService<RequestPortalDbContext>();
+    string[] migrations = db.Database.GetMigrations().ToArray();
+    if (migrations.Length == 0)
+        throw new InvalidOperationException("RP-PROD-MIGRATION-001: No EF Core migrations exist. Production startup is blocked until a baseline migration is generated and reviewed.");
+    await db.Database.MigrateAsync();
+}
+
+static async Task PrepareDemoAsync(WebApplication app)
+{
+    if (!app.Configuration.GetValue("Demo:Enabled", false)) return;
+    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<DemoDatabaseBootstrapper>().InitializeAsync();
+    await scope.ServiceProvider.GetRequiredService<DemoDataSeeder>().SeedAsync();
+    await scope.ServiceProvider.GetRequiredService<DemoReadinessValidator>().ValidateAsync();
+}
+
+static async Task ReportStartupDiagnosticsAsync(WebApplication app)
+{
+    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+    IReadOnlyList<DiagnosticCheckResult> results = await scope.ServiceProvider.GetRequiredService<StartupDiagnosticRunner>().RunAsync();
+    DiagnosticCheckResult? databaseResult = results.FirstOrDefault(result => result.Name == "PostgreSQL");
+    if (databaseResult is not null && !databaseResult.IsHealthy)
+        throw new InvalidOperationException($"RP-STARTUP-DB-001: PostgreSQL startup diagnostic failed. {databaseResult.Detail}");
+}
+
+public partial class Program { }
