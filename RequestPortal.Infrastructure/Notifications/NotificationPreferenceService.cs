@@ -4,8 +4,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RequestPortal.Application.Notifications;
 using RequestPortal.Domain.Notifications;
+using RequestPortal.Infrastructure.Messaging;
 using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Notifications;
@@ -13,17 +15,21 @@ namespace RequestPortal.Infrastructure.Notifications;
 public sealed class NotificationPreferenceService : INotificationPreferenceService
 {
     private readonly RequestPortalDbContext dbContext;
+    private readonly NotificationOptions notificationOptions;
 
-    public NotificationPreferenceService(RequestPortalDbContext dbContext)
+    public NotificationPreferenceService(
+        RequestPortalDbContext dbContext,
+        IOptions<NotificationOptions> notificationOptions)
     {
         this.dbContext = dbContext;
+        this.notificationOptions = notificationOptions.Value;
     }
 
     public async Task<IReadOnlyList<NotificationPreferenceView>> GetPreferencesAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        List<NotificationPreferenceView> preferences = await dbContext.NotificationPreferences
+        return await dbContext.NotificationPreferences
             .AsNoTracking()
             .Where(preference => preference.UserId == userId)
             .OrderBy(preference => preference.Channel)
@@ -32,8 +38,6 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
                 preference.Destination,
                 preference.Enabled))
             .ToListAsync(cancellationToken);
-
-        return preferences;
     }
 
     public async Task SavePreferenceAsync(
@@ -43,6 +47,11 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
         bool enabled,
         CancellationToken cancellationToken = default)
     {
+        if (enabled && !IsCommissioned(channel))
+        {
+            throw new InvalidOperationException($"{channel} notifications are not commissioned in this Request Portal environment.");
+        }
+
         NotificationPreference? preference = await dbContext.NotificationPreferences
             .SingleOrDefaultAsync(
                 item => item.UserId == userId && item.Channel == channel,
@@ -74,7 +83,7 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
     {
         int boundedTake = Math.Clamp(take, 1, 100);
 
-        List<NotificationHistoryView> history = await dbContext.NotificationHistory
+        return await dbContext.NotificationHistory
             .AsNoTracking()
             .Where(item => item.UserId == userId)
             .OrderByDescending(item => item.CreatedUtc)
@@ -89,7 +98,16 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
                 item.SentUtc,
                 item.LastError))
             .ToListAsync(cancellationToken);
+    }
 
-        return history;
+    private bool IsCommissioned(NotificationChannel channel)
+    {
+        return channel switch
+        {
+            NotificationChannel.Email => notificationOptions.Enabled,
+            NotificationChannel.Sms => notificationOptions.SmsEnabled,
+            NotificationChannel.WhatsApp => notificationOptions.WhatsAppEnabled,
+            _ => false
+        };
     }
 }
