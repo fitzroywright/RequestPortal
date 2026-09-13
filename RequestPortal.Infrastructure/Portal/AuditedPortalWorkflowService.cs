@@ -100,6 +100,7 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     public async Task SubmitRequestAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default)
     {
         RequestDetail? request = await inner.GetRequestAsync(userId, requestId, false, cancellationToken);
+        await EnsureOrganizationEligibleForSubmissionAsync(request?.OrganizationId, cancellationToken);
         await inner.SubmitRequestAsync(userId, requestId, cancellationToken);
         await auditWriter.WriteAsync(userId, "RequestSubmitted", "AssistanceRequest", requestId, request?.OrganizationId, cancellationToken: cancellationToken);
     }
@@ -107,6 +108,7 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     public async Task ResubmitRequestAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default)
     {
         RequestDetail? request = await inner.GetRequestAsync(userId, requestId, false, cancellationToken);
+        await EnsureOrganizationEligibleForSubmissionAsync(request?.OrganizationId, cancellationToken);
         await inner.ResubmitRequestAsync(userId, requestId, cancellationToken);
         await auditWriter.WriteAsync(userId, "RequestResubmitted", "AssistanceRequest", requestId, request?.OrganizationId, cancellationToken: cancellationToken);
     }
@@ -139,6 +141,22 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
         RequestDetail? request = await inner.GetRequestAsync(staffUserId, requestId, true, cancellationToken);
         await inner.RequestMoreInformationAsync(staffUserId, requestId, reason, cancellationToken);
         await auditWriter.WriteAsync(staffUserId, "MoreInformationRequested", "AssistanceRequest", requestId, request?.OrganizationId, reason, cancellationToken);
+    }
+
+    private async Task EnsureOrganizationEligibleForSubmissionAsync(
+        Guid? organizationId,
+        CancellationToken cancellationToken)
+    {
+        if (!organizationId.HasValue)
+        {
+            throw new InvalidOperationException("The request organization could not be resolved.");
+        }
+
+        Organization organization = await dbContext.Organizations
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == organizationId.Value, cancellationToken);
+
+        organization.EnsureEligibleForSubmission(DateOnly.FromDateTime(clock.UtcNow.UtcDateTime));
     }
 
     private void AddOutboxMessage<TMessage>(TMessage message)
