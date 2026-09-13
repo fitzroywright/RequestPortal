@@ -25,6 +25,6 @@ public interface IIntegrationStatusService
     Task MarkPendingAsync(Guid linkId, CancellationToken cancellationToken = default);
     Task MarkSynchronizedAsync(Guid linkId, string externalReference, CancellationToken cancellationToken = default);
     Task MarkFailedAsync(Guid linkId, string error, CancellationToken cancellationToken = default);
-    Task RetryAsync(Guid linkId, CancellationToken cancellationToken = default);
-    Task ReconcileAsync(Guid linkId, CancellationToken cancellationToken = default);
+    Task RetryAsync(Guid staffUserId, Guid linkId, CancellationToken cancellationToken = default);
+    Task ReconcileAsync(Guid staffUserId, Guid linkId, CancellationToken cancellationToken = default);
 }
