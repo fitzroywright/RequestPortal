@@ -35,8 +35,8 @@ public sealed class NotificationsModel : PageModel
     public IReadOnlyList<NotificationHistoryView> History { get; private set; } = Array.Empty<NotificationHistoryView>();
     public string DefaultEmail { get; private set; } = string.Empty;
     public bool EmailAvailable { get; private set; }
-    public bool SmsAvailable => false;
-    public bool WhatsAppAvailable => false;
+    public bool SmsAvailable { get; private set; }
+    public bool WhatsAppAvailable { get; private set; }
 
     [BindProperty]
     public PreferenceInput Input { get; set; } = new();
@@ -54,7 +54,7 @@ public sealed class NotificationsModel : PageModel
 
         if (Input.Enabled && !IsAvailable(Input.Channel))
         {
-            ModelState.AddModelError(string.Empty, $"{Input.Channel} notifications are not commissioned in this Request Portal build.");
+            ModelState.AddModelError(string.Empty, $"{Input.Channel} notifications are not commissioned in this Request Portal deployment.");
         }
 
         if (!ModelState.IsValid)
@@ -100,6 +100,8 @@ public sealed class NotificationsModel : PageModel
     private void LoadAvailability()
     {
         EmailAvailable = configuration.GetValue("Notifications:Enabled", false);
+        SmsAvailable = configuration.GetValue("Notifications:SmsEnabled", false);
+        WhatsAppAvailable = configuration.GetValue("Notifications:WhatsAppEnabled", false);
     }
 
     private bool IsAvailable(NotificationChannel channel)
@@ -107,8 +109,8 @@ public sealed class NotificationsModel : PageModel
         return channel switch
         {
             NotificationChannel.Email => EmailAvailable,
-            NotificationChannel.Sms => false,
-            NotificationChannel.WhatsApp => false,
+            NotificationChannel.Sms => SmsAvailable,
+            NotificationChannel.WhatsApp => WhatsAppAvailable,
             _ => false
         };
     }
