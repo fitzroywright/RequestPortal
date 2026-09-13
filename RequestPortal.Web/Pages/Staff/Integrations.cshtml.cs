@@ -29,29 +29,71 @@ public sealed class IntegrationsModel : PageModel
 
     public async Task<IActionResult> OnPostCreateAsync(Guid requestId, string systemName)
     {
+        if (requestId == Guid.Empty)
+        {
+            TempData["Error"] = "A request is required to create an integration link.";
+            return RedirectToPage();
+        }
         if (string.IsNullOrWhiteSpace(systemName))
         {
             TempData["Error"] = "System name is required.";
             return RedirectToPage();
         }
-        await integrationStatusService.EnsureLinkAsync(requestId, systemName.Trim(), HttpContext.RequestAborted);
-        TempData["Success"] = "Integration tracking link created.";
+
+        try
+        {
+            await integrationStatusService.EnsureLinkAsync(requestId, systemName.Trim(), HttpContext.RequestAborted);
+            TempData["Success"] = "Integration tracking link created.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            TempData["Error"] = exception.Message;
+        }
+
         return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostRetryAsync(Guid linkId)
     {
-        ApplicationUser staffUser = await GetStaffUserAsync();
-        await integrationStatusService.RetryAsync(staffUser.Id, linkId, HttpContext.RequestAborted);
-        TempData["Success"] = "Integration submission retried.";
+        if (linkId == Guid.Empty)
+        {
+            TempData["Error"] = "An integration link is required.";
+            return RedirectToPage();
+        }
+
+        try
+        {
+            ApplicationUser staffUser = await GetStaffUserAsync();
+            await integrationStatusService.RetryAsync(staffUser.Id, linkId, HttpContext.RequestAborted);
+            TempData["Success"] = "Integration submission retried.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            TempData["Error"] = exception.Message;
+        }
+
         return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostReconcileAsync(Guid linkId)
     {
-        ApplicationUser staffUser = await GetStaffUserAsync();
-        await integrationStatusService.ReconcileAsync(staffUser.Id, linkId, HttpContext.RequestAborted);
-        TempData["Success"] = "Integration reconciled with the external system.";
+        if (linkId == Guid.Empty)
+        {
+            TempData["Error"] = "An integration link is required.";
+            return RedirectToPage();
+        }
+
+        try
+        {
+            ApplicationUser staffUser = await GetStaffUserAsync();
+            await integrationStatusService.ReconcileAsync(staffUser.Id, linkId, HttpContext.RequestAborted);
+            TempData["Success"] = "Integration reconciled with the external system.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            TempData["Error"] = exception.Message;
+        }
+
         return RedirectToPage();
     }
 
