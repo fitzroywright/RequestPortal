@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -22,6 +23,7 @@ namespace RequestPortal.Infrastructure.Messaging;
 public sealed class OutboxDispatcher
 {
     private const int MaxAttempts = 10;
+    private const string RetryAtPrefix = "RETRY_AT=";
     private readonly RequestPortalDbContext dbContext;
     private readonly INotificationSender notificationSender;
     private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
@@ -69,10 +71,10 @@ public sealed class OutboxDispatcher
             {
                 message.AttemptCount++;
                 bool exhausted = message.AttemptCount >= MaxAttempts;
-                message.LastError = exhausted ? $"DEAD LETTER: {exception.Message}" : exception.Message;
 
                 if (exhausted)
                 {
+                    message.LastError = $"DEAD LETTER: {exception.Message}";
                     foreach (NotificationHistory history in dbContext.NotificationHistory.Local.Where(item => item.Status == NotificationDeliveryStatus.Failed))
                     {
                         history.MarkDeadLettered(exception.Message);
@@ -81,7 +83,14 @@ public sealed class OutboxDispatcher
                 }
                 else
                 {
-                    logger.LogError(exception, "Outbox message {MessageId} failed on attempt {AttemptCount}; retry will be delayed.", message.Id, message.AttemptCount);
+                    DateTimeOffset retryAt = DateTimeOffset.UtcNow.Add(GetRetryDelay(message.AttemptCount));
+                    message.LastError = $"{RetryAtPrefix}{retryAt:O}|{exception.Message}";
+                    logger.LogError(
+                        exception,
+                        "Outbox message {MessageId} failed on attempt {AttemptCount}; next retry is due at {RetryAtUtc}.",
+                        message.Id,
+                        message.AttemptCount,
+                        retryAt);
                 }
             }
         }
@@ -308,9 +317,39 @@ public sealed class OutboxDispatcher
     private static bool IsDue(OutboxMessage message, DateTimeOffset now)
     {
         if (message.AttemptCount <= 0) return true;
-        int exponent = Math.Min(message.AttemptCount - 1, 6);
-        TimeSpan delay = TimeSpan.FromMinutes(Math.Pow(2, exponent));
-        return message.OccurredUtc.Add(delay) <= now;
+        if (TryGetRetryAt(message.LastError, out DateTimeOffset retryAt)) return now >= retryAt;
+
+        // Legacy failed messages did not persist a retry timestamp. Keep a conservative
+        // fallback so an upgraded deployment does not retry them in a tight loop.
+        return message.OccurredUtc.Add(GetRetryDelay(message.AttemptCount)) <= now;
+    }
+
+    private static TimeSpan GetRetryDelay(int attemptCount)
+    {
+        int exponent = Math.Min(Math.Max(attemptCount - 1, 0), 6);
+        return TimeSpan.FromMinutes(Math.Pow(2, exponent));
+    }
+
+    private static bool TryGetRetryAt(string? lastError, out DateTimeOffset retryAt)
+    {
+        retryAt = default;
+        if (string.IsNullOrWhiteSpace(lastError) || !lastError.StartsWith(RetryAtPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        int delimiter = lastError.IndexOf('|', RetryAtPrefix.Length);
+        if (delimiter <= RetryAtPrefix.Length)
+        {
+            return false;
+        }
+
+        string value = lastError.Substring(RetryAtPrefix.Length, delimiter - RetryAtPrefix.Length);
+        return DateTimeOffset.TryParse(
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out retryAt);
     }
 
     private static Guid CreateDeterministicGuid(Guid requestId, string purpose)
