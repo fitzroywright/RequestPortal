@@ -1,0 +1,34 @@
+[
+  {
+    "pathPrefix": "/Requests/Create",
+    "title": "How to submit a request",
+    "description": "A short walkthrough of choosing the right request type, completing the form and attaching supporting documents.",
+    "videoUrl": "",
+    "duration": "1–2 min",
+    "active": true
+  },
+  {
+    "pathPrefix": "/Requests",
+    "title": "Working with your requests",
+    "description": "Learn how to review request status, respond to follow-up questions and provide additional documents.",
+    "videoUrl": "",
+    "duration": "1–2 min",
+    "active": true
+  },
+  {
+    "pathPrefix": "/Dashboard",
+    "title": "Request Portal overview",
+    "description": "A quick orientation to your dashboard, current requests and next actions.",
+    "videoUrl": "",
+    "duration": "1 min",
+    "active": true
+  },
+  {
+    "pathPrefix": "/Organizations",
+    "title": "Managing organizations",
+    "description": "Learn how organization information is used when submitting and tracking requests.",
+    "videoUrl": "",
+    "duration": "1 min",
+    "active": true
+  }
+]
