@@ -259,6 +259,28 @@ Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddSmtpMessagingChan
         UserName = notificationOptions.UserName ?? string.Empty,
         PasswordSecretName = notificationOptions.PasswordSecretName
     });
+if (notificationOptions.SmsEnabled)
+{
+    Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddSmsMessagingChannel(
+        builder.Services,
+        new Common.Messaging.Channels.Sms.SmsMessageOptions
+        {
+            Endpoint = notificationOptions.SmsEndpoint,
+            EndpointSecretName = notificationOptions.SmsEndpointSecretName,
+            ApiTokenSecretName = notificationOptions.SmsApiTokenSecretName
+        });
+}
+if (notificationOptions.WhatsAppEnabled)
+{
+    Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddWhatsAppMessagingChannel(
+        builder.Services,
+        new Common.Messaging.Channels.WhatsApp.WhatsAppMessageOptions
+        {
+            Endpoint = notificationOptions.WhatsAppEndpoint,
+            EndpointSecretName = notificationOptions.WhatsAppEndpointSecretName,
+            ApiTokenSecretName = notificationOptions.WhatsAppApiTokenSecretName
+        });
+}
 Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingQueuedDelivery(
     builder.Services,
     new Common.Messaging.ExternalDeliveryOptions
