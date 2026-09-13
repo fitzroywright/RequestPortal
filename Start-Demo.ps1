@@ -105,6 +105,25 @@ if ($LASTEXITCODE -ne 0) {
 
 $project = Join-Path $repoRoot "RequestPortal.Web\RequestPortal.Web.csproj"
 $assets = Join-Path $repoRoot "RequestPortal.Web\obj\project.assets.json"
+$mapAsset = Join-Path $repoRoot "RequestPortal.Web\wwwroot\img\maps\jamaica-parishes.svg"
+$mapSource = "https://upload.wikimedia.org/wikipedia/commons/2/26/Jamaica%2C_administrative_divisions_%28parishes%29_-_en_-_monochrome.svg"
+
+if (-not (Test-Path $mapAsset)) {
+    $mapDirectory = Split-Path -Parent $mapAsset
+    New-Item -ItemType Directory -Path $mapDirectory -Force | Out-Null
+    Write-Host "Caching Jamaica parish map for offline demo..."
+    try {
+        Invoke-WebRequest -Uri $mapSource -OutFile $mapAsset -UseBasicParsing
+        if ((Get-Item $mapAsset).Length -lt 1000) {
+            Remove-Item $mapAsset -Force
+            throw "Downloaded map file was unexpectedly small."
+        }
+        Write-Host "Jamaica parish map cached locally."
+    }
+    catch {
+        throw "The Jamaica parish map is not cached and could not be downloaded. Connect to the Internet once, rerun Start-Demo.ps1, and subsequent demo runs will work offline. Details: $($_.Exception.Message)"
+    }
+}
 
 if (-not (Test-Path $assets)) {
     Write-Host "This is the first run from this clone. Restoring NuGet packages once..."
