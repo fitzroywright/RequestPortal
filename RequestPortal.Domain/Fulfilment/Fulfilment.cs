@@ -84,6 +84,20 @@ public sealed class Fulfilment
         ExternalReference = normalizedReference;
     }
 
+    public void Restart(FulfilmentSource source, string? externalReference)
+    {
+        if (Status != FulfilmentStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Only cancelled fulfilments can be restarted.");
+        }
+
+        Source = source;
+        Status = FulfilmentStatus.InProgress;
+        ExternalReference = Normalize(externalReference);
+        FulfilledUtc = null;
+        Notes = null;
+    }
+
     public void Complete(DateTimeOffset fulfilledUtc, string? notes)
     {
         if (Status == FulfilmentStatus.Fulfilled)
