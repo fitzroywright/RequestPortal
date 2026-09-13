@@ -2,15 +2,17 @@
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
   "version": "1.1.0",
+  "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
     {
       "id": "database-connection",
       "displayName": "PostgreSQL connection credential",
       "kind": "Secret",
       "required": true,
-      "purpose": "Provides the Request Portal PostgreSQL connection string without placing credentials in source-controlled configuration.",
+      "purpose": "Provides the Request Portal PostgreSQL connection string through Common.Secrets/OpenBao.",
       "secretName": "ConnectionStrings:RequestPortal",
-      "validator": "secret"
+      "isConfigured": false,
+      "sensitive": true
     },
     {
       "id": "storage-root",
@@ -18,7 +20,8 @@
       "kind": "Configuration",
       "required": true,
       "purpose": "Defines durable document storage used through Common.Storage.",
-      "configurationKey": "Storage:Local:RootPath"
+      "configurationKey": "Storage:Local:RootPath",
+      "isConfigured": false
     },
     {
       "id": "data-protection-keys",
@@ -26,80 +29,92 @@
       "kind": "Configuration",
       "required": true,
       "purpose": "Persists ASP.NET Core Data Protection keys outside the application deployment directory.",
-      "configurationKey": "Security:DataProtectionKeysPath"
+      "configurationKey": "Security:DataProtectionKeysPath",
+      "isConfigured": false
     },
     {
-      "id": "secrets-address",
-      "displayName": "Secrets provider address",
-      "kind": "Configuration",
+      "id": "openbao-address",
+      "displayName": "OpenBao address",
+      "kind": "ExternalService",
       "required": true,
-      "purpose": "Identifies the production secrets service used by Common.Secrets.",
-      "configurationKey": "CommonSecrets:OpenBao:Address"
+      "purpose": "Identifies the OpenBao service used by Common.Secrets.",
+      "configurationKey": "CommonSecrets:OpenBao:Address",
+      "isConfigured": false,
+      "example": "https://openbao.example.internal"
     },
     {
-      "id": "secrets-role",
-      "displayName": "Secrets workload role",
-      "kind": "Configuration",
+      "id": "openbao-role",
+      "displayName": "OpenBao workload role",
+      "kind": "Secret",
       "required": true,
-      "purpose": "Identifies the workload role used by Common.Secrets production bootstrap.",
-      "configurationKey": "CommonSecrets:OpenBao:RoleId"
+      "purpose": "Provides the workload authentication material used by Common.Secrets to access OpenBao.",
+      "secretName": "CommonSecrets:OpenBao:RoleId",
+      "isConfigured": false,
+      "sensitive": true
     },
     {
       "id": "staff-oidc-authority",
       "displayName": "FFP Staff OIDC authority",
-      "kind": "Configuration",
+      "kind": "ExternalService",
       "required": true,
-      "purpose": "Defines the standards-compliant OIDC provider used only for FFP staff authentication. The provider, not Request Portal, validates fftpj.local credentials.",
-      "configurationKey": "Authentication:StaffOidc:Authority"
+      "purpose": "Defines the standards-compliant OIDC provider used for FFP staff authentication.",
+      "configurationKey": "Authentication:StaffOidc:Authority",
+      "isConfigured": false
     },
     {
       "id": "staff-oidc-client-id",
       "displayName": "FFP Staff OIDC client ID",
       "kind": "Configuration",
       "required": true,
-      "purpose": "Identifies Request Portal to the configurable FFP staff OIDC provider.",
-      "configurationKey": "Authentication:StaffOidc:ClientId"
+      "purpose": "Identifies Request Portal to the FFP staff OIDC provider.",
+      "configurationKey": "Authentication:StaffOidc:ClientId",
+      "isConfigured": false
     },
     {
       "id": "staff-oidc-client-secret",
       "displayName": "FFP Staff OIDC client secret",
       "kind": "Secret",
       "required": true,
-      "purpose": "Provides the OIDC confidential-client credential through Common.Secrets/OpenBao. Request Portal never stores or receives an AD user password.",
+      "purpose": "Provides the OIDC confidential-client credential through Common.Secrets/OpenBao.",
       "secretName": "Authentication:StaffOidc:ClientSecret",
-      "validator": "secret"
+      "isConfigured": false,
+      "sensitive": true
     },
     {
       "id": "staff-reviewer-groups",
       "displayName": "FFP staff reviewer group mappings",
       "kind": "Configuration",
       "required": true,
-      "purpose": "Names the AD groups emitted by the staff identity provider that Common.Security maps to Request Portal reviewer permissions.",
-      "configurationKey": "Authentication:ActiveDirectory:ReviewerGroups"
+      "purpose": "Names the identity-provider groups that Common.Security maps to reviewer permissions.",
+      "configurationKey": "Authentication:ActiveDirectory:ReviewerGroups",
+      "isConfigured": false
     },
     {
       "id": "staff-administrator-groups",
       "displayName": "FFP staff administrator group mappings",
       "kind": "Configuration",
       "required": true,
-      "purpose": "Names the AD groups emitted by the staff identity provider that Common.Security maps to Request Portal administrator permissions.",
-      "configurationKey": "Authentication:ActiveDirectory:AdministratorGroups"
+      "purpose": "Names the identity-provider groups that Common.Security maps to administrator permissions.",
+      "configurationKey": "Authentication:ActiveDirectory:AdministratorGroups",
+      "isConfigured": false
     },
     {
       "id": "storage-malware-scanner",
       "displayName": "Upload malware scanner",
-      "kind": "Configuration",
+      "kind": "ExternalService",
       "required": true,
       "purpose": "Defines the malware-scanning endpoint required before uploaded documents are accepted in production.",
-      "configurationKey": "Uploads:MalwareScanning:Host"
+      "configurationKey": "Uploads:MalwareScanning:Host",
+      "isConfigured": false
     },
     {
       "id": "smtp-host",
       "displayName": "Notification SMTP host",
-      "kind": "Configuration",
+      "kind": "ExternalService",
       "required": true,
       "purpose": "Defines the SMTP endpoint used by Common.Messaging for portal notifications.",
-      "configurationKey": "Notifications:SmtpHost"
+      "configurationKey": "Notifications:SmtpHost",
+      "isConfigured": false
     },
     {
       "id": "smtp-from",
@@ -107,16 +122,18 @@
       "kind": "Configuration",
       "required": true,
       "purpose": "Defines the sender address for portal notification messages.",
-      "configurationKey": "Notifications:FromAddress"
+      "configurationKey": "Notifications:FromAddress",
+      "isConfigured": false
     },
     {
       "id": "smtp-password",
       "displayName": "Notification SMTP credential",
       "kind": "Secret",
       "required": true,
-      "purpose": "Provides the SMTP credential through Common.Secrets.",
+      "purpose": "Provides the SMTP credential through Common.Secrets/OpenBao.",
       "secretName": "Notifications:SmtpPassword",
-      "validator": "secret"
+      "isConfigured": false,
+      "sensitive": true
     },
     {
       "id": "messaging-queue",
@@ -124,16 +141,18 @@
       "kind": "Configuration",
       "required": true,
       "purpose": "Defines durable external-delivery queue storage for Common.Messaging.",
-      "configurationKey": "Messaging:DurableQueuePath"
+      "configurationKey": "Messaging:DurableQueuePath",
+      "isConfigured": false
     },
     {
-      "id": "diagnostics-key",
-      "displayName": "Engineering diagnostics machine credential",
-      "kind": "Secret",
+      "id": "site-id",
+      "displayName": "Site ID",
+      "kind": "Configuration",
       "required": true,
-      "purpose": "Protects the machine-facing Common.Diagnostics interface.",
-      "secretName": "RequestPortal:Diagnostics:Key",
-      "validator": "secret"
+      "purpose": "Identifies the deployment site represented by this Request Portal instance.",
+      "configurationKey": "Site:Id",
+      "isConfigured": false,
+      "example": "FFP-JM"
     }
   ]
 }
