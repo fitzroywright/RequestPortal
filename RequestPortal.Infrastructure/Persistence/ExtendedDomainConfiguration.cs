@@ -4,7 +4,6 @@ using RequestPortal.Domain.Auditing;
 using RequestPortal.Domain.Beneficiaries;
 using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Documents;
-using RequestPortal.Domain.Fulfilment;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Notifications;
 using RequestFulfilment = RequestPortal.Domain.Fulfilment.Fulfilment;
@@ -86,23 +85,6 @@ internal sealed class FulfilmentConfiguration : IEntityTypeConfiguration<Request
         builder.Property(item => item.Notes).HasMaxLength(4000);
         builder.HasIndex(item => item.RequestId).IsUnique();
         builder.HasIndex(item => item.OrganizationId);
-    }
-}
-
-internal sealed class FulfilmentLineConfiguration : IEntityTypeConfiguration<FulfilmentLine>
-{
-    public void Configure(EntityTypeBuilder<FulfilmentLine> builder)
-    {
-        builder.ToTable("fulfilment_lines");
-        builder.HasKey(item => item.Id);
-        builder.Property(item => item.RequestedQuantity).HasPrecision(18, 4).IsRequired();
-        builder.Property(item => item.FulfilledQuantity).HasPrecision(18, 4).IsRequired();
-        builder.Property(item => item.FulfilledValue).HasPrecision(18, 2).IsRequired();
-        builder.Property(item => item.Notes).HasMaxLength(4000);
-        builder.Ignore(item => item.RemainingQuantity);
-        builder.Ignore(item => item.IsComplete);
-        builder.HasIndex(item => new { item.FulfilmentId, item.RequestItemId }).IsUnique();
-        builder.HasIndex(item => item.RequestItemId);
     }
 }
 
