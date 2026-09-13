@@ -9,6 +9,7 @@ using RequestPortal.Application.Fulfilment;
 using RequestPortal.Domain.Fulfilment;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Persistence;
+using FulfilmentEntity = RequestPortal.Domain.Fulfilment.Fulfilment;
 
 namespace RequestPortal.Infrastructure.Fulfilment;
 
@@ -38,7 +39,7 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
 
     public async Task<IReadOnlyList<FulfilmentLineView>> GetLinesAsync(Guid requestId, CancellationToken cancellationToken = default)
     {
-        Fulfilment? fulfilment = await dbContext.Fulfilments.AsNoTracking().SingleOrDefaultAsync(item => item.RequestId == requestId, cancellationToken);
+        FulfilmentEntity? fulfilment = await dbContext.Fulfilments.AsNoTracking().SingleOrDefaultAsync(item => item.RequestId == requestId, cancellationToken);
         if (fulfilment is null) return Array.Empty<FulfilmentLineView>();
 
         List<FulfilmentProgressRow> rows = await dbContext.Database.SqlQuery<FulfilmentProgressRow>($"""
@@ -67,12 +68,12 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
         AssistanceRequest request = await dbContext.AssistanceRequests.Include(item => item.StatusHistory).Include(item => item.Items).SingleAsync(item => item.Id == requestId, cancellationToken);
         if (request.Status != RequestStatus.Approved && request.Status != RequestStatus.PendingFulfilment) throw new InvalidOperationException("Only approved requests can enter fulfilment.");
 
-        Fulfilment? fulfilment = await dbContext.Fulfilments.SingleOrDefaultAsync(item => item.RequestId == requestId, cancellationToken);
+        FulfilmentEntity? fulfilment = await dbContext.Fulfilments.SingleOrDefaultAsync(item => item.RequestId == requestId, cancellationToken);
         bool created = fulfilment is null;
         bool restarted = false;
         if (fulfilment is null)
         {
-            fulfilment = new Fulfilment(Guid.NewGuid(), request.Id, request.OrganizationId, fulfilmentSource, DateTimeOffset.UtcNow);
+            fulfilment = new FulfilmentEntity(Guid.NewGuid(), request.Id, request.OrganizationId, fulfilmentSource, DateTimeOffset.UtcNow);
             dbContext.Fulfilments.Add(fulfilment);
             fulfilment.MarkInProgress(externalReference);
         }
@@ -132,7 +133,7 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
 
         AssistanceRequest request = await dbContext.AssistanceRequests.AsNoTracking().SingleAsync(item => item.Id == requestId, cancellationToken);
         if (request.Status != RequestStatus.PendingFulfilment) throw new InvalidOperationException("Progress can only be recorded while a request is pending fulfilment.");
-        Fulfilment fulfilment = await dbContext.Fulfilments.AsNoTracking().SingleAsync(item => item.RequestId == requestId, cancellationToken);
+        FulfilmentEntity fulfilment = await dbContext.Fulfilments.AsNoTracking().SingleAsync(item => item.RequestId == requestId, cancellationToken);
         if (fulfilment.Status is FulfilmentStatus.Cancelled or FulfilmentStatus.Fulfilled) throw new InvalidOperationException("This fulfilment no longer accepts progress updates.");
 
         string? normalizedNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
@@ -158,7 +159,7 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
         await LockRequestAsync(requestId, cancellationToken);
 
         AssistanceRequest request = await dbContext.AssistanceRequests.Include(item => item.StatusHistory).SingleAsync(item => item.Id == requestId, cancellationToken);
-        Fulfilment fulfilment = await dbContext.Fulfilments.SingleAsync(item => item.RequestId == requestId, cancellationToken);
+        FulfilmentEntity fulfilment = await dbContext.Fulfilments.SingleAsync(item => item.RequestId == requestId, cancellationToken);
         if (request.Status == RequestStatus.Fulfilled && fulfilment.Status == FulfilmentStatus.Fulfilled)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -188,7 +189,7 @@ public sealed class FulfilmentQueueService : IFulfilmentQueueService
         await LockRequestAsync(requestId, cancellationToken);
 
         AssistanceRequest request = await dbContext.AssistanceRequests.Include(item => item.StatusHistory).SingleAsync(item => item.Id == requestId, cancellationToken);
-        Fulfilment fulfilment = await dbContext.Fulfilments.SingleAsync(item => item.RequestId == requestId, cancellationToken);
+        FulfilmentEntity fulfilment = await dbContext.Fulfilments.SingleAsync(item => item.RequestId == requestId, cancellationToken);
         fulfilment.Cancel(reason);
         if (request.Status == RequestStatus.PendingFulfilment) request.ReturnToApproved(staffUserId, DateTimeOffset.UtcNow, reason);
         await dbContext.SaveChangesAsync(cancellationToken);
