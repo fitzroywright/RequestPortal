@@ -1,7 +1,7 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "requirements": [
     {
       "id": "database-connection",
@@ -125,6 +125,14 @@
       "required": true,
       "purpose": "Defines durable external-delivery queue storage for Common.Messaging.",
       "configurationKey": "Messaging:DurableQueuePath"
+    },
+    {
+      "id": "organization-renewal-warning-days",
+      "displayName": "Organization registration renewal warning windows",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines the day thresholds used for organization registration renewal reminders and the staff re-verification queue. Request Portal defaults to 60, 30 and 7 days when this setting is omitted.",
+      "configurationKey": "Organizations:RenewalWarningDays"
     },
     {
       "id": "diagnostics-key",
