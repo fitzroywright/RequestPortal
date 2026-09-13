@@ -57,13 +57,14 @@ public sealed class FfpManagerStatusPollingWorker : BackgroundService
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
         RequestPortalDbContext dbContext = scope.ServiceProvider.GetRequiredService<RequestPortalDbContext>();
         IFfpManagerIntegrationService integrationService = scope.ServiceProvider.GetRequiredService<IFfpManagerIntegrationService>();
+        IIntegrationStatusService statusService = scope.ServiceProvider.GetRequiredService<IIntegrationStatusService>();
 
         var links = await dbContext.IntegrationLinks
             .AsNoTracking()
             .Where(link =>
                 link.SystemName == options.SystemName &&
                 link.ExternalReference != null)
-            .Select(link => new { link.RequestId, link.ExternalReference })
+            .Select(link => new { link.Id, link.RequestId, link.ExternalReference })
             .ToListAsync(cancellationToken);
 
         foreach (var link in links)
@@ -87,6 +88,13 @@ public sealed class FfpManagerStatusPollingWorker : BackgroundService
                     link.RequestId,
                     status,
                     cancellationToken);
+
+                // A successful refresh proves the external link is reachable again. Marking the
+                // existing reference synchronized clears any durable failure recorded by a prior poll.
+                await statusService.MarkSynchronizedAsync(
+                    link.Id,
+                    link.ExternalReference!,
+                    cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -94,6 +102,19 @@ public sealed class FfpManagerStatusPollingWorker : BackgroundService
             }
             catch (Exception exception)
             {
+                string failure = $"{exception.GetType().Name}: {exception.Message}";
+                try
+                {
+                    await statusService.MarkFailedAsync(link.Id, failure, cancellationToken);
+                }
+                catch (Exception persistenceException)
+                {
+                    logger.LogError(
+                        persistenceException,
+                        "Unable to persist FFP Manager polling failure state for integration link {IntegrationLinkId}.",
+                        link.Id);
+                }
+
                 logger.LogWarning(
                     exception,
                     "Unable to refresh FFP Manager status for RequestPortal request {RequestId}.",
