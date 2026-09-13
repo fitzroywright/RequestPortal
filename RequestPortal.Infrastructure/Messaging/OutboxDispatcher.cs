@@ -45,9 +45,7 @@ public sealed class OutboxDispatcher
         this.logger = logger;
     }
 
-    public async Task<int> DispatchBatchAsync(
-        int batchSize = 20,
-        CancellationToken cancellationToken = default)
+    public async Task<int> DispatchBatchAsync(int batchSize = 20, CancellationToken cancellationToken = default)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         List<OutboxMessage> candidates = await dbContext.OutboxMessages
@@ -56,11 +54,7 @@ public sealed class OutboxDispatcher
             .Take(Math.Max(batchSize * 4, batchSize))
             .ToListAsync(cancellationToken);
 
-        List<OutboxMessage> messages = candidates
-            .Where(message => IsDue(message, now))
-            .Take(batchSize)
-            .ToList();
-
+        List<OutboxMessage> messages = candidates.Where(message => IsDue(message, now)).Take(batchSize).ToList();
         int processed = 0;
         foreach (OutboxMessage message in messages)
         {
@@ -75,31 +69,19 @@ public sealed class OutboxDispatcher
             {
                 message.AttemptCount++;
                 bool exhausted = message.AttemptCount >= MaxAttempts;
-                message.LastError = exhausted
-                    ? $"DEAD LETTER: {exception.Message}"
-                    : exception.Message;
+                message.LastError = exhausted ? $"DEAD LETTER: {exception.Message}" : exception.Message;
 
                 if (exhausted)
                 {
-                    foreach (NotificationHistory history in dbContext.NotificationHistory.Local
-                        .Where(item => item.Status == NotificationDeliveryStatus.Failed))
+                    foreach (NotificationHistory history in dbContext.NotificationHistory.Local.Where(item => item.Status == NotificationDeliveryStatus.Failed))
                     {
                         history.MarkDeadLettered(exception.Message);
                     }
-
-                    logger.LogCritical(
-                        exception,
-                        "Outbox message {MessageId} exhausted {AttemptCount} attempts and was dead-lettered.",
-                        message.Id,
-                        message.AttemptCount);
+                    logger.LogCritical(exception, "Outbox message {MessageId} exhausted {AttemptCount} attempts and was dead-lettered.", message.Id, message.AttemptCount);
                 }
                 else
                 {
-                    logger.LogError(
-                        exception,
-                        "Outbox message {MessageId} failed on attempt {AttemptCount}; retry will be delayed.",
-                        message.Id,
-                        message.AttemptCount);
+                    logger.LogError(exception, "Outbox message {MessageId} failed on attempt {AttemptCount}; retry will be delayed.", message.Id, message.AttemptCount);
                 }
             }
         }
@@ -108,7 +90,6 @@ public sealed class OutboxDispatcher
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-
         return processed;
     }
 
@@ -116,25 +97,24 @@ public sealed class OutboxDispatcher
     {
         if (outbox.MessageType.EndsWith(nameof(OrganizationApprovedMessage), StringComparison.Ordinal))
         {
-            OrganizationApprovedMessage message = Deserialize<OrganizationApprovedMessage>(outbox.Payload);
-            await SendOrganizationApprovedAsync(message, cancellationToken);
+            await SendOrganizationApprovedAsync(Deserialize<OrganizationApprovedMessage>(outbox.Payload), cancellationToken);
             return;
         }
-
+        if (outbox.MessageType.EndsWith(nameof(OrganizationRegistrationReminderMessage), StringComparison.Ordinal))
+        {
+            await SendOrganizationRegistrationReminderAsync(Deserialize<OrganizationRegistrationReminderMessage>(outbox.Payload), cancellationToken);
+            return;
+        }
         if (outbox.MessageType.EndsWith(nameof(MembershipRequestedMessage), StringComparison.Ordinal))
         {
-            MembershipRequestedMessage message = Deserialize<MembershipRequestedMessage>(outbox.Payload);
-            await SendMembershipRequestedAsync(message, cancellationToken);
+            await SendMembershipRequestedAsync(Deserialize<MembershipRequestedMessage>(outbox.Payload), cancellationToken);
             return;
         }
-
         if (outbox.MessageType.EndsWith(nameof(MembershipApprovedMessage), StringComparison.Ordinal))
         {
-            MembershipApprovedMessage message = Deserialize<MembershipApprovedMessage>(outbox.Payload);
-            await SendMembershipApprovedAsync(message, cancellationToken);
+            await SendMembershipApprovedAsync(Deserialize<MembershipApprovedMessage>(outbox.Payload), cancellationToken);
             return;
         }
-
         if (outbox.MessageType.EndsWith(nameof(RequestSubmittedMessage), StringComparison.Ordinal))
         {
             RequestSubmittedMessage message = Deserialize<RequestSubmittedMessage>(outbox.Payload);
@@ -142,11 +122,9 @@ public sealed class OutboxDispatcher
             {
                 await EnsureFfpManagerSubmissionQueuedAsync(message, cancellationToken);
             }
-
             await SendRequestSubmittedAsync(message, cancellationToken);
             return;
         }
-
         if (outbox.MessageType.EndsWith(nameof(FfpManagerSubmissionRequestedMessage), StringComparison.Ordinal))
         {
             FfpManagerSubmissionRequestedMessage message = Deserialize<FfpManagerSubmissionRequestedMessage>(outbox.Payload);
@@ -156,67 +134,44 @@ public sealed class OutboxDispatcher
             }
             return;
         }
-
         if (outbox.MessageType.EndsWith(nameof(RequestStatusChangedMessage), StringComparison.Ordinal))
         {
-            RequestStatusChangedMessage message = Deserialize<RequestStatusChangedMessage>(outbox.Payload);
-            await SendRequestStatusChangedAsync(message, cancellationToken);
+            await SendRequestStatusChangedAsync(Deserialize<RequestStatusChangedMessage>(outbox.Payload), cancellationToken);
             return;
         }
-
         if (outbox.MessageType.EndsWith(nameof(FfpManagerInformationRequestedMessage), StringComparison.Ordinal))
         {
-            FfpManagerInformationRequestedMessage message = Deserialize<FfpManagerInformationRequestedMessage>(outbox.Payload);
-            await SendFfpManagerInformationRequestedAsync(message, cancellationToken);
+            await SendFfpManagerInformationRequestedAsync(Deserialize<FfpManagerInformationRequestedMessage>(outbox.Payload), cancellationToken);
             return;
         }
 
-        logger.LogInformation(
-            "No notification projector registered for outbox type {MessageType}.",
-            outbox.MessageType);
+        logger.LogInformation("No notification projector registered for outbox type {MessageType}.", outbox.MessageType);
     }
 
-    private async Task EnsureFfpManagerSubmissionQueuedAsync(
-        RequestSubmittedMessage source,
-        CancellationToken cancellationToken)
+    private async Task EnsureFfpManagerSubmissionQueuedAsync(RequestSubmittedMessage source, CancellationToken cancellationToken)
     {
         Guid integrationMessageId = CreateDeterministicGuid(source.RequestId, "FFPManagerSubmission");
         bool alreadyTracked = dbContext.OutboxMessages.Local.Any(message => message.Id == integrationMessageId);
         if (!alreadyTracked)
         {
-            alreadyTracked = await dbContext.OutboxMessages
-                .AsNoTracking()
-                .AnyAsync(message => message.Id == integrationMessageId, cancellationToken);
+            alreadyTracked = await dbContext.OutboxMessages.AsNoTracking().AnyAsync(message => message.Id == integrationMessageId, cancellationToken);
         }
+        if (alreadyTracked) return;
 
-        if (alreadyTracked)
-        {
-            return;
-        }
-
-        FfpManagerSubmissionRequestedMessage message = new(
-            integrationMessageId,
-            source.OccurredUtc,
-            source.RequestId);
+        FfpManagerSubmissionRequestedMessage message = new(integrationMessageId, source.OccurredUtc, source.RequestId);
         dbContext.OutboxMessages.Add(new OutboxMessage
         {
             Id = message.MessageId,
-            MessageType = typeof(FfpManagerSubmissionRequestedMessage).FullName
-                ?? nameof(FfpManagerSubmissionRequestedMessage),
+            MessageType = typeof(FfpManagerSubmissionRequestedMessage).FullName ?? nameof(FfpManagerSubmissionRequestedMessage),
             Payload = JsonSerializer.Serialize(message),
             OccurredUtc = message.OccurredUtc,
             AttemptCount = 0
         });
     }
 
-    private async Task SendOrganizationApprovedAsync(
-        OrganizationApprovedMessage message,
-        CancellationToken cancellationToken)
+    private async Task SendOrganizationApprovedAsync(OrganizationApprovedMessage message, CancellationToken cancellationToken)
     {
-        Organization organization = await dbContext.Organizations
-            .AsNoTracking()
-            .SingleAsync(item => item.Id == message.OrganizationId, cancellationToken);
-
+        Organization organization = await dbContext.Organizations.AsNoTracking().SingleAsync(item => item.Id == message.OrganizationId, cancellationToken);
         await DeliverEmailAsync(
             organization.RegisteredByUserId,
             organization.Id,
@@ -226,168 +181,83 @@ public sealed class OutboxDispatcher
             cancellationToken);
     }
 
-    private async Task SendMembershipRequestedAsync(
-        MembershipRequestedMessage message,
-        CancellationToken cancellationToken)
+    private async Task SendOrganizationRegistrationReminderAsync(OrganizationRegistrationReminderMessage message, CancellationToken cancellationToken)
     {
-        string organizationName = await dbContext.Organizations
-            .AsNoTracking()
-            .Where(item => item.Id == message.OrganizationId)
-            .Select(item => item.Name)
-            .SingleAsync(cancellationToken);
+        Organization organization = await dbContext.Organizations.AsNoTracking().SingleAsync(item => item.Id == message.OrganizationId, cancellationToken);
+        string subject;
+        string body;
+        if (string.Equals(message.ReminderKind, "Expired", StringComparison.Ordinal))
+        {
+            subject = $"Registration expired: {organization.Name}";
+            body = $"The registration on file for {organization.Name} expired on {message.ExpiryDate:yyyy-MM-dd}. New request submissions are blocked until current registration information is provided and verified by FFP.";
+        }
+        else
+        {
+            subject = $"Registration renewal required: {organization.Name}";
+            body = $"The registration on file for {organization.Name} expires on {message.ExpiryDate:yyyy-MM-dd}. Please upload current registration evidence before the expiry date to avoid interruption to new request submissions.";
+        }
 
-        List<Guid> administratorUserIds = await dbContext.OrganizationMemberships
-            .AsNoTracking()
-            .Where(membership =>
-                membership.OrganizationId == message.OrganizationId &&
-                membership.Status == MembershipStatus.Approved &&
-                membership.Role == OrganizationRole.Administrator)
-            .Select(membership => membership.UserId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
+        await DeliverEmailAsync(
+            organization.RegisteredByUserId,
+            organization.Id,
+            null,
+            subject,
+            body,
+            cancellationToken);
+    }
 
+    private async Task SendMembershipRequestedAsync(MembershipRequestedMessage message, CancellationToken cancellationToken)
+    {
+        string organizationName = await dbContext.Organizations.AsNoTracking().Where(item => item.Id == message.OrganizationId).Select(item => item.Name).SingleAsync(cancellationToken);
+        List<Guid> administratorUserIds = await dbContext.OrganizationMemberships.AsNoTracking()
+            .Where(membership => membership.OrganizationId == message.OrganizationId && membership.Status == MembershipStatus.Approved && membership.Role == OrganizationRole.Administrator)
+            .Select(membership => membership.UserId).Distinct().ToListAsync(cancellationToken);
         foreach (Guid administratorUserId in administratorUserIds)
         {
-            await DeliverEmailAsync(
-                administratorUserId,
-                message.OrganizationId,
-                null,
-                $"Representative approval required: {organizationName}",
-                $"A representative has requested access to {organizationName}. Sign in to Request Portal to approve or reject the membership request.",
-                cancellationToken);
+            await DeliverEmailAsync(administratorUserId, message.OrganizationId, null, $"Representative approval required: {organizationName}", $"A representative has requested access to {organizationName}. Sign in to Request Portal to approve or reject the membership request.", cancellationToken);
         }
     }
 
-    private async Task SendMembershipApprovedAsync(
-        MembershipApprovedMessage message,
-        CancellationToken cancellationToken)
+    private async Task SendMembershipApprovedAsync(MembershipApprovedMessage message, CancellationToken cancellationToken)
     {
-        string organizationName = await dbContext.Organizations
-            .AsNoTracking()
-            .Where(item => item.Id == message.OrganizationId)
-            .Select(item => item.Name)
-            .SingleAsync(cancellationToken);
-
-        await DeliverEmailAsync(
-            message.UserId,
-            message.OrganizationId,
-            null,
-            $"Membership approved: {organizationName}",
-            $"Your representative membership for {organizationName} has been approved.",
-            cancellationToken);
+        string organizationName = await dbContext.Organizations.AsNoTracking().Where(item => item.Id == message.OrganizationId).Select(item => item.Name).SingleAsync(cancellationToken);
+        await DeliverEmailAsync(message.UserId, message.OrganizationId, null, $"Membership approved: {organizationName}", $"Your representative membership for {organizationName} has been approved.", cancellationToken);
     }
 
-    private async Task SendRequestSubmittedAsync(
-        RequestSubmittedMessage message,
-        CancellationToken cancellationToken)
+    private async Task SendRequestSubmittedAsync(RequestSubmittedMessage message, CancellationToken cancellationToken)
     {
-        var request = await dbContext.AssistanceRequests
-            .AsNoTracking()
-            .Where(item => item.Id == message.RequestId)
-            .Select(item => new
-            {
-                item.PublicReference,
-                item.SubmittedByUserId,
-                item.CreatedByUserId,
-                item.OrganizationId
-            })
-            .SingleAsync(cancellationToken);
-
+        var request = await dbContext.AssistanceRequests.AsNoTracking().Where(item => item.Id == message.RequestId)
+            .Select(item => new { item.PublicReference, item.SubmittedByUserId, item.CreatedByUserId, item.OrganizationId }).SingleAsync(cancellationToken);
         Guid recipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
-        await DeliverEmailAsync(
-            recipientUserId,
-            request.OrganizationId,
-            message.RequestId,
-            $"Request submitted: {request.PublicReference}",
-            $"Your request {request.PublicReference} has been submitted to FFP for review.",
-            cancellationToken);
+        await DeliverEmailAsync(recipientUserId, request.OrganizationId, message.RequestId, $"Request submitted: {request.PublicReference}", $"Your request {request.PublicReference} has been submitted to FFP for review.", cancellationToken);
     }
 
-    private async Task SendRequestStatusChangedAsync(
-        RequestStatusChangedMessage message,
-        CancellationToken cancellationToken)
+    private async Task SendRequestStatusChangedAsync(RequestStatusChangedMessage message, CancellationToken cancellationToken)
     {
-        AssistanceRequest request = await dbContext.AssistanceRequests
-            .AsNoTracking()
-            .Include(item => item.StatusHistory)
-            .SingleAsync(item => item.Id == message.RequestId, cancellationToken);
-
+        AssistanceRequest request = await dbContext.AssistanceRequests.AsNoTracking().Include(item => item.StatusHistory).SingleAsync(item => item.Id == message.RequestId, cancellationToken);
         Guid recipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
-        string? reason = request.StatusHistory
-            .OrderByDescending(item => item.ChangedUtc)
-            .Select(item => item.Reason)
-            .FirstOrDefault();
-
+        string? reason = request.StatusHistory.OrderByDescending(item => item.ChangedUtc).Select(item => item.Reason).FirstOrDefault();
         string body = $"Request {request.PublicReference} is now {request.Status}.";
-        if (!string.IsNullOrWhiteSpace(reason))
-        {
-            body += $"\n\n{reason}";
-        }
-
-        await DeliverEmailAsync(
-            recipientUserId,
-            request.OrganizationId,
-            request.Id,
-            $"Request status: {request.PublicReference}",
-            body,
-            cancellationToken);
+        if (!string.IsNullOrWhiteSpace(reason)) body += $"\n\n{reason}";
+        await DeliverEmailAsync(recipientUserId, request.OrganizationId, request.Id, $"Request status: {request.PublicReference}", body, cancellationToken);
     }
 
-    private async Task SendFfpManagerInformationRequestedAsync(
-        FfpManagerInformationRequestedMessage message,
-        CancellationToken cancellationToken)
+    private async Task SendFfpManagerInformationRequestedAsync(FfpManagerInformationRequestedMessage message, CancellationToken cancellationToken)
     {
-        AssistanceRequest request = await dbContext.AssistanceRequests
-            .AsNoTracking()
-            .SingleAsync(item => item.Id == message.RequestId, cancellationToken);
-
+        AssistanceRequest request = await dbContext.AssistanceRequests.AsNoTracking().SingleAsync(item => item.Id == message.RequestId, cancellationToken);
         Guid recipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
         string body = $"FFP needs additional information for request {request.PublicReference}.\n\n{message.Message}";
-        if (message.DueUtc.HasValue)
-        {
-            body += $"\n\nPlease respond by {message.DueUtc.Value:yyyy-MM-dd}.";
-        }
-
+        if (message.DueUtc.HasValue) body += $"\n\nPlease respond by {message.DueUtc.Value:yyyy-MM-dd}.";
         body += "\n\nSign in to Request Portal to provide the requested information and supporting documents.";
-        await DeliverEmailAsync(
-            recipientUserId,
-            request.OrganizationId,
-            request.Id,
-            $"Information required: {request.PublicReference}",
-            body,
-            cancellationToken);
+        await DeliverEmailAsync(recipientUserId, request.OrganizationId, request.Id, $"Information required: {request.PublicReference}", body, cancellationToken);
     }
 
-    private async Task DeliverEmailAsync(
-        Guid userId,
-        Guid? organizationId,
-        Guid? requestId,
-        string subject,
-        string body,
-        CancellationToken cancellationToken)
+    private async Task DeliverEmailAsync(Guid userId, Guid? organizationId, Guid? requestId, string subject, string body, CancellationToken cancellationToken)
     {
-        string? accountEmail = await dbContext.Users
-            .AsNoTracking()
-            .Where(user => user.Id == userId)
-            .Select(user => user.Email)
-            .SingleOrDefaultAsync(cancellationToken);
-
-        NotificationPreference? preference = await dbContext.NotificationPreferences
-            .AsNoTracking()
-            .SingleOrDefaultAsync(
-                item => item.UserId == userId && item.Channel == NotificationChannel.Email,
-                cancellationToken);
-
+        string? accountEmail = await dbContext.Users.AsNoTracking().Where(user => user.Id == userId).Select(user => user.Email).SingleOrDefaultAsync(cancellationToken);
+        NotificationPreference? preference = await dbContext.NotificationPreferences.AsNoTracking().SingleOrDefaultAsync(item => item.UserId == userId && item.Channel == NotificationChannel.Email, cancellationToken);
         string destination = preference?.Destination ?? accountEmail ?? "(no email address)";
-        NotificationHistory history = new(
-            Guid.NewGuid(),
-            userId,
-            organizationId,
-            requestId,
-            NotificationChannel.Email,
-            destination,
-            subject,
-            DateTimeOffset.UtcNow);
+        NotificationHistory history = new(Guid.NewGuid(), userId, organizationId, requestId, NotificationChannel.Email, destination, subject, DateTimeOffset.UtcNow);
         dbContext.NotificationHistory.Add(history);
 
         if (preference is not null && !preference.Enabled)
@@ -395,13 +265,11 @@ public sealed class OutboxDispatcher
             history.MarkSkipped("Email notifications are disabled in the user's notification preferences.");
             return;
         }
-
         if (string.IsNullOrWhiteSpace(accountEmail) && preference is null)
         {
             history.MarkSkipped("No email destination is available for this portal user.");
             return;
         }
-
         if (!notificationOptions.Enabled)
         {
             history.MarkSkipped("Notification delivery is disabled in the current environment.");
@@ -410,9 +278,7 @@ public sealed class OutboxDispatcher
 
         try
         {
-            await notificationSender.SendAsync(
-                new NotificationEnvelope(destination, subject, body),
-                cancellationToken);
+            await notificationSender.SendAsync(new NotificationEnvelope(destination, subject, body), cancellationToken);
             history.MarkSent(DateTimeOffset.UtcNow);
         }
         catch (Exception exception)
@@ -424,11 +290,7 @@ public sealed class OutboxDispatcher
 
     private static bool IsDue(OutboxMessage message, DateTimeOffset now)
     {
-        if (message.AttemptCount <= 0)
-        {
-            return true;
-        }
-
+        if (message.AttemptCount <= 0) return true;
         int exponent = Math.Min(message.AttemptCount - 1, 6);
         TimeSpan delay = TimeSpan.FromMinutes(Math.Pow(2, exponent));
         return message.OccurredUtc.Add(delay) <= now;
@@ -445,7 +307,6 @@ public sealed class OutboxDispatcher
     private static TMessage Deserialize<TMessage>(string payload)
     {
         return JsonSerializer.Deserialize<TMessage>(payload)
-            ?? throw new InvalidOperationException(
-                $"Unable to deserialize {typeof(TMessage).Name} outbox payload.");
+            ?? throw new InvalidOperationException($"Unable to deserialize {typeof(TMessage).Name} outbox payload.");
     }
 }
