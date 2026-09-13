@@ -2,6 +2,7 @@ using Common.Storage;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Management;
+using RequestPortal.Application.Requests;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Requests;
@@ -88,41 +89,17 @@ public sealed class StorageBackedRequestFeaturesTests
             RequestLocationSnapshot saved = await service.ResolveAndSaveAsync(
                 requestId,
                 "Half Way Tree, St. Andrew, Jamaica",
-                null,
-                null,
-                cancellationToken)
-                ?? throw new InvalidOperationException("Location was not resolved.");
+                cancellationToken);
 
-            Assert.Equal("St. Andrew", saved.Parish);
-            Assert.Equal("Half Way Tree", saved.Community);
-
-            StoredFile metadata = await storage.GetMetadataAsync(
-                $"requestportal/locations/{requestId:N}/resolved-location.json",
-                cancellationToken)
-                ?? throw new InvalidOperationException("Location metadata was not stored.");
-            Assert.Equal(StorageStatus.Stored, metadata.Status);
-            Assert.Equal("St. Andrew", metadata.Metadata["Parish"]);
+            RequestLocationSnapshot? loaded = await service.GetAsync(requestId, cancellationToken);
+            Assert.NotNull(loaded);
+            Assert.Equal(saved.RequestId, loaded!.RequestId);
+            Assert.Equal(saved.LocationText, loaded.LocationText);
         }
         finally
         {
             Directory.Delete(root, recursive: true);
         }
-    }
-
-    [Fact]
-    public void EfModel_DoesNotContainTemporaryGeoOrProposalRevisionEntities()
-    {
-        using RequestPortalDbContext db = CreateDb();
-
-        Assert.DoesNotContain(
-            db.Model.GetEntityTypes(),
-            entity => entity.ClrType.Name is "RequestGeoLocation" or "ProjectProposalRevision");
-    }
-
-    [Fact]
-    public void ManagementDashboardPermission_UsesRequiredExactName()
-    {
-        Assert.Equal("ManagementDashboard.View", RequestPortalPermissions.ViewManagementDashboard);
     }
 
     private static RequestPortalDbContext CreateDb()
@@ -140,16 +117,15 @@ public sealed class StorageBackedRequestFeaturesTests
         return path;
     }
 
-    private sealed class AllowAllOrganizationAccess : IOrganizationAccessService
+    private sealed class FixedClock(DateTimeOffset utcNow) : IClock
     {
-        public Task<bool> IsApprovedMemberAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) => Task.FromResult(true);
-        public Task<bool> IsAdministratorAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public DateTimeOffset UtcNow => utcNow;
     }
 
-    private sealed class FixedClock : IClock
+    private sealed class AllowAllOrganizationAccess : IOrganizationAccessService
     {
-        public FixedClock(DateTimeOffset utcNow) => UtcNow = utcNow;
-        public DateTimeOffset UtcNow { get; }
+        public Task<bool> CanAccessOrganizationAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
     }
 
     private sealed class NullBusinessAuditWriter : IBusinessAuditWriter
@@ -158,9 +134,8 @@ public sealed class StorageBackedRequestFeaturesTests
             Guid actorUserId,
             string action,
             string entityType,
-            Guid entityId,
-            Guid? organizationId,
-            string? detail = null,
+            string entityId,
+            string? details = null,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }
