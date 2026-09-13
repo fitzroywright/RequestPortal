@@ -25,7 +25,8 @@ public sealed class OperationsModel : PageModel
         Array.Empty<RequestWorkItem>(),
         Array.Empty<RequestWorkItem>(),
         Array.Empty<DocumentWorkItem>(),
-        Array.Empty<DeadLetterWorkItem>());
+        Array.Empty<DeadLetterWorkItem>(),
+        Array.Empty<NotificationDeliveryWorkItem>());
 
     public async Task OnGetAsync()
     {
@@ -34,10 +35,18 @@ public sealed class OperationsModel : PageModel
 
     public async Task<IActionResult> OnPostReplayDeadLetterAsync(Guid messageId)
     {
-        ApplicationUser staffUser = await userManager.GetUserAsync(User)
-            ?? throw new InvalidOperationException("Authenticated FFP staff user could not be resolved.");
-        await staffOperationsService.ReplayDeadLetterAsync(staffUser.Id, messageId, HttpContext.RequestAborted);
-        TempData["Success"] = "Dead-letter message queued for safe replay.";
+        try
+        {
+            ApplicationUser staffUser = await userManager.GetUserAsync(User)
+                ?? throw new InvalidOperationException("Authenticated FFP staff user could not be resolved.");
+            await staffOperationsService.ReplayDeadLetterAsync(staffUser.Id, messageId, HttpContext.RequestAborted);
+            TempData["Success"] = "Dead-letter message queued for safe replay.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            TempData["Error"] = exception.Message;
+        }
+
         return RedirectToPage();
     }
 }
