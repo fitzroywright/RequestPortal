@@ -91,6 +91,7 @@ if (($exists | Out-String).Trim() -ne "1") {
     & $psqlPath -h $PostgresHost -p $PostgresPort -U $PostgresUser -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $Database;"
 }
 
+# Demo mode must be controlled by this launcher, not by Visual Studio/launchSettings.json.
 $env:ASPNETCORE_ENVIRONMENT = "Demo"
 $env:ASPNETCORE_URLS = "https://0.0.0.0:$Port"
 $env:ConnectionStrings__RequestPortal = "Host=$PostgresHost;Port=$PostgresPort;Database=$Database;Username=$PostgresUser;Password=$pgPassword;Include Error Detail=true"
@@ -151,4 +152,6 @@ Write-Host "After the first successful bootstrap/restore, Wi-Fi/Internet may dis
 Write-Host "Press Ctrl+C here when the demonstration is complete."
 Write-Host ""
 
-dotnet run --project $project --configuration Debug --no-build --no-restore
+# --no-launch-profile is intentional: launchSettings.json would otherwise override
+# ASPNETCORE_ENVIRONMENT and ASPNETCORE_URLS, producing the wrong demo port/environment.
+dotnet run --project $project --configuration Debug --no-build --no-restore --no-launch-profile
