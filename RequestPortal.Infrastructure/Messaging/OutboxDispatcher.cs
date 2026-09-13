@@ -21,6 +21,7 @@ namespace RequestPortal.Infrastructure.Messaging;
 
 public sealed class OutboxDispatcher
 {
+    private const int MaxAttempts = 10;
     private readonly RequestPortalDbContext dbContext;
     private readonly INotificationSender notificationSender;
     private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
@@ -48,11 +49,17 @@ public sealed class OutboxDispatcher
         int batchSize = 20,
         CancellationToken cancellationToken = default)
     {
-        List<OutboxMessage> messages = await dbContext.OutboxMessages
-            .Where(message => message.ProcessedUtc == null && message.AttemptCount < 10)
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        List<OutboxMessage> candidates = await dbContext.OutboxMessages
+            .Where(message => message.ProcessedUtc == null && message.AttemptCount < MaxAttempts)
             .OrderBy(message => message.OccurredUtc)
-            .Take(batchSize)
+            .Take(Math.Max(batchSize * 4, batchSize))
             .ToListAsync(cancellationToken);
+
+        List<OutboxMessage> messages = candidates
+            .Where(message => IsDue(message, now))
+            .Take(batchSize)
+            .ToList();
 
         int processed = 0;
         foreach (OutboxMessage message in messages)
@@ -67,8 +74,33 @@ public sealed class OutboxDispatcher
             catch (Exception exception)
             {
                 message.AttemptCount++;
-                message.LastError = exception.Message;
-                logger.LogError(exception, "Outbox message {MessageId} failed.", message.Id);
+                bool exhausted = message.AttemptCount >= MaxAttempts;
+                message.LastError = exhausted
+                    ? $"DEAD LETTER: {exception.Message}"
+                    : exception.Message;
+
+                if (exhausted)
+                {
+                    foreach (NotificationHistory history in dbContext.NotificationHistory.Local
+                        .Where(item => item.Status == NotificationDeliveryStatus.Failed))
+                    {
+                        history.MarkDeadLettered(exception.Message);
+                    }
+
+                    logger.LogCritical(
+                        exception,
+                        "Outbox message {MessageId} exhausted {AttemptCount} attempts and was dead-lettered.",
+                        message.Id,
+                        message.AttemptCount);
+                }
+                else
+                {
+                    logger.LogError(
+                        exception,
+                        "Outbox message {MessageId} failed on attempt {AttemptCount}; retry will be delayed.",
+                        message.Id,
+                        message.AttemptCount);
+                }
             }
         }
 
@@ -388,6 +420,18 @@ public sealed class OutboxDispatcher
             history.MarkFailed(exception.Message);
             throw;
         }
+    }
+
+    private static bool IsDue(OutboxMessage message, DateTimeOffset now)
+    {
+        if (message.AttemptCount <= 0)
+        {
+            return true;
+        }
+
+        int exponent = Math.Min(message.AttemptCount - 1, 6);
+        TimeSpan delay = TimeSpan.FromMinutes(Math.Pow(2, exponent));
+        return message.OccurredUtc.Add(delay) <= now;
     }
 
     private static Guid CreateDeterministicGuid(Guid requestId, string purpose)
