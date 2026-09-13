@@ -17,11 +17,19 @@ public interface IMessagePublisher
         where TMessage : IMessage;
 }
 
+public enum NotificationTransport
+{
+    Email = 0,
+    Sms = 1,
+    WhatsApp = 2
+}
+
 public sealed record NotificationEnvelope(
     string Recipient,
     string Subject,
     string Body,
-    bool IsHtml = false);
+    bool IsHtml = false,
+    NotificationTransport Transport = NotificationTransport.Email);
 
 public interface INotificationSender
 {
