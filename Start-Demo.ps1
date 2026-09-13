@@ -68,10 +68,20 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $project = Join-Path $repoRoot "RequestPortal\RequestPortal.Web\RequestPortal.Web.csproj"
-Write-Host "Building demo from local sources only..."
+$assets = Join-Path $repoRoot "RequestPortal\RequestPortal.Web\obj\project.assets.json"
+
+if (-not (Test-Path $assets)) {
+    Write-Host "This is the first run from this clone. Restoring NuGet packages once..."
+    dotnet restore $project
+    if ($LASTEXITCODE -ne 0) {
+        throw "Initial NuGet restore failed. Internet/package-source access is needed only for this first restore. After it succeeds, future demo runs can operate offline."
+    }
+}
+
+Write-Host "Building demo from local sources..."
 dotnet build $project --configuration Debug --no-restore
 if ($LASTEXITCODE -ne 0) {
-    throw "Demo build failed. The launcher never downloads packages. Restore the repository once while dependencies are available, then Start-Demo.ps1 can run completely offline."
+    throw "Demo build failed. Fix the build errors shown above before starting the management demo."
 }
 
 Write-Host ""
@@ -102,7 +112,7 @@ try {
 Write-Host ""
 Write-Host "If Windows Firewall prompts, allow Private network access for LAN viewing."
 Write-Host "A LAN browser may warn about the laptop development certificate; localhost remains trusted on this laptop."
-Write-Host "Wi-Fi/Internet may disappear after startup; https://localhost:$Port continues to work."
+Write-Host "After the first successful restore, Wi-Fi/Internet may disappear and https://localhost:$Port continues to work."
 Write-Host "Press Ctrl+C here when the demonstration is complete."
 Write-Host ""
 
