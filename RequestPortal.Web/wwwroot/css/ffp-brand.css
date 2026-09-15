@@ -53,12 +53,21 @@
     color: var(--ffp-orange-dark);
 }
 
+/* Keep orange as an accent rather than making every primary action orange. */
 .button {
     border-radius: 5px;
-    background: var(--ffp-orange);
+    background: var(--ffp-navy);
 }
 
 .button:hover {
+    background: var(--ffp-navy-deep);
+}
+
+.donate-button {
+    background: var(--ffp-orange);
+}
+
+.donate-button:hover {
     background: var(--ffp-orange-dark);
 }
 
