@@ -7,5 +7,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RequestPortal.Application\RequestPortal.Application.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Secrets\Common.Secrets.csproj" />
   </ItemGroup>
 </Project>
