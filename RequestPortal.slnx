@@ -15,4 +15,5 @@
   <Project Path="../Common/Common.Storage/Common.Storage.csproj" />
   <Project Path="../Common/Common.Diagnostics/Common.Diagnostics.csproj" />
   <Project Path="../Common/Common.Messaging/Common.Messaging.Hosting/Common.Messaging.Hosting.csproj" />
+  <Project Path="../Common/Common.Registration/Common.Registration.csproj" />
 </Solution>
