@@ -7,8 +7,6 @@
   <Project Path="FfpManager.Bridge/FfpManager.Bridge.csproj" />
   <Project Path="RequestPortal.Tests/RequestPortal.Domain.Tests/RequestPortal.Domain.Tests.csproj" />
   <Project Path="RequestPortal.Tests/RequestPortal.Infrastructure.Tests/RequestPortal.Infrastructure.Tests.csproj" />
-  <Project Path="../Aegis.Configuration/Aegis.Configuration.Web/Aegis.Configuration.Web.csproj" />
-  <Project Path="../Aegis.Diagnostics/Aegis.Diagnostics.csproj" />
   <Project Path="../Common/Common.Security/Common.Security.csproj" />
   <Project Path="../Common/Common.Secrets/Common.Secrets.csproj" />
   <Project Path="../Common/Common.Messaging/Common.Messaging.csproj" />
