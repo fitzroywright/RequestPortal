@@ -9,8 +9,9 @@ This audit covers RequestPortal configuration contract publication. It does not 
 ## Registration boundary
 
 - RequestPortal registers only with Aegis.Configuration.
-- Registration transport is provided by Common.Registration.
+- Registration transport is provided by the standalone Common.Registration library.
 - RequestPortal does not register with Aegis.Diagnostics.
+- Retry occurs only while registration is unsuccessful; a real successful registration ends the startup retry cycle.
 
 ## Configuration ownership rule
 
@@ -20,7 +21,7 @@ RequestPortal may publish requirement metadata and configured-state evidence, in
 
 RequestPortal must not publish actual values from configuration, environment variables, connection strings, OpenBao, SMTP credentials, OIDC client secrets, storage paths as display values, or any resolved/default configuration content.
 
-The migration removes RequestPortal's previous construction of `safeDisplayValue`. Common.Registration also applies the metadata-only sanitizer centrally before transmission.
+The migration removes RequestPortal's previous construction of `safeDisplayValue`. Common.Registration recursively removes value-bearing fields again before transmission and normalizes requirement-kind wire metadata for Aegis.Configuration.
 
 ## Runtime checks retained
 
@@ -47,10 +48,6 @@ Missing contract, missing registration credential, malformed contract, non-succe
 
 ## Validation evidence
 
-Common.Registration's current staging branch has executable tests for metadata-only sanitization, source-contract non-mutation, and rejected-registration failure semantics, with green restore/build/test CI evidence.
+The permanent `fitzroywright/Common.Registration` repository has green CI with executable tests for recursive metadata sanitization, source non-mutation, wire-kind normalization, sanitized payload transmission, HTTP rejection, timeout, and transport failure.
 
-RequestPortal's current GitHub Actions job is not compilation evidence because it failed before any workflow steps executed and no runner was assigned. This branch therefore does not claim a successful RequestPortal compile/test run yet.
-
-## Temporary repository layout
-
-Common.Registration is temporarily staged on the `common-registration` branch of `Common.Diagnostics`. The intended permanent state is a standalone `Common.Registration` repository. RequestPortal must be restored, built, and tested against that standalone repository before this migration is promoted from draft.
+RequestPortal's workflow and solution consume the standalone library directly at `Common/Common.Registration`. RequestPortal's current GitHub Actions job is not compilation evidence because it failed before any workflow steps executed and no runner was assigned. This branch therefore does not claim a successful RequestPortal compile/test run yet.
