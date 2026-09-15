@@ -144,10 +144,12 @@ public sealed class ConfigurationContractPublisher(
 
                 requirement["isConfigured"] = configured;
                 requirement.Remove("safeDisplayValue");
-                if (!IsSensitive(requirement) && TryGetSafeDisplayValue(id, out string? safeValue))
-                {
-                    requirement["safeDisplayValue"] = safeValue;
-                }
+                requirement.Remove("defaultValue");
+                requirement.Remove("value");
+                requirement.Remove("currentValue");
+                requirement.Remove("resolvedValue");
+                requirement.Remove("effectiveValue");
+                requirement.Remove("example");
             }
         }
 
@@ -175,38 +177,16 @@ public sealed class ConfigurationContractPublisher(
         {
             return !string.IsNullOrWhiteSpace(await secrets.GetAsync(name, cancellationToken));
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             logger.LogDebug(exception, "Unable to confirm whether configuration secret {SecretName} is available.", name);
             return false;
         }
     }
-
-    private bool TryGetSafeDisplayValue(string requirementId, out string? value)
-    {
-        value = requirementId switch
-        {
-            "storage-root" => configuration["Storage:Local:RootPath"],
-            "data-protection-keys" => configuration["Security:DataProtectionKeysPath"],
-            "openbao-address" => configuration["CommonSecrets:OpenBao:Address"]
-                ?? configuration["OpenBao:Address"]
-                ?? Environment.GetEnvironmentVariable("OPENBAO_ADDR")
-                ?? Environment.GetEnvironmentVariable("VAULT_ADDR"),
-            "staff-oidc-authority" => configuration["Authentication:StaffOidc:Authority"],
-            "staff-oidc-client-id" => configuration["Authentication:StaffOidc:ClientId"],
-            "storage-malware-scanner" => configuration["Uploads:MalwareScanning:Host"],
-            "smtp-host" => configuration["Notifications:SmtpHost"],
-            "smtp-from" => configuration["Notifications:FromAddress"],
-            "messaging-queue" => configuration["Messaging:DurableQueuePath"],
-            "site-id" => configuration["Site:Id"],
-            _ => null
-        };
-
-        value = NullIfWhiteSpace(value);
-        return value is not null;
-    }
-
-    private static bool IsSensitive(JsonObject requirement) => requirement["sensitive"]?.GetValue<bool>() == true;
 
     private static bool HasNonPlaceholderValue(string? value) =>
         !string.IsNullOrWhiteSpace(value)
