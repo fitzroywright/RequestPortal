@@ -1,66 +1,310 @@
 @page
 @model RequestPortal.Web.Pages.IndexModel
 @{
-    ViewData["Title"] = "Request Portal";
+    ViewData["Title"] = "Relief Portal";
 }
 
-<section class="service-hero">
-    <div class="shell service-hero-grid">
-        <div>
-            <div class="service-kicker">Food For The Poor Jamaica</div>
-            <h1>Request assistance and follow its progress.</h1>
-            <p>Approved organizations can submit assistance requests, provide supporting documents, and follow each request through review and fulfilment.</p>
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                <a class="button service-primary-action" asp-page="/Dashboard/Index">Continue to your requests</a>
-            }
-            else
-            {
-                <a class="button service-primary-action" asp-page="/Account/Login">Register or sign in</a>
-            }
+<div class="startup-splash" data-startup-splash aria-hidden="true">
+    <div class="startup-splash-image" data-startup-splash-image></div>
+    <div class="startup-splash-fog"></div>
+    <div class="startup-splash-vignette"></div>
+    <div class="startup-splash-content">
+        <img class="startup-splash-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor" />
+        <div class="startup-splash-kicker" data-startup-splash-kicker>Disaster Relief</div>
+        <h1 data-startup-splash-title>Standing with Jamaica</h1>
+        <p data-startup-splash-text>Responding today. Rebuilding tomorrow. Together we bring hope.</p>
+        <div class="startup-splash-scripture">“As often as you did it for one of the least of my brothers and sisters, you did it for me.”</div>
+        <div class="startup-splash-scripture-ref">Matthew 25:40</div>
+        <div class="startup-splash-progress" aria-hidden="true"><span></span></div>
+        <div class="startup-splash-tagline">A brighter tomorrow is possible</div>
+    </div>
+</div>
+<style>
+    .startup-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        overflow: hidden;
+        background: #071421;
+        color: #fff;
+        opacity: 1;
+        transition: opacity .85s ease;
+    }
+    .startup-splash.is-hidden { opacity: 0; pointer-events: none; }
+    .startup-splash.is-removed { display: none; }
+    .startup-splash-image {
+        position: absolute;
+        inset: -2%;
+        background-position: center;
+        background-size: cover;
+        transform: scale(1.04);
+        filter: brightness(.45) saturate(.76) contrast(1.08) sepia(.08) hue-rotate(170deg);
+    }
+    .startup-splash-fog {
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 78% 38%, rgba(244,156,52,.18), transparent 25%),
+            linear-gradient(180deg, rgba(5,14,24,.48), rgba(8,18,29,.78)),
+            linear-gradient(90deg, rgba(7,17,28,.84) 0%, rgba(14,28,41,.52) 48%, rgba(8,18,30,.72) 100%);
+        backdrop-filter: blur(1.5px);
+    }
+    .startup-splash-vignette {
+        position: absolute;
+        inset: 0;
+        box-shadow: inset 0 0 180px 70px rgba(1,7,13,.72);
+        background: linear-gradient(0deg, rgba(5,13,22,.78) 0%, transparent 38%);
+    }
+    .startup-splash-content {
+        position: relative;
+        z-index: 2;
+        width: min(760px, calc(100% - 48px));
+        margin: 0 auto;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 48px 0;
+        text-shadow: 0 3px 18px rgba(0,0,0,.68);
+    }
+    .startup-splash-logo {
+        width: min(320px, 64vw);
+        max-height: 150px;
+        object-fit: contain;
+        margin-bottom: 28px;
+        filter: drop-shadow(0 8px 24px rgba(0,0,0,.45));
+    }
+    .startup-splash-kicker {
+        color: #f49b2f;
+        font-size: .8rem;
+        font-weight: 800;
+        letter-spacing: .18em;
+        text-transform: uppercase;
+        margin-bottom: 9px;
+    }
+    .startup-splash-content h1 {
+        margin: 0 0 12px;
+        max-width: 720px;
+        font-size: clamp(2.5rem, 6vw, 5.6rem);
+        line-height: .98;
+        letter-spacing: -.035em;
+    }
+    .startup-splash-content > p {
+        max-width: 650px;
+        margin: 0 0 30px;
+        font-size: clamp(1rem, 2vw, 1.32rem);
+        line-height: 1.55;
+        color: #e7edf2;
+    }
+    .startup-splash-scripture {
+        max-width: 620px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(1rem, 2vw, 1.25rem);
+        line-height: 1.45;
+        color: #f5f6f7;
+    }
+    .startup-splash-scripture-ref {
+        margin-top: 8px;
+        font-size: .74rem;
+        font-weight: 800;
+        letter-spacing: .22em;
+        text-transform: uppercase;
+        color: #d6dde3;
+    }
+    .startup-splash-progress {
+        width: min(300px, 66vw);
+        height: 3px;
+        margin: 42px auto 12px;
+        background: rgba(255,255,255,.3);
+        overflow: hidden;
+    }
+    .startup-splash-progress span {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #f49b2f;
+        animation: startupSplashProgress 7s linear forwards;
+    }
+    .startup-splash-tagline {
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .24em;
+        text-transform: uppercase;
+        color: #dce3e9;
+    }
+    @@keyframes startupSplashProgress { to { width: 100%; } }
+    @@media (max-width: 640px) {
+        .startup-splash-content { width: min(92vw, 560px); }
+        .startup-splash-logo { width: min(260px, 70vw); }
+    }
+    @@media (prefers-reduced-motion: reduce) {
+        .startup-splash { transition: none; }
+        .startup-splash-progress span { animation: none; width: 100%; }
+    }
+</style>
+
+<section class="relief-carousel" data-relief-carousel>
+    <div class="relief-carousel-stage">
+        <div class="relief-carousel-image" data-carousel-image aria-hidden="true"></div>
+        <div class="relief-carousel-shade"></div>
+        <button class="relief-carousel-arrow relief-carousel-prev" type="button" data-carousel-prev aria-label="Previous slide">‹</button>
+        <button class="relief-carousel-arrow relief-carousel-next" type="button" data-carousel-next aria-label="Next slide">›</button>
+        <div class="shell relief-carousel-copy">
+            <div class="eyebrow" data-carousel-kicker>Disaster Relief</div>
+            <h1 data-carousel-title>Standing with Jamaica</h1>
+            <p data-carousel-text>Responding today. Rebuilding tomorrow. Together we bring hope.</p>
+            <a class="button" asp-page="/Account/Login">Start here →</a>
         </div>
-        <aside class="service-help-panel" aria-label="Before you start">
-            <h2>Before you start</h2>
-            <p>Requests are submitted on behalf of an approved organization. Representatives must sign in as themselves and have approved membership in that organization.</p>
-            <a asp-page="/Organizations/Index">Organization access and membership</a>
-        </aside>
+        <div class="shell relief-carousel-thumbs" data-carousel-thumbs aria-label="Relief programme slides"></div>
     </div>
 </section>
 
-<section class="service-section">
+<section class="relief-access-section">
     <div class="shell">
-        <div class="service-section-heading">
-            <h2>How it works</h2>
-            <p>Three clear steps. Your request remains attached to the organization you are authorized to represent.</p>
+        <div class="relief-section-heading">
+            <span>User Assistance &amp; Access</span>
+            <h2>Get help or access your account</h2>
         </div>
-        <ol class="service-steps">
-            <li>
-                <strong>1</strong>
-                <div><h3>Confirm organization access</h3><p>Register an organization or request membership in an existing approved organization.</p></div>
-            </li>
-            <li>
-                <strong>2</strong>
-                <div><h3>Submit the request</h3><p>Enter the assistance details and upload any supporting documents required for review.</p></div>
-            </li>
-            <li>
-                <strong>3</strong>
-                <div><h3>Track the outcome</h3><p>See requests for more information, decisions, and fulfilment updates from your account.</p></div>
-            </li>
-        </ol>
+        <div class="relief-access-grid">
+            <section class="relief-info-card">
+                <article class="relief-info-row">
+                    <img src="~/img/leaningwoman.webp" alt="" aria-hidden="true" />
+                    <div>
+                        <h3>Request for Assistance</h3>
+                        <p>Assistance requests are made through approved organizations. Sign in to register an organization, request membership in an existing organization, or continue an assistance request.</p>
+                        <a class="relief-text-link" asp-page="/Account/Login">Start here →</a>
+                    </div>
+                </article>
+                <div class="relief-divider"></div>
+                <article class="relief-info-row">
+                    <img src="~/img/worker03.webp" alt="" aria-hidden="true" />
+                    <div>
+                        <h3>Organization Representatives</h3>
+                        <p>Representatives sign in as themselves and may act only for organizations that have approved their membership. Your account keeps those relationships and requests in one secure place.</p>
+                        <a class="relief-text-link" asp-page="/Account/Login">Representative access →</a>
+                    </div>
+                </article>
+            </section>
+            <aside class="relief-login-card">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <h3>Welcome back</h3>
+                    <p>You are signed in. Continue to your dashboard or organization workspace.</p>
+                    <a class="button relief-wide-button" asp-page="/Dashboard/Index">Open dashboard</a>
+                    <a class="button button-outline relief-wide-button" asp-page="/Organizations/Index">My organizations</a>
+                }
+                else
+                {
+                    <h3>Registered User Login</h3>
+                    <p>New here? Your first successful external sign-in creates your portal identity.</p>
+                    <a class="button relief-wide-button" asp-page="/Account/Login">Register or sign in</a>
+                    <a class="button button-outline relief-wide-button" asp-page="/Account/StaffLogin">FFP staff sign in</a>
+                    <small>Google, Microsoft, Facebook or other configured identity providers are shown on the sign-in page.</small>
+                }
+            </aside>
+        </div>
     </div>
 </section>
 
-<section class="service-section service-section-muted">
-    <div class="shell service-access-grid">
-        <div>
-            <h2>Representative access</h2>
-            <p>Use your own account. The portal records which organizations you are approved to represent and keeps requests separated by organization.</p>
-            <a class="service-text-link" asp-page="/Organizations/Index">Manage organization access</a>
+<section class="section relief-process-section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">One portal, clear ownership</div>
+            <h2>Assistance requests belong to organizations.</h2>
+            <p>Representatives authenticate as people, while each request remains tied to the organization they are authorized to represent. New organizations and new representative memberships follow an approval process before requests can be submitted.</p>
         </div>
-        <div>
-            <h2>Food For The Poor staff</h2>
-            <p>Staff use the separate staff sign-in for review, administration, fulfilment, reporting, and operational work.</p>
-            <a class="service-text-link" asp-page="/Account/StaffLogin">Staff sign in</a>
+        <div class="grid-3">
+            <article class="card"><h3>1. Register or join</h3><p>Register a new organization or request membership in an approved organization.</p></article>
+            <article class="card"><h3>2. Submit assistance</h3><p>Provide the request details and supporting documents on behalf of your organization.</p></article>
+            <article class="card"><h3>3. Follow the request</h3><p>Track review, requests for additional information, decisions and fulfilment from your dashboard.</p></article>
         </div>
     </div>
 </section>
+
+<script>
+(() => {
+    const slides = [
+        ['Disaster Relief','Standing with Jamaica','Responding today. Rebuilding tomorrow. Together we bring hope.','/img/carousel/disaster.jpg'],
+        ['Housing','Building safe homes','Secure housing gives families a stronger foundation for tomorrow.','/img/carousel/Splash01.jpg'],
+        ['Health Care','Care that reaches people','Supporting healthier communities with practical, compassionate assistance.','/img/carousel/Splash02.jpg'],
+        ['Agriculture','Growing stronger communities','Agriculture programmes help families build resilient livelihoods.','/img/carousel/Splash03.jpg'],
+        ['School Construction','Places to learn and grow','Creating safer spaces where students can learn, develop and thrive.','/img/carousel/Splash04.jpg'],
+        ['Missions','Serving communities together','Working with trusted partners to reach people where help is needed.','/img/carousel/Splash05.jpg'],
+        ['Education','Opening doors through education','Education creates opportunity and strengthens communities for generations.','/img/carousel/Splash06.jpg'],
+        ['Fishing Villages','Supporting coastal livelihoods','Helping fishing communities strengthen livelihoods and local resilience.','/img/carousel/Splash07.jpg'],
+        ['Hurricane Relief','Responding when disaster strikes','Emergency support today, recovery and rebuilding for tomorrow.','/img/carousel/Splash08.jpg'],
+        ['Income Generating Projects','Creating sustainable opportunity','Practical support helps families build income and greater independence.','/img/carousel/Splash09.jpg'],
+        ['Prison Ministry','Hope and human dignity','Extending compassion, dignity and support to people and their families.','/img/carousel/Splash10.jpg'],
+        ['Water Projects','Clean water changes lives','Improving access to safe water for healthier, stronger communities.','/img/carousel/Splash11.jpg'],
+        ['Community Support','Reaching people in need','Partnership turns generosity into practical help for Jamaican communities.','/img/carousel/Splash12.jpg'],
+        ['Development','Building for the future','Long-term solutions help communities move from crisis toward stability.','/img/carousel/Splash13.jpg'],
+        ['Partnerships','Stronger when we work together','Partners, representatives and communities working together to restore hope.','/img/carousel/Splash14.jpg']
+    ];
+
+    const splash = document.querySelector('[data-startup-splash]');
+    if (splash) {
+        let showSplash = true;
+        try {
+            showSplash = sessionStorage.getItem('requestportal-startup-splash-seen') !== '1';
+            if (showSplash) sessionStorage.setItem('requestportal-startup-splash-seen', '1');
+        } catch {
+            // If session storage is unavailable, show the splash for this page load.
+        }
+
+        if (showSplash) {
+            const splashSlide = slides[Math.floor(Math.random() * slides.length)];
+            const splashImage = splash.querySelector('[data-startup-splash-image]');
+            if (splashImage) splashImage.style.backgroundImage = `url('${splashSlide[3]}')`;
+            const splashKicker = splash.querySelector('[data-startup-splash-kicker]');
+            const splashTitle = splash.querySelector('[data-startup-splash-title]');
+            const splashText = splash.querySelector('[data-startup-splash-text]');
+            if (splashKicker) splashKicker.textContent = splashSlide[0];
+            if (splashTitle) splashTitle.textContent = splashSlide[1];
+            if (splashText) splashText.textContent = splashSlide[2];
+            window.setTimeout(() => {
+                splash.classList.add('is-hidden');
+                window.setTimeout(() => splash.classList.add('is-removed'), 900);
+            }, 7000);
+        } else {
+            splash.classList.add('is-removed');
+        }
+    }
+
+    const root = document.querySelector('[data-relief-carousel]');
+    if (!root) return;
+    const image = root.querySelector('[data-carousel-image]');
+    const kicker = root.querySelector('[data-carousel-kicker]');
+    const title = root.querySelector('[data-carousel-title]');
+    const text = root.querySelector('[data-carousel-text]');
+    const thumbs = root.querySelector('[data-carousel-thumbs]');
+    let index = 0;
+    let timer;
+    slides.forEach((slide, i) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'relief-carousel-thumb';
+        button.title = slide[0];
+        button.setAttribute('aria-label', `Show ${slide[0]} slide`);
+        button.innerHTML = `<span class="relief-carousel-thumb-image" style="background-image:url('${slide[3]}')"></span><span>${slide[0]}</span>`;
+        button.addEventListener('click', () => { show(i); restart(); });
+        thumbs.appendChild(button);
+    });
+    const buttons = [...thumbs.querySelectorAll('.relief-carousel-thumb')];
+    function show(next) {
+        index = (next + slides.length) % slides.length;
+        const slide = slides[index];
+        image.style.backgroundImage = `url('${slide[3]}')`;
+        kicker.textContent = slide[0]; title.textContent = slide[1]; text.textContent = slide[2];
+        buttons.forEach((button, i) => button.classList.toggle('active', i === index));
+        buttons[index].scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+    }
+    function restart() { clearInterval(timer); timer = setInterval(() => show(index + 1), 7000); }
+    root.querySelector('[data-carousel-prev]').addEventListener('click', () => { show(index - 1); restart(); });
+    root.querySelector('[data-carousel-next]').addEventListener('click', () => { show(index + 1); restart(); });
+    root.addEventListener('mouseenter', () => clearInterval(timer));
+    root.addEventListener('mouseleave', restart);
+    show(0); restart();
+})();
+</script>
