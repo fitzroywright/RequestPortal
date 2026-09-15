@@ -52,8 +52,7 @@ jobs:
       - name: Checkout Common.Registration
         uses: actions/checkout@v4
         with:
-          repository: fitzroywright/Common.Diagnostics
-          ref: common-registration
+          repository: fitzroywright/Common.Registration
           path: Common/Common.Registration
 
       - name: Mirror sibling Common layout
