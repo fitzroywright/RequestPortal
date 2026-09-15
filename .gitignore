@@ -16,3 +16,9 @@ secrets.json
 *.p12
 *.key
 *.pem
+
+# Local ASP.NET launch profiles
+**/Properties/launchSettings.json
+
+# ASP.NET Core Data Protection runtime keys
+**/App_Data/keys/
