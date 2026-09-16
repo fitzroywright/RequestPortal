@@ -257,13 +257,36 @@ builder.Services.AddSingleton<IClock, RequestPortal.Common.Time.SystemClock>();
 string storageRoot = builder.Configuration["Storage:Local:RootPath"] ?? "App_Data/storage";
 Common.Storage.StorageServiceCollectionExtensions.AddCommonStorage(builder.Services, storageRoot);
 builder.Services.AddSingleton<IDocumentUploadSecurity, DocumentUploadSecurity>();
-
 NotificationOptions notificationOptions = builder.Configuration
     .GetSection(NotificationOptions.SectionName)
     .Get<NotificationOptions>() ?? new NotificationOptions();
 string messagingQueuePath = builder.Configuration["Messaging:DurableQueuePath"]
     ?? Path.Combine("App_Data", "common-messaging");
 Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingSecrets(builder.Services);
+if (builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false))
+{
+    Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddMicrosoftGraphEmailMessagingChannel(
+        builder.Services,
+        new Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailOptions
+        {
+            TenantId = builder.Configuration["Messaging:MicrosoftGraph:TenantId"] ?? string.Empty,
+            ClientId = builder.Configuration["Messaging:MicrosoftGraph:ClientId"] ?? string.Empty,
+            SenderUpn = builder.Configuration["Messaging:MicrosoftGraph:Email:SenderUpn"] ?? string.Empty,
+            ClientSecretName = builder.Configuration["Messaging:MicrosoftGraph:ClientSecretName"]
+                ?? "messaging/msgraph/client-secret"
+        });
+}
+if (builder.Configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false))
+{
+    Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddMicrosoftGraphTeamsMessagingChannel(
+        builder.Services,
+        new Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphTeamsOptions
+        {
+            SenderUpn = builder.Configuration["Messaging:MicrosoftGraph:Teams:SenderUpn"] ?? string.Empty,
+            DelegatedAccessTokenSecretName = builder.Configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"]
+                ?? "messaging/msgraph/teams/delegated-access-token"
+        });
+}
 Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddSmtpMessagingChannel(
     builder.Services,
     new Common.Messaging.Channels.Smtp.SmtpMessageOptions
