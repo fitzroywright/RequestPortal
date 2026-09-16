@@ -112,7 +112,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.Name = "RequestPortal.Auth";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SameSiteMode = SameSiteMode.Lax;
     options.SlidingExpiration = true;
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
 });
@@ -290,7 +290,7 @@ if (notificationOptions.WhatsAppEnabled)
 {
     Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddWhatsAppMessagingChannel(
         builder.Services,
-        new Common.Messaging.Channels.WhatsApp.SmsMessageOptions
+        new Common.Messaging.Channels.WhatsApp.WhatsAppMessageOptions
         {
             Endpoint = notificationOptions.WhatsAppEndpoint,
             EndpointSecretName = notificationOptions.WhatsAppEndpointSecretName,
