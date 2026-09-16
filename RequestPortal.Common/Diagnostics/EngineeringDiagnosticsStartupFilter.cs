@@ -32,19 +32,6 @@ public sealed class EngineeringDiagnosticsStartupFilter : IStartupFilter
                     return;
                 }
 
-                if (context.Request.Path.Equals("/health", StringComparison.OrdinalIgnoreCase))
-                {
-                    context.Response.Clear();
-                    context.Response.StatusCode = StatusCodes.Status200OK;
-                    await context.Response.WriteAsJsonAsync(new
-                    {
-                        status = "running",
-                        application = "RequestPortal",
-                        timeUtc = DateTimeOffset.UtcNow
-                    });
-                    return;
-                }
-
                 if (!context.Request.Path.StartsWithSegments("/api/engineering/diagnostics"))
                 {
                     return;
