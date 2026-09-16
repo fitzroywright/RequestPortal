@@ -23,20 +23,9 @@ public sealed class ConfigurationContractPublisher(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        string? baseUrl = configuration["AegisConfiguration:BaseUrl"] ?? configuration["ConfigurationService:BaseUrl"];
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            logger.LogInformation("Aegis.Configuration publication is disabled because no Configuration base URL is configured.");
-            return;
-        }
-
-        string path = configuration["AegisConfiguration:ContractPath"]
-            ?? configuration["ConfigurationService:ContractPath"]
-            ?? Path.Combine(environment.ContentRootPath, "configuration", "RequestPortal.configuration-contract.json");
-
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (await TryPublishAsync(baseUrl, path, stoppingToken))
+            if (await PublishBootstrapAsync(configuration, environment, secrets, stoppingToken, logger))
             {
                 return;
             }
@@ -52,40 +41,75 @@ public sealed class ConfigurationContractPublisher(
         }
     }
 
-    private async Task<bool> TryPublishAsync(string baseUrl, string path, CancellationToken cancellationToken)
+    /// <summary>
+    /// Publishes the RequestPortal commissioning contract before the web host is allowed to fail
+    /// production validation. This is intentionally usable during bootstrap so Aegis.Configuration
+    /// can show incomplete commissioning state even when RequestPortal cannot fully start.
+    /// </summary>
+    public static async Task<bool> PublishBootstrapAsync(
+        IConfiguration configuration,
+        IWebHostEnvironment environment,
+        ISecretProvider secrets,
+        CancellationToken cancellationToken = default,
+        ILogger<ConfigurationContractPublisher>? logger = null)
     {
+        string? baseUrl = configuration["Aegis:Configuration:Url"]
+            ?? configuration["AegisConfiguration:BaseUrl"]
+            ?? configuration["ConfigurationService:BaseUrl"];
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            logger?.LogInformation("Aegis.Configuration publication is disabled because no Configuration URL is configured.");
+            return false;
+        }
+
+        string path = configuration["Aegis:Configuration:ContractPath"]
+            ?? configuration["AegisConfiguration:ContractPath"]
+            ?? configuration["ConfigurationService:ContractPath"]
+            ?? Path.Combine(environment.ContentRootPath, "configuration", "RequestPortal.configuration-contract.json");
+
         try
         {
             if (!File.Exists(path))
             {
-                logger.LogWarning("Configuration contract was not found at {ContractPath}; RequestPortal remains operational and will retry publication.", path);
+                logger?.LogWarning("Configuration contract was not found at {ContractPath}; RequestPortal will retry publication.", path);
                 return false;
             }
 
-            string? key = await secrets.GetAsync("configuration/registration/RequestPortal", cancellationToken);
-            if (string.IsNullOrWhiteSpace(key))
+            RegistrationCredentialResolution credential = await RegistrationCredentialResolver.ResolveAsync(
+                () => Environment.GetEnvironmentVariable(RegistrationCredentialResolver.EnvironmentVariableName),
+                ct => secrets.GetAsync(RegistrationCredentialResolver.SecretNameFor("RequestPortal"), ct),
+                () => configuration[RegistrationCredentialResolver.AppSettingKey],
+                cancellationToken);
+
+            if (!credential.Succeeded)
             {
-                logger.LogWarning("Configuration registration credential is unavailable; RequestPortal remains operational and will retry publication.");
+                logger?.LogWarning(
+                    "Aegis.Configuration registration credential is unavailable from Environment, SecretProvider, and AppSetting; RequestPortal will retry publication. Secret provider detail: {SecretProviderError}",
+                    credential.SecretProviderError ?? "none");
                 return false;
             }
 
-            JsonObject contract = await BuildRuntimeContractAsync(path, cancellationToken);
+            JsonObject contract = await BuildRuntimeContractAsync(configuration, environment, secrets, path, cancellationToken, logger);
             using HttpClient client = new();
             var registrar = new ConfigurationRegistrar(
                 client,
                 new RegistrationOptions(
                     new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute),
-                    key,
+                    credential.Credential,
                     TimeSpan.FromSeconds(10)));
 
             RegistrationResult result = await registrar.RegisterContractAsync(contract, cancellationToken);
             if (!result.Succeeded)
             {
-                logger.LogWarning("Aegis.Configuration registration failed for RequestPortal: {RegistrationError}; RequestPortal remains operational and will retry publication.", result.Error ?? "Unknown registration failure.");
+                logger?.LogWarning("Aegis.Configuration registration failed for RequestPortal: {RegistrationError}; RequestPortal will retry publication.", result.Error ?? "Unknown registration failure.");
                 return false;
             }
 
-            logger.LogInformation("RequestPortal configuration requirements and configured state registered with Aegis.Configuration with HTTP {StatusCode}.", (int?)result.StatusCode);
+            logger?.LogInformation(
+                "RequestPortal commissioning state registered with Aegis.Configuration with HTTP {StatusCode} using {CredentialSource} credential.",
+                (int?)result.StatusCode,
+                credential.Source);
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -94,12 +118,18 @@ public sealed class ConfigurationContractPublisher(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Unable to publish RequestPortal configuration requirements; RequestPortal remains operational and will retry publication.");
+            logger?.LogWarning(exception, "Unable to publish RequestPortal commissioning state; RequestPortal will retry publication.");
             return false;
         }
     }
 
-    private async Task<JsonObject> BuildRuntimeContractAsync(string path, CancellationToken cancellationToken)
+    private static async Task<JsonObject> BuildRuntimeContractAsync(
+        IConfiguration configuration,
+        IWebHostEnvironment environment,
+        ISecretProvider secrets,
+        string path,
+        CancellationToken cancellationToken,
+        ILogger<ConfigurationContractPublisher>? logger)
     {
         JsonObject contract = JsonNode.Parse(await File.ReadAllTextAsync(path, cancellationToken))?.AsObject()
             ?? throw new InvalidDataException("The RequestPortal configuration contract is not a JSON object.");
@@ -111,6 +141,23 @@ public sealed class ConfigurationContractPublisher(
         contract["siteId"] = NullIfWhiteSpace(siteId);
         contract["instanceId"] = NullIfWhiteSpace(configuration["Service:Identity"] ?? Environment.MachineName);
 
+        bool hasExternalProvider =
+            (HasValue(configuration, "Authentication:Google:ClientId") && await HasSecretOrValueAsync(configuration, secrets, "Authentication:Google:ClientSecret", cancellationToken, logger)) ||
+            (HasValue(configuration, "Authentication:Microsoft:ClientId") && await HasSecretOrValueAsync(configuration, secrets, "Authentication:Microsoft:ClientSecret", cancellationToken, logger)) ||
+            (HasValue(configuration, "Authentication:Facebook:AppId") && await HasSecretOrValueAsync(configuration, secrets, "Authentication:Facebook:AppSecret", cancellationToken, logger));
+
+        bool staffGroupsConfigured = HasSectionValues(configuration, "Authentication:ActiveDirectory:ReviewerGroups")
+            && HasSectionValues(configuration, "Authentication:ActiveDirectory:AdministratorGroups");
+        bool malwareConfigured = configuration.GetValue("Uploads:MalwareScanning:Enabled", false)
+            && HasValue(configuration, "Uploads:MalwareScanning:Host");
+        bool smtpConfigured = configuration.GetValue("Notifications:Enabled", false)
+            && HasValue(configuration, "Notifications:SmtpHost")
+            && HasValue(configuration, "Notifications:FromAddress");
+        bool oidcConfigured = configuration.GetValue("Authentication:StaffOidc:Enabled", false)
+            && HasValue(configuration, "Authentication:StaffOidc:Authority")
+            && HasValue(configuration, "Authentication:StaffOidc:ClientId")
+            && await HasSecretOrValueAsync(configuration, secrets, "Authentication:StaffOidc:ClientSecret", cancellationToken, logger);
+
         if (contract["requirements"] is JsonArray requirements)
         {
             foreach (JsonNode? node in requirements)
@@ -121,28 +168,61 @@ public sealed class ConfigurationContractPublisher(
                 }
 
                 string id = requirement["id"]?.GetValue<string>() ?? string.Empty;
-                bool configured = id switch
+                (bool configured, string? verification) = id switch
                 {
-                    "database-connection" => await HasSecretAsync("ConnectionStrings:RequestPortal", cancellationToken) || HasNonPlaceholderValue(configuration.GetConnectionString("RequestPortal")),
-                    "storage-root" => HasValue("Storage:Local:RootPath"),
-                    "data-protection-keys" => HasValue("Security:DataProtectionKeysPath"),
-                    "openbao-address" => HasAnyValue("CommonSecrets:OpenBao:Address", "OpenBao:Address", "OPENBAO_ADDR", "VAULT_ADDR"),
-                    "openbao-role" => HasAnyValue("CommonSecrets:OpenBao:RoleId", "OpenBao:RoleId", "OPENBAO_ROLE_ID") || await HasSecretAsync("CommonSecrets:OpenBao:RoleId", cancellationToken),
-                    "staff-oidc-authority" => HasValue("Authentication:StaffOidc:Authority"),
-                    "staff-oidc-client-id" => HasValue("Authentication:StaffOidc:ClientId"),
-                    "staff-oidc-client-secret" => await HasSecretAsync("Authentication:StaffOidc:ClientSecret", cancellationToken),
-                    "staff-reviewer-groups" => HasValue("Authentication:ActiveDirectory:ReviewerGroups"),
-                    "staff-administrator-groups" => HasValue("Authentication:ActiveDirectory:AdministratorGroups"),
-                    "storage-malware-scanner" => HasValue("Uploads:MalwareScanning:Host"),
-                    "smtp-host" => HasValue("Notifications:SmtpHost"),
-                    "smtp-from" => HasValue("Notifications:FromAddress"),
-                    "smtp-password" => await HasSecretAsync("Notifications:SmtpPassword", cancellationToken),
-                    "messaging-queue" => HasValue("Messaging:DurableQueuePath"),
-                    "site-id" => !string.IsNullOrWhiteSpace(siteId),
-                    _ => false
+                    "database-connection" =>
+                        (await HasSecretOrValueAsync(configuration, secrets, "ConnectionStrings:RequestPortal", cancellationToken, logger)
+                            || HasNonPlaceholderValue(configuration.GetConnectionString("RequestPortal")),
+                         "RP-CONFIG-DB-001: PostgreSQL connection string must resolve through Common.Secrets/OpenBao or deployment configuration."),
+                    "storage-root" =>
+                        (HasDurablePath(configuration["Storage:Local:RootPath"]),
+                         "RP-PROD-STORAGE-001: Production document storage must use a durable path outside App_Data."),
+                    "data-protection-keys" =>
+                        (HasDurablePath(configuration["Security:DataProtectionKeysPath"]),
+                         "RP-PROD-DP-001: Data Protection keys must be persisted outside the application deployment directory."),
+                    "openbao-address" =>
+                        (HasAnyValue(configuration, "CommonSecrets:OpenBao:Address", "OpenBao:Address", "OPENBAO_ADDR", "VAULT_ADDR"),
+                         "RP-PROD-SECRETS-001: Common.Secrets OpenBao address is required."),
+                    "openbao-role" =>
+                        (HasAnyValue(configuration, "CommonSecrets:OpenBao:RoleId", "OpenBao:RoleId", "OPENBAO_ROLE_ID")
+                            || await HasSecretOrValueAsync(configuration, secrets, "CommonSecrets:OpenBao:RoleId", cancellationToken, logger),
+                         "RP-PROD-SECRETS-002: OpenBao AppRole RoleId is required."),
+                    "allowed-hosts" =>
+                        (HasRestrictedHosts(configuration),
+                         "RP-PROD-HOSTS-001: AllowedHosts must be restricted in production."),
+                    "staff-oidc-enabled" or "staff-oidc-authority" or "staff-oidc-client-id" or "staff-oidc-client-secret" =>
+                        (oidcConfigured,
+                         "RP-PROD-OIDC-001: Staff OIDC must be enabled with Authority, ClientId and OpenBao-backed ClientSecret."),
+                    "staff-reviewer-groups" or "staff-administrator-groups" =>
+                        (staffGroupsConfigured,
+                         "RP-PROD-STAFF-GROUPS-001: Reviewer and administrator group mappings are required."),
+                    "storage-malware-scanner" =>
+                        (malwareConfigured,
+                         "RP-PROD-UPLOAD-001: Malware scanning must be enabled and have a scanner host."),
+                    "external-representative-provider" =>
+                        (hasExternalProvider,
+                         "RP-PROD-OAUTH-001: At least one external representative identity provider must be commissioned."),
+                    "smtp-host" or "smtp-from" or "notifications-enabled" =>
+                        (smtpConfigured,
+                         "RP-PROD-SMTP-001: Notifications must be enabled with SMTP host and From address."),
+                    "smtp-password" =>
+                        (await HasSecretOrValueAsync(configuration, secrets, "Notifications:SmtpPassword", cancellationToken, logger),
+                         "RP-PROD-SMTP-SECRET-001: SMTP credential must be available through Common.Secrets/OpenBao when required by the SMTP server."),
+                    "messaging-queue" =>
+                        (HasValue(configuration, "Messaging:DurableQueuePath"),
+                         "RP-PROD-MESSAGING-001: Common.Messaging durable queue path is required."),
+                    "site-id" =>
+                        (!string.IsNullOrWhiteSpace(siteId),
+                         "RP-PROD-SITE-001: Site:Id should identify this deployment."),
+                    _ => (false, null)
                 };
 
                 requirement["isConfigured"] = configured;
+                requirement["configurationState"] = configured ? "Configured" : "Missing";
+                requirement["effectiveValueAvailable"] = configured;
+                requirement["verificationStatus"] = configured
+                    ? "PASS"
+                    : verification;
                 requirement.Remove("safeDisplayValue");
                 requirement.Remove("defaultValue");
                 requirement.Remove("value");
@@ -156,13 +236,17 @@ public sealed class ConfigurationContractPublisher(
         return contract;
     }
 
-    private bool HasValue(string key) => !string.IsNullOrWhiteSpace(configuration[key]);
+    private static bool HasValue(IConfiguration configuration, string key)
+        => !string.IsNullOrWhiteSpace(configuration[key]);
 
-    private bool HasAnyValue(params string[] keys)
+    private static bool HasSectionValues(IConfiguration configuration, string key)
+        => configuration.GetSection(key).GetChildren().Any(child => !string.IsNullOrWhiteSpace(child.Value));
+
+    private static bool HasAnyValue(IConfiguration configuration, params string[] keys)
     {
         foreach (string key in keys)
         {
-            if (HasValue(key) || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(key)))
+            if (HasValue(configuration, key) || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(key)))
             {
                 return true;
             }
@@ -171,8 +255,18 @@ public sealed class ConfigurationContractPublisher(
         return false;
     }
 
-    private async Task<bool> HasSecretAsync(string name, CancellationToken cancellationToken)
+    private static async Task<bool> HasSecretOrValueAsync(
+        IConfiguration configuration,
+        ISecretProvider secrets,
+        string name,
+        CancellationToken cancellationToken,
+        ILogger<ConfigurationContractPublisher>? logger)
     {
+        if (HasNonPlaceholderValue(configuration[name]))
+        {
+            return true;
+        }
+
         try
         {
             return !string.IsNullOrWhiteSpace(await secrets.GetAsync(name, cancellationToken));
@@ -183,10 +277,20 @@ public sealed class ConfigurationContractPublisher(
         }
         catch (Exception exception)
         {
-            logger.LogDebug(exception, "Unable to confirm whether configuration secret {SecretName} is available.", name);
+            logger?.LogDebug(exception, "Unable to confirm whether configuration secret {SecretName} is available.", name);
             return false;
         }
     }
+
+    private static bool HasRestrictedHosts(IConfiguration configuration)
+    {
+        string? hosts = configuration["AllowedHosts"];
+        return !string.IsNullOrWhiteSpace(hosts) && hosts.Trim() != "*";
+    }
+
+    private static bool HasDurablePath(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+           && !value.Contains("App_Data", StringComparison.OrdinalIgnoreCase);
 
     private static bool HasNonPlaceholderValue(string? value) =>
         !string.IsNullOrWhiteSpace(value)
