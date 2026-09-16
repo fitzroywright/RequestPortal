@@ -69,10 +69,26 @@ if (builder.Environment.IsProduction())
 {
     secretsRuntime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(builder.Configuration);
     await HydrateProductionSecretsAsync(builder.Configuration, secretsRuntime.Provider);
+
+    IReadOnlyList<ProductionConfigurationFailure> failures = ValidateProductionConfiguration(builder.Configuration);
+    bool registrationSucceeded = await ConfigurationContractPublisher.PublishBootstrapAsync(
+        builder.Configuration,
+        builder.Environment,
+        secretsRuntime.Provider,
+        CancellationToken.None);
+
+    if (!registrationSucceeded)
+    {
+        Console.Error.WriteLine("RP-CONFIG-REG-001: RequestPortal could not publish its commissioning state to Aegis.Configuration before startup validation completed.");
+    }
+
+    if (failures.Count > 0)
+    {
+        throw new InvalidOperationException(BuildProductionValidationMessage(failures));
+    }
 }
 
-string connectionString = builder.Configuration.GetConnectionString("RequestPortal")
-    ?? throw new InvalidOperationException("RP-CONFIG-DB-001: PostgreSQL connection string 'RequestPortal' is not configured.");
+string connectionString = builder.Configuration.GetConnectionString("RequestPortal")!;
 
 long uploadMaxBytes = builder.Configuration.GetValue<long?>("Uploads:MaxBytes") ?? 25L * 1024L * 1024L;
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = uploadMaxBytes + (1024L * 1024L));
@@ -219,7 +235,7 @@ builder.Services.AddDataProtection()
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardedHeaders = XForwardedHeaders.XForwardedFor | XForwardedHeaders.XForwardedProto;
 });
 
 builder.Services.AddRateLimiter(options =>
@@ -362,7 +378,6 @@ WebApplication app = builder.Build();
 
 if (app.Environment.IsProduction())
 {
-    ValidateProductionConfiguration(app.Configuration);
     await ApplyProductionMigrationsAsync(app);
 }
 
@@ -432,8 +447,10 @@ static async Task HydrateProductionSecretsAsync(
     }
 }
 
-static void ValidateProductionConfiguration(IConfiguration configuration)
+static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfiguration(IConfiguration configuration)
 {
+    var failures = new List<ProductionConfigurationFailure>();
+    string connectionString = configuration.GetConnectionString("RequestPortal") ?? string.Empty;
     string storageRoot = configuration["Storage:Local:RootPath"] ?? string.Empty;
     string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
     string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
@@ -448,35 +465,69 @@ static void ValidateProductionConfiguration(IConfiguration configuration)
         (!string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppSecret"]));
     bool staffOidcEnabled = configuration.GetValue("Authentication:StaffOidc:Enabled", false);
 
-    if (string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException("RP-PROD-STORAGE-001: Production document storage must be a durable external filesystem path or network share.");
-    if (string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException("RP-PROD-DP-001: Production Data Protection keys must be persisted outside the application deployment directory.");
-    if (string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]))
-        throw new InvalidOperationException("RP-PROD-SECRETS-001: Common.Secrets OpenBao is not configured.");
-    if (string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:RoleId"]))
-        throw new InvalidOperationException("RP-PROD-SECRETS-002: Common.Secrets OpenBao AppRole RoleId is not configured.");
-    if (allowedHosts == "*" || string.IsNullOrWhiteSpace(allowedHosts))
-        throw new InvalidOperationException("RP-PROD-HOSTS-001: AllowedHosts must be restricted in production.");
-    if (!malwareScanningEnabled || string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]))
-        throw new InvalidOperationException("RP-PROD-UPLOAD-001: Malware scanning must be configured and enabled in production.");
-    if (reviewerGroups.Length == 0 || administratorGroups.Length == 0)
-        throw new InvalidOperationException("RP-PROD-STAFF-GROUPS-001: FFP staff directory-group mappings must be configured for Common.Security.");
-    if (!staffOidcEnabled ||
-        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:Authority"]) ||
-        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientId"]) ||
-        string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientSecret"]))
-        throw new InvalidOperationException("RP-PROD-OIDC-001: FFP staff OIDC Authority, ClientId and OpenBao-backed ClientSecret must be commissioned.");
-    if (!hasExternalProvider)
-        throw new InvalidOperationException("RP-PROD-OAUTH-001: At least one external representative identity provider must be commissioned.");
-    if (!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]))
-        throw new InvalidOperationException("RP-PROD-SMTP-001: SMTP notifications must be commissioned for production.");
-    if (string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]))
-        throw new InvalidOperationException("RP-PROD-MESSAGING-001: Common.Messaging durable queue path must be configured in production.");
-    if (ffpManagerEnabled &&
-        (string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:BaseUrl"]) ||
-         string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:SharedSecret"])))
-        throw new InvalidOperationException("RP-PROD-FFPMANAGER-001: FFP Manager integration requires BaseUrl and SharedSecret when enabled.");
+    AddIf(string.IsNullOrWhiteSpace(connectionString),
+        "RP-CONFIG-DB-001",
+        "PostgreSQL connection string 'RequestPortal' is not configured.");
+    AddIf(string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase),
+        "RP-PROD-STORAGE-001",
+        "Production document storage must be a durable external filesystem path or network share.");
+    AddIf(string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase),
+        "RP-PROD-DP-001",
+        "Production Data Protection keys must be persisted outside the application deployment directory.");
+    AddIf(string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]),
+        "RP-PROD-SECRETS-001",
+        "Common.Secrets OpenBao is not configured.");
+    AddIf(string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:RoleId"]),
+        "RP-PROD-SECRETS-002",
+        "Common.Secrets OpenBao AppRole RoleId is not configured.");
+    AddIf(allowedHosts == "*" || string.IsNullOrWhiteSpace(allowedHosts),
+        "RP-PROD-HOSTS-001",
+        "AllowedHosts must be restricted in production.");
+    AddIf(!malwareScanningEnabled || string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]),
+        "RP-PROD-UPLOAD-001",
+        "Malware scanning must be configured and enabled in production.");
+    AddIf(reviewerGroups.Length == 0 || administratorGroups.Length == 0,
+        "RP-PROD-STAFF-GROUPS-001",
+        "FFP staff directory-group mappings must be configured for Common.Security.");
+    AddIf(!staffOidcEnabled ||
+          string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:Authority"]) ||
+          string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientId"]) ||
+          string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientSecret"]),
+        "RP-PROD-OIDC-001",
+        "FFP staff OIDC Authority, ClientId and OpenBao-backed ClientSecret must be commissioned.");
+    AddIf(!hasExternalProvider,
+        "RP-PROD-OAUTH-001",
+        "At least one external representative identity provider must be commissioned.");
+    AddIf(!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]),
+        "RP-PROD-SMTP-001",
+        "SMTP notifications must be commissioned for production.");
+    AddIf(string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]),
+        "RP-PROD-MESSAGING-001",
+        "Common.Messaging durable queue path must be configured in production.");
+    AddIf(string.IsNullOrWhiteSpace(configuration["Site:Id"]),
+        "RP-PROD-SITE-001",
+        "Site:Id must identify the production deployment.");
+    AddIf(ffpManagerEnabled &&
+          (string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:BaseUrl"]) ||
+           string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:SharedSecret"])),
+        "RP-PROD-FFPMANAGER-001",
+        "FFP Manager integration requires BaseUrl and SharedSecret when enabled.");
+
+    return failures;
+
+    void AddIf(bool condition, string code, string message)
+    {
+        if (condition)
+        {
+            failures.Add(new ProductionConfigurationFailure(code, message));
+        }
+    }
+}
+
+static string BuildProductionValidationMessage(IReadOnlyList<ProductionConfigurationFailure> failures)
+{
+    return "RequestPortal production commissioning failed with " + failures.Count + " issue(s):\n"
+        + string.Join("\n", failures.Select(failure => $"{failure.Code}: {failure.Message}"));
 }
 
 static async Task ApplyProductionMigrationsAsync(WebApplication app)
@@ -506,5 +557,7 @@ static async Task ReportStartupDiagnosticsAsync(WebApplication app)
     if (databaseResult is not null && !databaseResult.IsHealthy)
         throw new InvalidOperationException($"RP-STARTUP-DB-001: PostgreSQL startup diagnostic failed. {databaseResult.Detail}");
 }
+
+internal sealed record ProductionConfigurationFailure(string Code, string Message);
 
 public partial class Program { }
