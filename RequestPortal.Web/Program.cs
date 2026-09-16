@@ -235,7 +235,7 @@ builder.Services.AddDataProtection()
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = XForwardedHeaders.XForwardedFor | XForwardedHeaders.XForwardedProto;
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
 builder.Services.AddRateLimiter(options =>
@@ -290,7 +290,7 @@ if (notificationOptions.WhatsAppEnabled)
 {
     Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddWhatsAppMessagingChannel(
         builder.Services,
-        new Common.Messaging.Channels.WhatsApp.WhatsAppMessageOptions
+        new Common.Messaging.Channels.WhatsApp.SmsMessageOptions
         {
             Endpoint = notificationOptions.WhatsAppEndpoint,
             EndpointSecretName = notificationOptions.WhatsAppEndpointSecretName,
