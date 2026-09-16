@@ -1,7 +1,7 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
     {"id":"database-connection","displayName":"PostgreSQL connection credential","kind":"Secret","required":true,"purpose":"Provides the Request Portal PostgreSQL connection string through Common.Secrets/OpenBao.","secretName":"ConnectionStrings:RequestPortal","isConfigured":false,"sensitive":true},
@@ -19,9 +19,17 @@
     {"id":"storage-malware-scanner","displayName":"Upload malware scanner","kind":"ExternalService","required":true,"purpose":"Requires malware scanning to be enabled and identifies the scanning endpoint used for uploaded documents.","configurationKey":"Uploads:MalwareScanning:Host","isConfigured":false},
     {"id":"external-representative-provider","displayName":"Representative external identity provider","kind":"ExternalService","required":true,"purpose":"Requires at least one commissioned external identity provider for portal representatives.","isConfigured":false},
     {"id":"notifications-enabled","displayName":"Notifications enabled","kind":"Configuration","required":true,"purpose":"Enables production portal notifications.","configurationKey":"Notifications:Enabled","isConfigured":false},
-    {"id":"smtp-host","displayName":"Notification SMTP host","kind":"ExternalService","required":true,"purpose":"Defines the SMTP endpoint used by Common.Messaging for portal notifications.","configurationKey":"Notifications:SmtpHost","isConfigured":false},
-    {"id":"smtp-from","displayName":"Notification sender address","kind":"Configuration","required":true,"purpose":"Defines the sender address for portal notification messages.","configurationKey":"Notifications:FromAddress","isConfigured":false},
+    {"id":"smtp-host","displayName":"Notification SMTP host","kind":"ExternalService","required":false,"purpose":"Defines the optional SMTP endpoint used by Common.Messaging for portal notifications.","configurationKey":"Notifications:SmtpHost","isConfigured":false},
+    {"id":"smtp-from","displayName":"Notification sender address","kind":"Configuration","required":false,"purpose":"Defines the sender address when SMTP delivery is used.","configurationKey":"Notifications:FromAddress","isConfigured":false},
     {"id":"smtp-password","displayName":"Notification SMTP credential","kind":"Secret","required":false,"purpose":"Provides the SMTP credential through Common.Secrets/OpenBao when required by the configured SMTP server.","secretName":"Notifications:SmtpPassword","isConfigured":false,"sensitive":true},
+    {"id":"graph-tenant","displayName":"Microsoft Graph tenant ID","kind":"Configuration","required":false,"purpose":"Identifies the Microsoft 365 tenant used by Common.Messaging Graph channels.","configurationKey":"Messaging:MicrosoftGraph:TenantId","isConfigured":false},
+    {"id":"graph-client","displayName":"Microsoft Graph client ID","kind":"Configuration","required":false,"purpose":"Identifies the Entra application used for Graph email delivery.","configurationKey":"Messaging:MicrosoftGraph:ClientId","isConfigured":false},
+    {"id":"graph-client-secret","displayName":"Microsoft Graph client secret","kind":"Secret","required":false,"purpose":"Authenticates Graph email through Common.Secrets.","secretName":"messaging/msgraph/client-secret","isConfigured":false,"sensitive":true},
+    {"id":"graph-email-enabled","displayName":"Microsoft Graph Email channel","kind":"Configuration","required":false,"purpose":"Enables Common.Messaging Graph email delivery.","configurationKey":"Messaging:MicrosoftGraph:Email:Enabled","isConfigured":false},
+    {"id":"graph-email-sender","displayName":"Microsoft Graph Email sender","kind":"Configuration","required":false,"purpose":"Selects the sender mailbox for Graph email.","configurationKey":"Messaging:MicrosoftGraph:Email:SenderUpn","isConfigured":false},
+    {"id":"graph-teams-enabled","displayName":"Microsoft Graph Teams channel","kind":"Configuration","required":false,"purpose":"Enables Common.Messaging delegated Teams direct-message delivery.","configurationKey":"Messaging:MicrosoftGraph:Teams:Enabled","isConfigured":false},
+    {"id":"graph-teams-sender","displayName":"Microsoft Graph Teams sender","kind":"Configuration","required":false,"purpose":"Selects the delegated service user for Teams direct messages.","configurationKey":"Messaging:MicrosoftGraph:Teams:SenderUpn","isConfigured":false},
+    {"id":"graph-teams-token","displayName":"Microsoft Graph Teams delegated token","kind":"Secret","required":false,"purpose":"Provides the delegated Teams token through Common.Secrets.","secretName":"messaging/msgraph/teams/delegated-access-token","isConfigured":false,"sensitive":true},
     {"id":"messaging-queue","displayName":"Durable messaging queue path","kind":"Configuration","required":true,"purpose":"Defines durable external-delivery queue storage for Common.Messaging.","configurationKey":"Messaging:DurableQueuePath","isConfigured":false},
     {"id":"site-id","displayName":"Site ID","kind":"Configuration","required":true,"purpose":"Identifies the deployment site represented by this Request Portal instance.","configurationKey":"Site:Id","isConfigured":false}
   ]
