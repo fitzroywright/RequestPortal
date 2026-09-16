@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Common.Messaging;
+using Microsoft.Extensions.Configuration;
 using RequestPortal.Common.Messaging;
 
 namespace RequestPortal.Infrastructure.Messaging;
@@ -10,10 +11,12 @@ namespace RequestPortal.Infrastructure.Messaging;
 public sealed class CommonQueuedNotificationSender : INotificationSender
 {
     private readonly IExternalDeliveryQueue queue;
+    private readonly IConfiguration configuration;
 
-    public CommonQueuedNotificationSender(IExternalDeliveryQueue queue)
+    public CommonQueuedNotificationSender(IExternalDeliveryQueue queue, IConfiguration configuration)
     {
         this.queue = queue ?? throw new ArgumentNullException(nameof(queue));
+        this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     }
 
     public async Task SendAsync(
@@ -23,9 +26,10 @@ public sealed class CommonQueuedNotificationSender : INotificationSender
         ArgumentNullException.ThrowIfNull(notification);
         ArgumentException.ThrowIfNullOrWhiteSpace(notification.Recipient);
 
+        bool graphEmailEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
         MessageChannel channel = notification.Transport switch
         {
-            NotificationTransport.Email => MessageChannel.Smtp,
+            NotificationTransport.Email => graphEmailEnabled ? MessageChannel.MsEmail : MessageChannel.Smtp,
             NotificationTransport.Sms => MessageChannel.Sms,
             NotificationTransport.WhatsApp => MessageChannel.WhatsApp,
             _ => throw new InvalidOperationException($"Unsupported notification transport '{notification.Transport}'.")
