@@ -12,7 +12,7 @@ public sealed class StaffOidcOptions
     public bool Enabled { get; set; }
     public string Authority { get; set; } = string.Empty;
     public string ClientId { get; set; } = string.Empty;
-    public string ClientSecret { get; set; } = string.Empty;
+    public string? ClientSecret { get; set; }
     public string CallbackPath { get; set; } = "/signin-ffp-staff";
     public bool RequireHttpsMetadata { get; set; } = true;
     public string UserNameClaim { get; set; } = "preferred_username";
