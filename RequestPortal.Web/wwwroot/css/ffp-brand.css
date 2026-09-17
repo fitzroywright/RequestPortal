@@ -57,18 +57,47 @@
 .button {
     border-radius: 5px;
     background: var(--ffp-navy);
+    color: #ffffff;
 }
 
 .button:hover {
     background: var(--ffp-navy-deep);
+    color: #ffffff;
+}
+
+/* Light button variants must retain dark text on their light backgrounds. */
+.button-secondary {
+    background: #ffffff;
+    color: var(--ink);
+}
+
+.button-secondary:hover {
+    background: #f3f5f6;
+    color: var(--ink);
+}
+
+.button-outline {
+    background: transparent;
+    color: var(--ink);
+}
+
+.button-outline:hover {
+    background: #eef1f3;
+    color: var(--ink);
+}
+
+.button-danger {
+    color: #ffffff;
 }
 
 .donate-button {
     background: var(--ffp-orange);
+    color: #ffffff;
 }
 
 .donate-button:hover {
     background: var(--ffp-orange-dark);
+    color: #ffffff;
 }
 
 .card,
