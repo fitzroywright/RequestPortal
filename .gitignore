@@ -22,3 +22,8 @@ secrets.json
 
 # ASP.NET Core Data Protection runtime keys
 **/App_Data/keys/
+
+# Local publish/package test artifacts
+publish-test/
+requestportal-clean.tgz
+requestportal-test.tgz
