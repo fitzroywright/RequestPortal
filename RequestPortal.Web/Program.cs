@@ -217,7 +217,6 @@ if (staffOidc.Enabled)
 
 Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonAuthorization<RequestPortalAuthorizationStore>(builder.Services);
 Common.Security.Integration.SecurityServiceCollectionExtensions.AddCommonSecurityDiagnostics(builder.Services);
-
 if (secretsRuntime is not null)
 {
     secretsRuntime.Register(builder.Services);
@@ -497,12 +496,6 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
     AddIf(string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase),
         "RP-PROD-DP-001",
         "Production Data Protection keys must be persisted outside the application deployment directory.");
-    AddIf(string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]),
-        "RP-PROD-SECRETS-001",
-        "Common.Secrets OpenBao is not configured.");
-    AddIf(string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:RoleId"]),
-        "RP-PROD-SECRETS-002",
-        "Common.Secrets OpenBao AppRole RoleId is not configured.");
     AddIf(allowedHosts == "*" || string.IsNullOrWhiteSpace(allowedHosts),
         "RP-PROD-HOSTS-001",
         "AllowedHosts must be restricted in production.");
@@ -517,7 +510,7 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
           string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientId"]) ||
           string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientSecret"]),
         "RP-PROD-OIDC-001",
-        "FFP staff OIDC Authority, ClientId and OpenBao-backed ClientSecret must be commissioned.");
+        "FFP staff OIDC Authority, ClientId and Common.Secrets-backed ClientSecret must be commissioned.");
     AddIf(!hasExternalProvider,
         "RP-PROD-OAUTH-001",
         "At least one external representative identity provider must be commissioned.");
