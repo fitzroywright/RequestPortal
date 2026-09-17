@@ -64,13 +64,14 @@ using RequestPortal.Web.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 Common.Secrets.CommonSecretsBootstrapRuntime? secretsRuntime = null;
+ProductionSecrets? productionSecrets = null;
 
 if (builder.Environment.IsProduction())
 {
     secretsRuntime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(builder.Configuration);
-    await HydrateProductionSecretsAsync(builder.Configuration, secretsRuntime.Provider);
+    productionSecrets = await LoadProductionSecretsAsync(secretsRuntime.Provider);
 
-    IReadOnlyList<ProductionConfigurationFailure> failures = ValidateProductionConfiguration(builder.Configuration);
+    IReadOnlyList<ProductionConfigurationFailure> failures = ValidateProductionConfiguration(builder.Configuration, productionSecrets);
     bool registrationSucceeded = await ConfigurationContractPublisher.PublishBootstrapAsync(
         builder.Configuration,
         builder.Environment,
@@ -88,7 +89,9 @@ if (builder.Environment.IsProduction())
     }
 }
 
-string connectionString = builder.Configuration.GetConnectionString("RequestPortal")!;
+string connectionString = productionSecrets?.ConnectionString
+    ?? builder.Configuration.GetConnectionString("RequestPortal")
+    ?? throw new InvalidOperationException("ConnectionStrings:RequestPortal is required.");
 
 long uploadMaxBytes = builder.Configuration.GetValue<long?>("Uploads:MaxBytes") ?? 25L * 1024L * 1024L;
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = uploadMaxBytes + (1024L * 1024L));
@@ -112,7 +115,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.Name = "RequestPortal.Auth";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.SameSiteMode = SameSiteMode.Lax;
+    options.Cookie.SameSite = SameSiteMode.Lax;
     options.SlidingExpiration = true;
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
 });
@@ -130,22 +133,22 @@ authentication.AddCookie(StaffOidcOptions.StaffCookieScheme, options =>
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
 });
 
-string? googleClientId = builder.Configuration["Authentication:Google:ClientId"];
-string? googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+string? googleClientId = productionSecrets?.GoogleClientId ?? builder.Configuration["Authentication:Google:ClientId"];
+string? googleClientSecret = productionSecrets?.GoogleClientSecret ?? builder.Configuration["Authentication:Google:ClientSecret"];
 if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
 {
     authentication.AddGoogle(options => { options.ClientId = googleClientId; options.ClientSecret = googleClientSecret; });
 }
 
-string? microsoftClientId = builder.Configuration["Authentication:Microsoft:ClientId"];
-string? microsoftClientSecret = builder.Configuration["Authentication:Microsoft:ClientSecret"];
+string? microsoftClientId = productionSecrets?.MicrosoftClientId ?? builder.Configuration["Authentication:Microsoft:ClientId"];
+string? microsoftClientSecret = productionSecrets?.MicrosoftClientSecret ?? builder.Configuration["Authentication:Microsoft:ClientSecret"];
 if (!string.IsNullOrWhiteSpace(microsoftClientId) && !string.IsNullOrWhiteSpace(microsoftClientSecret))
 {
     authentication.AddMicrosoftAccount(options => { options.ClientId = microsoftClientId; options.ClientSecret = microsoftClientSecret; });
 }
 
-string? facebookAppId = builder.Configuration["Authentication:Facebook:AppId"];
-string? facebookAppSecret = builder.Configuration["Authentication:Facebook:AppSecret"];
+string? facebookAppId = productionSecrets?.FacebookAppId ?? builder.Configuration["Authentication:Facebook:AppId"];
+string? facebookAppSecret = productionSecrets?.FacebookAppSecret ?? builder.Configuration["Authentication:Facebook:AppSecret"];
 if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret))
 {
     authentication.AddFacebook(options => { options.AppId = facebookAppId; options.AppSecret = facebookAppSecret; });
@@ -159,6 +162,7 @@ builder.Services.AddOptions<ManagementDashboardOptions>().Bind(builder.Configura
 StaffOidcOptions staffOidc = builder.Configuration
     .GetSection(StaffOidcOptions.SectionName)
     .Get<StaffOidcOptions>() ?? new StaffOidcOptions();
+staffOidc.ClientSecret = productionSecrets?.StaffOidcClientSecret ?? staffOidc.ClientSecret;
 if (staffOidc.Enabled)
 {
     authentication.AddOpenIdConnect(StaffOidcOptions.Scheme, options =>
@@ -442,37 +446,26 @@ finally
     }
 }
 
-static async Task HydrateProductionSecretsAsync(
-    IConfiguration configuration,
-    Common.Secrets.ISecretProvider provider)
+static async Task<ProductionSecrets> LoadProductionSecretsAsync(Common.Secrets.ISecretProvider provider)
 {
-    string[] keys =
-    [
-        "ConnectionStrings:RequestPortal",
-        "Authentication:Google:ClientId",
-        "Authentication:Google:ClientSecret",
-        "Authentication:Microsoft:ClientId",
-        "Authentication:Microsoft:ClientSecret",
-        "Authentication:Facebook:AppId",
-        "Authentication:Facebook:AppSecret",
-        "Authentication:StaffOidc:ClientSecret",
-        "FfpManagerIntegration:SharedSecret"
-    ];
-
-    foreach (string key in keys)
-    {
-        string? value = await provider.GetAsync(key);
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            configuration[key] = value;
-        }
-    }
+    return new ProductionSecrets(
+        await provider.GetAsync("ConnectionStrings:RequestPortal"),
+        await provider.GetAsync("Authentication:Google:ClientId"),
+        await provider.GetAsync("Authentication:Google:ClientSecret"),
+        await provider.GetAsync("Authentication:Microsoft:ClientId"),
+        await provider.GetAsync("Authentication:Microsoft:ClientSecret"),
+        await provider.GetAsync("Authentication:Facebook:AppId"),
+        await provider.GetAsync("Authentication:Facebook:AppSecret"),
+        await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
+        await provider.GetAsync("FfpManagerIntegration:SharedSecret"));
 }
 
-static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfiguration(IConfiguration configuration)
+static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfiguration(
+    IConfiguration configuration,
+    ProductionSecrets? secrets = null)
 {
     var failures = new List<ProductionConfigurationFailure>();
-    string connectionString = configuration.GetConnectionString("RequestPortal") ?? string.Empty;
+    string connectionString = secrets?.ConnectionString ?? configuration.GetConnectionString("RequestPortal") ?? string.Empty;
     string storageRoot = configuration["Storage:Local:RootPath"] ?? string.Empty;
     string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
     string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
@@ -481,15 +474,23 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
     bool ffpManagerEnabled = configuration.GetValue("FfpManagerIntegration:Enabled", false);
     string[] reviewerGroups = configuration.GetSection("Authentication:ActiveDirectory:ReviewerGroups").Get<string[]>() ?? Array.Empty<string>();
     string[] administratorGroups = configuration.GetSection("Authentication:ActiveDirectory:AdministratorGroups").Get<string[]>() ?? Array.Empty<string>();
+    string? googleClientId = secrets?.GoogleClientId ?? configuration["Authentication:Google:ClientId"];
+    string? googleClientSecret = secrets?.GoogleClientSecret ?? configuration["Authentication:Google:ClientSecret"];
+    string? microsoftClientId = secrets?.MicrosoftClientId ?? configuration["Authentication:Microsoft:ClientId"];
+    string? microsoftClientSecret = secrets?.MicrosoftClientSecret ?? configuration["Authentication:Microsoft:ClientSecret"];
+    string? facebookAppId = secrets?.FacebookAppId ?? configuration["Authentication:Facebook:AppId"];
+    string? facebookAppSecret = secrets?.FacebookAppSecret ?? configuration["Authentication:Facebook:AppSecret"];
+    string? staffOidcClientSecret = secrets?.StaffOidcClientSecret ?? configuration["Authentication:StaffOidc:ClientSecret"];
+    string? ffpManagerSharedSecret = secrets?.FfpManagerSharedSecret ?? configuration["FfpManagerIntegration:SharedSecret"];
     bool hasExternalProvider =
-        (!string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientSecret"])) ||
-        (!string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Microsoft:ClientSecret"])) ||
-        (!string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppId"]) && !string.IsNullOrWhiteSpace(configuration["Authentication:Facebook:AppSecret"]));
+        (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret)) ||
+        (!string.IsNullOrWhiteSpace(microsoftClientId) && !string.IsNullOrWhiteSpace(microsoftClientSecret)) ||
+        (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret));
     bool staffOidcEnabled = configuration.GetValue("Authentication:StaffOidc:Enabled", false);
 
     AddIf(string.IsNullOrWhiteSpace(connectionString),
         "RP-CONFIG-DB-001",
-        "PostgreSQL connection string 'RequestPortal' is not configured.");
+        "PostgreSQL connection string 'RequestPortal' is not configured through Common.Secrets.");
     AddIf(string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase),
         "RP-PROD-STORAGE-001",
         "Production document storage must be a durable external filesystem path or network share.");
@@ -508,7 +509,7 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
     AddIf(!staffOidcEnabled ||
           string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:Authority"]) ||
           string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientId"]) ||
-          string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientSecret"]),
+          string.IsNullOrWhiteSpace(staffOidcClientSecret),
         "RP-PROD-OIDC-001",
         "FFP staff OIDC Authority, ClientId and Common.Secrets-backed ClientSecret must be commissioned.");
     AddIf(!hasExternalProvider,
@@ -525,9 +526,9 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
         "Site:Id must identify the production deployment.");
     AddIf(ffpManagerEnabled &&
           (string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:BaseUrl"]) ||
-           string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:SharedSecret"])),
+           string.IsNullOrWhiteSpace(ffpManagerSharedSecret)),
         "RP-PROD-FFPMANAGER-001",
-        "FFP Manager integration requires BaseUrl and SharedSecret when enabled.");
+        "FFP Manager integration requires BaseUrl and a Common.Secrets-backed SharedSecret when enabled.");
 
     return failures;
 
@@ -573,6 +574,17 @@ static async Task ReportStartupDiagnosticsAsync(WebApplication app)
     if (databaseResult is not null && !databaseResult.IsHealthy)
         throw new InvalidOperationException($"RP-STARTUP-DB-001: PostgreSQL startup diagnostic failed. {databaseResult.Detail}");
 }
+
+internal sealed record ProductionSecrets(
+    string? ConnectionString,
+    string? GoogleClientId,
+    string? GoogleClientSecret,
+    string? MicrosoftClientId,
+    string? MicrosoftClientSecret,
+    string? FacebookAppId,
+    string? FacebookAppSecret,
+    string? StaffOidcClientSecret,
+    string? FfpManagerSharedSecret);
 
 internal sealed record ProductionConfigurationFailure(string Code, string Message);
 
