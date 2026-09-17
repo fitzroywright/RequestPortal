@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Common.Secrets;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Integration;
 
@@ -8,20 +9,27 @@ namespace RequestPortal.Infrastructure.Integration;
 
 public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
 {
+    private const string SharedSecretName = "FfpManagerIntegration:SharedSecret";
+
     private readonly HttpClient httpClient;
     private readonly FfpManagerBridgeOptions options;
+    private readonly ISecretProvider secrets;
 
-    public FfpManagerBridgeClient(HttpClient httpClient, IOptions<FfpManagerBridgeOptions> options)
+    public FfpManagerBridgeClient(
+        HttpClient httpClient,
+        IOptions<FfpManagerBridgeOptions> options,
+        ISecretProvider secrets)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
+        this.secrets = secrets;
     }
 
     public async Task<FfpManagerApplicationReference> SubmitApplicationAsync(
         FfpManagerApplicationSubmission submission,
         CancellationToken cancellationToken = default)
     {
-        using HttpRequestMessage request = CreateRequest(HttpMethod.Post, "api/applications");
+        using HttpRequestMessage request = await CreateRequestAsync(HttpMethod.Post, "api/applications", cancellationToken);
         request.Content = JsonContent.Create(submission);
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
@@ -35,7 +43,7 @@ public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
         CancellationToken cancellationToken = default)
     {
         string path = $"api/applications/{Uri.EscapeDataString(applicationId)}/artifacts/{descriptor.PortalDocumentId:D}";
-        using HttpRequestMessage request = CreateRequest(HttpMethod.Put, path);
+        using HttpRequestMessage request = await CreateRequestAsync(HttpMethod.Put, path, cancellationToken);
         using MultipartFormDataContent multipart = new();
         using StringContent metadata = new(JsonSerializer.Serialize(descriptor));
         metadata.Headers.ContentType = new MediaTypeHeaderValue("application/json");
@@ -53,7 +61,7 @@ public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
         CancellationToken cancellationToken = default)
     {
         string path = $"api/applications/{Uri.EscapeDataString(applicationId)}/status";
-        using HttpRequestMessage request = CreateRequest(HttpMethod.Get, path);
+        using HttpRequestMessage request = await CreateRequestAsync(HttpMethod.Get, path, cancellationToken);
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await ReadRequiredAsync<FfpManagerApplicationStatus>(response, cancellationToken);
@@ -64,18 +72,22 @@ public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
         CancellationToken cancellationToken = default)
     {
         string path = $"api/applications/{Uri.EscapeDataString(responsePayload.ApplicationId)}/information-responses";
-        using HttpRequestMessage request = CreateRequest(HttpMethod.Post, path);
+        using HttpRequestMessage request = await CreateRequestAsync(HttpMethod.Post, path, cancellationToken);
         request.Content = JsonContent.Create(responsePayload);
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    private HttpRequestMessage CreateRequest(HttpMethod method, string path)
+    private async Task<HttpRequestMessage> CreateRequestAsync(
+        HttpMethod method,
+        string path,
+        CancellationToken cancellationToken)
     {
         HttpRequestMessage request = new(method, path);
-        if (!string.IsNullOrWhiteSpace(options.SharedSecret))
+        string? sharedSecret = await secrets.GetAsync(SharedSecretName, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(sharedSecret))
         {
-            request.Headers.TryAddWithoutValidation("X-FFP-Integration-Key", options.SharedSecret);
+            request.Headers.TryAddWithoutValidation("X-FFP-Integration-Key", sharedSecret);
         }
 
         return request;
