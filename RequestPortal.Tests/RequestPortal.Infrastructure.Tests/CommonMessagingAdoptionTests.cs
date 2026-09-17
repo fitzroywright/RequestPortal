@@ -1,4 +1,5 @@
 using Common.Messaging;
+using Microsoft.Extensions.Configuration;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Infrastructure.Messaging;
 using Xunit;
@@ -12,7 +13,8 @@ public sealed class CommonMessagingAdoptionTests
     {
         CancellationToken testCancellationToken = TestContext.Current.CancellationToken;
         InMemoryExternalDeliveryQueue queue = new();
-        CommonQueuedNotificationSender sender = new(queue);
+        IConfiguration configuration = new ConfigurationBuilder().Build();
+        CommonQueuedNotificationSender sender = new(queue, configuration);
 
         await sender.SendAsync(
             new NotificationEnvelope(
