@@ -158,6 +158,22 @@ public sealed class ConfigurationContractPublisher(
             && HasValue(configuration, "Authentication:StaffOidc:ClientId")
             && await HasSecretOrValueAsync(configuration, secrets, "Authentication:StaffOidc:ClientSecret", cancellationToken, logger);
 
+        bool graphEmailEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
+        string graphClientSecretName = configuration["Messaging:MicrosoftGraph:ClientSecretName"]
+            ?? "messaging/msgraph/client-secret";
+        bool graphEmailConfigured = !graphEmailEnabled ||
+            (HasValue(configuration, "Messaging:MicrosoftGraph:TenantId")
+             && HasValue(configuration, "Messaging:MicrosoftGraph:ClientId")
+             && HasValue(configuration, "Messaging:MicrosoftGraph:Email:SenderUpn")
+             && await HasSecretOrValueAsync(configuration, secrets, graphClientSecretName, cancellationToken, logger));
+
+        bool graphTeamsEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false);
+        string graphTeamsTokenName = configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"]
+            ?? "messaging/msgraph/teams/delegated-access-token";
+        bool graphTeamsConfigured = !graphTeamsEnabled ||
+            (HasValue(configuration, "Messaging:MicrosoftGraph:Teams:SenderUpn")
+             && await HasSecretOrValueAsync(configuration, secrets, graphTeamsTokenName, cancellationToken, logger));
+
         if (contract["requirements"] is JsonArray requirements)
         {
             foreach (JsonNode? node in requirements)
@@ -208,6 +224,16 @@ public sealed class ConfigurationContractPublisher(
                     "smtp-password" =>
                         (await HasSecretOrValueAsync(configuration, secrets, "Notifications:SmtpPassword", cancellationToken, logger),
                          "RP-PROD-SMTP-SECRET-001: SMTP credential must be available through Common.Secrets/OpenBao when required by the SMTP server."),
+                    "graph-email-enabled" =>
+                        (true, null),
+                    "graph-tenant" or "graph-client" or "graph-client-secret" or "graph-email-sender" =>
+                        (graphEmailConfigured,
+                         "RP-MSG-GRAPH-EMAIL-001: When Graph Email is enabled, TenantId, ClientId, sender UPN and the Common.Secrets client credential must all be commissioned."),
+                    "graph-teams-enabled" =>
+                        (true, null),
+                    "graph-teams-sender" or "graph-teams-token" =>
+                        (graphTeamsConfigured,
+                         "RP-MSG-GRAPH-TEAMS-001: When Graph Teams is enabled, sender UPN and the Common.Secrets delegated token must both be commissioned."),
                     "messaging-queue" =>
                         (HasValue(configuration, "Messaging:DurableQueuePath"),
                          "RP-PROD-MESSAGING-001: Common.Messaging durable queue path is required."),
