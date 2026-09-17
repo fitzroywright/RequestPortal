@@ -66,20 +66,19 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 await using Common.Secrets.CommonSecretsBootstrapRuntime secretsRuntime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(builder.Configuration);
 RuntimeSecrets runtimeSecrets = await LoadRuntimeSecretsAsync(secretsRuntime.Provider);
 
+bool registrationSucceeded = await ConfigurationContractPublisher.PublishBootstrapAsync(
+    builder.Configuration,
+    builder.Environment,
+    secretsRuntime.Provider,
+    CancellationToken.None);
+if (!registrationSucceeded)
+{
+    Console.Error.WriteLine("RP-CONFIG-REG-001: RequestPortal could not publish its commissioning state to Aegis.Configuration before startup validation completed.");
+}
+
 if (builder.Environment.IsProduction())
 {
     IReadOnlyList<ProductionConfigurationFailure> failures = ValidateProductionConfiguration(builder.Configuration, runtimeSecrets);
-    bool registrationSucceeded = await ConfigurationContractPublisher.PublishBootstrapAsync(
-        builder.Configuration,
-        builder.Environment,
-        secretsRuntime.Provider,
-        CancellationToken.None);
-
-    if (!registrationSucceeded)
-    {
-        Console.Error.WriteLine("RP-CONFIG-REG-001: RequestPortal could not publish its commissioning state to Aegis.Configuration before startup validation completed.");
-    }
-
     if (failures.Count > 0)
     {
         throw new InvalidOperationException(BuildProductionValidationMessage(failures));
@@ -391,10 +390,7 @@ builder.Services.AddRazorPages(options =>
 
 WebApplication app = builder.Build();
 
-if (app.Environment.IsProduction())
-{
-    await ApplyProductionMigrationsAsync(app);
-}
+await ApplyDatabaseMigrationsAsync(app);
 
 if (!app.Environment.IsDevelopment())
 {
@@ -526,13 +522,13 @@ static string BuildProductionValidationMessage(IReadOnlyList<ProductionConfigura
         + string.Join("\n", failures.Select(failure => $"{failure.Code}: {failure.Message}"));
 }
 
-static async Task ApplyProductionMigrationsAsync(WebApplication app)
+static async Task ApplyDatabaseMigrationsAsync(WebApplication app)
 {
     await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
     RequestPortalDbContext db = scope.ServiceProvider.GetRequiredService<RequestPortalDbContext>();
     string[] migrations = db.Database.GetMigrations().ToArray();
     if (migrations.Length == 0)
-        throw new InvalidOperationException("RP-PROD-MIGRATION-001: No EF Core migrations exist. Production startup is blocked until a baseline migration is generated and reviewed.");
+        throw new InvalidOperationException("RP-MIGRATION-001: No EF Core migrations exist. Startup is blocked until a baseline migration is generated and reviewed.");
     await db.Database.MigrateAsync();
 }
 
