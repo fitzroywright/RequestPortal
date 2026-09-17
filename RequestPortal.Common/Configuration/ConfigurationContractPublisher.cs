@@ -72,7 +72,7 @@ public sealed class ConfigurationContractPublisher(
 
             JsonObject contract = await BuildRuntimeContractAsync(configuration, environment, secrets, path, cancellationToken, logger);
             using HttpClient client = new();
-            var registrar = new ConfigurationRegistrar(client, new RegistrationOptions(new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute), credential, TimeSpan.FromSeconds(10)));
+            ConfigurationRegistrar registrar = new(client, new RegistrationOptions(new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute), credential, TimeSpan.FromSeconds(10)));
             RegistrationResult result = await registrar.RegisterContractAsync(contract, cancellationToken);
             if (!result.Succeeded)
             {
@@ -108,6 +108,7 @@ public sealed class ConfigurationContractPublisher(
         bool smtpConfigured = configuration.GetValue("Notifications:Enabled", false) && HasValue(configuration, "Notifications:SmtpHost") && HasValue(configuration, "Notifications:FromAddress");
         bool oidcConfigured = configuration.GetValue("Authentication:StaffOidc:Enabled", false) && HasValue(configuration, "Authentication:StaffOidc:Authority") && HasValue(configuration, "Authentication:StaffOidc:ClientId") && await HasSecretAsync(secrets, "Authentication:StaffOidc:ClientSecret", cancellationToken, logger);
         bool databaseConfigured = await HasSecretAsync(secrets, "ConnectionStrings:RequestPortal", cancellationToken, logger);
+        bool allowedHostsConfigured = HasExplicitAllowedHosts(configuration["AllowedHosts"]);
 
         bool graphEmailEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
         bool graphTeamsEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false);
@@ -122,37 +123,55 @@ public sealed class ConfigurationContractPublisher(
             {
                 if (node is not JsonObject requirement) continue;
                 string id = requirement["id"]?.GetValue<string>() ?? string.Empty;
-                (bool configured, string? verification) = id switch
+                bool required = requirement["required"]?.GetValue<bool>() ?? false;
+                (bool configured, string state, string? verification) = id switch
                 {
-                    "database-connection" => (databaseConfigured, "RP-CONFIG-DB-001: PostgreSQL connection string must resolve through Common.Secrets."),
-                    "storage-root" => (HasDurablePath(configuration["Storage:Local:RootPath"]), "RP-PROD-STORAGE-001: Production document storage must use a durable path outside App_Data."),
-                    "data-protection-keys" => (HasDurablePath(configuration["Security:DataProtectionKeysPath"]), "RP-PROD-DP-001: Data Protection keys must be persisted outside the application deployment directory."),
-                    "staff-oidc-enabled" or "staff-oidc-authority" or "staff-oidc-client-id" or "staff-oidc-client-secret" => (oidcConfigured, "RP-PROD-OIDC-001: Staff OIDC must be enabled with Authority, ClientId and a Common.Secrets-backed ClientSecret."),
-                    "staff-reviewer-groups" or "staff-administrator-groups" => (staffGroupsConfigured, "RP-PROD-STAFF-GROUPS-001: Reviewer and administrator group mappings are required."),
-                    "storage-malware-scanner" => (malwareConfigured, "RP-PROD-UPLOAD-001: Malware scanning must be enabled and have a scanner host."),
-                    "external-representative-provider" => (hasExternalProvider, "RP-PROD-OAUTH-001: At least one external representative identity provider must be commissioned."),
-                    "smtp-host" or "smtp-from" or "notifications-enabled" => (smtpConfigured, "RP-PROD-SMTP-001: Notifications must be enabled with SMTP host and From address."),
-                    "smtp-password" => (await HasSecretAsync(secrets, "Notifications:SmtpPassword", cancellationToken, logger), "RP-PROD-SMTP-SECRET-001: SMTP credential must be available through Common.Secrets when required by the SMTP server."),
-                    "graph-tenant" => (!graphEmailEnabled || graphEmailTenantConfigured, "RP-MSG-GRAPH-EMAIL-001: Graph Email requires Messaging:MicrosoftGraph:TenantId."),
-                    "graph-client" => (!graphEmailEnabled || graphEmailClientConfigured, "RP-MSG-GRAPH-EMAIL-002: Graph Email requires Messaging:MicrosoftGraph:ClientId."),
-                    "graph-client-secret" => (!graphEmailEnabled || graphEmailSecretConfigured, "RP-MSG-GRAPH-EMAIL-003: Graph Email requires its client secret through Common.Secrets."),
-                    "graph-email-enabled" => (graphEmailEnabled, graphEmailEnabled ? null : "Microsoft Graph Email channel is disabled."),
-                    "graph-email-sender" => (!graphEmailEnabled || HasValue(configuration, "Messaging:MicrosoftGraph:Email:SenderUpn"), "RP-MSG-GRAPH-EMAIL-004: Graph Email requires a sender UPN when enabled."),
-                    "graph-teams-enabled" => (graphTeamsEnabled, graphTeamsEnabled ? null : "Microsoft Graph Teams channel is disabled."),
-                    "graph-teams-sender" => (!graphTeamsEnabled || HasValue(configuration, "Messaging:MicrosoftGraph:Teams:SenderUpn"), "RP-MSG-GRAPH-TEAMS-001: Graph Teams requires a sender UPN when enabled."),
-                    "graph-teams-token" => (!graphTeamsEnabled || graphTeamsTokenConfigured, "RP-MSG-GRAPH-TEAMS-002: Graph Teams requires its delegated token through Common.Secrets."),
-                    "messaging-queue" => (HasValue(configuration, "Messaging:DurableQueuePath"), "RP-PROD-MESSAGING-001: Durable messaging queue storage must be configured."),
-                    "site-id" => (!string.IsNullOrWhiteSpace(siteId), "RP-PROD-SITE-001: Site:Id should identify this deployment."),
-                    _ => (false, "No runtime commissioning evaluator is defined for this requirement.")
+                    "database-connection" => State(databaseConfigured, required, "RP-CONFIG-DB-001: PostgreSQL connection string must resolve through Common.Secrets."),
+                    "storage-root" => State(HasDurablePath(configuration["Storage:Local:RootPath"]), required, "RP-PROD-STORAGE-001: Production document storage must use a durable path outside App_Data."),
+                    "data-protection-keys" => State(HasDurablePath(configuration["Security:DataProtectionKeysPath"]), required, "RP-PROD-DP-001: Data Protection keys must be persisted outside the application deployment directory."),
+                    "allowed-hosts" => State(allowedHostsConfigured, required, "RP-PROD-HOSTS-001: AllowedHosts must contain explicit production host names and may not be '*'."),
+                    "staff-oidc-enabled" or "staff-oidc-authority" or "staff-oidc-client-id" or "staff-oidc-client-secret" => State(oidcConfigured, required, "RP-PROD-OIDC-001: Staff OIDC must be enabled with Authority, ClientId and a Common.Secrets-backed ClientSecret."),
+                    "staff-reviewer-groups" or "staff-administrator-groups" => State(staffGroupsConfigured, required, "RP-PROD-STAFF-GROUPS-001: Reviewer and administrator group mappings are required."),
+                    "storage-malware-scanner" => State(malwareConfigured, required, "RP-PROD-UPLOAD-001: Malware scanning must be enabled and have a scanner host."),
+                    "external-representative-provider" => State(hasExternalProvider, required, "RP-PROD-OAUTH-001: At least one external representative identity provider must be commissioned."),
+                    "smtp-host" or "smtp-from" or "notifications-enabled" => State(smtpConfigured, required, "RP-PROD-SMTP-001: Notifications must be enabled with SMTP host and From address."),
+                    "smtp-password" => State(await HasSecretAsync(secrets, "Notifications:SmtpPassword", cancellationToken, logger), required, "RP-PROD-SMTP-SECRET-001: SMTP credential must be available through Common.Secrets when required by the SMTP server."),
+                    "graph-tenant" => OptionalDependencyState(graphEmailEnabled, graphEmailTenantConfigured, "RP-MSG-GRAPH-EMAIL-001: Graph Email requires Messaging:MicrosoftGraph:TenantId."),
+                    "graph-client" => OptionalDependencyState(graphEmailEnabled, graphEmailClientConfigured, "RP-MSG-GRAPH-EMAIL-002: Graph Email requires Messaging:MicrosoftGraph:ClientId."),
+                    "graph-client-secret" => OptionalDependencyState(graphEmailEnabled, graphEmailSecretConfigured, "RP-MSG-GRAPH-EMAIL-003: Graph Email requires its client secret through Common.Secrets."),
+                    "graph-email-enabled" => OptionalFeatureState(graphEmailEnabled),
+                    "graph-email-sender" => OptionalDependencyState(graphEmailEnabled, HasValue(configuration, "Messaging:MicrosoftGraph:Email:SenderUpn"), "RP-MSG-GRAPH-EMAIL-004: Graph Email requires a sender UPN when enabled."),
+                    "graph-teams-enabled" => OptionalFeatureState(graphTeamsEnabled),
+                    "graph-teams-sender" => OptionalDependencyState(graphTeamsEnabled, HasValue(configuration, "Messaging:MicrosoftGraph:Teams:SenderUpn"), "RP-MSG-GRAPH-TEAMS-001: Graph Teams requires a sender UPN when enabled."),
+                    "graph-teams-token" => OptionalDependencyState(graphTeamsEnabled, graphTeamsTokenConfigured, "RP-MSG-GRAPH-TEAMS-002: Graph Teams requires its delegated token through Common.Secrets."),
+                    "messaging-queue" => State(HasValue(configuration, "Messaging:DurableQueuePath"), required, "RP-PROD-MESSAGING-001: Durable messaging queue storage must be configured."),
+                    "site-id" => State(!string.IsNullOrWhiteSpace(siteId), required, "RP-PROD-SITE-001: Site:Id should identify this deployment."),
+                    _ => (false, "Unknown", "No runtime commissioning evaluator is defined for this requirement.")
                 };
                 requirement["isConfigured"] = configured;
-                requirement["configurationState"] = configured ? "Configured" : "Missing";
+                requirement["configurationState"] = state;
                 requirement["effectiveValueAvailable"] = configured;
-                requirement["verificationStatus"] = configured ? "PASS" : verification;
+                requirement["verificationStatus"] = state == "Disabled" ? "NOT REQUIRED" : configured ? "PASS" : verification;
                 foreach (string key in new[] { "safeDisplayValue", "defaultValue", "value", "currentValue", "resolvedValue", "effectiveValue", "example" }) requirement.Remove(key);
             }
         }
         return contract;
+    }
+
+    private static (bool Configured, string State, string? Verification) State(bool configured, bool required, string message)
+        => configured ? (true, "Configured", null) : required ? (false, "Missing", message) : (false, "Disabled", null);
+
+    private static (bool Configured, string State, string? Verification) OptionalFeatureState(bool enabled)
+        => enabled ? (true, "Configured", null) : (false, "Disabled", null);
+
+    private static (bool Configured, string State, string? Verification) OptionalDependencyState(bool enabled, bool configured, string message)
+        => !enabled ? (false, "Disabled", null) : configured ? (true, "Configured", null) : (false, "Missing", message);
+
+    private static bool HasExplicitAllowedHosts(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        string[] hosts = value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return hosts.Length > 0 && hosts.All(host => host != "*");
     }
 
     private static bool HasValue(IConfiguration configuration, string key) => !string.IsNullOrWhiteSpace(configuration[key]);
