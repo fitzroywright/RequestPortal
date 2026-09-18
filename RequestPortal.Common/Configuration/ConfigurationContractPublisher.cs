@@ -38,10 +38,10 @@ public sealed class ConfigurationContractPublisher(
         CancellationToken cancellationToken = default,
         ILogger<ConfigurationContractPublisher>? logger = null)
     {
-        string? baseUrl = configuration["Aegis:Configuration:Url"] ?? configuration["AegisConfiguration:BaseUrl"] ?? configuration["ConfigurationService:BaseUrl"];
+        string? baseUrl = configuration["Aegis:Operations:Url"] ?? configuration["AegisOperations:BaseUrl"];
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            logger?.LogInformation("Aegis.Configuration publication is disabled because no Configuration URL is configured.");
+            logger?.LogInformation("Application registration is disabled because no Operations URL is configured.");
             return false;
         }
 
@@ -55,32 +55,24 @@ public sealed class ConfigurationContractPublisher(
                 return false;
             }
 
-            string secretName = RegistrationCredentialResolver.SecretNameFor("RequestPortal");
-            string? credential;
-            try { credential = await secrets.GetAsync(secretName, cancellationToken); }
-            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-            {
-                logger?.LogWarning(exception, "Common.Secrets could not resolve RequestPortal's Aegis.Configuration registration credential; RequestPortal will retry publication.");
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(credential))
-            {
-                logger?.LogWarning("Common.Secrets did not resolve required secret {SecretName}; RequestPortal will retry publication.", secretName);
-                return false;
-            }
-
             JsonObject contract = await BuildRuntimeContractAsync(configuration, environment, secrets, path, cancellationToken, logger);
             using HttpClient client = new();
-            ConfigurationRegistrar registrar = new(client, new RegistrationOptions(new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute), credential, TimeSpan.FromSeconds(10)));
-            RegistrationResult result = await registrar.RegisterContractAsync(contract, cancellationToken);
-            if (!result.Succeeded)
+            var registration = new ApplicationRegistrationClient(
+                client,
+                new ApplicationRegistrationOptions(
+                    new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute),
+                    "RequestPortal",
+                    contract["instanceId"]?.GetValue<string>() ?? Environment.MachineName,
+                    RegistrationCredentialResolver.EnvironmentVariableName,
+                    TimeSpan.FromSeconds(10)));
+            ApplicationRegistrationStatus result = await registration.RegisterAsync(contract, cancellationToken);
+            if (!result.IsRegistered)
             {
-                logger?.LogWarning("Aegis.Configuration registration failed for RequestPortal: {RegistrationError}; RequestPortal will retry publication.", result.Error ?? "Unknown registration failure.");
+                logger?.LogWarning("RequestPortal registration state is {RegistrationState}: {RegistrationError}; RequestPortal remains operational. Bootstrap must be repeated in Operations when the key is missing, invalid, or revoked.", result.State, result.Error ?? "No additional detail.");
                 return false;
             }
 
-            logger?.LogInformation("RequestPortal commissioning state registered with Aegis.Configuration with HTTP {StatusCode} using Common.Secrets.", (int?)result.StatusCode);
+            logger?.LogInformation("RequestPortal registration is valid and its commissioning contract was published.");
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
