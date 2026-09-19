@@ -186,15 +186,35 @@ if (staffOidc.Enabled)
             OnRedirectToIdentityProvider = context =>
             {
                 context.ProtocolMessage.Prompt = "login";
+                string correlationId = Guid.NewGuid().ToString("N");
+                context.Properties.Items["aegis.auth.correlation"] = correlationId;
+                RequestPortalOperationsFlowPublisher flows = context.HttpContext.RequestServices
+                    .GetRequiredService<RequestPortalOperationsFlowPublisher>();
+                flows.TryEnqueueAuthentication(correlationId, "IdentityProvider");
                 return Task.CompletedTask;
             },
             OnTokenValidated = async context =>
             {
+                string correlationId =
+                    context.Properties.Items.TryGetValue("aegis.auth.correlation", out string? value) &&
+                    !string.IsNullOrWhiteSpace(value)
+                        ? value
+                        : Guid.NewGuid().ToString("N");
+                RequestPortalOperationsFlowPublisher flows = context.HttpContext.RequestServices
+                    .GetRequiredService<RequestPortalOperationsFlowPublisher>();
+
                 if (context.Principal is null)
                 {
+                    flows.TryEnqueueAuthentication(
+                        correlationId,
+                        "Callback",
+                        "Identity provider callback returned no principal.",
+                        failed: true);
                     context.Fail("The staff identity provider returned no principal.");
                     return;
                 }
+
+                flows.TryEnqueueAuthentication(correlationId, "Claims");
 
                 StaffOidcPrincipalService service = context.HttpContext.RequestServices
                     .GetRequiredService<StaffOidcPrincipalService>();
@@ -203,14 +223,32 @@ if (staffOidc.Enabled)
                     context.HttpContext.RequestAborted);
                 if (!result.Allowed || result.Principal is null)
                 {
+                    flows.TryEnqueueAuthentication(
+                        correlationId,
+                        "Authorization",
+                        result.FailureCode ?? "Staff authorization denied.",
+                        failed: true);
                     context.Fail(result.FailureCode ?? "FFP staff access denied.");
                     return;
                 }
 
                 context.Principal = result.Principal;
+                flows.TryEnqueueAuthentication(correlationId, "Session");
             },
             OnRemoteFailure = context =>
             {
+                string correlationId =
+                    context.Properties?.Items.TryGetValue("aegis.auth.correlation", out string? value) == true &&
+                    !string.IsNullOrWhiteSpace(value)
+                        ? value
+                        : Guid.NewGuid().ToString("N");
+                RequestPortalOperationsFlowPublisher flows = context.HttpContext.RequestServices
+                    .GetRequiredService<RequestPortalOperationsFlowPublisher>();
+                flows.TryEnqueueAuthentication(
+                    correlationId,
+                    "Callback",
+                    "Remote authentication failed before a session was established.",
+                    failed: true);
                 context.HandleResponse();
                 context.Response.Redirect("/Account/StaffAccessDenied");
                 return Task.CompletedTask;
