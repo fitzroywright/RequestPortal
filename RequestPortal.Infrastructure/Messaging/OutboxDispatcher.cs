@@ -385,7 +385,13 @@ public sealed class OutboxDispatcher
         try
         {
             await notificationSender.SendAsync(
-                new NotificationEnvelope(preference.Destination, subject, body, false, transport),
+                new NotificationEnvelope(
+                    preference.Destination,
+                    subject,
+                    body,
+                    false,
+                    transport,
+                    requestId?.ToString("D")),
                 cancellationToken);
             history.MarkSent(DateTimeOffset.UtcNow);
         }
@@ -429,7 +435,13 @@ public sealed class OutboxDispatcher
 
         try
         {
-            await notificationSender.SendAsync(new NotificationEnvelope(destination, subject, body), cancellationToken);
+            await notificationSender.SendAsync(
+                new NotificationEnvelope(
+                    destination,
+                    subject,
+                    body,
+                    CorrelationId: requestId?.ToString("D")),
+                cancellationToken);
             history.MarkSent(DateTimeOffset.UtcNow);
         }
         catch (Exception exception)
