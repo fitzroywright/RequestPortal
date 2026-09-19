@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Documents;
+using RequestPortal.Application.Portal;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
@@ -30,6 +31,7 @@ public sealed class DocumentService : IDocumentService
     private readonly IDocumentUploadSecurity uploadSecurity;
     private readonly IMalwareScanner malwareScanner;
     private readonly IBusinessAuditWriter auditWriter;
+    private readonly IRequestPortalOperationsFlowPublisher operationsFlowPublisher;
 
     public DocumentService(
         RequestPortalDbContext dbContext,
@@ -38,7 +40,8 @@ public sealed class DocumentService : IDocumentService
         IClock clock,
         IDocumentUploadSecurity uploadSecurity,
         IConfiguration configuration,
-        IBusinessAuditWriter auditWriter)
+        IBusinessAuditWriter auditWriter,
+        IRequestPortalOperationsFlowPublisher operationsFlowPublisher)
     {
         this.dbContext = dbContext;
         this.organizationAccessService = organizationAccessService;
@@ -46,6 +49,7 @@ public sealed class DocumentService : IDocumentService
         this.clock = clock;
         this.uploadSecurity = uploadSecurity;
         this.auditWriter = auditWriter;
+        this.operationsFlowPublisher = operationsFlowPublisher;
         malwareScanner = new ClamAvMalwareScanner(configuration);
     }
 
@@ -57,6 +61,11 @@ public sealed class DocumentService : IDocumentService
         await malwareScanner.ScanAsync(content, cancellationToken);
         Guid documentId = await StoreMetadataAsync(userId, DocumentOwnerType.AssistanceRequest, requestId, organizationId, documentType, originalFileName, contentType, sizeBytes, content, cancellationToken);
         await AuditAsync(userId, "DocumentUploaded", documentId, organizationId, $"Request document type {documentType}; size {sizeBytes} bytes.", cancellationToken);
+        operationsFlowPublisher.TryEnqueue(
+            requestId,
+            "Documents",
+            clock.UtcNow,
+            $"Document {documentId:D} persisted and metadata committed.");
         return documentId;
     }
 
