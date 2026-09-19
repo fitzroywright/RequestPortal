@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Integration;
+using RequestPortal.Application.Portal;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
@@ -30,6 +31,7 @@ public sealed class OutboxDispatcher
     private readonly FfpManagerBridgeOptions ffpManagerOptions;
     private readonly NotificationOptions notificationOptions;
     private readonly ILogger<OutboxDispatcher> logger;
+    private readonly IRequestPortalOperationsFlowPublisher operationsFlowPublisher;
 
     public OutboxDispatcher(
         RequestPortalDbContext dbContext,
@@ -37,7 +39,8 @@ public sealed class OutboxDispatcher
         IFfpManagerIntegrationService ffpManagerIntegrationService,
         IOptions<FfpManagerBridgeOptions> ffpManagerOptions,
         IOptions<NotificationOptions> notificationOptions,
-        ILogger<OutboxDispatcher> logger)
+        ILogger<OutboxDispatcher> logger,
+        IRequestPortalOperationsFlowPublisher operationsFlowPublisher)
     {
         this.dbContext = dbContext;
         this.notificationSender = notificationSender;
@@ -45,6 +48,7 @@ public sealed class OutboxDispatcher
         this.ffpManagerOptions = ffpManagerOptions.Value;
         this.notificationOptions = notificationOptions.Value;
         this.logger = logger;
+        this.operationsFlowPublisher = operationsFlowPublisher;
     }
 
     public async Task<int> DispatchBatchAsync(int batchSize = 20, CancellationToken cancellationToken = default)
@@ -151,7 +155,25 @@ public sealed class OutboxDispatcher
             FfpManagerSubmissionRequestedMessage message = Deserialize<FfpManagerSubmissionRequestedMessage>(outbox.Payload);
             if (ffpManagerOptions.Enabled)
             {
-                await ffpManagerIntegrationService.SubmitRequestAsync(message.RequestId, cancellationToken);
+                try
+                {
+                    await ffpManagerIntegrationService.SubmitRequestAsync(message.RequestId, cancellationToken);
+                    operationsFlowPublisher.TryEnqueue(
+                        message.RequestId,
+                        "Downstream",
+                        DateTimeOffset.UtcNow,
+                        "FFP Manager downstream submission completed.");
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    operationsFlowPublisher.TryEnqueue(
+                        message.RequestId,
+                        "Downstream",
+                        DateTimeOffset.UtcNow,
+                        $"Downstream submission failed with {exception.GetType().Name}.",
+                        failed: true);
+                    throw;
+                }
             }
             return;
         }
