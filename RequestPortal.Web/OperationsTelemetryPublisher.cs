@@ -1,3 +1,4 @@
+using RequestPortal.Common.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
@@ -8,6 +9,7 @@ namespace RequestPortal.Web;
 public sealed class OperationsTelemetryPublisher(
     IConfiguration configuration,
     IHostEnvironment environment,
+    IServiceProvider services,
     ILogger<OperationsTelemetryPublisher> logger) : BackgroundService
 {
     private const string ApplicationId = "RequestPortal";
@@ -44,6 +46,22 @@ public sealed class OperationsTelemetryPublisher(
                 }
                 else
                 {
+                    IReadOnlyList<DiagnosticCheckResult>? diagnosticResults = null;
+                    try
+                    {
+                        await using AsyncServiceScope scope = services.CreateAsyncScope();
+                        StartupDiagnosticRunner runner = scope.ServiceProvider.GetRequiredService<StartupDiagnosticRunner>();
+                        diagnosticResults = await runner.RunAsync(stoppingToken);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        logger.LogDebug(ex, "Request Portal diagnostic publication could not collect current evidence.");
+                    }
+
+                    string operationalState = diagnosticResults is null
+                        ? "Unknown"
+                        : diagnosticResults.All(x => x.IsHealthy) ? "Healthy" : "Failed";
+
                     using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(10) };
                     using var request = new HttpRequestMessage(
                         HttpMethod.Post,
@@ -57,11 +75,13 @@ public sealed class OperationsTelemetryPublisher(
                             environment = environment.EnvironmentName,
                             version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown",
                             registrationStatus = "Registered",
-                            state = "Unknown",
+                            state = operationalState,
                             observedAtUtc = DateTimeOffset.UtcNow,
                             configurationStatus = "Published",
                             dependencies = Array.Empty<string>(),
-                            reason = "Process heartbeat received; aggregate health requires specialized diagnostic evidence."
+                            reason = diagnosticResults is null
+                                ? "Process heartbeat received but diagnostic evidence could not be collected."
+                                : "Aggregate state is based on the Request Portal startup diagnostic set."
                         })
                     };
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
@@ -83,6 +103,16 @@ public sealed class OperationsTelemetryPublisher(
                         operationsUrl,
                         identity,
                         stoppingToken);
+
+                    if (diagnosticResults is not null)
+                    {
+                        await PublishDiagnosticsAsync(
+                            client,
+                            operationsUrl,
+                            identity,
+                            diagnosticResults,
+                            stoppingToken);
+                    }
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -137,6 +167,46 @@ public sealed class OperationsTelemetryPublisher(
         if (!response.IsSuccessStatusCode)
         {
             // Flow metadata is advisory to Operations and must never affect application availability.
+        }
+    }
+
+
+    private static async Task PublishDiagnosticsAsync(
+        HttpClient client,
+        string operationsUrl,
+        RegistrationIdentityDocument identity,
+        IReadOnlyList<DiagnosticCheckResult> diagnostics,
+        CancellationToken ct)
+    {
+        DateTimeOffset observedAt = DateTimeOffset.UtcNow;
+        foreach (DiagnosticCheckResult check in diagnostics)
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                operationsUrl.TrimEnd('/') + "/api/operations/diagnostics/observe")
+            {
+                Content = JsonContent.Create(new
+                {
+                    diagnosticId = ApplicationId + ":" + check.Name,
+                    applicationId = ApplicationId,
+                    component = check.Name,
+                    category = "Health",
+                    state = check.IsHealthy ? "Healthy" : "Failed",
+                    summary = check.Detail,
+                    observedAtUtc = observedAt,
+                    detail = (string?)null,
+                    runbook = "Request Portal / Startup Diagnostics"
+                })
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
+            request.Headers.TryAddWithoutValidation("X-Aegis-Application-Id", identity.ApplicationId);
+            request.Headers.TryAddWithoutValidation("X-Aegis-Instance-Id", identity.InstanceId);
+            request.Headers.TryAddWithoutValidation("X-Aegis-Installation-Id", identity.InstallationId);
+            request.Headers.TryAddWithoutValidation("X-Aegis-Correlation-Id", Guid.NewGuid().ToString("N"));
+
+            using HttpResponseMessage response = await client.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+                break;
         }
     }
 
