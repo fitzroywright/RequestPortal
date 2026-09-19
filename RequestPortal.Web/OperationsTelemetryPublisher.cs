@@ -195,7 +195,7 @@ public sealed class OperationsTelemetryPublisher(
                     summary = check.Detail,
                     observedAtUtc = observedAt,
                     detail = (string?)null,
-                    runbook = "Request Portal / Startup Diagnostics"
+                    runbook = "docs/RUNBOOK.md"
                 })
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
