@@ -63,6 +63,7 @@ using RequestPortal.Web.Security;
 using RequestPortal.Web.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHostedService<RequestPortal.Web.OperationsTelemetryPublisher>();
 await using Common.Secrets.CommonSecretsBootstrapRuntime secretsRuntime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(builder.Configuration);
 RuntimeSecrets runtimeSecrets = await LoadRuntimeSecretsAsync(secretsRuntime.Provider);
 
