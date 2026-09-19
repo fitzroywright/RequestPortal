@@ -18,7 +18,6 @@ public sealed record RequestPortalFlowTelemetryItem(
 
 public sealed class RequestPortalOperationsFlowPublisher(
     IConfiguration configuration,
-    IHostEnvironment environment,
     ILogger<RequestPortalOperationsFlowPublisher> logger)
     : BackgroundService, IRequestPortalOperationsFlowPublisher
 {
