@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Channels;
@@ -22,6 +23,7 @@ public sealed class RequestPortalOperationsFlowPublisher(
     : BackgroundService, IRequestPortalOperationsFlowPublisher
 {
     private const string ApplicationId = "RequestPortal";
+    private readonly ConcurrentDictionary<string, DateTimeOffset> firstObserved = new(StringComparer.OrdinalIgnoreCase);
     private readonly Channel<RequestPortalFlowTelemetryItem> queue =
         Channel.CreateBounded<RequestPortalFlowTelemetryItem>(new BoundedChannelOptions(1000)
         {
@@ -100,6 +102,9 @@ public sealed class RequestPortalOperationsFlowPublisher(
             : ["Applicant", "Portal", "Validation", "Documents", "Submission", "Processing", "Downstream", "Acknowledgement"];
         int currentIndex = Array.FindIndex(stageNames, x => x.Equals(item.Stage, StringComparison.OrdinalIgnoreCase));
         if (currentIndex < 0) currentIndex = 0;
+        DateTimeOffset startedAt = firstObserved.GetOrAdd(
+            item.FlowType + "|" + item.CorrelationId,
+            item.ObservedAtUtc);
 
         var stages = stageNames.Select((name, index) => new
         {
@@ -112,11 +117,10 @@ public sealed class RequestPortalOperationsFlowPublisher(
                        item.Stage.Equals("Session", StringComparison.OrdinalIgnoreCase))
                         ? "Completed" : "Active"
                     : "Pending",
-            startedAtUtc = index <= currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
-            completedAtUtc = index < currentIndex ||
-                (index == currentIndex &&
-                 (item.Stage.Equals("Acknowledgement", StringComparison.OrdinalIgnoreCase) ||
-                  item.Stage.Equals("Session", StringComparison.OrdinalIgnoreCase)))
+            startedAtUtc = index == currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
+            completedAtUtc = index == currentIndex &&
+                (item.Stage.Equals("Acknowledgement", StringComparison.OrdinalIgnoreCase) ||
+                 item.Stage.Equals("Session", StringComparison.OrdinalIgnoreCase))
                 ? item.ObservedAtUtc
                 : (DateTimeOffset?)null,
             warningAfterSeconds = index switch
@@ -155,7 +159,7 @@ public sealed class RequestPortalOperationsFlowPublisher(
                 applicationId = ApplicationId,
                 flowType = item.FlowType,
                 instanceId,
-                startedAtUtc = item.ObservedAtUtc,
+                startedAtUtc,
                 observedAtUtc = item.ObservedAtUtc,
                 currentStage = item.Stage,
                 relatedBusinessId = item.BusinessId,
