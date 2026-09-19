@@ -38,10 +38,10 @@ public sealed class ConfigurationContractPublisher(
         CancellationToken cancellationToken = default,
         ILogger<ConfigurationContractPublisher>? logger = null)
     {
-        string? baseUrl = configuration["Aegis:Operations:Url"] ?? configuration["AegisOperations:BaseUrl"];
-        if (string.IsNullOrWhiteSpace(baseUrl))
+        string? configurationUrl = configuration["Aegis:Configuration:Url"];
+        if (string.IsNullOrWhiteSpace(configurationUrl))
         {
-            logger?.LogInformation("Application registration is disabled because no Operations URL is configured.");
+            logger?.LogInformation("Application registration is disabled because no Configuration URL is configured.");
             return false;
         }
 
@@ -55,25 +55,75 @@ public sealed class ConfigurationContractPublisher(
                 return false;
             }
 
-            JsonObject contract = await BuildRuntimeContractAsync(configuration, environment, secrets, path, cancellationToken, logger);
+            JsonObject contract = await BuildRuntimeContractAsync(
+                configuration,
+                environment,
+                secrets,
+                path,
+                cancellationToken,
+                logger);
+
+            string instanceId =
+                contract["instanceId"]?.GetValue<string>()
+                ?? Environment.MachineName;
+            contract["instanceId"] = instanceId;
+
+            string identityFile =
+                configuration["Aegis:Registration:IdentityFile"]
+                ?? (OperatingSystem.IsWindows()
+                    ? Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                        "Aegis",
+                        "RequestPortal",
+                        "registration-identity.json")
+                    : "/var/lib/aegis/requestportal/registration-identity.json");
+
             using HttpClient client = new();
-            var registration = new ApplicationRegistrationClient(
+            var registration = new RegistrationLifecycleClient(
                 client,
-                new ApplicationRegistrationOptions(
-                    new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute),
+                new RegistrationLifecycleOptions(
+                    new Uri(configurationUrl.TrimEnd('/') + "/", UriKind.Absolute),
                     "RequestPortal",
-                    contract["instanceId"]?.GetValue<string>() ?? Environment.MachineName,
-                    RegistrationCredentialResolver.EnvironmentVariableName,
-                    TimeSpan.FromSeconds(10)));
-            ApplicationRegistrationStatus result = await registration.RegisterAsync(contract, cancellationToken);
+                    instanceId,
+                    identityFile,
+                    TimeSpan.FromSeconds(10)),
+                logger: logger);
+
+            RegistrationLifecycleStatus result =
+                await registration.StepAsync(
+                    new JsonObject
+                    {
+                        ["displayName"] = "Request Portal",
+                        ["siteId"] = contract["siteId"]?.DeepClone(),
+                        ["publicUrl"] = configuration["Aegis:PublicUrl"],
+                        ["hostname"] = Environment.MachineName,
+                        ["runtimeEnvironment"] = environment.EnvironmentName
+                    },
+                    cancellationToken);
+
             if (!result.IsRegistered)
             {
-                logger?.LogWarning("RequestPortal registration state is {RegistrationState}: {RegistrationError}; RequestPortal remains operational. Bootstrap must be repeated in Operations when the key is missing, invalid, or revoked.", result.State, result.Error ?? "No additional detail.");
+                logger?.LogInformation(
+                    "RequestPortal registration state is {RegistrationState}: {RegistrationError}; RequestPortal remains operational.",
+                    result.State,
+                    result.Error ?? "No additional detail.");
                 return false;
             }
 
-            logger?.LogInformation("RequestPortal registration is valid and its commissioning contract was published.");
-            return true;
+            System.Net.HttpStatusCode contractStatus =
+                await registration.PublishConfigurationContractAsync(contract, cancellationToken);
+
+            if ((int)contractStatus is >= 200 and < 300)
+            {
+                logger?.LogInformation(
+                    "RequestPortal registration is valid and its commissioning contract was published.");
+                return true;
+            }
+
+            logger?.LogWarning(
+                "RequestPortal is registered, but Configuration contract publication returned HTTP {StatusCode}.",
+                (int)contractStatus);
+            return false;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception)
