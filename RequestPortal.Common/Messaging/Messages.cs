@@ -29,7 +29,8 @@ public sealed record NotificationEnvelope(
     string Subject,
     string Body,
     bool IsHtml = false,
-    NotificationTransport Transport = NotificationTransport.Email);
+    NotificationTransport Transport = NotificationTransport.Email,
+    string? CorrelationId = null);
 
 public interface INotificationSender
 {
