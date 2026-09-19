@@ -159,7 +159,7 @@ public sealed class RequestPortalOperationsFlowPublisher(
                 applicationId = ApplicationId,
                 flowType = item.FlowType,
                 instanceId,
-                startedAtUtc,
+                startedAtUtc = startedAt,
                 observedAtUtc = item.ObservedAtUtc,
                 currentStage = item.Stage,
                 relatedBusinessId = item.BusinessId,
