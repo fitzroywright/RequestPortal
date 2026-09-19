@@ -20,17 +20,20 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     private readonly IBusinessAuditWriter auditWriter;
     private readonly RequestPortalDbContext dbContext;
     private readonly IClock clock;
+    private readonly IRequestPortalOperationsFlowPublisher operationsFlowPublisher;
 
     public AuditedPortalWorkflowService(
         PortalWorkflowService inner,
         IBusinessAuditWriter auditWriter,
         RequestPortalDbContext dbContext,
-        IClock clock)
+        IClock clock,
+        IRequestPortalOperationsFlowPublisher operationsFlowPublisher)
     {
         this.inner = inner;
         this.auditWriter = auditWriter;
         this.dbContext = dbContext;
         this.clock = clock;
+        this.operationsFlowPublisher = operationsFlowPublisher;
     }
 
     public Task<IReadOnlyList<OrganizationSummary>> GetOrganizationsForUserAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -91,6 +94,7 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     {
         Guid requestId = await inner.CreateRequestAsync(userId, organizationId, summary, cancellationToken);
         await auditWriter.WriteAsync(userId, "RequestCreated", "AssistanceRequest", requestId, organizationId, summary, cancellationToken);
+        operationsFlowPublisher.TryEnqueue(requestId, "Applicant", clock.UtcNow, "Request draft created.");
         return requestId;
     }
 
@@ -103,6 +107,7 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
         await EnsureOrganizationEligibleForSubmissionAsync(request?.OrganizationId, cancellationToken);
         await inner.SubmitRequestAsync(userId, requestId, cancellationToken);
         await auditWriter.WriteAsync(userId, "RequestSubmitted", "AssistanceRequest", requestId, request?.OrganizationId, cancellationToken: cancellationToken);
+        operationsFlowPublisher.TryEnqueue(requestId, "Submission", clock.UtcNow, "Request submitted for review.");
     }
 
     public async Task ResubmitRequestAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default)
@@ -127,6 +132,7 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
         RequestDetail? request = await inner.GetRequestAsync(staffUserId, requestId, true, cancellationToken);
         await inner.ApproveRequestAsync(staffUserId, requestId, cancellationToken);
         await auditWriter.WriteAsync(staffUserId, "RequestApproved", "AssistanceRequest", requestId, request?.OrganizationId, cancellationToken: cancellationToken);
+        operationsFlowPublisher.TryEnqueue(requestId, "Acknowledgement", clock.UtcNow, "Request approved.", failed: false);
     }
 
     public async Task RejectRequestAsync(Guid staffUserId, Guid requestId, string reason, CancellationToken cancellationToken = default)
@@ -134,6 +140,7 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
         RequestDetail? request = await inner.GetRequestAsync(staffUserId, requestId, true, cancellationToken);
         await inner.RejectRequestAsync(staffUserId, requestId, reason, cancellationToken);
         await auditWriter.WriteAsync(staffUserId, "RequestRejected", "AssistanceRequest", requestId, request?.OrganizationId, reason, cancellationToken);
+        operationsFlowPublisher.TryEnqueue(requestId, "Processing", clock.UtcNow, reason, failed: true);
     }
 
     public async Task RequestMoreInformationAsync(Guid staffUserId, Guid requestId, string reason, CancellationToken cancellationToken = default)
@@ -141,6 +148,7 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
         RequestDetail? request = await inner.GetRequestAsync(staffUserId, requestId, true, cancellationToken);
         await inner.RequestMoreInformationAsync(staffUserId, requestId, reason, cancellationToken);
         await auditWriter.WriteAsync(staffUserId, "MoreInformationRequested", "AssistanceRequest", requestId, request?.OrganizationId, reason, cancellationToken);
+        operationsFlowPublisher.TryEnqueue(requestId, "Processing", clock.UtcNow, reason);
     }
 
     private async Task EnsureOrganizationEligibleForSubmissionAsync(
