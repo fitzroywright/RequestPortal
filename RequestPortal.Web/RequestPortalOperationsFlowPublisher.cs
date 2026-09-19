@@ -163,9 +163,7 @@ public sealed class RequestPortalOperationsFlowPublisher(
                 observedAtUtc = item.ObservedAtUtc,
                 currentStage = item.Stage,
                 relatedBusinessId = item.BusinessId,
-                runbook = item.FlowType == "StaffAuthentication"
-                    ? "Request Portal / Staff Authentication"
-                    : "Request Portal / Request Submission",
+                runbook = "docs/RUNBOOK.md",
                 stages
             })
         };
