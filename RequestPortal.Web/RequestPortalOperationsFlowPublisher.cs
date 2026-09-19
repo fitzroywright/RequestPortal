@@ -7,9 +7,11 @@ using RequestPortal.Application.Portal;
 namespace RequestPortal.Web;
 
 public sealed record RequestPortalFlowTelemetryItem(
-    Guid RequestId,
+    string CorrelationId,
+    string FlowType,
     string Stage,
     DateTimeOffset ObservedAtUtc,
+    string? BusinessId,
     string? Detail,
     bool Failed);
 
@@ -34,7 +36,29 @@ public sealed class RequestPortalOperationsFlowPublisher(
         DateTimeOffset observedAtUtc,
         string? detail = null,
         bool failed = false)
-        => queue.Writer.TryWrite(new(requestId, stage, observedAtUtc, detail, failed));
+        => queue.Writer.TryWrite(new(
+            requestId.ToString("D"),
+            "RequestSubmission",
+            stage,
+            observedAtUtc,
+            requestId.ToString("D"),
+            detail,
+            failed));
+
+    public bool TryEnqueueAuthentication(
+        string correlationId,
+        string stage,
+        string? detail = null,
+        bool failed = false)
+        => !string.IsNullOrWhiteSpace(correlationId) &&
+           queue.Writer.TryWrite(new(
+               correlationId.Trim(),
+               "StaffAuthentication",
+               stage,
+               DateTimeOffset.UtcNow,
+               null,
+               detail,
+               failed));
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -71,16 +95,9 @@ public sealed class RequestPortalOperationsFlowPublisher(
             await identityStore.LoadOrCreateAsync(ApplicationId, instanceId, ct);
         if (string.IsNullOrWhiteSpace(identity.Credential)) return;
 
-        string[] stageNames =
-        [
-            "Applicant",
-            "Validation",
-            "Documents",
-            "Submission",
-            "Processing",
-            "Downstream",
-            "Acknowledgement"
-        ];
+        string[] stageNames = item.FlowType == "StaffAuthentication"
+            ? ["Browser", "Authentication", "IdentityProvider", "Callback", "Claims", "Authorization", "Session"]
+            : ["Applicant", "Portal", "Validation", "Documents", "Submission", "Processing", "Downstream", "Acknowledgement"];
         int currentIndex = Array.FindIndex(stageNames, x => x.Equals(item.Stage, StringComparison.OrdinalIgnoreCase));
         if (currentIndex < 0) currentIndex = 0;
 
@@ -90,10 +107,16 @@ public sealed class RequestPortalOperationsFlowPublisher(
             state = index < currentIndex
                 ? "Completed"
                 : index == currentIndex
-                    ? item.Failed ? "Failed" : item.Stage.Equals("Acknowledgement", StringComparison.OrdinalIgnoreCase) ? "Completed" : "Active"
+                    ? item.Failed ? "Failed" :
+                      (item.Stage.Equals("Acknowledgement", StringComparison.OrdinalIgnoreCase) ||
+                       item.Stage.Equals("Session", StringComparison.OrdinalIgnoreCase))
+                        ? "Completed" : "Active"
                     : "Pending",
             startedAtUtc = index <= currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
-            completedAtUtc = index < currentIndex || (index == currentIndex && item.Stage.Equals("Acknowledgement", StringComparison.OrdinalIgnoreCase))
+            completedAtUtc = index < currentIndex ||
+                (index == currentIndex &&
+                 (item.Stage.Equals("Acknowledgement", StringComparison.OrdinalIgnoreCase) ||
+                  item.Stage.Equals("Session", StringComparison.OrdinalIgnoreCase)))
                 ? item.ObservedAtUtc
                 : (DateTimeOffset?)null,
             warningAfterSeconds = index switch
@@ -128,15 +151,17 @@ public sealed class RequestPortalOperationsFlowPublisher(
         {
             Content = JsonContent.Create(new
             {
-                correlationId = item.RequestId.ToString("D"),
+                correlationId = item.CorrelationId,
                 applicationId = ApplicationId,
-                flowType = "RequestSubmission",
+                flowType = item.FlowType,
                 instanceId,
                 startedAtUtc = item.ObservedAtUtc,
                 observedAtUtc = item.ObservedAtUtc,
                 currentStage = item.Stage,
-                relatedBusinessId = item.RequestId.ToString("D"),
-                runbook = "Request Portal / Request Submission",
+                relatedBusinessId = item.BusinessId,
+                runbook = item.FlowType == "StaffAuthentication"
+                    ? "Request Portal / Staff Authentication"
+                    : "Request Portal / Request Submission",
                 stages
             })
         };
@@ -144,7 +169,7 @@ public sealed class RequestPortalOperationsFlowPublisher(
         request.Headers.TryAddWithoutValidation("X-Aegis-Application-Id", identity.ApplicationId);
         request.Headers.TryAddWithoutValidation("X-Aegis-Instance-Id", identity.InstanceId);
         request.Headers.TryAddWithoutValidation("X-Aegis-Installation-Id", identity.InstallationId);
-        request.Headers.TryAddWithoutValidation("X-Aegis-Correlation-Id", item.RequestId.ToString("N"));
+        request.Headers.TryAddWithoutValidation("X-Aegis-Correlation-Id", item.CorrelationId);
 
         using HttpResponseMessage response = await client.SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)
