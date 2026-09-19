@@ -51,7 +51,9 @@ public sealed class CommonQueuedNotificationSender : INotificationSender
             Body = notification.Body,
             Channels = channel,
             Source = "RequestPortal",
-            CorrelationId = notificationId.ToString("N"),
+            CorrelationId = string.IsNullOrWhiteSpace(notification.CorrelationId)
+                ? notificationId.ToString("N")
+                : notification.CorrelationId.Trim(),
             Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["ContentType"] = notification.IsHtml ? "text/html" : "text/plain",
@@ -63,7 +65,7 @@ public sealed class CommonQueuedNotificationSender : INotificationSender
             [recipient],
             channel,
             request,
-            null,
+            request.CorrelationId,
             "RequestPortal notification",
             DateTimeOffset.UtcNow);
 
