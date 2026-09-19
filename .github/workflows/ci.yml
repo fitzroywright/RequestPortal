@@ -70,13 +70,19 @@ jobs:
       - name: Restore RequestPortal
         run: dotnet restore RequestPortal.Web/RequestPortal.Web.csproj
 
-      - name: Build RequestPortal
+      - name: Build RequestPortal Debug
+        run: dotnet build RequestPortal.Web/RequestPortal.Web.csproj --configuration Debug --no-restore
+
+      - name: Build RequestPortal Release
         run: dotnet build RequestPortal.Web/RequestPortal.Web.csproj --configuration Release --no-restore
 
       - name: Restore FFP Manager bridge
         run: dotnet restore FfpManager.Bridge/FfpManager.Bridge.csproj
 
-      - name: Build FFP Manager bridge
+      - name: Build FFP Manager bridge Debug
+        run: dotnet build FfpManager.Bridge/FfpManager.Bridge.csproj --configuration Debug --no-restore
+
+      - name: Build FFP Manager bridge Release
         run: dotnet build FfpManager.Bridge/FfpManager.Bridge.csproj --configuration Release --no-restore
 
       - name: Verify migration model is current
@@ -84,6 +90,10 @@ jobs:
           dotnet tool restore
           dotnet ef migrations has-pending-model-changes --project RequestPortal.Infrastructure --startup-project RequestPortal.Web
 
-      - name: Test
+      - name: Test Debug
+        run: |
+          find RequestPortal.Tests -name '*.csproj' -print0 | xargs -0 -n1 dotnet test --configuration Debug
+
+      - name: Test Release
         run: |
           find RequestPortal.Tests -name '*.csproj' -print0 | xargs -0 -n1 dotnet test --configuration Release
