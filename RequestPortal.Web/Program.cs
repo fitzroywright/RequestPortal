@@ -197,7 +197,7 @@ if (staffOidc.Enabled)
             OnTokenValidated = async context =>
             {
                 string correlationId =
-                    context.Properties.Items.TryGetValue("aegis.auth.correlation", out string? value) &&
+                    context.Properties?.Items.TryGetValue("aegis.auth.correlation", out string? value) == true &&
                     !string.IsNullOrWhiteSpace(value)
                         ? value
                         : Guid.NewGuid().ToString("N");
