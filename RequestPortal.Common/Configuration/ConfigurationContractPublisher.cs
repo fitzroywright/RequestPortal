@@ -94,6 +94,12 @@ public sealed class ConfigurationContractPublisher(
                     new JsonObject
                     {
                         ["displayName"] = "Request Portal",
+                        ["presentation"] = new JsonObject
+                        {
+                            ["iconUrl"] = configuration["Aegis:Presentation:IconUrl"],
+                            ["shortName"] = "Request",
+                            ["accent"] = configuration["Aegis:Presentation:Accent"] ?? "gold"
+                        },
                         ["siteId"] = contract["siteId"]?.DeepClone(),
                         ["publicUrl"] = configuration["Aegis:PublicUrl"],
                         ["hostname"] = Environment.MachineName,
@@ -140,6 +146,12 @@ public sealed class ConfigurationContractPublisher(
         string? siteId = configuration["Site:Id"];
         contract["siteId"] = NullIfWhiteSpace(siteId);
         contract["instanceId"] = NullIfWhiteSpace(configuration["Service:Identity"] ?? Environment.MachineName);
+        contract["presentation"] = new JsonObject
+        {
+            ["iconUrl"] = configuration["Aegis:Presentation:IconUrl"],
+            ["shortName"] = "Request",
+            ["accent"] = configuration["Aegis:Presentation:Accent"] ?? "gold"
+        };
 
         bool hasExternalProvider =
             (HasValue(configuration, "Authentication:Google:ClientId") && await HasSecretAsync(secrets, "Authentication:Google:ClientSecret", cancellationToken, logger)) ||
