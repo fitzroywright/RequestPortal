@@ -19,6 +19,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Common.Registration;
 using RequestPortal.Application.Administration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Beneficiaries;
@@ -64,6 +65,12 @@ using RequestPortal.Web.Security;
 using RequestPortal.Web.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+string operationsLogInstanceId = builder.Configuration["Service:Identity"]?.Trim() ?? Environment.MachineName;
+string operationsLogIdentityFile = builder.Configuration["Aegis:Registration:IdentityFile"]
+    ?? (OperatingSystem.IsWindows()
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Aegis", "RequestPortal", "registration-identity.json")
+        : "/var/lib/aegis/requestportal/registration-identity.json");
+builder.Services.AddAegisOperationsLogging(builder.Configuration, "RequestPortal", operationsLogInstanceId, operationsLogIdentityFile, builder.Environment.EnvironmentName);
 builder.Services.AddHostedService<RequestPortal.Web.OperationsTelemetryPublisher>();
 builder.Services.AddSingleton<RequestPortalOperationsFlowPublisher>();
 builder.Services.AddScoped<IPortalWorkflowService, AuditedPortalWorkflowService>();
