@@ -152,6 +152,15 @@ public sealed class ConfigurationContractPublisher(
             ["shortName"] = "Request",
             ["accent"] = configuration["Aegis:Presentation:Accent"] ?? "gold"
         };
+        contract["diagnostics"] = new JsonObject
+        {
+            ["baseUrl"] = NullIfWhiteSpace(configuration["Aegis:PublicUrl"]),
+            ["healthPath"] = "/health",
+            ["supportsRemoteDiagnostics"] = false,
+            ["supportsOperationalTelemetry"] = true,
+            ["authenticationScheme"] = "None",
+            ["supportedLevels"] = new JsonArray()
+        };
 
         bool hasExternalProvider =
             (HasValue(configuration, "Authentication:Google:ClientId") && await HasSecretAsync(secrets, "Authentication:Google:ClientSecret", cancellationToken, logger)) ||
@@ -200,13 +209,15 @@ public sealed class ConfigurationContractPublisher(
                     "graph-teams-token" => OptionalDependencyState(graphTeamsEnabled, graphTeamsTokenConfigured, "RP-MSG-GRAPH-TEAMS-002: Graph Teams requires its delegated token through Common.Secrets."),
                     "messaging-queue" => State(HasValue(configuration, "Messaging:DurableQueuePath"), required, "RP-PROD-MESSAGING-001: Durable messaging queue storage must be configured."),
                     "site-id" => State(!string.IsNullOrWhiteSpace(siteId), required, "RP-PROD-SITE-001: Site:Id should identify this deployment."),
+                    "public-url" => State(HasValue(configuration, "Aegis:PublicUrl"), required, "RP-PROD-PUBLIC-URL-001: Aegis:PublicUrl must identify the externally reachable Request Portal endpoint."),
                     _ => (false, "Unknown", "No runtime commissioning evaluator is defined for this requirement.")
                 };
                 requirement["isConfigured"] = configured;
                 requirement["configurationState"] = state;
                 requirement["effectiveValueAvailable"] = configured;
                 requirement["verificationStatus"] = state == "Disabled" ? "NOT REQUIRED" : configured ? "PASS" : verification;
-                foreach (string key in new[] { "safeDisplayValue", "defaultValue", "value", "currentValue", "resolvedValue", "effectiveValue", "example" }) requirement.Remove(key);
+                foreach (string key in new[] { "displayValue", "safeDisplayValue", "defaultValue", "value", "currentValue", "resolvedValue", "effectiveValue", "example" }) requirement.Remove(key);
+                if (id == "public-url" && configured) requirement["displayValue"] = configuration["Aegis:PublicUrl"]?.Trim();
             }
         }
         return contract;
