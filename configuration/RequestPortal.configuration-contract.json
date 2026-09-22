@@ -5,6 +5,15 @@
   "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
     {
+      "id": "public-url",
+      "displayName": "Public Service URL",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Canonical externally reachable Request Portal URL used by Control Plane health monitoring.",
+      "configurationKey": "Aegis:PublicUrl",
+      "isConfigured": false
+    },
+    {
       "id": "database-connection",
       "displayName": "PostgreSQL connection credential",
       "kind": "Secret",
@@ -243,5 +252,13 @@
       "isConfigured": false
     }
   ],
-  "runbookReference": "docs/RUNBOOK.md"
+  "runbookReference": "docs/RUNBOOK.md",
+  "diagnostics": {
+    "baseUrl": null,
+    "healthPath": "/health",
+    "supportsRemoteDiagnostics": false,
+    "supportsOperationalTelemetry": true,
+    "authenticationScheme": "None",
+    "supportedLevels": []
+  }
 }
