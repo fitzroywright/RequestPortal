@@ -19,7 +19,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Common.Diagnostics;
 using Common.Registration;
+using Common.Secrets;
 using RequestPortal.Application.Administration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Beneficiaries;
@@ -61,6 +63,7 @@ using RequestPortal.Infrastructure.Requests;
 using RequestPortal.Infrastructure.Security;
 using RequestPortal.Web;
 using RequestPortal.Web.Demo;
+using RequestPortal.Web.Diagnostics;
 using RequestPortal.Web.Security;
 using RequestPortal.Web.Services;
 
@@ -77,7 +80,25 @@ builder.Services.AddScoped<IPortalWorkflowService, AuditedPortalWorkflowService>
 builder.Services.AddSingleton<IRequestPortalOperationsFlowPublisher>(sp => sp.GetRequiredService<RequestPortalOperationsFlowPublisher>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RequestPortalOperationsFlowPublisher>());
 await using Common.Secrets.CommonSecretsBootstrapRuntime secretsRuntime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(builder.Configuration);
+secretsRuntime.Register(builder.Services);
 RuntimeSecrets runtimeSecrets = await LoadRuntimeSecretsAsync(secretsRuntime.Provider);
+
+builder.Services.AddCommonDiagnostics();
+builder.Services.AddSingleton(new DiagnosticLevelExecutionOptions
+{
+    Application = "RequestPortal",
+    Component = "RequestPortal.Web",
+    InstanceId = operationsLogInstanceId,
+    CatalogVersion = "1"
+});
+builder.Services.AddSingleton(new DiagnosticLevelStoreOptions
+{
+    Path = builder.Configuration["Aegis:Diagnostics:StorePath"]?.Trim()
+        ?? Path.Combine(builder.Environment.ContentRootPath, "data", "diagnostic-level", "requestportal.db")
+});
+builder.Services.AddSingleton<IDiagnosticLevelRequestCredentialProvider, CommonSecretsDiagnosticLevelRequestCredentialProvider>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BasicRuntimeIdentityDiagnosticLevelTest>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BasicControlPlaneConfigurationDiagnosticLevelTest>();
 
 bool registrationSucceeded = await ConfigurationContractPublisher.PublishBootstrapAsync(
     builder.Configuration,
@@ -439,6 +460,7 @@ builder.Services.AddRazorPages(options =>
 });
 
 WebApplication app = builder.Build();
+app.MapDiagnosticLevelRuntime();
 
 await ApplyDatabaseMigrationsAsync(app);
 
