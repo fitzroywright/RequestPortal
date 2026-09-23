@@ -256,10 +256,19 @@
   "diagnostics": {
     "baseUrl": null,
     "healthPath": "/health",
-    "supportsRemoteDiagnostics": false,
+    "diagnosticsRunPath": "/api/engineering/diagnostics/diagnostic-level/run",
+    "diagnosticsRunsPath": "/api/engineering/diagnostics/diagnostic-level/runs",
+    "supportsRemoteDiagnostics": true,
     "supportsOperationalTelemetry": true,
-    "authenticationScheme": "None",
-    "supportedLevels": []
+    "authenticationScheme": "DiagnosticLevel-HMAC-SHA256",
+    "secretName": "diagnostics/machine/RequestPortal",
+    "supportedLevels": [
+      5,
+      4,
+      3,
+      2,
+      1
+    ]
   },
   "module": "RequestPortal.Web"
 }
