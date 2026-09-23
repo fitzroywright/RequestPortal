@@ -9,10 +9,10 @@ public sealed class BasicRuntimeIdentityDiagnosticLevelTest(
     public string TestId => "REQUESTPORTAL.WEB.L5.RUNTIME.IDENTITY";
     public string Name => "Runtime identity";
     public string Owner => "RequestPortal.Web";
-    public Common.Diagnostics.EngineeringDiagnosticLevel Level => Common.Diagnostics.EngineeringDiagnosticLevel.Level5Scan;
+    public global::Common.Diagnostics.EngineeringDiagnosticLevel Level => global::Common.Diagnostics.EngineeringDiagnosticLevel.Level5Scan;
     public bool IsDestructive => false;
 
-    public Task<Common.Diagnostics.EngineeringDiagnosticCheckResult> RunAsync(CancellationToken cancellationToken)
+    public Task<global::Common.Diagnostics.EngineeringDiagnosticCheckResult> RunAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -40,10 +40,10 @@ public sealed class BasicControlPlaneConfigurationDiagnosticLevelTest(
     public string TestId => "REQUESTPORTAL.WEB.L5.CONTROLPLANE.CONFIG";
     public string Name => "Control Plane configuration";
     public string Owner => "RequestPortal.Web";
-    public Common.Diagnostics.EngineeringDiagnosticLevel Level => Common.Diagnostics.EngineeringDiagnosticLevel.Level5Scan;
+    public global::Common.Diagnostics.EngineeringDiagnosticLevel Level => global::Common.Diagnostics.EngineeringDiagnosticLevel.Level5Scan;
     public bool IsDestructive => false;
 
-    public Task<Common.Diagnostics.EngineeringDiagnosticCheckResult> RunAsync(CancellationToken cancellationToken)
+    public Task<global::Common.Diagnostics.EngineeringDiagnosticCheckResult> RunAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
