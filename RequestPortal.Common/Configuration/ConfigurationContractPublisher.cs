@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.Diagnostics;
 using Common.Registration;
 using Common.Secrets;
 using Microsoft.AspNetCore.Hosting;
@@ -25,7 +26,13 @@ public sealed class ConfigurationContractPublisher(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (await PublishBootstrapAsync(configuration, environment, secrets, stoppingToken, logger)) return;
+            await PublishBootstrapAsync(
+                configuration,
+                environment,
+                secrets,
+                stoppingToken,
+                logger);
+
             try { await Task.Delay(retryDelay, stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
         }
@@ -38,12 +45,16 @@ public sealed class ConfigurationContractPublisher(
         CancellationToken cancellationToken = default,
         ILogger<ConfigurationContractPublisher>? logger = null)
     {
-        string? configurationUrl = configuration["Aegis:Configuration:Url"];
-        if (string.IsNullOrWhiteSpace(configurationUrl))
-        {
-            logger?.LogInformation("Application registration is disabled because no Configuration URL is configured.");
-            return false;
-        }
+        string configurationUrl = AegisControlPlaneEndpoints.ResolvePublic(
+            configuration,
+            AegisControlPlaneService.Configuration,
+            logger,
+            configurationKey: "Aegis:Configuration:Url");
+        string operationsUrl = AegisControlPlaneEndpoints.ResolvePublic(
+            configuration,
+            AegisControlPlaneService.Operations,
+            logger,
+            configurationKey: "Aegis:Operations:Url");
 
         string path = configuration["Aegis:Configuration:ContractPath"] ?? configuration["AegisConfiguration:ContractPath"] ?? configuration["ConfigurationService:ContractPath"] ?? Path.Combine(environment.ContentRootPath, "configuration", "RequestPortal.configuration-contract.json");
 
@@ -79,6 +90,13 @@ public sealed class ConfigurationContractPublisher(
                     : "/var/lib/aegis/requestportal/registration-identity.json");
 
             using HttpClient client = new();
+            using HttpClient lifecycleClient = new();
+            ILifecycleEventSink lifecycle = CreateLifecycleSink(
+                operationsUrl,
+                lifecycleClient,
+                identityFile,
+                instanceId);
+
             var registration = new RegistrationLifecycleClient(
                 client,
                 new RegistrationLifecycleOptions(
@@ -86,14 +104,20 @@ public sealed class ConfigurationContractPublisher(
                     "RequestPortal",
                     instanceId,
                     identityFile,
-                    TimeSpan.FromSeconds(10)),
-                logger: logger);
+                    TimeSpan.FromSeconds(Math.Clamp(
+                        configuration.GetValue("Aegis:Registration:RequestTimeoutSeconds", 30),
+                        5,
+                        120)),
+                    RunbookReference: "docs/RUNBOOK.md"),
+                logger: logger,
+                lifecycleEventSink: lifecycle);
 
             RegistrationLifecycleStatus result =
                 await registration.StepAsync(
                     new JsonObject
                     {
                         ["displayName"] = "Request Portal",
+                        ["module"] = "RequestPortal.Web",
                         ["presentation"] = new JsonObject
                         {
                             ["iconUrl"] = configuration["Aegis:Presentation:IconUrl"],
@@ -146,6 +170,16 @@ public sealed class ConfigurationContractPublisher(
         string? siteId = configuration["Site:Id"];
         contract["siteId"] = NullIfWhiteSpace(siteId);
         contract["instanceId"] = NullIfWhiteSpace(configuration["Service:Identity"] ?? Environment.MachineName);
+        contract["module"] = "RequestPortal.Web";
+        contract["runbookReference"] = "docs/RUNBOOK.md";
+        contract["runtimeEnvironment"] = new JsonObject
+        {
+            ["machineName"] = Environment.MachineName,
+            ["operatingSystem"] = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            ["processArchitecture"] = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+            ["frameworkDescription"] = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+            ["hostingEnvironment"] = environment.EnvironmentName
+        };
         contract["presentation"] = new JsonObject
         {
             ["iconUrl"] = configuration["Aegis:Presentation:IconUrl"],
@@ -221,6 +255,49 @@ public sealed class ConfigurationContractPublisher(
             }
         }
         return contract;
+    }
+
+    private static ILifecycleEventSink CreateLifecycleSink(
+        string operationsUrl,
+        HttpClient client,
+        string identityFile,
+        string instanceId)
+    {
+        if (!Uri.TryCreate(
+                operationsUrl.TrimEnd('/') + "/api/operations/activity/observe",
+                UriKind.Absolute,
+                out Uri? endpoint))
+            return new NullLifecycleEventSink();
+
+        var store = new FileRegistrationIdentityStore(identityFile);
+        return new HttpLifecycleEventSink(
+            client,
+            new HttpLifecycleEventSinkOptions(endpoint, TimeSpan.FromSeconds(10)),
+            async (request, lifecycleEvent, cancellationToken) =>
+            {
+                RegistrationIdentityDocument identity =
+                    await store.LoadOrCreateAsync(
+                        "RequestPortal",
+                        instanceId,
+                        cancellationToken);
+
+                if (string.IsNullOrWhiteSpace(identity.Credential))
+                    return;
+
+                request.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer",
+                        identity.Credential);
+                request.Headers.TryAddWithoutValidation(
+                    "X-Aegis-Application-Id",
+                    identity.ApplicationId);
+                request.Headers.TryAddWithoutValidation(
+                    "X-Aegis-Instance-Id",
+                    identity.InstanceId);
+                request.Headers.TryAddWithoutValidation(
+                    "X-Aegis-Installation-Id",
+                    identity.InstallationId);
+            });
     }
 
     private static (bool Configured, string State, string? Verification) State(bool configured, bool required, string message)
