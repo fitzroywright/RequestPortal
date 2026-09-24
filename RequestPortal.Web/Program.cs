@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authentication.OAuth.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
@@ -181,6 +183,33 @@ string? facebookAppSecret = runtimeSecrets.FacebookAppSecret;
 if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret))
 {
     authentication.AddFacebook(options => { options.AppId = facebookAppId; options.AppSecret = facebookAppSecret; });
+}
+
+string? yahooClientId = builder.Configuration["Authentication:Yahoo:ClientId"];
+string? yahooClientSecret = runtimeSecrets.YahooClientSecret;
+if (!string.IsNullOrWhiteSpace(yahooClientId) && !string.IsNullOrWhiteSpace(yahooClientSecret))
+{
+    authentication.AddOpenIdConnect("Yahoo", options =>
+    {
+        options.SignInScheme = IdentityConstants.ExternalScheme;
+        options.Authority = "https://api.login.yahoo.com";
+        options.MetadataAddress = "https://api.login.yahoo.com/.well-known/openid-configuration";
+        options.ClientId = yahooClientId;
+        options.ClientSecret = yahooClientSecret;
+        options.CallbackPath = "/signin-yahoo";
+        options.ResponseType = "code";
+        options.UsePkce = true;
+        options.RequireHttpsMetadata = true;
+        options.SaveTokens = false;
+        options.GetClaimsFromUserInfoEndpoint = true;
+        options.Scope.Clear();
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+        options.ClaimActions.MapUniqueJsonKey(ClaimTypes.NameIdentifier, "sub");
+        options.ClaimActions.MapUniqueJsonKey(ClaimTypes.Name, "name");
+        options.ClaimActions.MapUniqueJsonKey(ClaimTypes.Email, "email");
+    });
 }
 
 builder.Services.AddOptions<ActiveDirectoryOptions>().Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
@@ -500,6 +529,7 @@ static async Task<RuntimeSecrets> LoadRuntimeSecretsAsync(Common.Secrets.ISecret
         await provider.GetAsync("Authentication:Google:ClientSecret"),
         await provider.GetAsync("Authentication:Microsoft:ClientSecret"),
         await provider.GetAsync("Authentication:Facebook:AppSecret"),
+        await provider.GetAsync("Authentication:Yahoo:ClientSecret"),
         await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
         await provider.GetAsync("FfpManagerIntegration:SharedSecret"));
 }
@@ -524,12 +554,15 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
     string? microsoftClientSecret = secrets.MicrosoftClientSecret;
     string? facebookAppId = configuration["Authentication:Facebook:AppId"];
     string? facebookAppSecret = secrets.FacebookAppSecret;
+    string? yahooClientId = configuration["Authentication:Yahoo:ClientId"];
+    string? yahooClientSecret = secrets.YahooClientSecret;
     string? staffOidcClientSecret = secrets.StaffOidcClientSecret;
     string? ffpManagerSharedSecret = secrets.FfpManagerSharedSecret;
     bool hasExternalProvider =
         (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret)) ||
         (!string.IsNullOrWhiteSpace(microsoftClientId) && !string.IsNullOrWhiteSpace(microsoftClientSecret)) ||
-        (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret));
+        (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret)) ||
+        (!string.IsNullOrWhiteSpace(yahooClientId) && !string.IsNullOrWhiteSpace(yahooClientSecret));
     bool staffOidcEnabled = configuration.GetValue("Authentication:StaffOidc:Enabled", false);
 
     AddIf(string.IsNullOrWhiteSpace(connectionString),
@@ -624,6 +657,7 @@ internal sealed record RuntimeSecrets(
     string? GoogleClientSecret,
     string? MicrosoftClientSecret,
     string? FacebookAppSecret,
+    string? YahooClientSecret,
     string? StaffOidcClientSecret,
     string? FfpManagerSharedSecret);
 
