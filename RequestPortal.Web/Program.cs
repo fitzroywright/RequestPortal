@@ -212,6 +212,31 @@ if (!string.IsNullOrWhiteSpace(yahooClientId) && !string.IsNullOrWhiteSpace(yaho
     });
 }
 
+string? appleClientId = builder.Configuration["Authentication:Apple:ClientId"];
+string? appleClientSecret = runtimeSecrets.AppleClientSecret;
+if (!string.IsNullOrWhiteSpace(appleClientId) && !string.IsNullOrWhiteSpace(appleClientSecret))
+{
+    authentication.AddOpenIdConnect("Apple", options =>
+    {
+        options.SignInScheme = IdentityConstants.ExternalScheme;
+        options.Authority = "https://appleid.apple.com";
+        options.MetadataAddress = "https://appleid.apple.com/.well-known/openid-configuration";
+        options.ClientId = appleClientId;
+        options.ClientSecret = appleClientSecret;
+        options.CallbackPath = "/signin-apple";
+        options.ResponseType = "code";
+        options.ResponseMode = "form_post";
+        options.RequireHttpsMetadata = true;
+        options.SaveTokens = false;
+        options.Scope.Clear();
+        options.Scope.Add("openid");
+        options.Scope.Add("name");
+        options.Scope.Add("email");
+        options.ClaimActions.MapUniqueJsonKey(ClaimTypes.NameIdentifier, "sub");
+        options.ClaimActions.MapUniqueJsonKey(ClaimTypes.Email, "email");
+    });
+}
+
 builder.Services.AddOptions<ActiveDirectoryOptions>().Bind(builder.Configuration.GetSection(ActiveDirectoryOptions.SectionName));
 builder.Services.AddOptions<StaffOidcOptions>().Bind(builder.Configuration.GetSection(StaffOidcOptions.SectionName));
 builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection(NotificationOptions.SectionName));
@@ -530,6 +555,7 @@ static async Task<RuntimeSecrets> LoadRuntimeSecretsAsync(Common.Secrets.ISecret
         await provider.GetAsync("Authentication:Microsoft:ClientSecret"),
         await provider.GetAsync("Authentication:Facebook:AppSecret"),
         await provider.GetAsync("Authentication:Yahoo:ClientSecret"),
+        await provider.GetAsync("Authentication:Apple:ClientSecret"),
         await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
         await provider.GetAsync("FfpManagerIntegration:SharedSecret"));
 }
@@ -556,13 +582,16 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
     string? facebookAppSecret = secrets.FacebookAppSecret;
     string? yahooClientId = configuration["Authentication:Yahoo:ClientId"];
     string? yahooClientSecret = secrets.YahooClientSecret;
+    string? appleClientId = configuration["Authentication:Apple:ClientId"];
+    string? appleClientSecret = secrets.AppleClientSecret;
     string? staffOidcClientSecret = secrets.StaffOidcClientSecret;
     string? ffpManagerSharedSecret = secrets.FfpManagerSharedSecret;
     bool hasExternalProvider =
         (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret)) ||
         (!string.IsNullOrWhiteSpace(microsoftClientId) && !string.IsNullOrWhiteSpace(microsoftClientSecret)) ||
         (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret)) ||
-        (!string.IsNullOrWhiteSpace(yahooClientId) && !string.IsNullOrWhiteSpace(yahooClientSecret));
+        (!string.IsNullOrWhiteSpace(yahooClientId) && !string.IsNullOrWhiteSpace(yahooClientSecret)) ||
+        (!string.IsNullOrWhiteSpace(appleClientId) && !string.IsNullOrWhiteSpace(appleClientSecret));
     bool staffOidcEnabled = configuration.GetValue("Authentication:StaffOidc:Enabled", false);
 
     AddIf(string.IsNullOrWhiteSpace(connectionString),
@@ -658,6 +687,7 @@ internal sealed record RuntimeSecrets(
     string? MicrosoftClientSecret,
     string? FacebookAppSecret,
     string? YahooClientSecret,
+    string? AppleClientSecret,
     string? StaffOidcClientSecret,
     string? FfpManagerSharedSecret);
 
