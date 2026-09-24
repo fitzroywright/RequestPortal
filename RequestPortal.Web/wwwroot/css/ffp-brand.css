@@ -203,3 +203,20 @@
         text-align: left;
     }
 }
+
+
+.dashboard-link-card {
+    display: block;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.dashboard-link-card:hover {
+    transform: translateY(-2px);
+    border-color: #b8c4ce;
+    box-shadow: 0 8px 22px rgba(16, 38, 58, .11);
+}
+
+.dashboard-link-card .stat {
+    color: var(--ffp-navy);
+    margin: 6px 0;
+}
