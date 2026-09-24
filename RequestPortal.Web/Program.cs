@@ -162,21 +162,21 @@ authentication.AddCookie(StaffOidcOptions.StaffCookieScheme, options =>
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
 });
 
-string? googleClientId = runtimeSecrets.GoogleClientId;
+string? googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 string? googleClientSecret = runtimeSecrets.GoogleClientSecret;
 if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
 {
     authentication.AddGoogle(options => { options.ClientId = googleClientId; options.ClientSecret = googleClientSecret; });
 }
 
-string? microsoftClientId = runtimeSecrets.MicrosoftClientId;
+string? microsoftClientId = builder.Configuration["Authentication:Microsoft:ClientId"];
 string? microsoftClientSecret = runtimeSecrets.MicrosoftClientSecret;
 if (!string.IsNullOrWhiteSpace(microsoftClientId) && !string.IsNullOrWhiteSpace(microsoftClientSecret))
 {
     authentication.AddMicrosoftAccount(options => { options.ClientId = microsoftClientId; options.ClientSecret = microsoftClientSecret; });
 }
 
-string? facebookAppId = runtimeSecrets.FacebookAppId;
+string? facebookAppId = builder.Configuration["Authentication:Facebook:AppId"];
 string? facebookAppSecret = runtimeSecrets.FacebookAppSecret;
 if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret))
 {
@@ -497,11 +497,8 @@ static async Task<RuntimeSecrets> LoadRuntimeSecretsAsync(Common.Secrets.ISecret
 {
     return new RuntimeSecrets(
         await provider.GetAsync("ConnectionStrings:RequestPortal"),
-        await provider.GetAsync("Authentication:Google:ClientId"),
         await provider.GetAsync("Authentication:Google:ClientSecret"),
-        await provider.GetAsync("Authentication:Microsoft:ClientId"),
         await provider.GetAsync("Authentication:Microsoft:ClientSecret"),
-        await provider.GetAsync("Authentication:Facebook:AppId"),
         await provider.GetAsync("Authentication:Facebook:AppSecret"),
         await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
         await provider.GetAsync("FfpManagerIntegration:SharedSecret"));
@@ -521,11 +518,11 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
     bool ffpManagerEnabled = configuration.GetValue("FfpManagerIntegration:Enabled", false);
     string[] reviewerGroups = configuration.GetSection("Authentication:ActiveDirectory:ReviewerGroups").Get<string[]>() ?? Array.Empty<string>();
     string[] administratorGroups = configuration.GetSection("Authentication:ActiveDirectory:AdministratorGroups").Get<string[]>() ?? Array.Empty<string>();
-    string? googleClientId = secrets.GoogleClientId;
+    string? googleClientId = configuration["Authentication:Google:ClientId"];
     string? googleClientSecret = secrets.GoogleClientSecret;
-    string? microsoftClientId = secrets.MicrosoftClientId;
+    string? microsoftClientId = configuration["Authentication:Microsoft:ClientId"];
     string? microsoftClientSecret = secrets.MicrosoftClientSecret;
-    string? facebookAppId = secrets.FacebookAppId;
+    string? facebookAppId = configuration["Authentication:Facebook:AppId"];
     string? facebookAppSecret = secrets.FacebookAppSecret;
     string? staffOidcClientSecret = secrets.StaffOidcClientSecret;
     string? ffpManagerSharedSecret = secrets.FfpManagerSharedSecret;
@@ -624,11 +621,8 @@ static async Task ReportStartupDiagnosticsAsync(WebApplication app)
 
 internal sealed record RuntimeSecrets(
     string? ConnectionString,
-    string? GoogleClientId,
     string? GoogleClientSecret,
-    string? MicrosoftClientId,
     string? MicrosoftClientSecret,
-    string? FacebookAppId,
     string? FacebookAppSecret,
     string? StaffOidcClientSecret,
     string? FfpManagerSharedSecret);
