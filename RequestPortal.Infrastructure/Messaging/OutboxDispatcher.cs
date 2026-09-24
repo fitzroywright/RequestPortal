@@ -335,16 +335,6 @@ public sealed class OutboxDispatcher
             body,
             cancellationToken);
 
-        await DeliverSupplementalChannelAsync(
-            userId,
-            organizationId,
-            requestId,
-            NotificationChannel.Sms,
-            NotificationTransport.Sms,
-            notificationOptions.SmsEnabled,
-            subject,
-            BuildSmsBody(subject, body),
-            cancellationToken);
     }
 
     private async Task DeliverSupplementalChannelAsync(
@@ -449,18 +439,6 @@ public sealed class OutboxDispatcher
             history.MarkFailed(exception.Message);
             throw;
         }
-    }
-
-    private static string BuildSmsBody(string subject, string body)
-    {
-        string compact = $"{subject}. {body}".Replace("\r", " ").Replace("\n", " ");
-        while (compact.Contains("  ", StringComparison.Ordinal))
-        {
-            compact = compact.Replace("  ", " ", StringComparison.Ordinal);
-        }
-
-        const int maxLength = 480;
-        return compact.Length <= maxLength ? compact : compact[..(maxLength - 3)] + "...";
     }
 
     private static bool IsDue(OutboxMessage message, DateTimeOffset now)
