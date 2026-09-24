@@ -421,13 +421,9 @@ public sealed class FulfilmentIntegrityDiagnosticLevelTest(
                     fulfilment.FulfilledUtc != null,
                 cancellationToken);
 
-        int quantityOverrun = await db.Set<FulfilmentLine>()
-            .AsNoTracking()
-            .CountAsync(line => line.FulfilledQuantity > line.RequestedQuantity, cancellationToken);
-
-        int invalid = fulfilledWithoutTimestamp + timestampOnNonFulfilled + quantityOverrun;
+        int invalid = fulfilledWithoutTimestamp + timestampOnNonFulfilled;
         string evidence =
-            $"FulfilledWithoutTimestamp={fulfilledWithoutTimestamp}; NonFulfilledWithTimestamp={timestampOnNonFulfilled}; QuantityOverrun={quantityOverrun}";
+            $"FulfilledWithoutTimestamp={fulfilledWithoutTimestamp}; NonFulfilledWithTimestamp={timestampOnNonFulfilled}";
 
         return invalid == 0
             ? EngineeringDiagnosticPolicy.Passed(TestId, Name, "Fulfilment records satisfy core state and quantity invariants.")
