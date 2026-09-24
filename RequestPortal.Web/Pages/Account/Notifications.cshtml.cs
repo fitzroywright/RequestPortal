@@ -33,12 +33,16 @@ public sealed class NotificationsModel : PageModel
 
     public IReadOnlyList<NotificationPreferenceView> Preferences { get; private set; } = Array.Empty<NotificationPreferenceView>();
     public IReadOnlyList<NotificationHistoryView> History { get; private set; } = Array.Empty<NotificationHistoryView>();
+    public IReadOnlyList<OrganizationNotificationSubscriptionView> OrganizationSubscriptions { get; private set; } = Array.Empty<OrganizationNotificationSubscriptionView>();
     public string DefaultEmail { get; private set; } = string.Empty;
     public bool EmailAvailable { get; private set; }
     public bool WhatsAppAvailable { get; private set; }
 
     [BindProperty]
     public PreferenceInput Input { get; set; } = new();
+
+    [BindProperty]
+    public OrganizationSubscriptionInput OrganizationInput { get; set; } = new();
 
     public async Task OnGetAsync()
     {
@@ -82,6 +86,31 @@ public sealed class NotificationsModel : PageModel
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostOrganizationAsync()
+    {
+        ApplicationUser user = await GetUserAsync();
+
+        try
+        {
+            await notificationPreferenceService.SaveOrganizationSubscriptionAsync(
+                user.Id,
+                OrganizationInput.MembershipId,
+                OrganizationInput.ReceiveOrganizationNotifications,
+                OrganizationInput.ReceiveRequestNotifications,
+                OrganizationInput.ReceiveMembershipNotifications,
+                HttpContext.RequestAborted);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(string.Empty, exception.Message);
+            await LoadAsync(user);
+            return Page();
+        }
+
+        TempData["Success"] = "Organization notification settings saved.";
+        return RedirectToPage();
+    }
+
     private async Task<ApplicationUser> GetUserAsync()
     {
         return await userManager.GetUserAsync(User)
@@ -92,7 +121,12 @@ public sealed class NotificationsModel : PageModel
     {
         LoadAvailability();
         DefaultEmail = user.Email ?? string.Empty;
+        await notificationPreferenceService.EnsureDefaultEmailPreferenceAsync(
+            user.Id,
+            user.Email,
+            HttpContext.RequestAborted);
         Preferences = await notificationPreferenceService.GetPreferencesAsync(user.Id, HttpContext.RequestAborted);
+        OrganizationSubscriptions = await notificationPreferenceService.GetOrganizationSubscriptionsAsync(user.Id, HttpContext.RequestAborted);
         History = await notificationPreferenceService.GetRecentHistoryAsync(user.Id, 25, HttpContext.RequestAborted);
     }
 
@@ -115,6 +149,17 @@ public sealed class NotificationsModel : PageModel
     public NotificationPreferenceView? FindPreference(NotificationChannel channel)
     {
         return Preferences.FirstOrDefault(preference => preference.Channel == channel);
+    }
+
+    public sealed class OrganizationSubscriptionInput
+    {
+        public Guid MembershipId { get; set; }
+
+        public bool ReceiveOrganizationNotifications { get; set; }
+
+        public bool ReceiveRequestNotifications { get; set; }
+
+        public bool ReceiveMembershipNotifications { get; set; }
     }
 
     public sealed class PreferenceInput
