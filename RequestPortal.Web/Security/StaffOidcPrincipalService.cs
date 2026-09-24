@@ -64,13 +64,12 @@ public sealed class StaffOidcPrincipalService
             subject,
             RequestPortalPermissions.Access,
             cancellationToken);
-        if (!access.Allowed)
-        {
-            await ReportAsync("RP-AUTH-OIDC-DENIED", DiagnosticSeverity.Warning,
-                "OIDC-authenticated staff member does not have Request Portal access.", access.Reason, cancellationToken);
-            return new(false, null, "NOT_AUTHORIZED_FOR_REQUEST_PORTAL");
-        }
 
+        // Reaching this point means the configured FFP staff identity provider has
+        // authenticated the user successfully. Establish the basic staff session
+        // even when Common.Security has not yet resolved a directory-group or
+        // direct-role mapping. Common.Security still controls all elevated
+        // permissions added below.
         ApplicationUser user = await FindOrCreateShadowUserAsync(userName, displayName, email, cancellationToken);
 
         List<Claim> claims = providerPrincipal.Claims
@@ -80,6 +79,7 @@ public sealed class StaffOidcPrincipalService
         claims.Add(new Claim(ClaimTypes.Name, displayName));
         claims.Add(new Claim(ClaimTypes.Email, email));
         claims.Add(new Claim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue));
+        claims.Add(new Claim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.Access));
         claims.AddRange(access.EffectiveRoles.Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(role => new Claim(ClaimTypes.Role, role)));
 
@@ -98,9 +98,14 @@ public sealed class StaffOidcPrincipalService
             ClaimTypes.Name,
             ClaimTypes.Role);
 
-        await ReportAsync("RP-AUTH-OIDC-OK", DiagnosticSeverity.Information,
-            "FFP staff identity authenticated by OIDC and authorized through Common.Security.",
-            string.Join(',', access.EffectiveRoles), cancellationToken);
+        await ReportAsync(
+            access.Allowed ? "RP-AUTH-OIDC-OK" : "RP-AUTH-OIDC-BASIC",
+            access.Allowed ? DiagnosticSeverity.Information : DiagnosticSeverity.Warning,
+            access.Allowed
+                ? "FFP staff identity authenticated by OIDC and mapped through Common.Security."
+                : "FFP staff identity authenticated by OIDC. A basic staff session was established, but no Common.Security access mapping was resolved.",
+            access.Allowed ? string.Join(',', access.EffectiveRoles) : access.Reason,
+            cancellationToken);
         return new(true, new ClaimsPrincipal(identity));
     }
 
