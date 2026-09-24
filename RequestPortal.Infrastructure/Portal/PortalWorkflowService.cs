@@ -120,7 +120,13 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
             throw new InvalidOperationException("Membership can only be requested for an approved organization.");
         }
 
-        organization.RequestMembership(Guid.NewGuid(), userId, clock.UtcNow);
+        OrganizationMembership membership =
+            organization.RequestMembership(Guid.NewGuid(), userId, clock.UtcNow);
+
+        // This is a new child on an existing aggregate. Mark it explicitly as Added
+        // so EF never infers an update for the new membership from graph state.
+        dbContext.OrganizationMemberships.Add(membership);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
