@@ -21,23 +21,22 @@
         <h2>Representative sign in</h2>
         <p class="muted">Use one of the available external identity providers.</p>
 
-        @if (Model.ExternalProviders.Count > 0)
+        @foreach (RequestPortal.Web.Pages.Account.LoginModel.ExternalProviderOption provider in Model.ExternalProviders)
         {
-            @foreach (string provider in Model.ExternalProviders)
-            {
-                <form method="post" asp-page-handler="External">
-                    <input type="hidden" name="provider" value="@provider" />
-                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-                    <button class="button provider-button" type="submit">Continue with @provider</button>
-                </form>
-            }
-        }
-        else
-        {
-            <div class="card">
-                <strong>External providers are not configured yet.</strong>
-                <p class="muted">The temporary demo sign-ins can be used while provider credentials are being completed.</p>
-            </div>
+            <form method="post" asp-page-handler="External">
+                <input type="hidden" name="provider" value="@provider.Name" />
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <button class="button provider-button @(provider.IsConfigured ? string.Empty : "provider-button-disabled")"
+                        type="submit"
+                        disabled="@(!provider.IsConfigured)"
+                        aria-disabled="@(!provider.IsConfigured)">
+                    Continue with @provider.Name
+                    @if (!provider.IsConfigured)
+                    {
+                        <span class="provider-state">Not configured</span>
+                    }
+                </button>
+            </form>
         }
 
         @if (Model.DemoEnabled)
