@@ -70,6 +70,92 @@ public sealed class PortalAuthorizationIsolationTests
     }
 
     [Fact]
+    public async Task OrganizationLifecycle_FirstRegistrantBecomesAdministrator_ThenControlsMembership()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
+
+        Guid firstUserId = Guid.NewGuid();
+        Guid secondUserId = Guid.NewGuid();
+        Guid staffUserId = Guid.NewGuid();
+
+        Guid organizationId = await context.Service.RegisterOrganizationAsync(
+            firstUserId,
+            "Lifecycle Org",
+            "JM",
+            cancellationToken);
+
+        Organization pendingOrganization = await context.Db.Organizations
+            .Include(item => item.Memberships)
+            .SingleAsync(item => item.Id == organizationId, cancellationToken);
+
+        Assert.Equal(OrganizationStatus.PendingApproval, pendingOrganization.Status);
+        OrganizationMembership initialMembership = Assert.Single(
+            pendingOrganization.Memberships,
+            item => item.UserId == firstUserId);
+        Assert.Equal(MembershipStatus.Pending, initialMembership.Status);
+        Assert.Equal(OrganizationRole.Member, initialMembership.Role);
+
+        await context.Service.ApproveOrganizationAsync(
+            staffUserId,
+            organizationId,
+            cancellationToken);
+
+        OrganizationMembership approvedAdministrator = await context.Db.OrganizationMemberships
+            .SingleAsync(
+                item => item.OrganizationId == organizationId && item.UserId == firstUserId,
+                cancellationToken);
+
+        Assert.Equal(MembershipStatus.Approved, approvedAdministrator.Status);
+        Assert.Equal(OrganizationRole.Administrator, approvedAdministrator.Role);
+        Assert.Equal(staffUserId, approvedAdministrator.ApprovedByUserId);
+
+        await context.Service.RequestMembershipAsync(
+            secondUserId,
+            organizationId,
+            cancellationToken);
+
+        OrganizationMembership secondMembership = await context.Db.OrganizationMemberships
+            .SingleAsync(
+                item => item.OrganizationId == organizationId && item.UserId == secondUserId,
+                cancellationToken);
+
+        Assert.Equal(MembershipStatus.Pending, secondMembership.Status);
+        Assert.Equal(OrganizationRole.Member, secondMembership.Role);
+
+        await context.Service.ApproveMembershipAsync(
+            firstUserId,
+            organizationId,
+            secondMembership.Id,
+            cancellationToken);
+
+        secondMembership = await context.Db.OrganizationMemberships
+            .SingleAsync(item => item.Id == secondMembership.Id, cancellationToken);
+
+        Assert.Equal(MembershipStatus.Approved, secondMembership.Status);
+        Assert.Equal(firstUserId, secondMembership.ApprovedByUserId);
+
+        await context.Service.RevokeMembershipAsync(
+            firstUserId,
+            organizationId,
+            secondMembership.Id,
+            "Access removed.",
+            cancellationToken);
+
+        secondMembership = await context.Db.OrganizationMemberships
+            .SingleAsync(item => item.Id == secondMembership.Id, cancellationToken);
+
+        Assert.Equal(MembershipStatus.Revoked, secondMembership.Status);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => context.Service.CreateRequestAsync(
+                secondUserId,
+                organizationId,
+                "Must not be allowed after revocation",
+                cancellationToken));
+    }
+
+    [Fact]
     public async Task OrdinaryMember_CannotExerciseAdministratorRightsInOwnOrganization()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken; await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken); Guid owner = Guid.NewGuid(); Guid member = Guid.NewGuid(); Guid pendingUser = Guid.NewGuid(); Organization organization = CreateApprovedOrganization(owner, "Org A"); AddApprovedMember(organization, member, approve: true); OrganizationMembership pending = organization.RequestMembership(Guid.NewGuid(), pendingUser, Now.AddMinutes(2)); context.Db.Organizations.Add(organization); await context.Db.SaveChangesAsync(cancellationToken); await Assert.ThrowsAsync<UnauthorizedAccessException>(() => context.Service.GetPendingMembershipsAsync(member, organization.Id, cancellationToken)); await Assert.ThrowsAsync<UnauthorizedAccessException>(() => context.Service.ApproveMembershipAsync(member, organization.Id, pending.Id, cancellationToken));
