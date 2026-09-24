@@ -104,6 +104,12 @@ public sealed class PortalAuthorizationIsolationTests
             organizationId,
             cancellationToken);
 
+        // ApproveOrganizationAsync uses a real transaction in production. EF InMemory
+        // cannot model transaction/change-tracker semantics reliably across this
+        // multi-step lifecycle, so clear tracked instances before continuing with
+        // the next independent service operation.
+        context.Db.ChangeTracker.Clear();
+
         OrganizationMembership approvedAdministrator = await context.Db.OrganizationMemberships
             .SingleAsync(
                 item => item.OrganizationId == organizationId && item.UserId == firstUserId,
