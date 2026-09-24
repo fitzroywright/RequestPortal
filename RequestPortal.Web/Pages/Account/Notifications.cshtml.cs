@@ -35,7 +35,6 @@ public sealed class NotificationsModel : PageModel
     public IReadOnlyList<NotificationHistoryView> History { get; private set; } = Array.Empty<NotificationHistoryView>();
     public string DefaultEmail { get; private set; } = string.Empty;
     public bool EmailAvailable { get; private set; }
-    public bool SmsAvailable { get; private set; }
     public bool WhatsAppAvailable { get; private set; }
 
     [BindProperty]
@@ -100,7 +99,6 @@ public sealed class NotificationsModel : PageModel
     private void LoadAvailability()
     {
         EmailAvailable = configuration.GetValue("Notifications:Enabled", false);
-        SmsAvailable = configuration.GetValue("Notifications:SmsEnabled", false);
         WhatsAppAvailable = configuration.GetValue("Notifications:WhatsAppEnabled", false);
     }
 
@@ -109,7 +107,6 @@ public sealed class NotificationsModel : PageModel
         return channel switch
         {
             NotificationChannel.Email => EmailAvailable,
-            NotificationChannel.Sms => SmsAvailable,
             NotificationChannel.WhatsApp => WhatsAppAvailable,
             _ => false
         };
