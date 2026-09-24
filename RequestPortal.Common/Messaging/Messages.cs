@@ -20,8 +20,7 @@ public interface IMessagePublisher
 public enum NotificationTransport
 {
     Email = 0,
-    Sms = 1,
-    WhatsApp = 2
+    WhatsApp = 1
 }
 
 public sealed record NotificationEnvelope(
