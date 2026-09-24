@@ -42,7 +42,7 @@ public sealed class LoginModel : PageModel
         this.diagnostics = diagnostics;
     }
 
-    public IReadOnlyList<string> ExternalProviders { get; private set; } = Array.Empty<string>();
+    public IReadOnlyList<ExternalProviderOption> ExternalProviders { get; private set; } = Array.Empty<ExternalProviderOption>();
 
     public bool DemoEnabled { get; private set; }
 
@@ -56,11 +56,23 @@ public sealed class LoginModel : PageModel
         await LoadProvidersAsync();
     }
 
-    public IActionResult OnPostExternal(string provider, string? returnUrl = null)
+    public async Task<IActionResult> OnPostExternalAsync(string provider, string? returnUrl = null)
     {
         if (!supportedProviders.Contains(provider, StringComparer.OrdinalIgnoreCase))
         {
             return BadRequest("Unsupported external identity provider.");
+        }
+
+        IEnumerable<AuthenticationScheme> schemes = await schemeProvider.GetAllSchemesAsync();
+        bool configured = schemes.Any(scheme =>
+            string.Equals(scheme.Name, provider, StringComparison.OrdinalIgnoreCase));
+
+        if (!configured)
+        {
+            ReturnUrl = LocalReturnUrl(returnUrl);
+            ErrorMessage = $"{provider} sign-in is not configured yet.";
+            await LoadProvidersAsync();
+            return Page();
         }
 
         string redirectUrl = Url.Page(
@@ -187,11 +199,14 @@ public sealed class LoginModel : PageModel
     private async Task LoadProvidersAsync()
     {
         IEnumerable<AuthenticationScheme> schemes = await schemeProvider.GetAllSchemesAsync();
-        ExternalProviders = schemes
-            .Where(scheme => supportedProviders.Contains(scheme.Name, StringComparer.OrdinalIgnoreCase))
+        HashSet<string> configuredProviders = schemes
             .Select(scheme => scheme.Name)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        ExternalProviders = supportedProviders
+            .Select(provider => new ExternalProviderOption(
+                provider,
+                configuredProviders.Contains(provider)))
             .ToArray();
 
         DemoEnabled = configuration.GetValue("Demo:Enabled", false);
@@ -206,6 +221,8 @@ public sealed class LoginModel : PageModel
 
         return "/Dashboard";
     }
+
+    public sealed record ExternalProviderOption(string Name, bool IsConfigured);
 
     private Task EmitAsync(string code, string message, string detail)
     {
