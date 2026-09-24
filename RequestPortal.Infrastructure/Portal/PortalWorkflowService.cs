@@ -127,6 +127,13 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         // so EF never infers an update for the new membership from graph state.
         dbContext.OrganizationMemberships.Add(membership);
 
+        AddOutboxMessage(new MembershipRequestedMessage(
+            Guid.NewGuid(),
+            clock.UtcNow,
+            organizationId,
+            membership.Id,
+            userId));
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
@@ -224,6 +231,13 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
                 cancellationToken);
 
         membership.Approve(administratorUserId, clock.UtcNow);
+        AddOutboxMessage(new MembershipApprovedMessage(
+            Guid.NewGuid(),
+            clock.UtcNow,
+            organizationId,
+            membership.Id,
+            membership.UserId));
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await WriteDiagnosticAsync(
