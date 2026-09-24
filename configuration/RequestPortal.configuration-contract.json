@@ -1,7 +1,7 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
     {
@@ -121,6 +121,63 @@
       "required": true,
       "purpose": "Requires at least one commissioned external identity provider for portal representatives.",
       "isConfigured": false
+    },
+    {
+      "id": "google-client-id",
+      "displayName": "Google representative sign-in client ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Identifies Request Portal to Google when Google representative sign-in is commissioned.",
+      "configurationKey": "Authentication:Google:ClientId",
+      "isConfigured": false
+    },
+    {
+      "id": "google-client-secret",
+      "displayName": "Google representative sign-in client secret",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Provides the Google confidential-client credential through Common.Secrets.",
+      "secretName": "Authentication:Google:ClientSecret",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "facebook-app-id",
+      "displayName": "Facebook representative sign-in app ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Identifies Request Portal to Facebook when Facebook representative sign-in is commissioned.",
+      "configurationKey": "Authentication:Facebook:AppId",
+      "isConfigured": false
+    },
+    {
+      "id": "facebook-app-secret",
+      "displayName": "Facebook representative sign-in app secret",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Provides the Facebook application secret through Common.Secrets.",
+      "secretName": "Authentication:Facebook:AppSecret",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "yahoo-client-id",
+      "displayName": "Yahoo representative sign-in client ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Identifies Request Portal to Yahoo when Yahoo representative sign-in is commissioned.",
+      "configurationKey": "Authentication:Yahoo:ClientId",
+      "isConfigured": false
+    },
+    {
+      "id": "yahoo-client-secret",
+      "displayName": "Yahoo representative sign-in client secret",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Provides the Yahoo confidential-client credential through Common.Secrets.",
+      "secretName": "Authentication:Yahoo:ClientSecret",
+      "isConfigured": false,
+      "sensitive": true
     },
     {
       "id": "notifications-enabled",
