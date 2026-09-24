@@ -17,7 +17,7 @@ namespace RequestPortal.Web.Pages.Account;
 
 public sealed class LoginModel : PageModel
 {
-    private static readonly string[] supportedProviders = ["Google", "Facebook", "Yahoo", "Microsoft"];
+    private static readonly string[] supportedProviders = ["Google", "Facebook", "Yahoo", "Microsoft", "Apple"];
 
     private readonly SignInManager<ApplicationUser> signInManager;
     private readonly UserManager<ApplicationUser> userManager;
