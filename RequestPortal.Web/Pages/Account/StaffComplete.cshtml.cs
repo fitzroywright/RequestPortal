@@ -16,11 +16,11 @@ public sealed class StaffCompleteModel : PageModel
             StaffOidcOptions.PermissionClaim,
             RequestPortalPermissions.ViewManagementDashboard);
 
-        if (!canViewManagement)
+        if (canViewManagement)
         {
-            return RedirectToPage("/Account/StaffAccessDenied", new { reason = "permission" });
+            return RedirectToPage("/Management/Index");
         }
 
-        return RedirectToPage("/Management/Index");
+        return RedirectToPage("/Staff/Index");
     }
 }
