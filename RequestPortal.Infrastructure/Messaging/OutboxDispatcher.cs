@@ -140,6 +140,16 @@ public sealed class OutboxDispatcher
             await SendMembershipApprovedAsync(Deserialize<MembershipApprovedMessage>(outbox.Payload), cancellationToken);
             return;
         }
+        if (outbox.MessageType.EndsWith(nameof(MembershipChangedMessage), StringComparison.Ordinal))
+        {
+            await SendMembershipChangedAsync(Deserialize<MembershipChangedMessage>(outbox.Payload), cancellationToken);
+            return;
+        }
+        if (outbox.MessageType.EndsWith(nameof(OrganizationStatusChangedMessage), StringComparison.Ordinal))
+        {
+            await SendOrganizationStatusChangedAsync(Deserialize<OrganizationStatusChangedMessage>(outbox.Payload), cancellationToken);
+            return;
+        }
         if (outbox.MessageType.EndsWith(nameof(RequestSubmittedMessage), StringComparison.Ordinal))
         {
             RequestSubmittedMessage message = Deserialize<RequestSubmittedMessage>(outbox.Payload);
@@ -302,6 +312,76 @@ public sealed class OutboxDispatcher
             null,
             $"Membership approved: {organizationName}",
             $"Your representative membership for {organizationName} has been approved.",
+            cancellationToken);
+    }
+
+    private async Task SendMembershipChangedAsync(
+        MembershipChangedMessage message,
+        CancellationToken cancellationToken)
+    {
+        string organizationName = await dbContext.Organizations
+            .AsNoTracking()
+            .Where(item => item.Id == message.OrganizationId)
+            .Select(item => item.Name)
+            .SingleAsync(cancellationToken);
+
+        IReadOnlyCollection<Guid> recipients = await GetMembershipNotificationRecipientsAsync(
+            message.OrganizationId,
+            message.UserId,
+            cancellationToken);
+
+        string changeText = message.Change switch
+        {
+            "Rejected" => "rejected",
+            "Revoked" => "revoked",
+            "PromotedToAdministrator" => "promoted to organization administrator",
+            "DemotedToMember" => "changed to organization representative",
+            "Approved" => "approved",
+            _ => message.Change
+        };
+
+        string body = $"Your representative membership for {organizationName} was {changeText}.";
+        if (!string.IsNullOrWhiteSpace(message.Detail))
+        {
+            body += $"\n\n{message.Detail}";
+        }
+
+        await DeliverToRecipientsAsync(
+            recipients,
+            message.OrganizationId,
+            null,
+            $"Membership update: {organizationName}",
+            body,
+            cancellationToken);
+    }
+
+    private async Task SendOrganizationStatusChangedAsync(
+        OrganizationStatusChangedMessage message,
+        CancellationToken cancellationToken)
+    {
+        string organizationName = await dbContext.Organizations
+            .AsNoTracking()
+            .Where(item => item.Id == message.OrganizationId)
+            .Select(item => item.Name)
+            .SingleAsync(cancellationToken);
+
+        IReadOnlyCollection<Guid> recipients = await GetOrganizationNotificationRecipientsAsync(
+            message.OrganizationId,
+            message.RegisteredByUserId,
+            cancellationToken);
+
+        string body = $"{organizationName} is now {message.Status}.";
+        if (!string.IsNullOrWhiteSpace(message.Detail))
+        {
+            body += $"\n\n{message.Detail}";
+        }
+
+        await DeliverToRecipientsAsync(
+            recipients,
+            message.OrganizationId,
+            null,
+            $"Organization status: {organizationName}",
+            body,
             cancellationToken);
     }
 
