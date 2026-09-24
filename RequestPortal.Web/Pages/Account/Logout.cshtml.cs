@@ -7,6 +7,7 @@ using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Pages.Account;
 
+[IgnoreAntiforgeryToken]
 public sealed class LogoutModel : PageModel
 {
     private readonly SignInManager<ApplicationUser> signInManager;
