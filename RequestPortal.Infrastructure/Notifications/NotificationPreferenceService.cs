@@ -117,7 +117,6 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
         return channel switch
         {
             NotificationChannel.Email => notificationOptions.Enabled,
-            NotificationChannel.Sms => notificationOptions.SmsEnabled,
             NotificationChannel.WhatsApp => notificationOptions.WhatsAppEnabled,
             _ => false
         };
