@@ -241,3 +241,70 @@
     font-weight: 700;
     color: #7a8791;
 }
+
+
+.provider-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.provider-button-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.provider-icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    display: inline-grid;
+    place-items: center;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.provider-icon-google {
+    background: #ffffff;
+    border: 1px solid #d9dde2;
+    border-radius: 50%;
+    color: #4285f4;
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+}
+
+.provider-icon-facebook {
+    border-radius: 50%;
+    background: #1877f2;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
+    font-size: 1.18rem;
+    padding-top: 2px;
+}
+
+.provider-icon-yahoo {
+    border-radius: 50%;
+    background: #6001d2;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
+    font-size: .72rem;
+    letter-spacing: -.06em;
+}
+
+.provider-icon-microsoft {
+    grid-template-columns: repeat(2, 10px);
+    grid-template-rows: repeat(2, 10px);
+    gap: 2px;
+}
+
+.provider-icon-microsoft span:nth-child(1) { background: #f25022; }
+.provider-icon-microsoft span:nth-child(2) { background: #7fba00; }
+.provider-icon-microsoft span:nth-child(3) { background: #00a4ef; }
+.provider-icon-microsoft span:nth-child(4) { background: #ffb900; }
+
+.provider-button-disabled .provider-icon {
+    filter: grayscale(1);
+    opacity: .6;
+}
