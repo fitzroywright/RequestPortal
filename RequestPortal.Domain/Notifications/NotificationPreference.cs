@@ -5,8 +5,7 @@ namespace RequestPortal.Domain.Notifications;
 public enum NotificationChannel
 {
     Email = 0,
-    Sms = 1,
-    WhatsApp = 2
+    WhatsApp = 1
 }
 
 public sealed class NotificationPreference
