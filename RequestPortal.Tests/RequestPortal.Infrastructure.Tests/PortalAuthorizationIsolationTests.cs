@@ -4,9 +4,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Common.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using RequestPortal.Application.Auditing;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
+using RequestPortal.Infrastructure.Organizations;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Portal;
 using Xunit;
@@ -135,7 +137,7 @@ public sealed class PortalAuthorizationIsolationTests
         Assert.Equal(MembershipStatus.Approved, secondMembership.Status);
         Assert.Equal(firstUserId, secondMembership.ApprovedByUserId);
 
-        await context.Service.RevokeMembershipAsync(
+        await context.Governance.RevokeAsync(
             firstUserId,
             organizationId,
             secondMembership.Id,
@@ -167,11 +169,47 @@ public sealed class PortalAuthorizationIsolationTests
 
     private sealed class PortalTestContext : IAsyncDisposable
     {
-        private PortalTestContext(RequestPortalDbContext db, CapturingDiagnosticRouter diagnostics) { Db = db; Diagnostics = diagnostics; Service = new PortalWorkflowService(db, new FixedClock(Now), diagnostics); }
-        public RequestPortalDbContext Db { get; } public CapturingDiagnosticRouter Diagnostics { get; } public PortalWorkflowService Service { get; }
-        public static async Task<PortalTestContext> CreateAsync(CancellationToken cancellationToken) { DbContextOptions<RequestPortalDbContext> options = new DbContextOptionsBuilder<RequestPortalDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options; RequestPortalDbContext db = new(options); await db.Database.EnsureCreatedAsync(cancellationToken); return new PortalTestContext(db, new CapturingDiagnosticRouter()); }
+        private PortalTestContext(RequestPortalDbContext db, CapturingDiagnosticRouter diagnostics)
+        {
+            Db = db;
+            Diagnostics = diagnostics;
+            FixedClock clock = new(Now);
+            Service = new PortalWorkflowService(db, clock, diagnostics);
+            Governance = new OrganizationMembershipGovernanceService(db, clock, new NullBusinessAuditWriter());
+        }
+
+        public RequestPortalDbContext Db { get; }
+        public CapturingDiagnosticRouter Diagnostics { get; }
+        public PortalWorkflowService Service { get; }
+        public OrganizationMembershipGovernanceService Governance { get; }
+
+        public static async Task<PortalTestContext> CreateAsync(CancellationToken cancellationToken)
+        {
+            DbContextOptions<RequestPortalDbContext> options = new DbContextOptionsBuilder<RequestPortalDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+                .Options;
+            RequestPortalDbContext db = new(options);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+            return new PortalTestContext(db, new CapturingDiagnosticRouter());
+        }
         public async ValueTask DisposeAsync() { await Db.DisposeAsync(); }
     }
     private sealed class FixedClock(DateTimeOffset utcNow) : IClock { public DateTimeOffset UtcNow { get; } = utcNow; }
+
+    private sealed class NullBusinessAuditWriter : IBusinessAuditWriter
+    {
+        public Task WriteAsync(
+            Guid actorUserId,
+            string action,
+            string entityType,
+            Guid entityId,
+            Guid? organizationId,
+            string? detail = null,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class CapturingDiagnosticRouter : IDiagnosticOperationsRouter { public List<DiagnosticTelemetryEvent> Events { get; } = new(); public Task RouteAsync(DiagnosticTelemetryEvent telemetryEvent, CancellationToken cancellationToken = default) { Events.Add(telemetryEvent); return Task.CompletedTask; } }
 }
