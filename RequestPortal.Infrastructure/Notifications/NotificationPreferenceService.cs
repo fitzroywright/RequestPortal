@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Notifications;
 using RequestPortal.Domain.Notifications;
+using RequestPortal.Domain.Organizations;
 using RequestPortal.Infrastructure.Messaging;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -27,6 +28,38 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
         this.dbContext = dbContext;
         this.notificationOptions = notificationOptions.Value;
         this.auditWriter = auditWriter;
+    }
+
+    public async Task EnsureDefaultEmailPreferenceAsync(
+        Guid userId,
+        string? registeredEmail,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(registeredEmail))
+        {
+            return;
+        }
+
+        bool exists = await dbContext.NotificationPreferences
+            .AsNoTracking()
+            .AnyAsync(
+                item => item.UserId == userId && item.Channel == NotificationChannel.Email,
+                cancellationToken);
+
+        if (exists)
+        {
+            return;
+        }
+
+        dbContext.NotificationPreferences.Add(
+            new NotificationPreference(
+                Guid.NewGuid(),
+                userId,
+                NotificationChannel.Email,
+                registeredEmail.Trim(),
+                enabled: true));
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<NotificationPreferenceView>> GetPreferencesAsync(
@@ -85,6 +118,61 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
             preference.Id,
             null,
             $"channel={channel}; enabled={enabled}",
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<OrganizationNotificationSubscriptionView>> GetOrganizationSubscriptionsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await (
+            from membership in dbContext.OrganizationMemberships.AsNoTracking()
+            join organization in dbContext.Organizations.AsNoTracking()
+                on membership.OrganizationId equals organization.Id
+            where membership.UserId == userId &&
+                  membership.Status == MembershipStatus.Approved &&
+                  membership.Role == OrganizationRole.Administrator
+            orderby organization.Name
+            select new OrganizationNotificationSubscriptionView(
+                membership.Id,
+                organization.Id,
+                organization.Name,
+                membership.Role.ToString(),
+                membership.ReceiveOrganizationNotifications,
+                membership.ReceiveRequestNotifications,
+                membership.ReceiveMembershipNotifications))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task SaveOrganizationSubscriptionAsync(
+        Guid userId,
+        Guid membershipId,
+        bool receiveOrganizationNotifications,
+        bool receiveRequestNotifications,
+        bool receiveMembershipNotifications,
+        CancellationToken cancellationToken = default)
+    {
+        OrganizationMembership membership = await dbContext.OrganizationMemberships
+            .SingleAsync(
+                item =>
+                    item.Id == membershipId &&
+                    item.UserId == userId &&
+                    item.Status == MembershipStatus.Approved,
+                cancellationToken);
+
+        membership.SetNotificationSubscriptions(
+            receiveOrganizationNotifications,
+            receiveRequestNotifications,
+            receiveMembershipNotifications);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(
+            userId,
+            "OrganizationNotificationSubscriptionChanged",
+            "OrganizationMembership",
+            membership.Id,
+            membership.OrganizationId,
+            $"organization={receiveOrganizationNotifications}; requests={receiveRequestNotifications}; memberships={receiveMembershipNotifications}",
             cancellationToken);
     }
 
