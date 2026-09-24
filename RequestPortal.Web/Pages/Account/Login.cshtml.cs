@@ -115,6 +115,17 @@ public sealed class LoginModel : PageModel
 
         if (existingResult.Succeeded)
         {
+            ApplicationUser? existingUser = await userManager.FindByLoginAsync(
+                loginInfo.LoginProvider,
+                loginInfo.ProviderKey);
+            if (existingUser is not null)
+            {
+                await notificationPreferences.EnsureDefaultEmailPreferenceAsync(
+                    existingUser.Id,
+                    existingUser.Email,
+                    HttpContext.RequestAborted);
+            }
+
             await EmitAsync("RP-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
             return LocalRedirect(ReturnUrl);
         }
