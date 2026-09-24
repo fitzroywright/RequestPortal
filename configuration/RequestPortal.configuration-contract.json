@@ -1,7 +1,7 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
     {
@@ -176,6 +176,25 @@
       "required": false,
       "purpose": "Provides the Yahoo confidential-client credential through Common.Secrets.",
       "secretName": "Authentication:Yahoo:ClientSecret",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "apple-client-id",
+      "displayName": "Apple representative sign-in Services ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Identifies Request Portal to Sign in with Apple when Apple representative sign-in is commissioned.",
+      "configurationKey": "Authentication:Apple:ClientId",
+      "isConfigured": false
+    },
+    {
+      "id": "apple-client-secret",
+      "displayName": "Apple representative sign-in client secret",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Provides the signed Apple client-secret JWT through Common.Secrets.",
+      "secretName": "Authentication:Apple:ClientSecret",
       "isConfigured": false,
       "sensitive": true
     },
