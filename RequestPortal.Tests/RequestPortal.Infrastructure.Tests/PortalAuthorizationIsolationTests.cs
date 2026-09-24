@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Common.Diagnostics;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
@@ -176,31 +175,39 @@ public sealed class PortalAuthorizationIsolationTests
 
     private sealed class PortalTestContext : IAsyncDisposable
     {
-        private PortalTestContext(RequestPortalDbContext db, CapturingDiagnosticRouter diagnostics)
+        private PortalTestContext(
+            PostgreSqlTestDatabase database,
+            CapturingDiagnosticRouter diagnostics)
         {
-            Db = db;
+            databaseHarness = database;
+            Db = database.Db;
             Diagnostics = diagnostics;
             FixedClock clock = new(Now);
-            Service = new PortalWorkflowService(db, clock, diagnostics);
-            Governance = new OrganizationMembershipGovernanceService(db, clock, new NullBusinessAuditWriter());
+            Service = new PortalWorkflowService(Db, clock, diagnostics);
+            Governance = new OrganizationMembershipGovernanceService(
+                Db,
+                clock,
+                new NullBusinessAuditWriter());
         }
+
+        private readonly PostgreSqlTestDatabase databaseHarness;
 
         public RequestPortalDbContext Db { get; }
         public CapturingDiagnosticRouter Diagnostics { get; }
         public PortalWorkflowService Service { get; }
         public OrganizationMembershipGovernanceService Governance { get; }
 
-        public static async Task<PortalTestContext> CreateAsync(CancellationToken cancellationToken)
+        public static async Task<PortalTestContext> CreateAsync(
+            CancellationToken cancellationToken)
         {
-            DbContextOptions<RequestPortalDbContext> options = new DbContextOptionsBuilder<RequestPortalDbContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-                .Options;
-            RequestPortalDbContext db = new(options);
-            await db.Database.EnsureCreatedAsync(cancellationToken);
-            return new PortalTestContext(db, new CapturingDiagnosticRouter());
+            PostgreSqlTestDatabase database =
+                await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+            return new PortalTestContext(
+                database,
+                new CapturingDiagnosticRouter());
         }
-        public async ValueTask DisposeAsync() { await Db.DisposeAsync(); }
+
+        public ValueTask DisposeAsync() => databaseHarness.DisposeAsync();
     }
     private sealed class FixedClock(DateTimeOffset utcNow) : IClock { public DateTimeOffset UtcNow { get; } = utcNow; }
 
