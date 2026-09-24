@@ -26,7 +26,9 @@ public sealed class StorageBackedRequestFeaturesTests
         string root = CreateTemporaryDirectory();
         try
         {
-            await using RequestPortalDbContext db = CreateDb();
+            await using PostgreSqlTestDatabase database =
+                await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+            RequestPortalDbContext db = database.Db;
             Guid userId = Guid.NewGuid();
             Guid organizationId = Guid.NewGuid();
             Guid requestId = Guid.NewGuid();
@@ -119,14 +121,6 @@ public sealed class StorageBackedRequestFeaturesTests
         {
             Directory.Delete(root, recursive: true);
         }
-    }
-
-    private static RequestPortalDbContext CreateDb()
-    {
-        DbContextOptions<RequestPortalDbContext> options = new DbContextOptionsBuilder<RequestPortalDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
-        return new RequestPortalDbContext(options);
     }
 
     private static string CreateTemporaryDirectory()
