@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Organizations;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Infrastructure.Persistence;
@@ -66,6 +67,7 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
         Organization organization = await LoadForAdministrationAsync(administratorUserId, organizationId, cancellationToken);
         OrganizationMembership membership = organization.Memberships.Single(item => item.Id == membershipId);
         membership.Approve(administratorUserId, clock.UtcNow);
+        AddMembershipChangedOutbox(organizationId, membership, "Approved", null);
         await SaveAndAuditAsync(administratorUserId, organizationId, membershipId, "MembershipApproved", null, cancellationToken);
     }
 
@@ -78,6 +80,8 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
     {
         Organization organization = await LoadForAdministrationAsync(administratorUserId, organizationId, cancellationToken);
         organization.RejectMembership(membershipId, administratorUserId, clock.UtcNow, reason);
+        OrganizationMembership membership = organization.Memberships.Single(item => item.Id == membershipId);
+        AddMembershipChangedOutbox(organizationId, membership, "Rejected", reason);
         await SaveAndAuditAsync(administratorUserId, organizationId, membershipId, "MembershipRejected", reason, cancellationToken);
     }
 
@@ -89,6 +93,8 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
     {
         Organization organization = await LoadForAdministrationAsync(administratorUserId, organizationId, cancellationToken);
         organization.PromoteToAdministrator(membershipId);
+        OrganizationMembership membership = organization.Memberships.Single(item => item.Id == membershipId);
+        AddMembershipChangedOutbox(organizationId, membership, "PromotedToAdministrator", null);
         await SaveAndAuditAsync(administratorUserId, organizationId, membershipId, "MembershipPromotedToAdministrator", null, cancellationToken);
     }
 
@@ -105,6 +111,8 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
 
         Organization organization = await LoadForAdministrationAsync(administratorUserId, organizationId, cancellationToken);
         organization.DemoteAdministrator(membershipId);
+        OrganizationMembership membership = organization.Memberships.Single(item => item.Id == membershipId);
+        AddMembershipChangedOutbox(organizationId, membership, "DemotedToMember", null);
         await SaveAndAuditAsync(administratorUserId, organizationId, membershipId, "MembershipDemotedToMember", null, cancellationToken);
     }
 
@@ -122,6 +130,8 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
 
         Organization organization = await LoadForAdministrationAsync(administratorUserId, organizationId, cancellationToken);
         organization.RevokeMembership(membershipId, administratorUserId, clock.UtcNow, reason);
+        OrganizationMembership membership = organization.Memberships.Single(item => item.Id == membershipId);
+        AddMembershipChangedOutbox(organizationId, membership, "Revoked", reason);
         await SaveAndAuditAsync(administratorUserId, organizationId, membershipId, "MembershipRevoked", reason, cancellationToken);
     }
 
@@ -177,6 +187,31 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
             .Where(item => item.OrganizationId == organizationId && item.Id == membershipId)
             .Select(item => item.UserId)
             .SingleAsync(cancellationToken);
+    }
+
+    private void AddMembershipChangedOutbox(
+        Guid organizationId,
+        OrganizationMembership membership,
+        string change,
+        string? detail)
+    {
+        MembershipChangedMessage message = new(
+            Guid.NewGuid(),
+            clock.UtcNow,
+            organizationId,
+            membership.Id,
+            membership.UserId,
+            change,
+            detail);
+
+        dbContext.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = message.MessageId,
+            MessageType = typeof(MembershipChangedMessage).FullName ?? nameof(MembershipChangedMessage),
+            Payload = System.Text.Json.JsonSerializer.Serialize(message),
+            OccurredUtc = message.OccurredUtc,
+            AttemptCount = 0
+        });
     }
 
     private async Task SaveAndAuditAsync(
