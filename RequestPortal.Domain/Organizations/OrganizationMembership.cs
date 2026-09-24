@@ -40,6 +40,12 @@ public sealed class OrganizationMembership
 
     public string? EndReason { get; private set; }
 
+    public bool ReceiveOrganizationNotifications { get; private set; }
+
+    public bool ReceiveRequestNotifications { get; private set; }
+
+    public bool ReceiveMembershipNotifications { get; private set; }
+
     public void Approve(Guid approvedByUserId, DateTimeOffset approvedUtc)
     {
         EnsurePending();
@@ -52,6 +58,9 @@ public sealed class OrganizationMembership
     {
         EnsurePending();
         Role = OrganizationRole.Administrator;
+        ReceiveOrganizationNotifications = true;
+        ReceiveRequestNotifications = true;
+        ReceiveMembershipNotifications = true;
         Status = MembershipStatus.Approved;
         ApprovedByUserId = approvedByUserId;
         ApprovedUtc = approvedUtc;
@@ -70,6 +79,9 @@ public sealed class OrganizationMembership
     {
         EnsureApproved();
         Role = OrganizationRole.Administrator;
+        ReceiveOrganizationNotifications = true;
+        ReceiveRequestNotifications = true;
+        ReceiveMembershipNotifications = true;
     }
 
     public void DemoteToMember()
@@ -82,9 +94,28 @@ public sealed class OrganizationMembership
     {
         EnsureApproved();
         Status = MembershipStatus.Revoked;
+        ReceiveOrganizationNotifications = false;
+        ReceiveRequestNotifications = false;
+        ReceiveMembershipNotifications = false;
         EndedByUserId = revokedByUserId;
         EndedUtc = revokedUtc;
         EndReason = NormalizeReason(reason);
+    }
+
+    public void SetNotificationSubscriptions(
+        bool receiveOrganizationNotifications,
+        bool receiveRequestNotifications,
+        bool receiveMembershipNotifications)
+    {
+        EnsureApproved();
+        if (Role != OrganizationRole.Administrator)
+        {
+            throw new InvalidOperationException("Only organization administrators can subscribe to organization-wide notifications.");
+        }
+
+        ReceiveOrganizationNotifications = receiveOrganizationNotifications;
+        ReceiveRequestNotifications = receiveRequestNotifications;
+        ReceiveMembershipNotifications = receiveMembershipNotifications;
     }
 
     private void EnsurePending()
