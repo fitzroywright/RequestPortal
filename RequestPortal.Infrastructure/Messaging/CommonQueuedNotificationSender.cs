@@ -30,13 +30,12 @@ public sealed class CommonQueuedNotificationSender : INotificationSender
         MessageChannel channel = notification.Transport switch
         {
             NotificationTransport.Email => graphEmailEnabled ? MessageChannel.MsEmail : MessageChannel.Smtp,
-            NotificationTransport.Sms => MessageChannel.Sms,
             NotificationTransport.WhatsApp => MessageChannel.WhatsApp,
             _ => throw new InvalidOperationException($"Unsupported notification transport '{notification.Transport}'.")
         };
 
         Guid notificationId = Guid.NewGuid();
-        bool usesMobile = channel is MessageChannel.Sms or MessageChannel.WhatsApp;
+        bool usesMobile = channel == MessageChannel.WhatsApp;
         RecipientSnapshot recipient = new(
             notification.Recipient,
             notification.Recipient,
