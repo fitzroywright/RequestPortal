@@ -30,7 +30,26 @@
                         type="submit"
                         disabled="@(!provider.IsConfigured)"
                         aria-disabled="@(!provider.IsConfigured)">
-                    Continue with @provider.Name
+                    <span class="provider-button-content">
+                        @switch (provider.Name)
+                        {
+                            case "Google":
+                                <span class="provider-icon provider-icon-google" aria-hidden="true">G</span>
+                                break;
+                            case "Facebook":
+                                <span class="provider-icon provider-icon-facebook" aria-hidden="true">f</span>
+                                break;
+                            case "Yahoo":
+                                <span class="provider-icon provider-icon-yahoo" aria-hidden="true">Y!</span>
+                                break;
+                            case "Microsoft":
+                                <span class="provider-icon provider-icon-microsoft" aria-hidden="true">
+                                    <span></span><span></span><span></span><span></span>
+                                </span>
+                                break;
+                        }
+                        <span>Continue with @provider.Name</span>
+                    </span>
                     @if (!provider.IsConfigured)
                     {
                         <span class="provider-state">Not configured</span>
