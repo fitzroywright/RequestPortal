@@ -126,13 +126,23 @@ public sealed class NotificationWorkflowTests
 
         ApplicationUser representative = CreateUser("representative@example.com");
         ApplicationUser manager = CreateUser("manager@example.com");
+        ApplicationUser optedOutManager = CreateUser("opted-out-manager@example.com");
         ApplicationUser unrelatedManager = CreateUser("other-manager@example.com");
-        database.Db.Users.AddRange(representative, manager, unrelatedManager);
+        database.Db.Users.AddRange(representative, manager, optedOutManager, unrelatedManager);
 
         Organization organization = CreateApprovedOrganization(manager.Id, "Organization A");
         OrganizationMembership representativeMembership =
             organization.RequestMembership(Guid.NewGuid(), representative.Id, Now.AddMinutes(1));
         representativeMembership.Approve(manager.Id, Now.AddMinutes(2));
+
+        OrganizationMembership optedOutMembership =
+            organization.RequestMembership(Guid.NewGuid(), optedOutManager.Id, Now.AddMinutes(2));
+        optedOutMembership.Approve(manager.Id, Now.AddMinutes(3));
+        organization.PromoteToAdministrator(optedOutMembership.Id);
+        optedOutMembership.SetNotificationSubscriptions(
+            receiveOrganizationNotifications: false,
+            receiveRequestNotifications: false,
+            receiveMembershipNotifications: false);
 
         Organization unrelatedOrganization =
             CreateApprovedOrganization(unrelatedManager.Id, "Organization B");
@@ -175,6 +185,10 @@ public sealed class NotificationWorkflowTests
         await preferenceService.EnsureDefaultEmailPreferenceAsync(
             manager.Id,
             manager.Email,
+            cancellationToken);
+        await preferenceService.EnsureDefaultEmailPreferenceAsync(
+            optedOutManager.Id,
+            optedOutManager.Email,
             cancellationToken);
         await preferenceService.EnsureDefaultEmailPreferenceAsync(
             unrelatedManager.Id,
@@ -231,6 +245,9 @@ public sealed class NotificationWorkflowTests
             ["manager@example.com", "representative@example.com"],
             recipients);
 
+        Assert.DoesNotContain(
+            queued.SelectMany(item => item.Recipients),
+            recipient => recipient.Email == "opted-out-manager@example.com");
         Assert.DoesNotContain(
             queued.SelectMany(item => item.Recipients),
             recipient => recipient.Email == "other-manager@example.com");
