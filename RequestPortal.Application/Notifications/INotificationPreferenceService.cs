@@ -11,6 +11,15 @@ public sealed record NotificationPreferenceView(
     string Destination,
     bool Enabled);
 
+public sealed record OrganizationNotificationSubscriptionView(
+    Guid MembershipId,
+    Guid OrganizationId,
+    string OrganizationName,
+    string Role,
+    bool ReceiveOrganizationNotifications,
+    bool ReceiveRequestNotifications,
+    bool ReceiveMembershipNotifications);
+
 public sealed record NotificationHistoryView(
     Guid Id,
     NotificationChannel Channel,
@@ -23,6 +32,11 @@ public sealed record NotificationHistoryView(
 
 public interface INotificationPreferenceService
 {
+    Task EnsureDefaultEmailPreferenceAsync(
+        Guid userId,
+        string? registeredEmail,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<NotificationPreferenceView>> GetPreferencesAsync(
         Guid userId,
         CancellationToken cancellationToken = default);
@@ -32,6 +46,18 @@ public interface INotificationPreferenceService
         NotificationChannel channel,
         string destination,
         bool enabled,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OrganizationNotificationSubscriptionView>> GetOrganizationSubscriptionsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task SaveOrganizationSubscriptionAsync(
+        Guid userId,
+        Guid membershipId,
+        bool receiveOrganizationNotifications,
+        bool receiveRequestNotifications,
+        bool receiveMembershipNotifications,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<NotificationHistoryView>> GetRecentHistoryAsync(
