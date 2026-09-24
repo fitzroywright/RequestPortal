@@ -19,11 +19,14 @@
                 </span>
             </a>
             <nav class="main-nav">
+                @{
+                    bool isFfpStaff = User.Identity?.IsAuthenticated == true &&
+                        User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim, RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
+                    bool canViewManagement = User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard);
+                }
                 <a asp-page="/Index">Home</a>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
-                    bool isFfpStaff = User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim, RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
-                    bool canViewManagement = User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard);
                     if (isFfpStaff)
                     {
                         if (canViewManagement)
@@ -51,7 +54,10 @@
                     <a asp-page="/Account/StaffLogin">FFP Staff Sign-In</a>
                     <a class="button button-small" asp-page="/Account/Login">Sign in</a>
                 }
-                <a class="button button-small donate-button" href="https://www.foodforthepoorja.org/hurricane-melissa-relief/" target="_blank" rel="noopener noreferrer">Donate</a>
+                @if (!isFfpStaff)
+                {
+                    <a class="button button-small donate-button" href="https://www.foodforthepoorja.org/hurricane-melissa-relief/" target="_blank" rel="noopener noreferrer">Donate</a>
+                }
             </nav>
         </div>
     </header>
