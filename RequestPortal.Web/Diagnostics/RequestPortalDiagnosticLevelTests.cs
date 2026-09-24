@@ -297,7 +297,14 @@ public sealed class RequestRelationshipIntegrityDiagnosticLevelTest(
         int submittedWithoutTimestamp = await db.AssistanceRequests
             .AsNoTracking()
             .Where(request =>
-                request.Status != RequestStatus.Draft &&
+                (request.Status == RequestStatus.Submitted ||
+                 request.Status == RequestStatus.MoreInformationRequired ||
+                 request.Status == RequestStatus.Approved ||
+                 request.Status == RequestStatus.Rejected ||
+                 request.Status == RequestStatus.Duplicate ||
+                 request.Status == RequestStatus.PendingFulfilment ||
+                 request.Status == RequestStatus.Fulfilled ||
+                 request.Status == RequestStatus.Closed) &&
                 request.SubmittedUtc == null)
             .CountAsync(cancellationToken);
 
