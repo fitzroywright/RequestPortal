@@ -305,6 +305,5 @@
 .provider-icon-microsoft span:nth-child(4) { background: #ffb900; }
 
 .provider-button-disabled .provider-icon {
-    filter: grayscale(1);
-    opacity: .6;
+    opacity: .82;
 }
