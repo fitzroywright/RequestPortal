@@ -64,6 +64,60 @@
     </div>
 </section>
 
+
+<section class="section section-muted">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Organization manager notifications</h2>
+            <p>Choose which organization-wide events you want to receive for each organization you administer. These settings are independent for each organization.</p>
+        </div>
+
+        @if (Model.OrganizationSubscriptions.Count == 0)
+        {
+            <div class="card">
+                <p class="muted">You do not currently administer any approved organizations.</p>
+            </div>
+        }
+        else
+        {
+            <div class="grid-2">
+            @foreach (OrganizationNotificationSubscriptionView subscription in Model.OrganizationSubscriptions)
+            {
+                <article class="card">
+                    <h3>@subscription.OrganizationName</h3>
+                    <p class="muted">Role: @subscription.Role</p>
+                    <form method="post" asp-page-handler="Organization">
+                        <input type="hidden" name="OrganizationInput.MembershipId" value="@subscription.MembershipId" />
+                        <label class="check-row">
+                            <input type="checkbox"
+                                   name="OrganizationInput.ReceiveOrganizationNotifications"
+                                   value="true"
+                                   @(subscription.ReceiveOrganizationNotifications ? "checked" : null) />
+                            <span>Organization notices and registration events</span>
+                        </label>
+                        <label class="check-row">
+                            <input type="checkbox"
+                                   name="OrganizationInput.ReceiveRequestNotifications"
+                                   value="true"
+                                   @(subscription.ReceiveRequestNotifications ? "checked" : null) />
+                            <span>Request submissions and status changes</span>
+                        </label>
+                        <label class="check-row">
+                            <input type="checkbox"
+                                   name="OrganizationInput.ReceiveMembershipNotifications"
+                                   value="true"
+                                   @(subscription.ReceiveMembershipNotifications ? "checked" : null) />
+                            <span>Representative membership events</span>
+                        </label>
+                        <button class="button button-small" type="submit">Save organization settings</button>
+                    </form>
+                </article>
+            }
+            </div>
+        }
+    </div>
+</section>
+
 <section class="section section-muted">
     <div class="shell">
         <div class="section-heading">
