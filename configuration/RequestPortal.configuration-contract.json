@@ -1,7 +1,7 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
     {
@@ -138,6 +138,25 @@
       "required": false,
       "purpose": "Provides the Google confidential-client credential through Common.Secrets.",
       "secretName": "Authentication:Google:ClientSecret",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "microsoft-client-id",
+      "displayName": "Microsoft representative sign-in client ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Identifies Request Portal to Microsoft when Microsoft representative sign-in is commissioned.",
+      "configurationKey": "Authentication:Microsoft:ClientId",
+      "isConfigured": false
+    },
+    {
+      "id": "microsoft-client-secret",
+      "displayName": "Microsoft representative sign-in client secret",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Provides the Microsoft confidential-client credential through Common.Secrets.",
+      "secretName": "Authentication:Microsoft:ClientSecret",
       "isConfigured": false,
       "sensitive": true
     },
