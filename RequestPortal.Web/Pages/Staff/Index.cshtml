@@ -1,32 +1,95 @@
 @page
 @model RequestPortal.Web.Pages.Staff.IndexModel
+@using RequestPortal.Application.Administration
+@using RequestPortal.Application.Portal
 @{
-    ViewData["Title"] = "FFP Review";
+    ViewData["Title"] = "FFP Staff Dashboard";
 }
 
 <section class="section">
     <div class="shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">FFP internal</div>
-            <h1>Review workspace</h1>
-            <p>Approve organization registrations, review assistance requests, and follow requests through fulfilment.</p>
-            <div class="action-row">
-                <a class="button" asp-page="/Management/Index">Management dashboard</a>
-                <a class="button button-secondary" asp-page="/Staff/Operations">Action & aging queues</a>
-                <a class="button button-secondary" asp-page="/Staff/Organizations">All organizations</a>
-                <a class="button button-secondary" asp-page="/Staff/Reports">Reports & search</a>
-                <a class="button button-secondary" asp-page="/Staff/Fulfilment">Fulfilment</a>
-                <a class="button button-secondary" asp-page="/Staff/Integrations">Integrations</a>
-                <a class="button button-secondary" asp-page="/Staff/Diagnostics">Diagnostics</a>
-            </div>
+            <h1>Staff dashboard</h1>
+            <p>Review what needs attention now, open operational queues, and move directly into organization, request, fulfilment, reporting, and integration work.</p>
+        </div>
+
+        <div class="dashboard-grid" style="margin-bottom:24px">
+            <a class="card dashboard-link-card" asp-page="/Staff/Operations">
+                <div class="muted">Total attention items</div>
+                <div class="stat">@Model.TotalAttentionItems</div>
+                <strong>Open action queues →</strong>
+            </a>
+            <a class="card dashboard-link-card" asp-page="/Staff/Operations">
+                <div class="muted">Requests awaiting review</div>
+                <div class="stat">@Model.Operations.OpenReviewRequests.Count</div>
+                <strong>Oldest: @Model.OldestReviewAgeDays day(s) →</strong>
+            </a>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:28px">
+            <a class="card dashboard-link-card" asp-page="/Staff/Organizations">
+                <h3>Organizations</h3>
+                <div class="stat">@Model.Operations.PendingOrganizations.Count</div>
+                <p class="muted">Pending approval</p>
+                <strong>Review organizations →</strong>
+            </a>
+
+            <a class="card dashboard-link-card" asp-page="/Staff/Operations">
+                <h3>More information</h3>
+                <div class="stat">@Model.Operations.ActionRequiredRequests.Count</div>
+                <p class="muted">Requests waiting on follow-up</p>
+                <strong>Open queue →</strong>
+            </a>
+
+            <a class="card dashboard-link-card" asp-page="/Staff/Operations">
+                <h3>Documents</h3>
+                <div class="stat">@Model.Operations.DocumentsAwaitingVerification.Count</div>
+                <p class="muted">Awaiting verification</p>
+                <strong>Open document queue →</strong>
+            </a>
+
+            <a class="card dashboard-link-card" asp-page="/Staff/Operations">
+                <h3>Reverification</h3>
+                <div class="stat">@Model.Operations.ReverificationOrganizations.Count</div>
+                <p class="muted">Organizations approaching expiry</p>
+                <strong>Review renewals →</strong>
+            </a>
+
+            <a class="card dashboard-link-card" asp-page="/Staff/Integrations">
+                <h3>Messaging failures</h3>
+                <div class="stat">@Model.Operations.FailedNotificationDeliveries.Count</div>
+                <p class="muted">Failed or dead-lettered deliveries</p>
+                <strong>Open integrations →</strong>
+            </a>
+
+            <a class="card dashboard-link-card" asp-page="/Staff/Operations">
+                <h3>Dead letters</h3>
+                <div class="stat">@Model.Operations.DeadLetters.Count</div>
+                <p class="muted">Outbox messages requiring review</p>
+                <strong>Open recovery queue →</strong>
+            </a>
+        </div>
+
+        <div class="action-row" style="margin-bottom:28px">
+            <a class="button" asp-page="/Staff/Operations">Action & aging queues</a>
+            <a class="button button-secondary" asp-page="/Staff/Organizations">Organizations</a>
+            <a class="button button-secondary" asp-page="/Staff/Reports">Reports & search</a>
+            <a class="button button-secondary" asp-page="/Staff/Fulfilment">Fulfilment</a>
+            <a class="button button-secondary" asp-page="/Staff/Integrations">Integrations</a>
+            @if (User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard))
+            {
+                <a class="button button-secondary" asp-page="/Management/Index">Management dashboard</a>
+            }
         </div>
 
         <div class="grid-2">
             <section class="card">
                 <div class="action-row" style="justify-content:space-between;align-items:center">
                     <h2>Organizations awaiting approval</h2>
-                    <span class="status">@Model.PendingOrganizations.Count pending</span>
+                    <a asp-page="/Staff/Organizations"><span class="status">@Model.PendingOrganizations.Count pending</span></a>
                 </div>
+
                 @if (Model.PendingOrganizations.Count == 0)
                 {
                     <p class="muted">No organization registrations are awaiting review.</p>
@@ -37,10 +100,14 @@
                         <table>
                             <thead><tr><th>Organization</th><th>Country</th><th></th></tr></thead>
                             <tbody>
-                            @foreach (OrganizationSummary organization in Model.PendingOrganizations)
+                            @foreach (OrganizationSummary organization in Model.PendingOrganizations.Take(8))
                             {
                                 <tr>
-                                    <td><strong>@organization.Name</strong></td>
+                                    <td>
+                                        <a asp-page="/Staff/Organization" asp-route-id="@organization.Id">
+                                            <strong>@organization.Name</strong>
+                                        </a>
+                                    </td>
                                     <td>@organization.CountryCode</td>
                                     <td>
                                         <form method="post" asp-page-handler="ApproveOrganization">
@@ -53,14 +120,20 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @if (Model.PendingOrganizations.Count > 8)
+                    {
+                        <p><a asp-page="/Staff/Organizations"><strong>View all pending organizations →</strong></a></p>
+                    }
                 }
             </section>
 
             <section class="card">
                 <div class="action-row" style="justify-content:space-between;align-items:center">
-                    <h2>Submitted requests</h2>
-                    <span class="status status-Submitted">@Model.SubmittedRequests.Count waiting</span>
+                    <h2>Requests awaiting review</h2>
+                    <a asp-page="/Staff/Operations"><span class="status status-Submitted">@Model.SubmittedRequests.Count waiting</span></a>
                 </div>
+
                 @if (Model.SubmittedRequests.Count == 0)
                 {
                     <p class="muted">No assistance requests are awaiting review.</p>
@@ -71,10 +144,14 @@
                         <table>
                             <thead><tr><th>Reference</th><th>Organization</th><th>Summary</th><th></th></tr></thead>
                             <tbody>
-                            @foreach (RequestSummary request in Model.SubmittedRequests)
+                            @foreach (RequestSummary request in Model.SubmittedRequests.Take(8))
                             {
                                 <tr>
-                                    <td><strong>@request.PublicReference</strong></td>
+                                    <td>
+                                        <a asp-page="/Staff/Review" asp-route-id="@request.Id">
+                                            <strong>@request.PublicReference</strong>
+                                        </a>
+                                    </td>
                                     <td>@request.OrganizationName</td>
                                     <td>@request.Summary</td>
                                     <td><a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.Id">Review</a></td>
@@ -83,6 +160,11 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @if (Model.SubmittedRequests.Count > 8)
+                    {
+                        <p><a asp-page="/Staff/Operations"><strong>View all submitted requests →</strong></a></p>
+                    }
                 }
             </section>
         </div>
