@@ -68,6 +68,23 @@ public sealed record MembershipApprovedMessage(
     Guid MembershipId,
     Guid UserId) : IMessage;
 
+public sealed record MembershipChangedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid OrganizationId,
+    Guid MembershipId,
+    Guid UserId,
+    string Change,
+    string? Detail = null) : IMessage;
+
+public sealed record OrganizationStatusChangedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid OrganizationId,
+    Guid RegisteredByUserId,
+    string Status,
+    string? Detail = null) : IMessage;
+
 public sealed record RequestSubmittedMessage(
     Guid MessageId,
     DateTimeOffset OccurredUtc,
