@@ -37,6 +37,9 @@ internal sealed class OrganizationMembershipConfiguration : IEntityTypeConfigura
         builder.HasKey(membership => membership.Id);
         builder.Property(membership => membership.Status).HasConversion<string>().HasMaxLength(24).IsRequired();
         builder.Property(membership => membership.Role).HasConversion<string>().HasMaxLength(24).IsRequired();
+        builder.Property(membership => membership.ReceiveOrganizationNotifications).HasDefaultValue(false).IsRequired();
+        builder.Property(membership => membership.ReceiveRequestNotifications).HasDefaultValue(false).IsRequired();
+        builder.Property(membership => membership.ReceiveMembershipNotifications).HasDefaultValue(false).IsRequired();
         builder.HasIndex(membership => new { membership.OrganizationId, membership.UserId }).IsUnique();
         builder.HasIndex(membership => membership.UserId);
     }
