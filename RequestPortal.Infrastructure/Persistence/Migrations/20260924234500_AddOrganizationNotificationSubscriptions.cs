@@ -10,6 +10,11 @@ public partial class AddOrganizationNotificationSubscriptions : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
+        migrationBuilder.Sql("""
+            DELETE FROM notification_history WHERE "Channel" = 'Sms';
+            DELETE FROM notification_preferences WHERE "Channel" = 'Sms';
+            """);
+
         migrationBuilder.AddColumn<bool>(
             name: "ReceiveMembershipNotifications",
             table: "organization_memberships",
