@@ -201,10 +201,27 @@ public sealed class ConfigurationContractPublisher(
             ["supportedLevels"] = new JsonArray(5, 4, 3, 2, 1)
         };
 
+        bool googleConfigured =
+            HasValue(configuration, "Authentication:Google:ClientId") &&
+            await HasSecretAsync(secrets, "Authentication:Google:ClientSecret", cancellationToken, logger);
+        bool microsoftConfigured =
+            HasValue(configuration, "Authentication:Microsoft:ClientId") &&
+            await HasSecretAsync(secrets, "Authentication:Microsoft:ClientSecret", cancellationToken, logger);
+        bool facebookConfigured =
+            HasValue(configuration, "Authentication:Facebook:AppId") &&
+            await HasSecretAsync(secrets, "Authentication:Facebook:AppSecret", cancellationToken, logger);
+        bool yahooConfigured =
+            HasValue(configuration, "Authentication:Yahoo:ClientId") &&
+            await HasSecretAsync(secrets, "Authentication:Yahoo:ClientSecret", cancellationToken, logger);
+        bool appleConfigured =
+            HasValue(configuration, "Authentication:Apple:ClientId") &&
+            await HasSecretAsync(secrets, "Authentication:Apple:ClientSecret", cancellationToken, logger);
         bool hasExternalProvider =
-            (HasValue(configuration, "Authentication:Google:ClientId") && await HasSecretAsync(secrets, "Authentication:Google:ClientSecret", cancellationToken, logger)) ||
-            (HasValue(configuration, "Authentication:Microsoft:ClientId") && await HasSecretAsync(secrets, "Authentication:Microsoft:ClientSecret", cancellationToken, logger)) ||
-            (HasValue(configuration, "Authentication:Facebook:AppId") && await HasSecretAsync(secrets, "Authentication:Facebook:AppSecret", cancellationToken, logger));
+            googleConfigured ||
+            microsoftConfigured ||
+            facebookConfigured ||
+            yahooConfigured ||
+            appleConfigured;
         bool staffGroupsConfigured = HasSectionValues(configuration, "Authentication:ActiveDirectory:ReviewerGroups") && HasSectionValues(configuration, "Authentication:ActiveDirectory:AdministratorGroups");
         bool malwareConfigured = configuration.GetValue("Uploads:MalwareScanning:Enabled", false) && HasValue(configuration, "Uploads:MalwareScanning:Host");
         bool smtpConfigured = configuration.GetValue("Notifications:Enabled", false) && HasValue(configuration, "Notifications:SmtpHost") && HasValue(configuration, "Notifications:FromAddress");
@@ -236,6 +253,11 @@ public sealed class ConfigurationContractPublisher(
                     "staff-reviewer-groups" or "staff-administrator-groups" => State(staffGroupsConfigured, required, "RP-PROD-STAFF-GROUPS-001: Reviewer and administrator group mappings are required."),
                     "storage-malware-scanner" => State(malwareConfigured, required, "RP-PROD-UPLOAD-001: Malware scanning must be enabled and have a scanner host."),
                     "external-representative-provider" => State(hasExternalProvider, required, "RP-PROD-OAUTH-001: At least one external representative identity provider must be commissioned."),
+                    "google-client-id" or "google-client-secret" => OptionalFeatureState(googleConfigured),
+                    "microsoft-client-id" or "microsoft-client-secret" => OptionalFeatureState(microsoftConfigured),
+                    "facebook-app-id" or "facebook-app-secret" => OptionalFeatureState(facebookConfigured),
+                    "yahoo-client-id" or "yahoo-client-secret" => OptionalFeatureState(yahooConfigured),
+                    "apple-client-id" or "apple-client-secret" => OptionalFeatureState(appleConfigured),
                     "smtp-host" or "smtp-from" or "notifications-enabled" => State(smtpConfigured, required, "RP-PROD-SMTP-001: Notifications must be enabled with SMTP host and From address."),
                     "smtp-password" => State(await HasSecretAsync(secrets, "Notifications:SmtpPassword", cancellationToken, logger), required, "RP-PROD-SMTP-SECRET-001: SMTP credential must be available through Common.Secrets when required by the SMTP server."),
                     "graph-tenant" => OptionalDependencyState(graphEmailEnabled, graphEmailTenantConfigured, "RP-MSG-GRAPH-EMAIL-001: Graph Email requires Messaging:MicrosoftGraph:TenantId."),
