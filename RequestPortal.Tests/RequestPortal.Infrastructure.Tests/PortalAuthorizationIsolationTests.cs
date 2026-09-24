@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Common.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
@@ -187,6 +188,7 @@ public sealed class PortalAuthorizationIsolationTests
         {
             DbContextOptions<RequestPortalDbContext> options = new DbContextOptionsBuilder<RequestPortalDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+                .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
                 .Options;
             RequestPortalDbContext db = new(options);
             await db.Database.EnsureCreatedAsync(cancellationToken);
