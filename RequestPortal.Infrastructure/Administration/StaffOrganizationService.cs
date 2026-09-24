@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Administration;
 using RequestPortal.Application.Auditing;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Infrastructure.Persistence;
@@ -124,6 +125,7 @@ public sealed class StaffOrganizationService : IStaffOrganizationService
     {
         Organization organization = await LoadAsync(organizationId, cancellationToken);
         organization.Reject(staffUserId, reason);
+        AddOrganizationStatusOutbox(organization, "Rejected", reason);
         await dbContext.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync(
             staffUserId,
@@ -143,6 +145,7 @@ public sealed class StaffOrganizationService : IStaffOrganizationService
     {
         Organization organization = await LoadAsync(organizationId, cancellationToken);
         organization.Suspend(reason);
+        AddOrganizationStatusOutbox(organization, "Suspended", reason);
         await dbContext.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync(
             staffUserId,
@@ -162,6 +165,7 @@ public sealed class StaffOrganizationService : IStaffOrganizationService
     {
         Organization organization = await LoadAsync(organizationId, cancellationToken);
         organization.Reactivate(notes);
+        AddOrganizationStatusOutbox(organization, "Reactivated", notes);
         await dbContext.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync(
             staffUserId,
@@ -171,6 +175,29 @@ public sealed class StaffOrganizationService : IStaffOrganizationService
             organizationId,
             notes,
             cancellationToken);
+    }
+
+    private void AddOrganizationStatusOutbox(
+        Organization organization,
+        string status,
+        string? detail)
+    {
+        OrganizationStatusChangedMessage message = new(
+            Guid.NewGuid(),
+            clock.UtcNow,
+            organization.Id,
+            organization.RegisteredByUserId,
+            status,
+            detail);
+
+        dbContext.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = message.MessageId,
+            MessageType = typeof(OrganizationStatusChangedMessage).FullName ?? nameof(OrganizationStatusChangedMessage),
+            Payload = System.Text.Json.JsonSerializer.Serialize(message),
+            OccurredUtc = message.OccurredUtc,
+            AttemptCount = 0
+        });
     }
 
     private Task<Organization> LoadAsync(Guid organizationId, CancellationToken cancellationToken)
