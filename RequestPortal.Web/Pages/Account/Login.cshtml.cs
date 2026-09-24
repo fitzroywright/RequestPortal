@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Configuration;
+using RequestPortal.Application.Notifications;
 using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Web.Demo;
@@ -25,6 +26,7 @@ public sealed class LoginModel : PageModel
     private readonly IConfiguration configuration;
     private readonly IClock clock;
     private readonly IDiagnosticOperationsRouter diagnostics;
+    private readonly INotificationPreferenceService notificationPreferences;
 
     public LoginModel(
         SignInManager<ApplicationUser> signInManager,
@@ -32,7 +34,8 @@ public sealed class LoginModel : PageModel
         IAuthenticationSchemeProvider schemeProvider,
         IConfiguration configuration,
         IClock clock,
-        IDiagnosticOperationsRouter diagnostics)
+        IDiagnosticOperationsRouter diagnostics,
+        INotificationPreferenceService notificationPreferences)
     {
         this.signInManager = signInManager;
         this.userManager = userManager;
@@ -40,6 +43,7 @@ public sealed class LoginModel : PageModel
         this.configuration = configuration;
         this.clock = clock;
         this.diagnostics = diagnostics;
+        this.notificationPreferences = notificationPreferences;
     }
 
     public IReadOnlyList<ExternalProviderOption> ExternalProviders { get; private set; } = Array.Empty<ExternalProviderOption>();
@@ -159,6 +163,10 @@ public sealed class LoginModel : PageModel
 
         user.LastSignInUtc = clock.UtcNow;
         await userManager.UpdateAsync(user);
+        await notificationPreferences.EnsureDefaultEmailPreferenceAsync(
+            user.Id,
+            user.Email,
+            HttpContext.RequestAborted);
         await signInManager.SignInAsync(user, isPersistent: false);
         await EmitAsync("RP-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
 
@@ -190,6 +198,10 @@ public sealed class LoginModel : PageModel
 
         user.LastSignInUtc = clock.UtcNow;
         await userManager.UpdateAsync(user);
+        await notificationPreferences.EnsureDefaultEmailPreferenceAsync(
+            user.Id,
+            user.Email,
+            HttpContext.RequestAborted);
         await signInManager.SignInAsync(user, isPersistent: false);
         await EmitAsync("RP-AUTH-DEMO-REP", "Demo representative signed in.", demoEmail);
 
