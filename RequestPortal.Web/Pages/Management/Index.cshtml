@@ -97,10 +97,10 @@
     <section class="mg-panel" style="margin-top:16px">
         <h2>Delivery / Proof of Delivery</h2>
         <div class="performance">
-            <div><strong>@Model.Dashboard.Delivery.AwaitingAcknowledgement</strong><span class="muted">Awaiting acknowledgement</span></div>
-            <div><strong>@Model.Dashboard.Delivery.Delivered</strong><span class="muted">Delivered</span></div>
-            <div><strong>@Model.Dashboard.Delivery.PartiallyDelivered</strong><span class="muted">Partially delivered</span></div>
-            <div><strong>@Model.Dashboard.Delivery.Failed</strong><span class="muted">Failed / not delivered</span></div>
+            <div><a asp-page="/Management/Deliveries" asp-route-status="Ready" style="color:inherit;text-decoration:none"><strong>@Model.Dashboard.Delivery.AwaitingAcknowledgement</strong><span class="muted">Awaiting acknowledgement</span></a></div>
+            <div><a asp-page="/Management/Deliveries" asp-route-status="Delivered" style="color:inherit;text-decoration:none"><strong>@Model.Dashboard.Delivery.Delivered</strong><span class="muted">Delivered</span></a></div>
+            <div><a asp-page="/Management/Deliveries" asp-route-status="PartiallyDelivered" style="color:inherit;text-decoration:none"><strong>@Model.Dashboard.Delivery.PartiallyDelivered</strong><span class="muted">Partially delivered</span></a></div>
+            <div><a asp-page="/Management/Deliveries" asp-route-status="Failed" style="color:inherit;text-decoration:none"><strong>@Model.Dashboard.Delivery.Failed</strong><span class="muted">Failed / not delivered</span></a></div>
         </div>
         @if (Model.Dashboard.Delivery.PendingFfpManagerSync > 0)
         {
