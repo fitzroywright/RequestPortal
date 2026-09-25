@@ -457,8 +457,21 @@ public sealed class OutboxDispatcher
             $"{message.Subject}\n\n" +
             "Sign in to Request Portal to read and reply.";
 
+        Guid[] externalRecipients = await dbContext.Users
+            .AsNoTracking()
+            .Where(user =>
+                message.RecipientUserIds.Contains(user.Id) &&
+                !user.IsInternalStaff)
+            .Select(user => user.Id)
+            .ToArrayAsync(cancellationToken);
+
+        if (externalRecipients.Length == 0)
+        {
+            return;
+        }
+
         await DeliverToRecipientsAsync(
-            message.RecipientUserIds,
+            externalRecipients,
             message.OrganizationId,
             message.RequestId,
             $"New message: {message.Subject}",
