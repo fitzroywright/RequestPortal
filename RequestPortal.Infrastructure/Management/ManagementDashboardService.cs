@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Management;
 using RequestPortal.Domain.Documents;
+using RequestPortal.Domain.Delivery;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -71,6 +72,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
 
         IReadOnlyList<ManagementNamedCount> categories = GroupNamed(rows, row => row.Category);
         IReadOnlyList<ManagementNamedCount> programs = GroupNamed(rows, row => row.Program);
+        ManagementDeliverySummary delivery = await BuildDeliverySummaryAsync(cancellationToken);
         ManagementPerformanceMetrics performance = BuildPerformance(rows, timings, now);
         IReadOnlyList<ManagementTrendPoint> trend = BuildTrend(rows, timings, now);
         IReadOnlyList<ParishReachSummary> parishes = BuildParishes(rows);
@@ -82,9 +84,22 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             attention,
             categories,
             programs,
+            delivery,
             performance,
             trend,
             parishes);
+    }
+
+    private async Task<ManagementDeliverySummary> BuildDeliverySummaryAsync(CancellationToken cancellationToken)
+    {
+        int awaiting = await dbContext.Deliveries.AsNoTracking().CountAsync(item => item.Status == DeliveryStatus.Ready, cancellationToken);
+        int delivered = await dbContext.Deliveries.AsNoTracking().CountAsync(item => item.Status == DeliveryStatus.Delivered, cancellationToken);
+        int partial = await dbContext.Deliveries.AsNoTracking().CountAsync(item => item.Status == DeliveryStatus.PartiallyDelivered, cancellationToken);
+        int failed = await dbContext.Deliveries.AsNoTracking().CountAsync(item => item.Status == DeliveryStatus.Failed, cancellationToken);
+        int pendingSync = await dbContext.Deliveries.AsNoTracking().CountAsync(
+            item => item.Status != DeliveryStatus.Ready && item.SyncedToFfpManagerUtc == null,
+            cancellationToken);
+        return new ManagementDeliverySummary(awaiting, delivered, partial, failed, pendingSync);
     }
 
     public async Task<IReadOnlyList<ManagementRequestRow>> GetRequestsAsync(
