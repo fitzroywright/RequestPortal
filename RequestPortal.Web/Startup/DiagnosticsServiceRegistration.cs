@@ -10,63 +10,107 @@ internal static class DiagnosticsServiceRegistration
         WebApplicationBuilder builder
         , string instanceId)
     {
+        AddCore(
+            builder
+            , instanceId);
+        AddLevel5(builder);
+        AddLevel4(builder);
+        AddLevel3(builder);
+        AddLevel2(builder);
+    }
+
+    private static void AddCore(
+        WebApplicationBuilder builder
+        , string instanceId)
+    {
         builder.Services.AddCommonDiagnostics();
 
-        builder.Services.AddSingleton(new DiagnosticLevelExecutionOptions
-        {
-            Application = "RequestPortal"
-            , Component = "RequestPortal.Web"
-            , InstanceId = instanceId
-            , CatalogVersion = "1"
-        });
+        builder.Services.AddSingleton(
+            new DiagnosticLevelExecutionOptions
+            {
+                Application = "RequestPortal"
+                , Component = "RequestPortal.Web"
+                , InstanceId = instanceId
+                , CatalogVersion = "1"
+            });
 
-        builder.Services.AddSingleton(new DiagnosticLevelStoreOptions
-        {
-            Path = builder.Configuration["Aegis:Diagnostics:StorePath"]?.Trim()
-                ?? Path.Combine(
-                    builder.Environment.ContentRootPath
-                    , "data"
-                    , "diagnostic-level"
-                    , "requestportal.db")
-        });
+        builder.Services.AddSingleton(
+            new DiagnosticLevelStoreOptions
+            {
+                Path =
+                    builder.Configuration[
+                        "Aegis:Diagnostics:StorePath"]?.Trim()
+                    ?? Path.Combine(
+                        builder.Environment.ContentRootPath
+                        , "data"
+                        , "diagnostic-level"
+                        , "requestportal.db")
+            });
 
         builder.Services.AddSingleton<
             IDiagnosticLevelRequestCredentialProvider
             , CommonSecretsDiagnosticLevelRequestCredentialProvider>();
+    }
 
+    private static void AddLevel5(
+        WebApplicationBuilder builder)
+    {
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , BasicRuntimeIdentityDiagnosticLevelTest>();
+
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , BasicControlPlaneConfigurationDiagnosticLevelTest>();
+
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , PostgreSqlConnectivityDiagnosticLevelTest>();
+
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , MalwareScannerConnectivityDiagnosticLevelTest>();
+
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , ExternalIdentityProvidersDiagnosticLevelTest>();
+    }
+
+    private static void AddLevel4(
+        WebApplicationBuilder builder)
+    {
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , OrganizationAdministratorIntegrityDiagnosticLevelTest>();
+
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , MembershipStateIntegrityDiagnosticLevelTest>();
+
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , RequestRelationshipIntegrityDiagnosticLevelTest>();
+
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , DocumentStorageReferenceDiagnosticLevelTest>();
+    }
+
+    private static void AddLevel3(
+        WebApplicationBuilder builder)
+    {
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , ExpiredOrganizationRegistrationDiagnosticLevelTest>();
+
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , FulfilmentIntegrityDiagnosticLevelTest>();
+    }
+
+    private static void AddLevel2(
+        WebApplicationBuilder builder)
+    {
         builder.Services.AddSingleton<
             IDiagnosticLevelLocalTest
             , FfpManagerBridgeReadinessDiagnosticLevelTest>();
