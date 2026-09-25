@@ -111,7 +111,8 @@ public interface IPortalMessageService
         Guid? threadId,
         string subject,
         string body,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
 
     Task<Guid> ReplyAsync(
         Guid senderUserId,
