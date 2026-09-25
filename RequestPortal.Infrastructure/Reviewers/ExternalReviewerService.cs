@@ -102,7 +102,7 @@ public sealed class ExternalReviewerService : IExternalReviewerService
             "ExternalReviewerInvitation",
             invitation.Id,
             null,
-            $"scope={invitation.Scope}",
+            $"email={invitation.Email}; scope={invitation.Scope}",
             cancellationToken);
 
         return new ExternalReviewerAuthentication(
@@ -125,6 +125,14 @@ public sealed class ExternalReviewerService : IExternalReviewerService
 
         invitation.RecordAccess(now);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(
+            Guid.Empty,
+            "ExternalReviewerAccessed",
+            "ExternalReviewerInvitation",
+            invitation.Id,
+            null,
+            $"email={invitation.Email}; scope={invitation.Scope}",
+            cancellationToken);
         return true;
     }
 
