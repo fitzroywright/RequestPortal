@@ -64,24 +64,6 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.ToTable("message_attachments", (string)null);
                 });
 
-            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
-                {
-                    b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
-                        .WithMany()
-                        .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("RequestPortal.Domain.Messages.PortalMessage", b =>
-                {
-                    b.HasOne("RequestPortal.Domain.Messages.MessageThread", null)
-                        .WithMany()
-                        .HasForeignKey("ThreadId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -1043,6 +1025,24 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
                         .WithMany()
                         .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.PortalMessage", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Messages.MessageThread", null)
+                        .WithMany()
+                        .HasForeignKey("ThreadId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
