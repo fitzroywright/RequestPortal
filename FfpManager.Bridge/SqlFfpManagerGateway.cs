@@ -14,8 +14,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         this.options = options.Value;
     }
 
-    public async Task<FfpManagerApplicationReference> CreateApplicationAsync(
-        FfpManagerApplicationSubmission submission,
+    public async Task<ExternalApplicationReference> CreateApplicationAsync(
+        ExternalApplicationSubmission submission,
         CancellationToken cancellationToken = default)
     {
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
@@ -25,7 +25,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         if (existing is not null)
         {
             await transaction.CommitAsync(cancellationToken);
-            return new FfpManagerApplicationReference(
+            return new ExternalApplicationReference(
                 existing.Id.ToString(),
                 existing.ReferenceNo ?? existing.Code ?? existing.Id.ToString(),
                 existing.DateCreated ?? submission.SubmittedUtc,
@@ -74,13 +74,13 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         object? inserted = await command.ExecuteScalarAsync(cancellationToken);
         long applicationId = Convert.ToInt64(inserted, System.Globalization.CultureInfo.InvariantCulture);
 
-        foreach (FfpManagerApplicationItem item in submission.Items)
+        foreach (ExternalApplicationItem item in submission.Items)
         {
             await InsertItemAsync(connection, transaction, applicationId, item, submission.SubmittedUtc, cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);
-        return new FfpManagerApplicationReference(
+        return new ExternalApplicationReference(
             applicationId.ToString(),
             submission.PublicReference,
             submission.SubmittedUtc,
@@ -89,7 +89,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
 
     public async Task SaveArtifactAsync(
         string applicationId,
-        FfpManagerArtifactDescriptor descriptor,
+        ExternalArtifactDescriptor descriptor,
         Stream content,
         CancellationToken cancellationToken = default)
     {
@@ -186,7 +186,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         }
     }
 
-    public async Task<FfpManagerApplicationStatus?> GetStatusAsync(
+    public async Task<ExternalApplicationStatus?> GetStatusAsync(
         string applicationId,
         CancellationToken cancellationToken = default)
     {
@@ -220,11 +220,11 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             : !reader.IsDBNull(1) ? reader.GetDateTime(1) : DateTime.UtcNow;
         string? detail = reader.IsDBNull(5) ? null : reader.GetString(5);
         bool terminal = canonical is "REJECTED" or "DECLINED" or "CLOSED";
-        return new FfpManagerApplicationStatus(id.ToString(), canonical, statusText, new DateTimeOffset(DateTime.SpecifyKind(changed, DateTimeKind.Utc)), detail, terminal);
+        return new ExternalApplicationStatus(id.ToString(), canonical, statusText, new DateTimeOffset(DateTime.SpecifyKind(changed, DateTimeKind.Utc)), detail, terminal);
     }
 
     public async Task SaveInformationResponseAsync(
-        FfpManagerInformationResponse response,
+        ExternalInformationResponse response,
         CancellationToken cancellationToken = default)
     {
         long id = ParseApplicationId(response.ApplicationId);
@@ -266,7 +266,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    public async Task<FfpManagerApplicationSubmission?> GetApplicationAsync(
+    public async Task<ExternalApplicationSubmission?> GetApplicationAsync(
         string applicationId,
         CancellationToken cancellationToken = default)
     {
@@ -300,8 +300,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         string? requirements = reader.IsDBNull(9) ? null : reader.GetString(9);
         await reader.CloseAsync();
 
-        List<FfpManagerApplicationItem> items = await ReadItemsAsync(connection, id, cancellationToken);
-        return new FfpManagerApplicationSubmission(
+        List<ExternalApplicationItem> items = await ReadItemsAsync(connection, id, cancellationToken);
+        return new ExternalApplicationSubmission(
             portalRequestId,
             portalRequestId,
             publicReference,
@@ -325,7 +325,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             []);
     }
 
-    public async Task<FfpManagerApplicationStatus> SetStatusAsync(
+    public async Task<ExternalApplicationStatus> SetStatusAsync(
         string applicationId,
         string statusCode,
         string statusText,
@@ -361,7 +361,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         SqlConnection connection,
         SqlTransaction transaction,
         long applicationId,
-        FfpManagerApplicationItem item,
+        ExternalApplicationItem item,
         DateTimeOffset submittedUtc,
         CancellationToken cancellationToken)
     {
@@ -398,7 +398,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private async Task<List<FfpManagerApplicationItem>> ReadItemsAsync(
+    private async Task<List<ExternalApplicationItem>> ReadItemsAsync(
         SqlConnection connection,
         long applicationId,
         CancellationToken cancellationToken)
@@ -412,13 +412,13 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         await using SqlCommand command = new(sql, connection);
         command.Parameters.Add("@ApplicationLetterID", SqlDbType.BigInt).Value = applicationId;
         await using SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        List<FfpManagerApplicationItem> result = [];
+        List<ExternalApplicationItem> result = [];
         while (await reader.ReadAsync(cancellationToken))
         {
             Guid portalItemId = Guid.TryParseExact(reader.IsDBNull(0) ? null : reader.GetString(0), "N", out Guid parsed)
                 ? parsed
                 : Guid.Empty;
-            result.Add(new FfpManagerApplicationItem(
+            result.Add(new ExternalApplicationItem(
                 portalItemId,
                 reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
                 reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
@@ -542,14 +542,14 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         return string.IsNullOrWhiteSpace(name) ? "document.bin" : name;
     }
 
-    private static string? CombineComments(FfpManagerApplicationSubmission submission)
+    private static string? CombineComments(ExternalApplicationSubmission submission)
     {
         string[] parts = [submission.Summary ?? string.Empty, submission.Circumstances ?? string.Empty, submission.OrganizationAddress ?? string.Empty, submission.OrganizationEmail ?? string.Empty];
         string value = string.Join(Environment.NewLine, parts.Where(part => !string.IsNullOrWhiteSpace(part)));
         return Truncate(value, 2500);
     }
 
-    private static string? CombineRequirements(FfpManagerApplicationSubmission submission)
+    private static string? CombineRequirements(ExternalApplicationSubmission submission)
     {
         string value = string.Join(" / ", new[] { submission.Category, submission.Subcategory }.Where(part => !string.IsNullOrWhiteSpace(part)));
         return Truncate(value, 255);
