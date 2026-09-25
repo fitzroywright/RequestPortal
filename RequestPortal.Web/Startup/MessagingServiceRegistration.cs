@@ -1,5 +1,4 @@
 using RequestPortal.Application.Notifications;
-using RequestPortal.Common.Messaging;
 using RequestPortal.Infrastructure.Messaging;
 using RequestPortal.Infrastructure.Notifications;
 
@@ -17,73 +16,37 @@ internal static class MessagingServiceRegistration
 
         NotificationOptions notificationOptions =
             builder.Configuration
-                .GetSection(NotificationOptions.SectionName)
+                .GetSection(
+                    NotificationOptions.SectionName)
                 .Get<NotificationOptions>()
             ?? new NotificationOptions();
 
         string messagingQueuePath =
-            builder.Configuration["Messaging:DurableQueuePath"]
+            builder.Configuration[
+                "Messaging:DurableQueuePath"]
             ?? Path.Combine(
                 "App_Data"
                 , "common-messaging");
 
         Common.Messaging.Hosting.ServiceCollectionExtensions
-            .AddCommonMessagingSecrets(builder.Services);
+            .AddCommonMessagingSecrets(
+                builder.Services);
 
         AddMicrosoftGraphEmail(builder);
         AddMicrosoftGraphTeams(builder);
-
-        Common.Messaging.Hosting.ChannelServiceCollectionExtensions
-            .AddSmtpMessagingChannel(
-                builder.Services
-                , new Common.Messaging.Channels.Smtp.SmtpMessageOptions
-                {
-                    Host = notificationOptions.SmtpHost ?? string.Empty
-                    , Port = notificationOptions.SmtpPort
-                    , EnableSsl = notificationOptions.EnableSsl
-                    , FromAddress =
-                        notificationOptions.FromAddress ?? string.Empty
-                    , UserName =
-                        notificationOptions.UserName ?? string.Empty
-                    , PasswordSecretName =
-                        notificationOptions.PasswordSecretName
-                });
-
-        if (notificationOptions.WhatsAppEnabled)
-        {
-            Common.Messaging.Hosting.ChannelServiceCollectionExtensions
-                .AddWhatsAppMessagingChannel(
-                    builder.Services
-                    , new Common.Messaging.Channels.WhatsApp.WhatsAppMessageOptions
-                    {
-                        Endpoint = notificationOptions.WhatsAppEndpoint
-                        , EndpointSecretName =
-                            notificationOptions.WhatsAppEndpointSecretName
-                        , ApiTokenSecretName =
-                            notificationOptions.WhatsAppApiTokenSecretName
-                    });
-        }
+        AddSmtp(
+            builder
+            , notificationOptions);
+        AddWhatsApp(
+            builder
+            , notificationOptions);
+        AddQueuedDelivery(
+            builder
+            , messagingQueuePath);
 
         Common.Messaging.Hosting.ServiceCollectionExtensions
-            .AddCommonMessagingQueuedDelivery(
-                builder.Services
-                , new Common.Messaging.ExternalDeliveryOptions
-                {
-                    DeliveryMode =
-                        Common.Messaging.ExternalDeliveryMode
-                            .ParallelByRecipient
-                    , MaxConcurrency = 4
-                    , MaxAttempts = 5
-                    , InitialRetryDelay =
-                        TimeSpan.FromSeconds(5)
-                    , MaxRetryDelay =
-                        TimeSpan.FromMinutes(5)
-                    , DurableQueuePath = messagingQueuePath
-                }
-                , durable: true);
-
-        Common.Messaging.Hosting.ServiceCollectionExtensions
-            .AddCommonMessagingDiagnostics(builder.Services);
+            .AddCommonMessagingDiagnostics(
+                builder.Services);
 
         builder.Services.AddScoped<
             INotificationSender
@@ -150,5 +113,74 @@ internal static class MessagingServiceRegistration
                             "Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"]
                         ?? "messaging/msgraph/teams/delegated-access-token"
                 });
+    }
+
+    private static void AddSmtp(
+        WebApplicationBuilder builder
+        , NotificationOptions options)
+    {
+        Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+            .AddSmtpMessagingChannel(
+                builder.Services
+                , new Common.Messaging.Channels.Smtp
+                    .SmtpMessageOptions
+                {
+                    Host = options.SmtpHost ?? string.Empty
+                    , Port = options.SmtpPort
+                    , EnableSsl = options.EnableSsl
+                    , FromAddress =
+                        options.FromAddress ?? string.Empty
+                    , UserName =
+                        options.UserName ?? string.Empty
+                    , PasswordSecretName =
+                        options.PasswordSecretName
+                });
+    }
+
+    private static void AddWhatsApp(
+        WebApplicationBuilder builder
+        , NotificationOptions options)
+    {
+        if (!options.WhatsAppEnabled)
+        {
+            return;
+        }
+
+        Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+            .AddWhatsAppMessagingChannel(
+                builder.Services
+                , new Common.Messaging.Channels.WhatsApp
+                    .WhatsAppMessageOptions
+                {
+                    Endpoint = options.WhatsAppEndpoint
+                    , EndpointSecretName =
+                        options.WhatsAppEndpointSecretName
+                    , ApiTokenSecretName =
+                        options.WhatsAppApiTokenSecretName
+                });
+    }
+
+    private static void AddQueuedDelivery(
+        WebApplicationBuilder builder
+        , string messagingQueuePath)
+    {
+        Common.Messaging.Hosting.ServiceCollectionExtensions
+            .AddCommonMessagingQueuedDelivery(
+                builder.Services
+                , new Common.Messaging.ExternalDeliveryOptions
+                {
+                    DeliveryMode =
+                        Common.Messaging.ExternalDeliveryMode
+                            .ParallelByRecipient
+                    , MaxConcurrency = 4
+                    , MaxAttempts = 5
+                    , InitialRetryDelay =
+                        TimeSpan.FromSeconds(5)
+                    , MaxRetryDelay =
+                        TimeSpan.FromMinutes(5)
+                    , DurableQueuePath =
+                        messagingQueuePath
+                }
+                , durable: true);
     }
 }
