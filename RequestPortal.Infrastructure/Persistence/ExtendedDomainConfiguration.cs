@@ -68,6 +68,8 @@ internal sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEn
         builder.Property(item => item.Action).HasMaxLength(100).IsRequired();
         builder.Property(item => item.EntityType).HasMaxLength(100).IsRequired();
         builder.Property(item => item.Detail).HasMaxLength(4000);
+        builder.Property(item => item.ApplicationContext).HasMaxLength(100).IsRequired();
+        builder.Property(item => item.Outcome).HasMaxLength(64).IsRequired();
         builder.HasIndex(item => new { item.OrganizationId, item.OccurredUtc });
         builder.HasIndex(item => new { item.EntityType, item.EntityId, item.OccurredUtc });
     }
