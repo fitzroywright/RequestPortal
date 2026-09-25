@@ -93,6 +93,31 @@ public sealed record ManagementRequestFilter(
     DateTimeOffset? FromUtc = null,
     DateTimeOffset? ToUtc = null);
 
+public sealed record ManagementDeliveryFilter(
+    string? Status = null,
+    string? Organization = null,
+    string? Program = null,
+    string? Parish = null,
+    DateTimeOffset? FromUtc = null,
+    DateTimeOffset? ToUtc = null);
+
+public sealed record ManagementDeliveryRow(
+    Guid DeliveryId,
+    Guid RequestId,
+    string RequestReference,
+    string OrganizationName,
+    string? Program,
+    string? Parish,
+    string DocumentReference,
+    string DocumentType,
+    string RecipientName,
+    string Status,
+    DateTimeOffset CreatedUtc,
+    DateTimeOffset? AcknowledgedUtc,
+    string? AcknowledgedBy,
+    string? Notes,
+    Guid? EvidenceDocumentId);
+
 public sealed record ParishDrillDown(
     string Parish,
     IReadOnlyList<CommunityReachSummary> Communities,
@@ -103,6 +128,7 @@ public interface IManagementDashboardService
     Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ManagementRequestRow>> GetRequestsAsync(ManagementRequestFilter filter, CancellationToken cancellationToken = default);
     Task<ParishDrillDown> GetParishAsync(string parish, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ManagementDeliveryRow>> GetDeliveriesAsync(ManagementDeliveryFilter filter, CancellationToken cancellationToken = default);
 }
 
 public enum LocationPrecision
