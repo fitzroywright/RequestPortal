@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RequestPortal.Domain.Delivery;
+using RequestPortal.Domain.Requests;
 
 namespace RequestPortal.Infrastructure.Persistence;
 
@@ -19,6 +20,10 @@ public sealed class DeliveryConfiguration : IEntityTypeConfiguration<DeliveryRec
         builder.Property(item => item.AcknowledgedBy).HasMaxLength(240);
         builder.Property(item => item.SignatureData).HasColumnType("text");
         builder.Property(item => item.Notes).HasMaxLength(2000);
+        builder.HasOne<AssistanceRequest>()
+            .WithMany()
+            .HasForeignKey(item => item.RequestId)
+            .OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(item => item.RequestId);
         builder.HasIndex(item => item.DocumentReference);
         builder.HasIndex(item => new { item.Status, item.SyncedToFfpManagerUtc });
