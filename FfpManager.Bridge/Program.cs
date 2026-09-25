@@ -194,6 +194,65 @@ app.MapGet("/health", () => Results.Ok(new
     maxArtifactBytes
 }));
 
+app.MapGet("/ready", async (
+    IIntegrationOutboxStore outbox,
+    IFfpManagerReferenceDataCatalog referenceData,
+    CancellationToken cancellationToken) =>
+{
+    if (!gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.Ok(new
+        {
+            status = "ready",
+            gateway = gatewayMode,
+            detail = "Non-SQL gateway is ready for its configured environment."
+        });
+    }
+
+    try
+    {
+        bool outboxSchema = await outbox.SchemaExistsAsync(cancellationToken);
+        FfpManagerReferenceDataSnapshot snapshot =
+            await referenceData.GetSnapshotAsync(cancellationToken);
+        bool referenceDataReady =
+            snapshot.ApplicationStatuses.Count > 0 &&
+            snapshot.DocumentTypes.Count > 0 &&
+            snapshot.UnitsOfMeasure.Count > 0;
+
+        if (!outboxSchema || !referenceDataReady)
+        {
+            return Results.Json(
+                new
+                {
+                    status = "not-ready",
+                    gateway = gatewayMode,
+                    outboxSchema,
+                    referenceDataReady
+                },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return Results.Ok(new
+        {
+            status = "ready",
+            gateway = gatewayMode,
+            outboxSchema,
+            referenceDataReady
+        });
+    }
+    catch (Exception exception)
+    {
+        return Results.Json(
+            new
+            {
+                status = "not-ready",
+                gateway = gatewayMode,
+                failureType = exception.GetType().Name
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
 RouteGroupBuilder api = app.MapGroup("/api");
 api.AddEndpointFilter(async (context, next) =>
 {
