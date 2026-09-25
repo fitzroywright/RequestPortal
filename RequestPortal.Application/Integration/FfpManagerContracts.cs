@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace RequestPortal.Application.Integration;
 
-public sealed record FfpManagerApplicationItem(Guid PortalItemId, string Description, decimal Quantity, string UnitOfMeasure);
-public sealed record FfpManagerArtifactDescriptor(Guid PortalDocumentId, string DocumentType, string FileName, string ContentType, long SizeBytes, DateTimeOffset UploadedUtc);
+public sealed record ExternalApplicationItem(Guid PortalItemId, string Description, decimal Quantity, string UnitOfMeasure);
+public sealed record ExternalArtifactDescriptor(Guid PortalDocumentId, string DocumentType, string FileName, string ContentType, long SizeBytes, DateTimeOffset UploadedUtc);
 
-public sealed record FfpManagerApplicationSubmission(
+public sealed record ExternalApplicationSubmission(
     Guid CorrelationId,
     Guid PortalRequestId,
     string PublicReference,
@@ -29,28 +29,28 @@ public sealed record FfpManagerApplicationSubmission(
     string? ProgramCategory,
     string? Location,
     string? Circumstances,
-    IReadOnlyList<FfpManagerApplicationItem> Items,
-    IReadOnlyList<FfpManagerArtifactDescriptor> Artifacts);
+    IReadOnlyList<ExternalApplicationItem> Items,
+    IReadOnlyList<ExternalArtifactDescriptor> Artifacts);
 
-public sealed record FfpManagerApplicationReference(string ApplicationId, string? ApplicationNumber, DateTimeOffset AcceptedUtc, bool AlreadyExisted = false);
-public sealed record FfpManagerApplicationStatus(string ApplicationId, string StatusCode, string StatusText, DateTimeOffset ChangedUtc, string? Detail = null, bool IsTerminal = false);
-public sealed record FfpManagerInformationRequest(Guid MessageId, Guid PortalRequestId, string ApplicationId, string Message, DateTimeOffset RequestedUtc, string? RequestedBy = null, IReadOnlyList<string>? RequestedArtifacts = null, DateTimeOffset? DueUtc = null);
-public sealed record FfpManagerInformationResponse(Guid MessageId, Guid PortalRequestId, string ApplicationId, Guid RespondedByUserId, string Message, DateTimeOffset RespondedUtc, IReadOnlyList<FfpManagerArtifactDescriptor> Artifacts);
-public sealed record FfpManagerStatusCallback(Guid MessageId, Guid PortalRequestId, FfpManagerApplicationStatus Status);
+public sealed record ExternalApplicationReference(string ApplicationId, string? ApplicationNumber, DateTimeOffset AcceptedUtc, bool AlreadyExisted = false);
+public sealed record ExternalApplicationStatus(string ApplicationId, string StatusCode, string StatusText, DateTimeOffset ChangedUtc, string? Detail = null, bool IsTerminal = false);
+public sealed record ExternalInformationRequest(Guid MessageId, Guid PortalRequestId, string ApplicationId, string Message, DateTimeOffset RequestedUtc, string? RequestedBy = null, IReadOnlyList<string>? RequestedArtifacts = null, DateTimeOffset? DueUtc = null);
+public sealed record ExternalInformationResponse(Guid MessageId, Guid PortalRequestId, string ApplicationId, Guid RespondedByUserId, string Message, DateTimeOffset RespondedUtc, IReadOnlyList<ExternalArtifactDescriptor> Artifacts);
+public sealed record ExternalStatusCallback(Guid MessageId, Guid PortalRequestId, ExternalApplicationStatus Status);
 
-public interface IFfpManagerBridgeClient
+public interface IExternalApplicationBridgeClient
 {
-    Task<FfpManagerApplicationReference> SubmitApplicationAsync(FfpManagerApplicationSubmission submission, CancellationToken cancellationToken = default);
-    Task UploadArtifactAsync(string applicationId, FfpManagerArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default);
-    Task<FfpManagerApplicationStatus> GetStatusAsync(string applicationId, CancellationToken cancellationToken = default);
-    Task SendInformationResponseAsync(FfpManagerInformationResponse response, CancellationToken cancellationToken = default);
+    Task<ExternalApplicationReference> SubmitApplicationAsync(ExternalApplicationSubmission submission, CancellationToken cancellationToken = default);
+    Task UploadArtifactAsync(string applicationId, ExternalArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default);
+    Task<ExternalApplicationStatus> GetStatusAsync(string applicationId, CancellationToken cancellationToken = default);
+    Task SendInformationResponseAsync(ExternalInformationResponse response, CancellationToken cancellationToken = default);
 }
 
-public interface IFfpManagerIntegrationService
+public interface IExternalApplicationIntegrationService
 {
-    Task<FfpManagerApplicationReference> SubmitRequestAsync(Guid requestId, CancellationToken cancellationToken = default);
-    Task<FfpManagerApplicationStatus?> RefreshStatusAsync(Guid requestId, CancellationToken cancellationToken = default);
-    Task ReceiveStatusAsync(Guid messageId, Guid requestId, FfpManagerApplicationStatus status, CancellationToken cancellationToken = default);
-    Task ReceiveInformationRequestAsync(FfpManagerInformationRequest request, CancellationToken cancellationToken = default);
+    Task<ExternalApplicationReference> SubmitRequestAsync(Guid requestId, CancellationToken cancellationToken = default);
+    Task<ExternalApplicationStatus?> RefreshStatusAsync(Guid requestId, CancellationToken cancellationToken = default);
+    Task ReceiveStatusAsync(Guid messageId, Guid requestId, ExternalApplicationStatus status, CancellationToken cancellationToken = default);
+    Task ReceiveInformationRequestAsync(ExternalInformationRequest request, CancellationToken cancellationToken = default);
     Task RespondToInformationRequestAsync(Guid requestId, string applicationId, Guid userId, string message, IReadOnlyList<Guid> documentIds, CancellationToken cancellationToken = default);
 }
