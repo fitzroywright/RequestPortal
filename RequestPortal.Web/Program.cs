@@ -405,6 +405,7 @@ builder.Services.AddSingleton<IClock, RequestPortal.Common.Time.SystemClock>();
 string storageRoot = builder.Configuration["Storage:Local:RootPath"] ?? "App_Data/storage";
 Common.Storage.StorageServiceCollectionExtensions.AddCommonStorage(builder.Services, storageRoot);
 builder.Services.AddSingleton<IDocumentUploadSecurity, DocumentUploadSecurity>();
+builder.Services.AddSingleton<IMalwareScanner, ClamAvMalwareScanner>();
 NotificationOptions notificationOptions = builder.Configuration
     .GetSection(NotificationOptions.SectionName)
     .Get<NotificationOptions>() ?? new NotificationOptions();
