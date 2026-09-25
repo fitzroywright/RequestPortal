@@ -24,6 +24,12 @@ public sealed record MessageThreadView(
     string? RequestReference,
     IReadOnlyList<MessageDetailView> Messages);
 
+public sealed record MessageAttachmentView(
+    Guid DocumentId,
+    string FileName,
+    string ContentType,
+    long SizeBytes);
+
 public sealed record MessageDetailView(
     Guid MessageId,
     string SenderName,
@@ -31,7 +37,8 @@ public sealed record MessageDetailView(
     string SenderKind,
     string Body,
     DateTimeOffset SentUtc,
-    bool IsMine);
+    bool IsMine,
+    IReadOnlyList<MessageAttachmentView> Attachments);
 
 public sealed record MessageRecipientOption(
     Guid UserId,
@@ -88,7 +95,8 @@ public interface IPortalMessageService
         string subject,
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
 
     Task<IReadOnlyList<MessageRecipientOption>> GetOrganizationRecipientsAsync(
         Guid userId,
@@ -110,7 +118,8 @@ public interface IPortalMessageService
         bool senderIsStaff,
         Guid threadId,
         string body,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
 
     Task<Guid> SendSystemMessageAsync(
         Guid? organizationId,
