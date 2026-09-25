@@ -38,6 +38,21 @@
                             <span class="muted">@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</span>
                         </div>
                         <div class="message-body">@message.Body</div>
+                        @if (message.Attachments.Count > 0)
+                        {
+                            <div class="message-attachments">
+                                @foreach (MessageAttachmentView attachment in message.Attachments)
+                                {
+                                    <a class="message-attachment"
+                                       asp-page-handler="Attachment"
+                                       asp-route-id="@Model.Thread.ThreadId"
+                                       asp-route-documentId="@attachment.DocumentId">
+                                        @attachment.FileName
+                                        <small>@($"{Math.Max(1, attachment.SizeBytes / 1024)} KB")</small>
+                                    </a>
+                                }
+                            </div>
+                        }
                     </article>
                 }
             </div>
@@ -46,6 +61,21 @@
                 <label asp-for="Reply">Reply</label>
                 <textarea asp-for="Reply" rows="6" maxlength="10000" required></textarea>
                 <span asp-validation-for="Reply" class="validation"></span>
+
+                @if (Model.AvailableAttachments.Count > 0)
+                {
+                    <fieldset class="field" style="border:1px solid #dde3e8;padding:14px;margin:14px 0">
+                        <legend style="font-weight:700">Attach request documents</legend>
+                        @foreach (var document in Model.AvailableAttachments.Where(item => !item.IsArchived))
+                        {
+                            <label class="check-row">
+                                <input type="checkbox" name="AttachmentDocumentIds" value="@document.Id" />
+                                <span>@document.OriginalFileName <small class="muted">(@document.DocumentType)</small></span>
+                            </label>
+                        }
+                    </fieldset>
+                }
+
                 <button class="button" type="submit">Send reply</button>
             </form>
         }
