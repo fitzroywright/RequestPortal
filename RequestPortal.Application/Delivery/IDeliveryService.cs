@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -48,6 +49,8 @@ public interface IDeliveryService
 {
     Task<CreateDeliveryResult> CreateAsync(CreateDeliveryCommand command, CancellationToken cancellationToken = default);
     Task<DeliveryView?> GetAsync(Guid deliveryId, string accessToken, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DeliveryView>> GetForRequestAsync(Guid requestId, CancellationToken cancellationToken = default);
+    Task<Guid> UploadEvidenceAsync(Guid deliveryId, string accessToken, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default);
     Task AcknowledgeAsync(Guid deliveryId, string accessToken, string status, string acknowledgedBy, string? signatureData, Guid? evidenceDocumentId, string? notes, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DeliveryConfirmation>> GetUnsyncedConfirmationsAsync(CancellationToken cancellationToken = default);
     Task MarkSyncedAsync(Guid deliveryId, CancellationToken cancellationToken = default);
