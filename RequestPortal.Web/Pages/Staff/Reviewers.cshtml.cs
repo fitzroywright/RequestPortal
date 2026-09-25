@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
@@ -18,9 +19,9 @@ public sealed class ReviewersModel : PageModel
     public IReadOnlyList<ExternalReviewerInvitationView> Invitations { get; private set; } =
         Array.Empty<ExternalReviewerInvitationView>();
 
-    [BindProperty] public string Email { get; set; } = string.Empty;
-    [BindProperty] public string DisplayName { get; set; } = string.Empty;
-    [BindProperty] public int ExpiresInHours { get; set; } = 24;
+    [BindProperty, Required, EmailAddress, StringLength(320)] public string Email { get; set; } = string.Empty;
+    [BindProperty, Required, StringLength(200, MinimumLength = 2)] public string DisplayName { get; set; } = string.Empty;
+    [BindProperty, Range(1, 168)] public int ExpiresInHours { get; set; } = 24;
     [BindProperty] public string ScopeType { get; set; } = ExternalReviewerScopes.ManagementDashboard;
     [BindProperty] public Guid? OrganizationId { get; set; }
     [BindProperty] public Guid? RequestId { get; set; }
@@ -61,6 +62,18 @@ public sealed class ReviewersModel : PageModel
     {
         await reviewerService.RevokeAsync(invitationId, GetActorId(), HttpContext.RequestAborted);
         TempData["Success"] = "External reviewer access revoked.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostReissueAsync(Guid invitationId)
+    {
+        string publicBaseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+        ExternalReviewerInvitationView invitation = await reviewerService.ReissueAsync(
+            invitationId,
+            GetActorId(),
+            publicBaseUrl,
+            HttpContext.RequestAborted);
+        TempData["Success"] = $"A new 24-hour invitation was sent to {invitation.Email}.";
         return RedirectToPage();
     }
 
