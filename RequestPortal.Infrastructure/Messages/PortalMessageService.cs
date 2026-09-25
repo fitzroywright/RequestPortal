@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Messages;
 using RequestPortal.Domain.Messages;
 using RequestPortal.Domain.Organizations;
+using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Messages;
@@ -697,7 +698,7 @@ public sealed class PortalMessageService : IPortalMessageService
         PortalMessage message,
         MessageThread thread,
         DateTimeOffset? readUtc,
-        ApplicationUserProjection? sender,
+        ApplicationUser? sender,
         string? organizationName,
         string? requestReference,
         bool viewerIsStaff)
@@ -726,7 +727,7 @@ public sealed class PortalMessageService : IPortalMessageService
 
     private static (string Name, string? Email, string Kind) ProjectSender(
         PortalMessage message,
-        ApplicationUserProjection? sender,
+        ApplicationUser? sender,
         bool viewerIsStaff)
     {
         if (message.SenderKind == PortalMessageSenderKind.System)
