@@ -60,6 +60,21 @@
                 <textarea asp-for="Body" rows="9" maxlength="10000"></textarea>
                 <span asp-validation-for="Body" class="validation"></span>
 
+                @if (Model.AvailableAttachments.Count > 0)
+                {
+                    <fieldset class="field" style="border:1px solid #dde3e8;padding:14px">
+                        <legend style="font-weight:700">Attach request documents</legend>
+                        <p class="muted">These are existing Request Portal documents. The files remain in Common.Storage; the message stores only document references.</p>
+                        @foreach (var document in Model.AvailableAttachments.Where(item => !item.IsArchived))
+                        {
+                            <label class="check-row">
+                                <input type="checkbox" name="AttachmentDocumentIds" value="@document.Id" />
+                                <span>@document.OriginalFileName <small class="muted">(@document.DocumentType)</small></span>
+                            </label>
+                        }
+                    </fieldset>
+                }
+
                 <button class="button" type="submit">Send message</button>
                 <a class="button button-secondary" asp-page="/Messages/Inbox">Cancel</a>
             </form>
