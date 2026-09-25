@@ -44,6 +44,38 @@ public sealed class DemoCompletionDomainTests
     }
 
     [Fact]
+    public void DeliveryAccessExpiresAndRejectsInvalidExpiry()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DeliveryRecord delivery = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Delivery Note",
+            "DN-EXP",
+            "{}",
+            new string('Z', 64),
+            "Recipient",
+            null,
+            now,
+            now.AddMinutes(15));
+
+        Assert.True(delivery.IsAccessActive(now.AddMinutes(14)));
+        Assert.False(delivery.IsAccessActive(now.AddMinutes(15)));
+
+        Assert.Throws<ArgumentException>(() => new DeliveryRecord(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Delivery Note",
+            "DN-BAD",
+            "{}",
+            new string('Y', 64),
+            "Recipient",
+            null,
+            now,
+            now));
+    }
+
+    [Fact]
     public void UnacknowledgedDeliveryCannotBeMarkedSynced()
     {
         DeliveryRecord delivery = new(
@@ -78,6 +110,47 @@ public sealed class DemoCompletionDomainTests
 
         Assert.Throws<InvalidOperationException>(() =>
             invitation.RecordRedemption(now.AddMinutes(2)));
+    }
+
+    [Fact]
+    public void ReviewerScopeIsPreservedAndInvalidDateRangeIsRejected()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        Guid organizationId = Guid.NewGuid();
+        Guid requestId = Guid.NewGuid();
+
+        ExternalReviewerInvitation invitation = new(
+            Guid.NewGuid(),
+            "reviewer@example.org",
+            "Reviewer",
+            "Request",
+            new string('E', 64),
+            Guid.NewGuid(),
+            now,
+            now.AddHours(24),
+            organizationId,
+            requestId,
+            now.AddDays(-7),
+            now);
+
+        Assert.Equal(organizationId, invitation.OrganizationId);
+        Assert.Equal(requestId, invitation.RequestId);
+        Assert.Equal(now.AddDays(-7), invitation.FromUtc);
+        Assert.Equal(now, invitation.ToUtc);
+
+        Assert.Throws<ArgumentException>(() => new ExternalReviewerInvitation(
+            Guid.NewGuid(),
+            "reviewer@example.org",
+            "Reviewer",
+            "DateRange",
+            new string('F', 64),
+            Guid.NewGuid(),
+            now,
+            now.AddHours(24),
+            null,
+            null,
+            now,
+            now.AddDays(-1)));
     }
 
     [Fact]

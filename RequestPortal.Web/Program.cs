@@ -530,7 +530,7 @@ builder.Services.AddAuthorization(options =>
         policy.AuthenticationSchemes.Add("ExternalReviewer");
         policy.RequireAuthenticatedUser();
         policy.RequireClaim("requestportal.external-review", "true");
-        policy.RequireClaim("requestportal.external-review.scope", ExternalReviewerScopes.ManagementDashboard);
+        policy.RequireClaim("requestportal.external-review.scope");
     });
     options.AddPolicy("PortalMessages", policy =>
     {

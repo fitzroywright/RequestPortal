@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,6 +10,8 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Delivery;
+using RequestPortal.Application.Documents;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Delivery;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -18,11 +21,19 @@ public sealed class DeliveryService : IDeliveryService
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IBusinessAuditWriter auditWriter;
+    private readonly IDocumentService documentService;
+    private readonly INotificationSender? notificationSender;
 
-    public DeliveryService(RequestPortalDbContext dbContext, IBusinessAuditWriter auditWriter)
+    public DeliveryService(
+        RequestPortalDbContext dbContext,
+        IBusinessAuditWriter auditWriter,
+        IDocumentService documentService,
+        INotificationSender? notificationSender = null)
     {
         this.dbContext = dbContext;
         this.auditWriter = auditWriter;
+        this.documentService = documentService;
+        this.notificationSender = notificationSender;
     }
 
     public async Task<CreateDeliveryResult> CreateAsync(CreateDeliveryCommand command, CancellationToken cancellationToken = default)
@@ -60,15 +71,126 @@ public sealed class DeliveryService : IDeliveryService
 
         dbContext.Deliveries.Add(record);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await auditWriter.WriteAsync(Guid.Empty, "DeliveryCreated", "Delivery", record.Id, null, $"request={command.RequestId:D}; document={command.DocumentReference}", cancellationToken);
-        return new CreateDeliveryResult(record.Id, accessToken);
+        await auditWriter.WriteAsync(
+            Guid.Empty,
+            "DeliveryCreated",
+            "Delivery",
+            record.Id,
+            null,
+            $"request={command.RequestId:D}; document={command.DocumentReference}",
+            cancellationToken);
+
+        bool notificationQueued = false;
+        if (notificationSender is not null &&
+            !string.IsNullOrWhiteSpace(command.RecipientEmail) &&
+            !string.IsNullOrWhiteSpace(command.PublicBaseUrl))
+        {
+            string acknowledgementUrl =
+                $"{command.PublicBaseUrl.TrimEnd('/')}/Delivery/{record.Id:D}?token={Uri.EscapeDataString(accessToken)}";
+
+            try
+            {
+                await notificationSender.SendAsync(
+                    new NotificationEnvelope(
+                        command.RecipientEmail.Trim(),
+                        $"Delivery acknowledgement required: {command.DocumentReference}",
+                        $"A delivery is ready for your acknowledgement.\n\nReference: {command.DocumentReference}\nRecipient: {command.RecipientName}\n\nOpen the secure link below to confirm whether the delivery was received in full, partially delivered, or not delivered:\n{acknowledgementUrl}\n\nThis secure link expires {record.AccessExpiresUtc:u}.",
+                        CorrelationId: record.Id.ToString("D")),
+                    cancellationToken);
+
+                notificationQueued = true;
+                await auditWriter.WriteAsync(
+                    Guid.Empty,
+                    "DeliveryNotificationQueued",
+                    "Delivery",
+                    record.Id,
+                    null,
+                    $"recipient={command.RecipientEmail.Trim()}",
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await auditWriter.WriteAsync(
+                    Guid.Empty,
+                    "DeliveryNotificationQueueFailed",
+                    "Delivery",
+                    record.Id,
+                    null,
+                    $"recipient={command.RecipientEmail.Trim()}; error={ex.GetType().Name}",
+                    cancellationToken);
+            }
+        }
+
+        return new CreateDeliveryResult(record.Id, accessToken, notificationQueued);
     }
 
     public async Task<DeliveryView?> GetAsync(Guid deliveryId, string accessToken, CancellationToken cancellationToken = default)
     {
         DeliveryRecord? item = await dbContext.Deliveries.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == deliveryId, cancellationToken);
-        return item is null || !TokenMatches(item.AccessTokenHash, accessToken) ? null : ToView(item);
+        return item is null ||
+               !item.IsAccessActive(DateTimeOffset.UtcNow) ||
+               !TokenMatches(item.AccessTokenHash, accessToken)
+            ? null
+            : ToView(item);
+    }
+
+    public async Task<IReadOnlyList<DeliveryView>> GetForRequestAsync(Guid requestId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Deliveries
+            .AsNoTracking()
+            .Where(item => item.RequestId == requestId)
+            .OrderByDescending(item => item.CreatedUtc)
+            .Select(item => new DeliveryView(
+                item.Id,
+                item.RequestId,
+                item.DocumentType,
+                item.DocumentReference,
+                item.RecipientName,
+                item.DeliveryPerson,
+                item.Status.ToString(),
+                item.CreatedUtc,
+                item.SnapshotJson,
+                item.AcknowledgedBy,
+                item.AcknowledgedUtc,
+                item.EvidenceDocumentId,
+                item.Notes,
+                item.SyncedToFfpManagerUtc))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Guid> UploadEvidenceAsync(
+        Guid deliveryId,
+        string accessToken,
+        string originalFileName,
+        string contentType,
+        long sizeBytes,
+        Stream content,
+        CancellationToken cancellationToken = default)
+    {
+        DeliveryRecord delivery = await dbContext.Deliveries
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == deliveryId, cancellationToken);
+
+        if (!delivery.IsAccessActive(DateTimeOffset.UtcNow) ||
+            !TokenMatches(delivery.AccessTokenHash, accessToken))
+        {
+            throw new UnauthorizedAccessException("The delivery access token is invalid or expired.");
+        }
+
+        if (delivery.Status != DeliveryStatus.Ready)
+        {
+            throw new InvalidOperationException("Evidence can only be uploaded before the delivery acknowledgement is finalized.");
+        }
+
+        return await documentService.UploadDeliveryEvidenceAsync(
+            delivery.RequestId,
+            delivery.Id,
+            originalFileName,
+            contentType,
+            sizeBytes,
+            content,
+            cancellationToken);
     }
 
     public async Task AcknowledgeAsync(Guid deliveryId, string accessToken, string status, string acknowledgedBy, string? signatureData, Guid? evidenceDocumentId, string? notes, CancellationToken cancellationToken = default)
@@ -79,7 +201,9 @@ public sealed class DeliveryService : IDeliveryService
         }
 
         DeliveryRecord delivery = await dbContext.Deliveries.SingleAsync(item => item.Id == deliveryId, cancellationToken);
-        if (!TokenMatches(delivery.AccessTokenHash, accessToken)) throw new UnauthorizedAccessException("The delivery access token is invalid.");
+        if (!delivery.IsAccessActive(DateTimeOffset.UtcNow) ||
+            !TokenMatches(delivery.AccessTokenHash, accessToken))
+            throw new UnauthorizedAccessException("The delivery access token is invalid or expired.");
         delivery.Acknowledge(deliveryStatus, acknowledgedBy, DateTimeOffset.UtcNow, signatureData, evidenceDocumentId, notes);
         await dbContext.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync(Guid.Empty, "DeliveryAcknowledged", "Delivery", delivery.Id, null, $"status={delivery.Status}; acknowledgedBy={delivery.AcknowledgedBy}", cancellationToken);

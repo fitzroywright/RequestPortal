@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Documents;
+using RequestPortal.Application.Delivery;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
@@ -22,6 +23,7 @@ public sealed class ReviewModel : PageModel
     private readonly IProjectProposalService projectProposalService;
     private readonly IProjectPlanningService projectPlanningService;
     private readonly IRequestReferenceDataService referenceDataService;
+    private readonly IDeliveryService deliveryService;
 
     public ReviewModel(
         UserManager<ApplicationUser> userManager,
@@ -30,7 +32,8 @@ public sealed class ReviewModel : PageModel
         IDocumentService documentService,
         IProjectProposalService projectProposalService,
         IProjectPlanningService projectPlanningService,
-        IRequestReferenceDataService referenceDataService)
+        IRequestReferenceDataService referenceDataService,
+        IDeliveryService deliveryService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -39,12 +42,14 @@ public sealed class ReviewModel : PageModel
         this.projectProposalService = projectProposalService;
         this.projectPlanningService = projectPlanningService;
         this.referenceDataService = referenceDataService;
+        this.deliveryService = deliveryService;
     }
 
     public new RequestDetail? Request { get; private set; }
     public ProjectProposalDetail? ProjectProposal { get; private set; }
     public ProjectPlanningDetail? ProjectPlanning { get; private set; }
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
+    public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
 
     [BindProperty, StringLength(4000)] public string DecisionReason { get; set; } = string.Empty;
@@ -153,6 +158,7 @@ public sealed class ReviewModel : PageModel
             ProjectPlanning = await projectPlanningService.GetAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
 
         Documents = await documentService.GetRequestDocumentsAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
+        Deliveries = await deliveryService.GetForRequestAsync(id, HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
         return Page();
     }

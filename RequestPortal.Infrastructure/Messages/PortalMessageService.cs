@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Messages;
+using RequestPortal.Application.Auditing;
 using RequestPortal.Domain.Messages;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Organizations;
@@ -12,13 +13,16 @@ public sealed class PortalMessageService : IPortalMessageService
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IPortalMessageRealtimeNotifier realtimeNotifier;
+    private readonly IBusinessAuditWriter? auditWriter;
 
     public PortalMessageService(
         RequestPortalDbContext dbContext,
-        IPortalMessageRealtimeNotifier realtimeNotifier)
+        IPortalMessageRealtimeNotifier realtimeNotifier,
+        IBusinessAuditWriter? auditWriter = null)
     {
         this.dbContext = dbContext;
         this.realtimeNotifier = realtimeNotifier;
+        this.auditWriter = auditWriter;
     }
 
     public async Task<int> GetUnreadCountAsync(
@@ -493,6 +497,18 @@ public sealed class PortalMessageService : IPortalMessageService
         AddRecipients(message.Id, allRecipients, senderUserId: null);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        if (auditWriter is not null)
+        {
+            await auditWriter.WriteAsync(
+                Guid.Empty,
+                "SystemMessageSent",
+                "PortalMessage",
+                message.Id,
+                thread.OrganizationId,
+                $"thread={thread.Id:D}; request={thread.RequestId}; recipients={allRecipients.Length}",
+                cancellationToken);
+        }
+
         await NotifyAsync(message, thread, allRecipients, cancellationToken);
         return thread.Id;
     }
@@ -555,6 +571,17 @@ public sealed class PortalMessageService : IPortalMessageService
         if (recipients.Count > 0)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            if (auditWriter is not null)
+            {
+                await auditWriter.WriteAsync(
+                userId,
+                "MessageThreadRead",
+                "MessageThread",
+                threadId,
+                null,
+                $"Unread messages marked read={recipients.Count}",
+                cancellationToken);
+            }
         }
     }
 
@@ -625,6 +652,17 @@ public sealed class PortalMessageService : IPortalMessageService
 
         AddExternalNotificationOutbox(message, thread, recipients);
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (auditWriter is not null)
+        {
+            await auditWriter.WriteAsync(
+            senderUserId,
+            "MessageSent",
+            "PortalMessage",
+            message.Id,
+            thread.OrganizationId,
+            $"thread={thread.Id:D}; request={thread.RequestId}; recipients={recipients.Length}; attachments={attachments.Length}",
+            cancellationToken);
+        }
 
         await NotifyAsync(message, thread, recipients, cancellationToken);
         return thread.Id;

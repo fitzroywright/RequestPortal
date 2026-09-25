@@ -22,9 +22,18 @@ public static class DeliveryEndpoints
                 return Results.Unauthorized();
             }
 
-            CreateDeliveryResult result = await service.CreateAsync(command, cancellationToken);
+            string publicBaseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
+            CreateDeliveryResult result = await service.CreateAsync(
+                command with { PublicBaseUrl = publicBaseUrl },
+                cancellationToken);
             string url = $"/Delivery/{result.DeliveryId:D}?token={Uri.EscapeDataString(result.AccessToken)}";
-            return Results.Ok(new { deliveryId = result.DeliveryId, accessToken = result.AccessToken, acknowledgementUrl = url });
+            return Results.Ok(new
+            {
+                deliveryId = result.DeliveryId,
+                accessToken = result.AccessToken,
+                acknowledgementUrl = url,
+                notificationQueued = result.NotificationQueued
+            });
         }).AllowAnonymous();
 
         group.MapGet("/confirmations", async (

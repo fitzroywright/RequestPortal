@@ -105,6 +105,15 @@
                        asp-route-FromDate="@fromDateRoute"
                        asp-route-ToDate="@toDateRoute">Export Excel</a>
                     <a class="button button-secondary"
+                       asp-page-handler="Pdf"
+                       asp-route-Search="@Model.Search"
+                       asp-route-Status="@Model.Status"
+                       asp-route-CountryCode="@Model.CountryCode"
+                       asp-route-Category="@Model.Category"
+                       asp-route-Priority="@Model.Priority"
+                       asp-route-FromDate="@fromDateRoute"
+                       asp-route-ToDate="@toDateRoute">Download PDF</a>
+                    <a class="button button-secondary"
                        asp-page-handler="Print"
                        target="_blank"
                        asp-route-Search="@Model.Search"

@@ -108,6 +108,53 @@
         }
     </section>
 
+
+    <div class="mg-grid-3" style="margin-top:16px">
+        <section class="mg-panel">
+            <h2>Delivery by organization</h2>
+            @if (Model.Dashboard.DeliveryAnalytics.Organizations.Count == 0) { <p class="muted">No delivery data yet.</p> }
+            <div class="table-wrap"><table><thead><tr><th>Organization</th><th>Waiting</th><th>Delivered</th><th>Partial</th><th>Failed</th></tr></thead><tbody>
+            @foreach (ManagementDeliveryDimension item in Model.Dashboard.DeliveryAnalytics.Organizations)
+            {
+                <tr><td>@item.Name</td><td>@item.AwaitingAcknowledgement</td><td>@item.Delivered</td><td>@item.PartiallyDelivered</td><td>@item.Failed</td></tr>
+            }
+            </tbody></table></div>
+        </section>
+        <section class="mg-panel">
+            <h2>Delivery by program</h2>
+            @if (Model.Dashboard.DeliveryAnalytics.Programs.Count == 0) { <p class="muted">No program delivery data yet.</p> }
+            <div class="table-wrap"><table><thead><tr><th>Program</th><th>Waiting</th><th>Delivered</th><th>Partial</th><th>Failed</th></tr></thead><tbody>
+            @foreach (ManagementDeliveryDimension item in Model.Dashboard.DeliveryAnalytics.Programs)
+            {
+                <tr><td>@item.Name</td><td>@item.AwaitingAcknowledgement</td><td>@item.Delivered</td><td>@item.PartiallyDelivered</td><td>@item.Failed</td></tr>
+            }
+            </tbody></table></div>
+        </section>
+        <section class="mg-panel">
+            <h2>Delivery by parish</h2>
+            @if (Model.Dashboard.DeliveryAnalytics.Parishes.Count == 0) { <p class="muted">No parish delivery data yet.</p> }
+            <div class="table-wrap"><table><thead><tr><th>Parish</th><th>Waiting</th><th>Delivered</th><th>Partial</th><th>Failed</th></tr></thead><tbody>
+            @foreach (ManagementDeliveryDimension item in Model.Dashboard.DeliveryAnalytics.Parishes)
+            {
+                <tr><td>@item.Name</td><td>@item.AwaitingAcknowledgement</td><td>@item.Delivered</td><td>@item.PartiallyDelivered</td><td>@item.Failed</td></tr>
+            }
+            </tbody></table></div>
+        </section>
+    </div>
+
+    <section class="mg-panel" style="margin-top:16px">
+        <h2>Delivery outcome trend</h2>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Week</th><th>Delivered</th><th>Partially delivered</th><th>Failed</th></tr></thead>
+            <tbody>
+            @foreach (ManagementDeliveryTrendPoint point in Model.Dashboard.DeliveryAnalytics.Trend)
+            {
+                <tr><td>@point.WeekStarting.ToString("MMM d, yyyy")</td><td>@point.Delivered</td><td>@point.PartiallyDelivered</td><td>@point.Failed</td></tr>
+            }
+            </tbody>
+        </table></div>
+    </section>
+
     <div class="mg-grid-3" style="margin-top:16px">
         <section class="mg-panel">
             <h2>Requests by category</h2>

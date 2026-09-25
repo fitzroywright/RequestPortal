@@ -83,6 +83,27 @@ public sealed class StaffReportingService : IStaffReportingService
         return stream.ToArray();
     }
 
+    public async Task<byte[]> ExportPdfAsync(RequestReportFilter filter, CancellationToken cancellationToken = default)
+    {
+        List<RequestReportRow> rows = await ProjectRows(BuildQuery(filter)).ToListAsync(cancellationToken);
+        List<string> lines = new()
+        {
+            $"Generated {DateTimeOffset.UtcNow:u}",
+            $"Matching requests: {rows.Count}",
+            string.Empty
+        };
+
+        foreach (RequestReportRow row in rows)
+        {
+            lines.Add($"{row.Reference} | {row.Organization} | {row.Status} | {row.Priority}");
+            lines.Add($"  {row.Summary}");
+            lines.Add($"  {row.Kind} | {row.Category} | Created {row.CreatedUtc:u}");
+            lines.Add(string.Empty);
+        }
+
+        return SimpleReportPdfWriter.Create("Request Portal Management Report", lines);
+    }
+
     public async Task<string> ExportPrintableHtmlAsync(RequestReportFilter filter, CancellationToken cancellationToken = default)
     {
         List<RequestReportRow> rows = await ProjectRows(BuildQuery(filter)).ToListAsync(cancellationToken);

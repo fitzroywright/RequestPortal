@@ -14,12 +14,46 @@
 <section class="card" style="margin-bottom:18px">
     <h2>Invite reviewer</h2>
     <form method="post" asp-page-handler="Invite">
+        <div asp-validation-summary="ModelOnly" class="validation"></div>
         <div class="form-grid">
             <div class="form-group"><label asp-for="DisplayName">Name</label><input asp-for="DisplayName" required /></div>
             <div class="form-group"><label asp-for="Email">Email</label><input asp-for="Email" type="email" required /></div>
             <div class="form-group"><label asp-for="ExpiresInHours">Expires in hours</label><input asp-for="ExpiresInHours" type="number" min="1" max="168" required /></div>
+            <div class="form-group">
+                <label asp-for="Scope">Access scope</label>
+                <select asp-for="Scope" id="reviewerScope">
+                    <option value="@ExternalReviewerScopes.ManagementDashboard">All aggregate management data</option>
+                    <option value="@ExternalReviewerScopes.Organization">One organization</option>
+                    <option value="@ExternalReviewerScopes.Request">One request</option>
+                    <option value="@ExternalReviewerScopes.DateRange">Date range</option>
+                </select>
+            </div>
+            <div class="form-group" id="organizationScope">
+                <label asp-for="OrganizationId">Organization</label>
+                <select asp-for="OrganizationId">
+                    <option value="">Select organization</option>
+                    @foreach (RequestPortal.Web.Pages.Staff.ReviewerOrganizationOption item in Model.Organizations)
+                    {
+                        <option value="@item.Id">@item.Name</option>
+                    }
+                </select>
+                <span asp-validation-for="OrganizationId" class="validation"></span>
+            </div>
+            <div class="form-group" id="requestScope">
+                <label asp-for="RequestId">Request</label>
+                <select asp-for="RequestId">
+                    <option value="">Select request</option>
+                    @foreach (RequestPortal.Web.Pages.Staff.ReviewerRequestOption item in Model.Requests)
+                    {
+                        <option value="@item.Id">@item.Reference — @item.OrganizationName</option>
+                    }
+                </select>
+                <span asp-validation-for="RequestId" class="validation"></span>
+            </div>
+            <div class="form-group" id="fromScope"><label asp-for="FromDate">From date</label><input asp-for="FromDate" type="date" /></div>
+            <div class="form-group" id="toScope"><label asp-for="ToDate">To date</label><input asp-for="ToDate" type="date" /></div>
         </div>
-        <p class="muted">Scope: Management Dashboard. Aggregate activity only; no editing or applicant contact information.</p>
+        <p class="muted">External review is always read-only. Applicant contact information, messaging, approvals and administration remain unavailable.</p>
         <button class="button" type="submit">Send secure invitation</button>
     </form>
 </section>
@@ -27,22 +61,33 @@
 <section class="card">
     <h2>Invitations</h2>
     <div class="table-wrap"><table>
-        <thead><tr><th>Reviewer</th><th>Scope</th><th>Expires</th><th>Last access</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Reviewer</th><th>Scope</th><th>Expires</th><th>Last access</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
         @foreach (ExternalReviewerInvitationView item in Model.Invitations)
         {
             string status = item.RevokedUtc.HasValue ? "Revoked" : item.ExpiresUtc <= DateTimeOffset.UtcNow ? "Expired" : item.RedeemedUtc.HasValue ? "Active" : "Invited";
             <tr>
-                <td><strong>@item.DisplayName</strong><br/><span class="muted">@item.Email</span></td>
-                <td>@item.Scope</td>
+                <td><strong>@item.DisplayName</strong><br/><span class="muted">@item.Email</span><br/><small>Invited by @item.InvitedByUserId</small></td>
+                <td>
+                    <strong>@item.Scope</strong>
+                    @if (item.OrganizationId.HasValue) { <div class="muted">Organization: @item.OrganizationId</div> }
+                    @if (item.RequestId.HasValue) { <div class="muted">Request: @item.RequestId</div> }
+                    @if (item.FromUtc.HasValue || item.ToUtc.HasValue)
+                    {
+                        <div class="muted">@item.FromUtc?.ToLocalTime().ToString("d") — @item.ToUtc?.ToLocalTime().ToString("d")</div>
+                    }
+                </td>
                 <td>@item.ExpiresUtc.ToLocalTime().ToString("g")</td>
                 <td>@(item.LastAccessUtc?.ToLocalTime().ToString("g") ?? "—")</td>
                 <td>@status</td>
                 <td>
-                    @if (!item.RevokedUtc.HasValue && item.ExpiresUtc > DateTimeOffset.UtcNow)
-                    {
-                        <form method="post" asp-page-handler="Revoke"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-outline" type="submit">Revoke</button></form>
-                    }
+                    <div class="action-row">
+                        @if (!item.RevokedUtc.HasValue && item.ExpiresUtc > DateTimeOffset.UtcNow)
+                        {
+                            <form method="post" asp-page-handler="Revoke"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-outline" type="submit">Revoke</button></form>
+                        }
+                        <form method="post" asp-page-handler="Reissue"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-outline" type="submit">Reissue 24h link</button></form>
+                    </div>
                 </td>
             </tr>
         }
@@ -50,3 +95,23 @@
     </table></div>
 </section>
 </div></section>
+
+<script>
+(() => {
+    const scope = document.getElementById('reviewerScope');
+    const org = document.getElementById('organizationScope');
+    const req = document.getElementById('requestScope');
+    const from = document.getElementById('fromScope');
+    const to = document.getElementById('toScope');
+    function update() {
+        const value = scope?.value || '';
+        org.style.display = value === '@ExternalReviewerScopes.Organization' ? '' : 'none';
+        req.style.display = value === '@ExternalReviewerScopes.Request' ? '' : 'none';
+        const dates = value === '@ExternalReviewerScopes.DateRange';
+        from.style.display = dates ? '' : 'none';
+        to.style.display = dates ? '' : 'none';
+    }
+    scope?.addEventListener('change', update);
+    update();
+})();
+</script>

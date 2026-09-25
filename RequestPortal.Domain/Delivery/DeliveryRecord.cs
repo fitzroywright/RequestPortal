@@ -23,7 +23,8 @@ public sealed class DeliveryRecord
         string accessTokenHash,
         string recipientName,
         string? deliveryPerson,
-        DateTimeOffset createdUtc)
+        DateTimeOffset createdUtc,
+        DateTimeOffset? accessExpiresUtc = null)
     {
         if (id == Guid.Empty) throw new ArgumentException("Delivery id is required.", nameof(id));
         if (requestId == Guid.Empty) throw new ArgumentException("Request id is required.", nameof(requestId));
@@ -43,6 +44,8 @@ public sealed class DeliveryRecord
         DeliveryPerson = Normalize(deliveryPerson);
         Status = DeliveryStatus.Ready;
         CreatedUtc = createdUtc;
+        AccessExpiresUtc = accessExpiresUtc ?? createdUtc.AddDays(30);
+        if (AccessExpiresUtc <= createdUtc) throw new ArgumentException("Delivery access must expire after creation.", nameof(accessExpiresUtc));
     }
 
     public Guid Id { get; private set; }
@@ -56,11 +59,14 @@ public sealed class DeliveryRecord
     public DeliveryStatus Status { get; private set; }
     public string? AcknowledgedBy { get; private set; }
     public DateTimeOffset CreatedUtc { get; private set; }
+    public DateTimeOffset AccessExpiresUtc { get; private set; }
     public DateTimeOffset? AcknowledgedUtc { get; private set; }
     public Guid? EvidenceDocumentId { get; private set; }
     public string? SignatureData { get; private set; }
     public string? Notes { get; private set; }
     public DateTimeOffset? SyncedToFfpManagerUtc { get; private set; }
+
+    public bool IsAccessActive(DateTimeOffset now) => now < AccessExpiresUtc;
 
     public void Acknowledge(
         DeliveryStatus status,
