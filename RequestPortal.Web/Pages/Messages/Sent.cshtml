@@ -1,0 +1,52 @@
+@page
+@model RequestPortal.Web.Pages.Messages.SentModel
+@using RequestPortal.Application.Messages
+@{
+    ViewData["Title"] = "Sent Items";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Messages</div>
+            <h1>Sent items</h1>
+            <p>Messages you have sent through Request Portal.</p>
+        </div>
+        <div class="action-row" style="margin-bottom:20px">
+            <a class="button" asp-page="/Messages/New">New message</a>
+            <a class="button button-secondary" asp-page="/Messages/Inbox">Inbox</a>
+        </div>
+
+        @if (Model.Messages.Count == 0)
+        {
+            <div class="card"><p class="muted">No sent messages yet.</p></div>
+        }
+        else
+        {
+            <div class="card table-wrap">
+                <table>
+                    <thead><tr><th>Subject</th><th>Context</th><th>Sent</th></tr></thead>
+                    <tbody>
+                    @foreach (MailboxMessageView message in Model.Messages)
+                    {
+                        <tr>
+                            <td>
+                                <a asp-page="/Messages/Thread" asp-route-id="@message.ThreadId"><strong>@message.Subject</strong></a>
+                                <div class="muted">@message.Preview</div>
+                            </td>
+                            <td>
+                                @message.OrganizationName
+                                @if (!string.IsNullOrWhiteSpace(message.RequestReference))
+                                {
+                                    <div class="muted">@message.RequestReference</div>
+                                }
+                            </td>
+                            <td>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
