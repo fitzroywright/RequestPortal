@@ -228,7 +228,8 @@ public sealed class SqlIntegrationOutboxStore : IIntegrationOutboxStore
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         const string sql = """
             SELECT CASE
-                WHEN OBJECT_ID(N'dbo.RequestPortalIntegrationOutbox', N'U') IS NOT NULL
+                WHEN COL_LENGTH(N'dbo.ApplicationLetters', N'ExternalRequestId') IS NOT NULL
+                     AND OBJECT_ID(N'dbo.RequestPortalIntegrationOutbox', N'U') IS NOT NULL
                      AND OBJECT_ID(N'dbo.RequestPortal_EnqueueApplicationStatusChanged', N'P') IS NOT NULL
                      AND OBJECT_ID(N'dbo.RequestPortal_EnqueueInformationRequest', N'P') IS NOT NULL
                 THEN CAST(1 AS bit)
