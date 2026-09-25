@@ -20,6 +20,7 @@ public sealed class DeliveryRecord
         string documentType,
         string documentReference,
         string snapshotJson,
+        string accessTokenHash,
         string recipientName,
         string? deliveryPerson,
         DateTimeOffset createdUtc)
@@ -29,6 +30,7 @@ public sealed class DeliveryRecord
         if (string.IsNullOrWhiteSpace(documentType)) throw new ArgumentException("Document type is required.", nameof(documentType));
         if (string.IsNullOrWhiteSpace(documentReference)) throw new ArgumentException("Document reference is required.", nameof(documentReference));
         if (string.IsNullOrWhiteSpace(snapshotJson)) throw new ArgumentException("Delivery snapshot is required.", nameof(snapshotJson));
+        if (string.IsNullOrWhiteSpace(accessTokenHash)) throw new ArgumentException("Access token hash is required.", nameof(accessTokenHash));
         if (string.IsNullOrWhiteSpace(recipientName)) throw new ArgumentException("Recipient is required.", nameof(recipientName));
 
         Id = id;
@@ -36,6 +38,7 @@ public sealed class DeliveryRecord
         DocumentType = documentType.Trim();
         DocumentReference = documentReference.Trim();
         SnapshotJson = snapshotJson;
+        AccessTokenHash = accessTokenHash;
         RecipientName = recipientName.Trim();
         DeliveryPerson = Normalize(deliveryPerson);
         Status = DeliveryStatus.Ready;
@@ -47,6 +50,7 @@ public sealed class DeliveryRecord
     public string DocumentType { get; private set; } = string.Empty;
     public string DocumentReference { get; private set; } = string.Empty;
     public string SnapshotJson { get; private set; } = string.Empty;
+    public string AccessTokenHash { get; private set; } = string.Empty;
     public string RecipientName { get; private set; } = string.Empty;
     public string? DeliveryPerson { get; private set; }
     public DeliveryStatus Status { get; private set; }
