@@ -34,7 +34,7 @@ public sealed class FfpManagerBridgeStartupDiagnostic : IStartupDiagnostic
 
         try
         {
-            HttpClient client = httpClientFactory.CreateClient("FfpManagerBridgeHealth");
+            HttpClient client = httpClientFactory.CreateClient("FfpManagerBridgeReadiness");
             using HttpRequestMessage request = new(HttpMethod.Get, new Uri(baseUri, "ready"));
             using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
@@ -42,7 +42,7 @@ public sealed class FfpManagerBridgeStartupDiagnostic : IStartupDiagnostic
                 return new DiagnosticCheckResult(
                     Name,
                     false,
-                    $"Bridge health endpoint returned HTTP {(int)response.StatusCode} {response.ReasonPhrase}.");
+                    $"Bridge readiness endpoint returned HTTP {(int)response.StatusCode} {response.ReasonPhrase}.");
             }
 
             BridgeReadinessResponse? health = await response.Content.ReadFromJsonAsync<BridgeReadinessResponse>(
