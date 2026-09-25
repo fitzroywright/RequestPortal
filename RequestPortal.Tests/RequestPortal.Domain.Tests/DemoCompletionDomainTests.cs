@@ -44,6 +44,38 @@ public sealed class DemoCompletionDomainTests
     }
 
     [Fact]
+    public void DeliveryAccessExpiresAndRejectsInvalidExpiry()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DeliveryRecord delivery = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Delivery Note",
+            "DN-EXP",
+            "{}",
+            new string('Z', 64),
+            "Recipient",
+            null,
+            now,
+            now.AddMinutes(15));
+
+        Assert.True(delivery.IsAccessActive(now.AddMinutes(14)));
+        Assert.False(delivery.IsAccessActive(now.AddMinutes(15)));
+
+        Assert.Throws<ArgumentException>(() => new DeliveryRecord(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Delivery Note",
+            "DN-BAD",
+            "{}",
+            new string('Y', 64),
+            "Recipient",
+            null,
+            now,
+            now));
+    }
+
+    [Fact]
     public void UnacknowledgedDeliveryCannotBeMarkedSynced()
     {
         DeliveryRecord delivery = new(
