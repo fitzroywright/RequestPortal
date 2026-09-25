@@ -1020,33 +1020,6 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.ToTable("request_status_history", (string)null);
                 });
 
-            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageAttachment", b =>
-                {
-                    b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
-                        .WithMany()
-                        .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
-                {
-                    b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
-                        .WithMany()
-                        .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("RequestPortal.Domain.Messages.PortalMessage", b =>
-                {
-                    b.HasOne("RequestPortal.Domain.Messages.MessageThread", null)
-                        .WithMany()
-                        .HasForeignKey("ThreadId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
                 {
                     b.Property<Guid>("MessageId")
@@ -1277,6 +1250,33 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProcessedUtc", "OccurredUtc");
 
                     b.ToTable("outbox_messages", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageAttachment", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.PortalMessage", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Messages.MessageThread", null)
+                        .WithMany()
+                        .HasForeignKey("ThreadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
