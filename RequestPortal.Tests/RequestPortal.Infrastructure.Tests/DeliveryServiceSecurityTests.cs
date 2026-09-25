@@ -9,6 +9,7 @@ using RequestPortal.Application.Documents;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Infrastructure.Delivery;
 using RequestPortal.Infrastructure.Identity;
 using Xunit;
@@ -99,6 +100,67 @@ public sealed class DeliveryServiceSecurityTests
                 cancellationToken));
     }
 
+
+    [Fact]
+    public async Task DeliveryCreationQueuesSecureAcknowledgementEmailWhenRecipientEmailIsProvided()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        ApplicationUser user = new()
+        {
+            Id = Guid.NewGuid(),
+            UserName = "notify@example.org",
+            NormalizedUserName = "NOTIFY@EXAMPLE.ORG",
+            Email = "notify@example.org",
+            NormalizedEmail = "NOTIFY@EXAMPLE.ORG",
+            EmailConfirmed = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            DisplayName = "Notify Owner",
+            CreatedUtc = now
+        };
+        database.Db.Users.Add(user);
+
+        Organization organization = new(Guid.NewGuid(), "POD Notification Organization", "JM", user.Id, now);
+        organization.RequestMembership(Guid.NewGuid(), user.Id, now);
+        organization.Approve(Guid.NewGuid(), now.AddMinutes(1));
+        database.Db.Organizations.Add(organization);
+
+        AssistanceRequest request = new(Guid.NewGuid(), "RP-POD-003", organization.Id, user.Id, now);
+        request.SetSummary("POD notification test");
+        database.Db.AssistanceRequests.Add(request);
+        await database.Db.SaveChangesAsync(cancellationToken);
+
+        CapturingNotificationSender notifications = new();
+        DeliveryService service = new(
+            database.Db,
+            new NullAuditWriter(),
+            new StubDocumentService(),
+            notifications);
+
+        CreateDeliveryResult created = await service.CreateAsync(
+            new CreateDeliveryCommand(
+                request.Id,
+                "Delivery Note",
+                "DN-102",
+                "Jane Recipient",
+                "Driver",
+                [new DeliveryLineSnapshot("Food parcel", 1m, "parcel")],
+                null,
+                "jane@example.org",
+                "https://requestportal.example.org"),
+            cancellationToken);
+
+        Assert.True(created.NotificationQueued);
+        NotificationEnvelope notification = Assert.Single(notifications.Notifications);
+        Assert.Equal("jane@example.org", notification.Recipient);
+        Assert.Contains("DN-102", notification.Subject, StringComparison.Ordinal);
+        Assert.Contains($"/Delivery/{created.DeliveryId:D}?token=", notification.Body, StringComparison.Ordinal);
+        Assert.Contains("https://requestportal.example.org", notification.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("BAD-TOKEN", notification.Body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task RequestDeliveryListReflectsAcknowledgementOutcome()
     {
@@ -156,6 +218,17 @@ public sealed class DeliveryServiceSecurityTests
         Assert.Equal("PartiallyDelivered", delivery.Status);
         Assert.Equal("Recipient", delivery.AcknowledgedBy);
         Assert.Equal("One case damaged.", delivery.Notes);
+    }
+
+    private sealed class CapturingNotificationSender : INotificationSender
+    {
+        public List<NotificationEnvelope> Notifications { get; } = [];
+
+        public Task SendAsync(NotificationEnvelope notification, CancellationToken cancellationToken = default)
+        {
+            Notifications.Add(notification);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class NullAuditWriter : IBusinessAuditWriter
