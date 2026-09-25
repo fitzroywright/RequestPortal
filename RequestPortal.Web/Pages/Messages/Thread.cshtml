@@ -1,0 +1,53 @@
+@page "{id:guid}"
+@model RequestPortal.Web.Pages.Messages.ThreadModel
+@using RequestPortal.Application.Messages
+@{
+    ViewData["Title"] = Model.Thread?.Subject ?? "Conversation";
+}
+
+<section class="section">
+    <div class="shell">
+        @if (Model.Thread is not null)
+        {
+            <div class="section-heading">
+                <div class="eyebrow" style="color:#b45b09">Conversation</div>
+                <h1>@Model.Thread.Subject</h1>
+                <p>
+                    @Model.Thread.OrganizationName
+                    @if (!string.IsNullOrWhiteSpace(Model.Thread.RequestReference))
+                    {
+                        <span> · @Model.Thread.RequestReference</span>
+                    }
+                </p>
+            </div>
+
+            <div class="message-thread">
+                @foreach (MessageDetailView message in Model.Thread.Messages)
+                {
+                    <article class="message-bubble @(message.IsMine ? "message-mine" : null)">
+                        <div class="message-meta">
+                            <strong>@message.SenderName</strong>
+                            @if (message.SenderKind == "FFP Staff")
+                            {
+                                <span class="status">FFP Staff</span>
+                            }
+                            @if (Model.IsStaff && !string.IsNullOrWhiteSpace(message.SenderEmail))
+                            {
+                                <span class="muted">@message.SenderEmail</span>
+                            }
+                            <span class="muted">@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</span>
+                        </div>
+                        <div class="message-body">@message.Body</div>
+                    </article>
+                }
+            </div>
+
+            <form method="post" class="card" style="margin-top:20px">
+                <label asp-for="Reply">Reply</label>
+                <textarea asp-for="Reply" rows="6" maxlength="10000" required></textarea>
+                <span asp-validation-for="Reply" class="validation"></span>
+                <button class="button" type="submit">Send reply</button>
+            </form>
+        }
+    </div>
+</section>
