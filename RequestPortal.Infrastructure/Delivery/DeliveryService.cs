@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Delivery;
 using RequestPortal.Application.Documents;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Delivery;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -21,15 +22,18 @@ public sealed class DeliveryService : IDeliveryService
     private readonly RequestPortalDbContext dbContext;
     private readonly IBusinessAuditWriter auditWriter;
     private readonly IDocumentService documentService;
+    private readonly INotificationSender? notificationSender;
 
     public DeliveryService(
         RequestPortalDbContext dbContext,
         IBusinessAuditWriter auditWriter,
-        IDocumentService documentService)
+        IDocumentService documentService,
+        INotificationSender? notificationSender = null)
     {
         this.dbContext = dbContext;
         this.auditWriter = auditWriter;
         this.documentService = documentService;
+        this.notificationSender = notificationSender;
     }
 
     public async Task<CreateDeliveryResult> CreateAsync(CreateDeliveryCommand command, CancellationToken cancellationToken = default)
@@ -67,8 +71,57 @@ public sealed class DeliveryService : IDeliveryService
 
         dbContext.Deliveries.Add(record);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await auditWriter.WriteAsync(Guid.Empty, "DeliveryCreated", "Delivery", record.Id, null, $"request={command.RequestId:D}; document={command.DocumentReference}", cancellationToken);
-        return new CreateDeliveryResult(record.Id, accessToken);
+        await auditWriter.WriteAsync(
+            Guid.Empty,
+            "DeliveryCreated",
+            "Delivery",
+            record.Id,
+            null,
+            $"request={command.RequestId:D}; document={command.DocumentReference}",
+            cancellationToken);
+
+        bool notificationQueued = false;
+        if (notificationSender is not null &&
+            !string.IsNullOrWhiteSpace(command.RecipientEmail) &&
+            !string.IsNullOrWhiteSpace(command.PublicBaseUrl))
+        {
+            string acknowledgementUrl =
+                $"{command.PublicBaseUrl.TrimEnd('/')}/Delivery/{record.Id:D}?token={Uri.EscapeDataString(accessToken)}";
+
+            try
+            {
+                await notificationSender.SendAsync(
+                    new NotificationEnvelope(
+                        command.RecipientEmail.Trim(),
+                        $"Delivery acknowledgement required: {command.DocumentReference}",
+                        $"A delivery is ready for your acknowledgement.\n\nReference: {command.DocumentReference}\nRecipient: {command.RecipientName}\n\nOpen the secure link below to confirm whether the delivery was received in full, partially delivered, or not delivered:\n{acknowledgementUrl}\n\nThis secure link expires {record.AccessExpiresUtc:u}.",
+                        CorrelationId: record.Id.ToString("D")),
+                    cancellationToken);
+
+                notificationQueued = true;
+                await auditWriter.WriteAsync(
+                    Guid.Empty,
+                    "DeliveryNotificationQueued",
+                    "Delivery",
+                    record.Id,
+                    null,
+                    $"recipient={command.RecipientEmail.Trim()}",
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await auditWriter.WriteAsync(
+                    Guid.Empty,
+                    "DeliveryNotificationQueueFailed",
+                    "Delivery",
+                    record.Id,
+                    null,
+                    $"recipient={command.RecipientEmail.Trim()}; error={ex.GetType().Name}",
+                    cancellationToken);
+            }
+        }
+
+        return new CreateDeliveryResult(record.Id, accessToken, notificationQueued);
     }
 
     public async Task<DeliveryView?> GetAsync(Guid deliveryId, string accessToken, CancellationToken cancellationToken = default)
