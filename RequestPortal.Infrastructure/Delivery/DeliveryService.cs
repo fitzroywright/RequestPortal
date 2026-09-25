@@ -82,7 +82,7 @@ public sealed class DeliveryService : IDeliveryService
         if (!TokenMatches(delivery.AccessTokenHash, accessToken)) throw new UnauthorizedAccessException("The delivery access token is invalid.");
         delivery.Acknowledge(deliveryStatus, acknowledgedBy, DateTimeOffset.UtcNow, signatureData, evidenceDocumentId, notes);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await auditWriter.WriteAsync(null, "DeliveryAcknowledged", "Delivery", delivery.Id, null, $"status={delivery.Status}; acknowledgedBy={delivery.AcknowledgedBy}", cancellationToken);
+        await auditWriter.WriteAsync(Guid.Empty, "DeliveryAcknowledged", "Delivery", delivery.Id, null, $"status={delivery.Status}; acknowledgedBy={delivery.AcknowledgedBy}", cancellationToken);
     }
 
     public async Task<IReadOnlyList<DeliveryConfirmation>> GetUnsyncedConfirmationsAsync(CancellationToken cancellationToken = default)
@@ -107,7 +107,7 @@ public sealed class DeliveryService : IDeliveryService
         DeliveryRecord delivery = await dbContext.Deliveries.SingleAsync(item => item.Id == deliveryId, cancellationToken);
         delivery.MarkSynced(DateTimeOffset.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await auditWriter.WriteAsync(null, "DeliverySyncedToFfpManager", "Delivery", delivery.Id, null, null, cancellationToken);
+        await auditWriter.WriteAsync(Guid.Empty, "DeliverySyncedToFfpManager", "Delivery", delivery.Id, null, null, cancellationToken);
     }
 
     private static bool TokenMatches(string expectedHash, string token)
