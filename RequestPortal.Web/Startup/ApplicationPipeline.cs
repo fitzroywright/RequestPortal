@@ -1,13 +1,9 @@
-using Common.Diagnostics;
-
 namespace RequestPortal.Web.Startup;
 
 internal static class ApplicationPipeline
 {
     public static void Configure(WebApplication app)
     {
-        app.MapDiagnosticLevelRuntime();
-
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error");
