@@ -22,7 +22,13 @@
                     <h1>@Model.Request.PublicReference</h1>
                     <p>@Model.Request.Summary</p>
                 </div>
-                <span class="status status-@Model.Request.Status">@Model.Request.Status</span>
+                <div class="action-row">
+                    <a class="button button-outline"
+                       asp-page="/Messages/New"
+                       asp-route-OrganizationId="@Model.Request.OrganizationId"
+                       asp-route-RequestId="@Model.Request.Id">Message FFP</a>
+                    <span class="status status-@Model.Request.Status">@Model.Request.Status</span>
+                </div>
             </div>
 
             <div class="dashboard-grid">
