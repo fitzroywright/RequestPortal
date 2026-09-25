@@ -1,6 +1,6 @@
+using RequestPortal.Web.Security;
 using System.Security.Claims;
 using RequestPortal.Application.Messages;
-using RequestPortal.Common.Security;
 using RequestPortal.Web.Messaging;
 using RequestPortal.Web.Services;
 
