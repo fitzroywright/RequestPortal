@@ -2,14 +2,19 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using RequestPortal.Application.Documents;
 using RequestPortal.Application.Messages;
 using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Pages.Messages;
 
-public sealed class ThreadModel(IPortalMessageService messageService) : PageModel
+public sealed class ThreadModel(
+    IPortalMessageService messageService,
+    IDocumentService documentService) : PageModel
 {
     public MessageThreadView? Thread { get; private set; }
+
+    public IReadOnlyList<DocumentSummary> AvailableAttachments { get; private set; } = Array.Empty<DocumentSummary>();
 
     public bool IsStaff { get; private set; }
 
@@ -18,16 +23,37 @@ public sealed class ThreadModel(IPortalMessageService messageService) : PageMode
     [StringLength(10000)]
     public string Reply { get; set; } = string.Empty;
 
-    public async Task<IActionResult> OnGetAsync(Guid id)
+    [BindProperty]
+    public List<Guid> AttachmentDocumentIds { get; set; } = [];
+
+    public Task<IActionResult> OnGetAsync(Guid id) => LoadAsync(id);
+
+    public async Task<IActionResult> OnGetAttachmentAsync(Guid id, Guid documentId)
     {
         Guid userId = CurrentUserId();
         IsStaff = IsFfpStaff();
-        Thread = await messageService.GetThreadAsync(
+
+        bool allowed = await messageService.CanAccessAttachmentAsync(
             userId,
             IsStaff,
             id,
+            documentId,
             HttpContext.RequestAborted);
-        return Thread is null ? NotFound() : Page();
+
+        if (!allowed)
+        {
+            return NotFound();
+        }
+
+        DocumentDownload? download = await documentService.DownloadAsync(
+            userId,
+            documentId,
+            IsStaff,
+            HttpContext.RequestAborted);
+
+        return download is null
+            ? NotFound()
+            : File(download.Content, download.ContentType, download.FileName);
     }
 
     public async Task<IActionResult> OnPostAsync(Guid id)
@@ -37,12 +63,7 @@ public sealed class ThreadModel(IPortalMessageService messageService) : PageMode
 
         if (!ModelState.IsValid)
         {
-            Thread = await messageService.GetThreadAsync(
-                userId,
-                IsStaff,
-                id,
-                HttpContext.RequestAborted);
-            return Page();
+            return await LoadAsync(id);
         }
 
         await messageService.ReplyAsync(
@@ -50,9 +71,38 @@ public sealed class ThreadModel(IPortalMessageService messageService) : PageMode
             IsStaff,
             id,
             Reply,
-            HttpContext.RequestAborted);
+            cancellationToken: HttpContext.RequestAborted,
+            attachmentDocumentIds: AttachmentDocumentIds);
 
         return RedirectToPage(new { id });
+    }
+
+    private async Task<IActionResult> LoadAsync(Guid id)
+    {
+        Guid userId = CurrentUserId();
+        IsStaff = IsFfpStaff();
+
+        Thread = await messageService.GetThreadAsync(
+            userId,
+            IsStaff,
+            id,
+            HttpContext.RequestAborted);
+
+        if (Thread is null)
+        {
+            return NotFound();
+        }
+
+        if (Thread.RequestId.HasValue)
+        {
+            AvailableAttachments = await documentService.GetRequestDocumentsAsync(
+                userId,
+                Thread.RequestId.Value,
+                IsStaff,
+                HttpContext.RequestAborted);
+        }
+
+        return Page();
     }
 
     private Guid CurrentUserId() =>
