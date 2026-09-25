@@ -8,7 +8,7 @@ using RequestPortal.Common.Messaging;
 
 namespace RequestPortal.Infrastructure.Messaging;
 
-public sealed class CommonQueuedNotificationSender : INotificationSender
+public sealed class CommonQueuedNotificationSender : RequestPortal.Common.Messaging.INotificationSender
 {
     private readonly IExternalDeliveryQueue queue;
     private readonly IConfiguration configuration;
