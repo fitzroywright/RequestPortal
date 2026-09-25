@@ -131,6 +131,13 @@ public interface IPortalMessageService
         IReadOnlyCollection<Guid> recipientUserIds,
         CancellationToken cancellationToken = default);
 
+    Task<bool> CanAccessAttachmentAsync(
+        Guid userId,
+        bool isStaff,
+        Guid threadId,
+        Guid documentId,
+        CancellationToken cancellationToken = default);
+
     Task MarkThreadReadAsync(
         Guid userId,
         Guid threadId,
