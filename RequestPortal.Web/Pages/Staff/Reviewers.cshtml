@@ -32,7 +32,7 @@
                 <label asp-for="OrganizationId">Organization</label>
                 <select asp-for="OrganizationId">
                     <option value="">Select organization</option>
-                    @foreach (ReviewerOrganizationOption item in Model.Organizations)
+                    @foreach (RequestPortal.Web.Pages.Staff.ReviewerOrganizationOption item in Model.Organizations)
                     {
                         <option value="@item.Id">@item.Name</option>
                     }
@@ -43,7 +43,7 @@
                 <label asp-for="RequestId">Request</label>
                 <select asp-for="RequestId">
                     <option value="">Select request</option>
-                    @foreach (ReviewerRequestOption item in Model.Requests)
+                    @foreach (RequestPortal.Web.Pages.Staff.ReviewerRequestOption item in Model.Requests)
                     {
                         <option value="@item.Id">@item.Reference — @item.OrganizationName</option>
                     }
