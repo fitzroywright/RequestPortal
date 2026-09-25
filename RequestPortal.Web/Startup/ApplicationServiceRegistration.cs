@@ -14,6 +14,7 @@ using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Reviewers;
 using RequestPortal.Application.Reporting;
+using RequestPortal.Application.Security;
 using RequestPortal.Application.Requests;
 using RequestPortal.Common.Configuration;
 using RequestPortal.Common.Diagnostics;
@@ -36,9 +37,11 @@ using RequestPortal.Infrastructure.Portal;
 using RequestPortal.Infrastructure.ReferenceData;
 using RequestPortal.Infrastructure.Reviewers;
 using RequestPortal.Infrastructure.Reporting;
+using RequestPortal.Infrastructure.Security;
 using RequestPortal.Infrastructure.Requests;
 using RequestPortal.Web.Demo;
 using RequestPortal.Web.Messaging;
+using RequestPortal.Web.Services;
 
 namespace RequestPortal.Web.Startup;
 
