@@ -497,6 +497,18 @@ public sealed class PortalMessageService : IPortalMessageService
         AddRecipients(message.Id, allRecipients, senderUserId: null);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        if (auditWriter is not null)
+        {
+            await auditWriter.WriteAsync(
+                Guid.Empty,
+                "SystemMessageSent",
+                "PortalMessage",
+                message.Id,
+                thread.OrganizationId,
+                $"thread={thread.Id:D}; request={thread.RequestId}; recipients={allRecipients.Length}",
+                cancellationToken);
+        }
+
         await NotifyAsync(message, thread, allRecipients, cancellationToken);
         return thread.Id;
     }
