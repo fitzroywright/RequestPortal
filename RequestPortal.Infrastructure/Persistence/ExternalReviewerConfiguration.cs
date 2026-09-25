@@ -17,5 +17,7 @@ public sealed class ExternalReviewerConfiguration : IEntityTypeConfiguration<Ext
         builder.HasIndex(item => item.Email);
         builder.HasIndex(item => item.ExpiresUtc);
         builder.HasIndex(item => item.RevokedUtc);
+        builder.HasIndex(item => item.OrganizationId);
+        builder.HasIndex(item => item.RequestId);
     }
 }
