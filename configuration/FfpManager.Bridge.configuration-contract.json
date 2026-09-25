@@ -1,0 +1,110 @@
+{
+  "applicationId": "FfpManager.Bridge",
+  "displayName": "FFP Manager Bridge",
+  "version": "1.0.0",
+  "description": "Adapter service between Request Portal business contracts and FFP Manager.",
+  "requirements": [
+    {
+      "id": "service-identity",
+      "displayName": "Bridge service identity",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Provides a stable machine/service identity for diagnostics and operations.",
+      "configurationKey": "Bridge:ServiceIdentity",
+      "isConfigured": false
+    },
+    {
+      "id": "request-portal-url",
+      "displayName": "Request Portal callback URL",
+      "kind": "ExternalService",
+      "required": true,
+      "purpose": "Defines the HTTPS Request Portal callback base URL.",
+      "configurationKey": "Bridge:RequestPortalBaseUrl",
+      "isConfigured": false
+    },
+    {
+      "id": "gateway",
+      "displayName": "FFP Manager gateway mode",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Requires SQL gateway mode for production FFP Manager integration.",
+      "configurationKey": "Bridge:Gateway",
+      "isConfigured": false
+    },
+    {
+      "id": "sql-connection",
+      "displayName": "FFP Manager SQL credential",
+      "kind": "Secret",
+      "required": true,
+      "purpose": "Provides the FFP Manager SQL connection through Common.Secrets.",
+      "secretName": "FfpManagerBridge:SqlConnectionString",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "callback-secret",
+      "displayName": "Request Portal callback credential",
+      "kind": "Secret",
+      "required": true,
+      "purpose": "Authenticates bridge callbacks to Request Portal through Common.Secrets.",
+      "secretName": "FfpManagerIntegration:SharedSecret",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "initial-status",
+      "displayName": "Initial application status",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines the FFP Manager status assigned to newly integrated applications.",
+      "configurationKey": "Bridge:InitialApplicationStatus",
+      "isConfigured": false
+    },
+    {
+      "id": "document-root",
+      "displayName": "Legacy supporting document root",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Temporary legacy document location until the SharePoint document provider replaces filesystem storage.",
+      "configurationKey": "Bridge:SupportingDocumentRoot",
+      "isConfigured": false
+    },
+    {
+      "id": "outbox-enabled",
+      "displayName": "Durable outbox dispatch",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Enables durable FFP Manager outbound event delivery.",
+      "configurationKey": "Bridge:EnableOutboxDispatch",
+      "isConfigured": false
+    },
+    {
+      "id": "allowed-hosts",
+      "displayName": "Allowed bridge hosts",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Restricts production host names accepted by the bridge.",
+      "configurationKey": "AllowedHosts",
+      "isConfigured": false
+    }
+  ],
+  "runbookReference": "docs/FFP-MANAGER-INTEGRATION-COMMISSIONING.md",
+  "diagnostics": {
+    "baseUrl": null,
+    "healthPath": "/health",
+    "diagnosticsRunPath": "/api/engineering/diagnostics/diagnostic-level/run",
+    "diagnosticsRunsPath": "/api/engineering/diagnostics/diagnostic-level/runs",
+    "supportsRemoteDiagnostics": true,
+    "supportsOperationalTelemetry": false,
+    "authenticationScheme": "DiagnosticLevel-HMAC-SHA256",
+    "secretName": "Aegis:Diagnostics:RequestCredential",
+    "supportedLevels": [
+      5,
+      4,
+      3,
+      2,
+      1
+    ]
+  },
+  "module": "FfpManager.Bridge"
+}
