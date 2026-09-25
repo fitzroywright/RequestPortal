@@ -1,0 +1,71 @@
+@page "/Delivery/{deliveryId:guid}"
+@model RequestPortal.Web.Pages.Delivery.ViewModel
+@{
+    ViewData["Title"] = "Delivery Acknowledgement";
+}
+<section class="section">
+<div class="shell" style="max-width:900px">
+    @if (Model.Delivery is null)
+    {
+        <section class="card"><h1>Delivery link unavailable</h1><p class="muted">This delivery link is invalid or no longer available.</p></section>
+    }
+    else
+    {
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Delivery acknowledgement</div>
+            <h1>@Model.Delivery.DocumentReference</h1>
+            <p>@Model.Delivery.DocumentType · Recipient: @Model.Delivery.RecipientName</p>
+        </div>
+
+        <section class="card" style="margin-bottom:16px">
+            <h2>Delivery details</h2>
+            <div class="table-wrap">
+                <table>
+                    <tbody>
+                        <tr><th>Recipient</th><td>@Model.Delivery.RecipientName</td></tr>
+                        <tr><th>Delivery person</th><td>@(Model.Delivery.DeliveryPerson ?? "Not specified")</td></tr>
+                        <tr><th>Reference</th><td>@Model.Delivery.DocumentReference</td></tr>
+                        <tr><th>Status</th><td>@Model.Delivery.Status</td></tr>
+                        <tr><th>Created</th><td>@Model.Delivery.CreatedUtc.ToLocalTime().ToString("f")</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card" style="margin-bottom:16px">
+            <h2>Items and document snapshot</h2>
+            <pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fa;padding:14px;border:1px solid #e2e7ea;border-radius:6px">@Model.FormattedSnapshot</pre>
+            <p class="muted">This snapshot is preserved exactly as received for this delivery and will not silently change if the source record later changes.</p>
+        </section>
+
+        @if (Model.Delivery.Status == "Ready")
+        {
+            <section class="card">
+                <h2>Acknowledge receipt</h2>
+                <form method="post">
+                    <input type="hidden" asp-for="Token" />
+                    <div class="form-group"><label asp-for="AcknowledgedBy">Your name</label><input asp-for="AcknowledgedBy" required /></div>
+                    <div class="form-group"><label asp-for="Status">Delivery result</label>
+                        <select asp-for="Status" required>
+                            <option value="Delivered">Delivered</option>
+                            <option value="PartiallyDelivered">Partially delivered</option>
+                            <option value="Failed">Failed / not delivered</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label asp-for="SignatureData">Signature / acknowledgement</label><textarea asp-for="SignatureData" rows="3" required placeholder="Type your name or acknowledgement mark"></textarea></div>
+                    <div class="form-group"><label asp-for="Notes">Notes</label><textarea asp-for="Notes" rows="4"></textarea></div>
+                    <button class="button" type="submit">Confirm delivery result</button>
+                </form>
+            </section>
+        }
+        else
+        {
+            <section class="card">
+                <h2>Acknowledgement recorded</h2>
+                <p><strong>@Model.Delivery.Status</strong> by @Model.Delivery.AcknowledgedBy on @Model.Delivery.AcknowledgedUtc?.ToLocalTime().ToString("f").</p>
+                @if (!string.IsNullOrWhiteSpace(Model.Delivery.Notes)) { <p>@Model.Delivery.Notes</p> }
+            </section>
+        }
+    }
+</div>
+</section>
