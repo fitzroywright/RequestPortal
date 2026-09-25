@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Administration;
+using RequestPortal.Application.Documents;
 using RequestPortal.Application.Messages;
 using RequestPortal.Application.Portal;
 using RequestPortal.Web.Security;
@@ -12,11 +13,14 @@ namespace RequestPortal.Web.Pages.Messages;
 public sealed class NewModel(
     IPortalMessageService messageService,
     IPortalWorkflowService workflowService,
-    IStaffOrganizationService staffOrganizationService) : PageModel
+    IStaffOrganizationService staffOrganizationService,
+    IDocumentService documentService) : PageModel
 {
     public IReadOnlyList<OrganizationOption> Organizations { get; private set; } = Array.Empty<OrganizationOption>();
 
     public IReadOnlyList<MessageRecipientOption> Recipients { get; private set; } = Array.Empty<MessageRecipientOption>();
+
+    public IReadOnlyList<DocumentSummary> AvailableAttachments { get; private set; } = Array.Empty<DocumentSummary>();
 
     public bool IsStaff { get; private set; }
 
@@ -31,6 +35,9 @@ public sealed class NewModel(
 
     [BindProperty]
     public bool ToFfpStaff { get; set; }
+
+    [BindProperty]
+    public List<Guid> AttachmentDocumentIds { get; set; } = [];
 
     [BindProperty]
     [Required]
@@ -85,7 +92,8 @@ public sealed class NewModel(
                 null,
                 Subject,
                 Body,
-                HttpContext.RequestAborted);
+                cancellationToken: HttpContext.RequestAborted,
+                attachmentDocumentIds: AttachmentDocumentIds);
         }
         else
         {
@@ -98,7 +106,8 @@ public sealed class NewModel(
                 Subject,
                 Body,
                 [RecipientUserId!.Value],
-                HttpContext.RequestAborted);
+                cancellationToken: HttpContext.RequestAborted,
+                attachmentDocumentIds: AttachmentDocumentIds);
         }
 
         return RedirectToPage("/Messages/Thread", new { id = threadId });
@@ -135,6 +144,15 @@ public sealed class NewModel(
                 userId,
                 IsStaff,
                 OrganizationId.Value,
+                HttpContext.RequestAborted);
+        }
+
+        if (RequestId.HasValue)
+        {
+            AvailableAttachments = await documentService.GetRequestDocumentsAsync(
+                userId,
+                RequestId.Value,
+                IsStaff,
                 HttpContext.RequestAborted);
         }
     }
