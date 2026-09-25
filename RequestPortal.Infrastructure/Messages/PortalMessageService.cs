@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Messages;
 using RequestPortal.Domain.Messages;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
@@ -521,6 +522,7 @@ public sealed class PortalMessageService : IPortalMessageService
             .Distinct()
             .ToArray();
         AddRecipients(message.Id, recipients, senderUserId);
+        AddExternalNotificationOutbox(message, thread, recipients);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await NotifyAsync(message, thread, recipients, cancellationToken);
@@ -573,6 +575,32 @@ public sealed class PortalMessageService : IPortalMessageService
         {
             dbContext.MessageRecipients.Add(new MessageRecipient(messageId, userId));
         }
+    }
+
+    private void AddExternalNotificationOutbox(
+        PortalMessage message,
+        MessageThread thread,
+        IReadOnlyCollection<Guid> recipientUserIds)
+    {
+        PortalMessageNotificationRequestedMessage notification = new(
+            Guid.NewGuid(),
+            message.SentUtc,
+            message.Id,
+            thread.Id,
+            thread.OrganizationId,
+            thread.RequestId,
+            message.SenderDisplayName,
+            thread.Subject,
+            recipientUserIds);
+
+        dbContext.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = notification.MessageId,
+            MessageType = typeof(PortalMessageNotificationRequestedMessage).FullName ?? nameof(PortalMessageNotificationRequestedMessage),
+            Payload = System.Text.Json.JsonSerializer.Serialize(notification),
+            OccurredUtc = notification.OccurredUtc,
+            AttemptCount = 0
+        });
     }
 
     private async Task NotifyAsync(
