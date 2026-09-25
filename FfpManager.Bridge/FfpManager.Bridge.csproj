@@ -7,5 +7,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RequestPortal.Application\RequestPortal.Application.csproj" />
+    <ProjectReference Include="..\..\Common\Common.Diagnostics\Common.Diagnostics.csproj" />
+    <ProjectReference Include="..\..\Common\Common.Secrets\Common.Secrets.csproj" />
   </ItemGroup>
 </Project>
