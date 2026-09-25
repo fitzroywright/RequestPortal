@@ -170,6 +170,36 @@ public sealed class ExternalReviewerService : IExternalReviewerService
             cancellationToken);
     }
 
+    public async Task<ExternalReviewerInvitationView> ReissueAsync(
+        Guid invitationId,
+        Guid invitedByUserId,
+        string publicBaseUrl,
+        CancellationToken cancellationToken = default)
+    {
+        ExternalReviewerInvitation existing = await dbContext.ExternalReviewerInvitations
+            .SingleAsync(item => item.Id == invitationId, cancellationToken);
+
+        existing.Revoke(DateTimeOffset.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(
+            invitedByUserId,
+            "ExternalReviewerReissued",
+            "ExternalReviewerInvitation",
+            existing.Id,
+            null,
+            $"email={existing.Email}; scope={existing.Scope}",
+            cancellationToken);
+
+        return await InviteAsync(
+            invitedByUserId,
+            existing.Email,
+            existing.DisplayName,
+            existing.Scope,
+            DateTimeOffset.UtcNow.AddHours(24),
+            publicBaseUrl,
+            cancellationToken);
+    }
+
     private static ExternalReviewerInvitationView ToView(ExternalReviewerInvitation item) =>
         new(item.Id, item.Email, item.DisplayName, item.Scope, item.CreatedUtc, item.ExpiresUtc, item.RedeemedUtc, item.RevokedUtc, item.LastAccessUtc);
 
