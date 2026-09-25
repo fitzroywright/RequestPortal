@@ -58,8 +58,7 @@ The bridge claims committed events with SQL locking, posts them to Request Porta
 marks successful delivery, and retries failures with bounded exponential backoff.
 Events that exhaust the retry budget remain visible for Level 1 diagnostics.
 
-Polling of Request Portal -> FFP status remains a reconciliation mechanism on the
-Request Portal side. Table scanning is not the normal FFP -> Portal transport.
+Request Portal status reconciliation remains a recovery mechanism on the Request Portal side. It is not the normal FFP -> Portal transport.
 
 ## Production secrets and identity
 
@@ -115,3 +114,13 @@ Request Portal exposes an authenticated callback probe at:
 `GET /api/integration/ffpmanager/probe`
 
 The same Common.Secrets-backed integration key used for callbacks protects the probe.
+
+
+## Health and readiness
+
+The bridge exposes two different operational signals:
+
+- `GET /health` -- process liveness only. It answers whether the bridge process is running.
+- `GET /ready` -- integration readiness. In SQL mode it verifies the durable outbox schema and reference-data availability and returns HTTP 503 when those dependencies are not ready.
+
+Use Level 5 -> Level 1 diagnostics for detailed fault isolation. Do not treat the liveness endpoint as proof that the integration is commissioned.
