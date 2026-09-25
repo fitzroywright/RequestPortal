@@ -181,6 +181,11 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ActorUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ApplicationContext")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Detail")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -198,6 +203,11 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.HasKey("Id");
 
@@ -374,6 +384,80 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "OwnerType", "OwnerId");
 
                     b.ToTable("documents", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Delivery.DeliveryRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("AcknowledgedBy")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeliveryPerson")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<string>("DocumentReference")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("EvidenceDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("RecipientName")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SignatureData")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("SyncedToFfpManagerUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentReference");
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex("Status", "SyncedToFfpManagerUtc");
+
+                    b.ToTable("deliveries", (string)null);
                 });
 
             modelBuilder.Entity("RequestPortal.Domain.Fulfilment.Fulfilment", b =>
@@ -763,6 +847,61 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("units_of_measure", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Reviewers.ExternalReviewerInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTimeOffset>("ExpiresUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InvitedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastAccessUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RedeemedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RevokedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("ExpiresUtc");
+
+                    b.HasIndex("RevokedUtc");
+
+                    b.ToTable("external_reviewer_invitations", (string)null);
                 });
 
             modelBuilder.Entity("RequestPortal.Domain.Requests.AssistanceRequest", b =>
@@ -1250,6 +1389,15 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProcessedUtc", "OccurredUtc");
 
                     b.ToTable("outbox_messages", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Delivery.DeliveryRecord", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Requests.AssistanceRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RequestPortal.Domain.Messages.MessageAttachment", b =>
