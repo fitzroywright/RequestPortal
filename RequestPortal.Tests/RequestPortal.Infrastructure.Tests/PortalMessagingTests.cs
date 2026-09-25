@@ -1,3 +1,4 @@
+using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Messages;
 using RequestPortal.Domain.Messages;
 using RequestPortal.Domain.Organizations;
@@ -32,7 +33,7 @@ public sealed class PortalMessagingTests
         await database.Db.SaveChangesAsync(cancellationToken);
 
         CapturingRealtimeNotifier realtime = new();
-        PortalMessageService service = new(database.Db, realtime);
+        PortalMessageService service = new(database.Db, realtime, new NoOpAuditWriter());
 
         Guid threadId = await service.SendToSharedStaffAsync(
             representative.Id,
@@ -108,7 +109,7 @@ public sealed class PortalMessagingTests
         database.Db.Organizations.AddRange(organization, otherOrganization);
         await database.Db.SaveChangesAsync(cancellationToken);
 
-        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier(), new NoOpAuditWriter());
 
         Guid threadId = await service.SendAsync(
             maria.Id,
@@ -157,7 +158,7 @@ public sealed class PortalMessagingTests
         await database.Db.SaveChangesAsync(cancellationToken);
 
         CapturingRealtimeNotifier realtime = new();
-        PortalMessageService service = new(database.Db, realtime);
+        PortalMessageService service = new(database.Db, realtime, new NoOpAuditWriter());
 
         Guid threadId = await service.SendSystemMessageAsync(
             organization.Id,
@@ -221,7 +222,7 @@ public sealed class PortalMessagingTests
 
         await database.Db.SaveChangesAsync(cancellationToken);
 
-        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier(), new NoOpAuditWriter());
 
         Guid threadId = await service.SendToSharedStaffAsync(
             representative.Id,
@@ -300,6 +301,18 @@ public sealed class PortalMessagingTests
             Now.AddMinutes(1));
 
         return organization;
+    }
+
+    private sealed class NoOpAuditWriter : IBusinessAuditWriter
+    {
+        public Task WriteAsync(
+            Guid actorUserId,
+            string action,
+            string entityType,
+            Guid entityId,
+            Guid? organizationId,
+            string? detail = null,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class CapturingRealtimeNotifier : IPortalMessageRealtimeNotifier

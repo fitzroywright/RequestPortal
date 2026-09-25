@@ -73,6 +73,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         IReadOnlyList<ManagementNamedCount> categories = GroupNamed(rows, row => row.Category);
         IReadOnlyList<ManagementNamedCount> programs = GroupNamed(rows, row => row.Program);
         ManagementDeliverySummary delivery = await BuildDeliverySummaryAsync(cancellationToken);
+        ManagementDeliveryAnalytics deliveryAnalytics = await BuildDeliveryAnalyticsAsync(rows, now, cancellationToken);
         ManagementPerformanceMetrics performance = BuildPerformance(rows, timings, now);
         IReadOnlyList<ManagementTrendPoint> trend = BuildTrend(rows, timings, now);
         IReadOnlyList<ParishReachSummary> parishes = BuildParishes(rows);
@@ -85,6 +86,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             categories,
             programs,
             delivery,
+            deliveryAnalytics,
             performance,
             trend,
             parishes);
@@ -100,6 +102,68 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             item => item.Status != DeliveryStatus.Ready && item.SyncedToFfpManagerUtc == null,
             cancellationToken);
         return new ManagementDeliverySummary(awaiting, delivered, partial, failed, pendingSync);
+    }
+
+    private async Task<ManagementDeliveryAnalytics> BuildDeliveryAnalyticsAsync(
+        IReadOnlyList<ManagementRequestRow> requestRows,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var deliveries = await dbContext.Deliveries
+            .AsNoTracking()
+            .Select(item => new { item.RequestId, item.CreatedUtc, item.AcknowledgedUtc })
+            .ToListAsync(cancellationToken);
+
+        Dictionary<Guid, ManagementRequestRow> rows = requestRows.ToDictionary(item => item.Id);
+        var linked = deliveries
+            .Where(item => rows.ContainsKey(item.RequestId))
+            .Select(item => new { Delivery = item, Request = rows[item.RequestId] })
+            .ToArray();
+
+        IReadOnlyList<ManagementNamedCount> organizations = linked
+            .GroupBy(item => item.Request.OrganizationName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ManagementNamedCount(group.Key, group.Count()))
+            .OrderByDescending(item => item.Count)
+            .ThenBy(item => item.Name)
+            .Take(12)
+            .ToArray();
+
+        IReadOnlyList<ManagementNamedCount> programs = linked
+            .Where(item => !string.IsNullOrWhiteSpace(item.Request.Program))
+            .GroupBy(item => item.Request.Program!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ManagementNamedCount(group.Key, group.Count()))
+            .OrderByDescending(item => item.Count)
+            .ThenBy(item => item.Name)
+            .Take(12)
+            .ToArray();
+
+        IReadOnlyList<ManagementNamedCount> parishes = linked
+            .Where(item => !string.IsNullOrWhiteSpace(item.Request.Parish))
+            .GroupBy(item => item.Request.Parish!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ManagementNamedCount(group.Key, group.Count()))
+            .OrderByDescending(item => item.Count)
+            .ThenBy(item => item.Name)
+            .Take(14)
+            .ToArray();
+
+        DateTimeOffset today = new(now.Year, now.Month, now.Day, 0, 0, 0, TimeSpan.Zero);
+        int daysSinceMonday = ((int)today.DayOfWeek + 6) % 7;
+        DateTimeOffset currentWeek = today.AddDays(-daysSinceMonday);
+        DateTimeOffset firstWeek = currentWeek.AddDays(-49);
+
+        IReadOnlyList<ManagementDeliveryTrendPoint> trend = Enumerable.Range(0, 8)
+            .Select(index =>
+            {
+                DateTimeOffset start = firstWeek.AddDays(index * 7);
+                DateTimeOffset end = start.AddDays(7);
+                return new ManagementDeliveryTrendPoint(
+                    DateOnly.FromDateTime(start.UtcDateTime),
+                    deliveries.Count(item => item.CreatedUtc >= start && item.CreatedUtc < end),
+                    deliveries.Count(item => item.AcknowledgedUtc >= start && item.AcknowledgedUtc < end));
+            })
+            .ToArray();
+
+        return new ManagementDeliveryAnalytics(organizations, programs, parishes, trend);
     }
 
     public async Task<IReadOnlyList<ManagementRequestRow>> GetRequestsAsync(
@@ -121,11 +185,74 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             rows = rows.Where(row => string.Equals(row.Parish, filter.Parish, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(filter.Community))
             rows = rows.Where(row => string.Equals(row.Community, filter.Community, StringComparison.OrdinalIgnoreCase));
+        if (filter.OrganizationId.HasValue)
+            rows = rows.Where(row => row.OrganizationId == filter.OrganizationId.Value);
+        if (filter.RequestId.HasValue)
+            rows = rows.Where(row => row.Id == filter.RequestId.Value);
+        if (filter.FromUtc.HasValue)
+            rows = rows.Where(row => (row.SubmittedUtc ?? row.CreatedUtc) >= filter.FromUtc.Value);
+        if (filter.ToUtc.HasValue)
+            rows = rows.Where(row => (row.SubmittedUtc ?? row.CreatedUtc) <= filter.ToUtc.Value);
 
         return rows
             .OrderByDescending(row => row.SubmittedUtc ?? row.CreatedUtc)
             .ThenBy(row => row.PublicReference)
             .ToArray();
+    }
+
+    public async Task<IReadOnlyList<ManagementDeliveryRow>> GetDeliveriesAsync(
+        ManagementDeliveryFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        IReadOnlyList<ManagementRequestRow> requests = await LoadRowsAsync(now, cancellationToken);
+        Dictionary<Guid, ManagementRequestRow> requestLookup = requests.ToDictionary(item => item.Id);
+
+        var deliveries = await dbContext.Deliveries
+            .AsNoTracking()
+            .OrderByDescending(item => item.CreatedUtc)
+            .ToListAsync(cancellationToken);
+
+        IEnumerable<ManagementDeliveryRow> rows = deliveries
+            .Where(item => requestLookup.ContainsKey(item.RequestId))
+            .Select(item =>
+            {
+                ManagementRequestRow request = requestLookup[item.RequestId];
+                return new ManagementDeliveryRow(
+                    item.Id,
+                    item.RequestId,
+                    request.PublicReference,
+                    request.OrganizationName,
+                    request.Program,
+                    request.Parish,
+                    item.DocumentReference,
+                    item.DocumentType,
+                    item.RecipientName,
+                    item.Status.ToString(),
+                    item.CreatedUtc,
+                    item.AcknowledgedUtc,
+                    item.AcknowledgedBy,
+                    item.Notes,
+                    item.EvidenceDocumentId);
+            });
+
+        if (!string.IsNullOrWhiteSpace(filter.Status))
+        {
+            string status = filter.Status.Trim();
+            rows = rows.Where(item => string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase));
+        }
+        if (!string.IsNullOrWhiteSpace(filter.Organization))
+            rows = rows.Where(item => string.Equals(item.OrganizationName, filter.Organization, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(filter.Program))
+            rows = rows.Where(item => string.Equals(item.Program, filter.Program, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(filter.Parish))
+            rows = rows.Where(item => string.Equals(item.Parish, filter.Parish, StringComparison.OrdinalIgnoreCase));
+        if (filter.FromUtc.HasValue)
+            rows = rows.Where(item => item.CreatedUtc >= filter.FromUtc.Value);
+        if (filter.ToUtc.HasValue)
+            rows = rows.Where(item => item.CreatedUtc <= filter.ToUtc.Value);
+
+        return rows.ToArray();
     }
 
     public async Task<ParishDrillDown> GetParishAsync(string parish, CancellationToken cancellationToken = default)
@@ -155,6 +282,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
                 request.Id,
                 request.PublicReference,
                 OrganizationName = organization.Name,
+                request.OrganizationId,
                 request.Status,
                 request.Category,
                 Program = request.ProgramCategory,
@@ -210,6 +338,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
 
             return new ManagementRequestRow(
                 row.Id,
+                row.OrganizationId,
                 row.PublicReference,
                 row.OrganizationName,
                 row.Status.ToString(),

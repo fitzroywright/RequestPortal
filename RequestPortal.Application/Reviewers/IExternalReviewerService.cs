@@ -8,6 +8,41 @@ namespace RequestPortal.Application.Reviewers;
 public static class ExternalReviewerScopes
 {
     public const string ManagementDashboard = "ManagementDashboard";
+    public const string DeliverySummary = "DeliverySummary";
+    public const string OrganizationPrefix = "Organization:";
+    public const string RequestPrefix = "Request:";
+    public const string DateRangePrefix = "DateRange:";
+
+    public static bool IsSupported(string scope)
+    {
+        if (string.Equals(scope, ManagementDashboard, StringComparison.Ordinal) ||
+            string.Equals(scope, DeliverySummary, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (scope.StartsWith(OrganizationPrefix, StringComparison.Ordinal) &&
+            Guid.TryParse(scope[OrganizationPrefix.Length..], out _))
+        {
+            return true;
+        }
+
+        if (scope.StartsWith(RequestPrefix, StringComparison.Ordinal) &&
+            Guid.TryParse(scope[RequestPrefix.Length..], out _))
+        {
+            return true;
+        }
+
+        if (scope.StartsWith(DateRangePrefix, StringComparison.Ordinal))
+        {
+            string[] parts = scope[DateRangePrefix.Length..].Split('|', 2);
+            return parts.Length == 2 &&
+                   DateTimeOffset.TryParse(parts[0], out _) &&
+                   DateTimeOffset.TryParse(parts[1], out _);
+        }
+
+        return false;
+    }
 }
 
 public sealed record ExternalReviewerInvitationView(
@@ -35,4 +70,5 @@ public interface IExternalReviewerService
     Task<bool> ValidateSessionAsync(Guid invitationId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ExternalReviewerInvitationView>> ListAsync(CancellationToken cancellationToken = default);
     Task RevokeAsync(Guid invitationId, Guid revokedByUserId, CancellationToken cancellationToken = default);
+    Task<ExternalReviewerInvitationView> ReissueAsync(Guid invitationId, Guid invitedByUserId, string publicBaseUrl, CancellationToken cancellationToken = default);
 }

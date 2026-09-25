@@ -69,6 +69,36 @@ public sealed class DocumentService : IDocumentService
         return documentId;
     }
 
+    public async Task<Guid> UploadDeliveryEvidenceAsync(
+        Guid requestId,
+        string originalFileName,
+        string contentType,
+        long sizeBytes,
+        Stream content,
+        CancellationToken cancellationToken = default)
+    {
+        Guid organizationId = await dbContext.AssistanceRequests
+            .AsNoTracking()
+            .Where(request => request.Id == requestId)
+            .Select(request => request.OrganizationId)
+            .SingleAsync(cancellationToken);
+        await uploadSecurity.ValidateAsync(originalFileName, contentType, sizeBytes, content, cancellationToken);
+        await malwareScanner.ScanAsync(content, cancellationToken);
+        Guid documentId = await StoreMetadataAsync(
+            Guid.Empty,
+            DocumentOwnerType.AssistanceRequest,
+            requestId,
+            organizationId,
+            DocumentType.DeliveryEvidence,
+            originalFileName,
+            contentType,
+            sizeBytes,
+            content,
+            cancellationToken);
+        await AuditAsync(Guid.Empty, "DeliveryEvidenceUploaded", documentId, organizationId, $"size={sizeBytes} bytes", cancellationToken);
+        return documentId;
+    }
+
     public async Task<Guid> UploadForOrganizationAsync(Guid userId, Guid organizationId, DocumentType documentType, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default)
     {
         Organization organization = await dbContext.Organizations.AsNoTracking().SingleAsync(item => item.Id == organizationId, cancellationToken);
@@ -105,6 +135,7 @@ public sealed class DocumentService : IDocumentService
         if (document is null) return null;
         if (!isStaff) await EnsureApprovedMemberAsync(userId, document.OrganizationId, cancellationToken);
         Stream stream = await fileStorage.OpenReadAsync(document.StorageKey, cancellationToken);
+        await AuditAsync(userId, "DocumentDownloaded", document.Id, document.OrganizationId, $"file={document.OriginalFileName}; staff={isStaff}", cancellationToken);
         return new DocumentDownload(stream, document.ContentType, document.OriginalFileName);
     }
 

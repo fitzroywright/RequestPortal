@@ -39,7 +39,7 @@ public sealed class ExternalReviewerService : IExternalReviewerService
         string publicBaseUrl,
         CancellationToken cancellationToken = default)
     {
-        if (!string.Equals(scope, ExternalReviewerScopes.ManagementDashboard, StringComparison.Ordinal))
+        if (!ExternalReviewerScopes.IsSupported(scope))
         {
             throw new ArgumentException("Unsupported external reviewer scope.", nameof(scope));
         }
@@ -167,6 +167,36 @@ public sealed class ExternalReviewerService : IExternalReviewerService
             invitation.Id,
             null,
             $"email={invitation.Email}; scope={invitation.Scope}",
+            cancellationToken);
+    }
+
+    public async Task<ExternalReviewerInvitationView> ReissueAsync(
+        Guid invitationId,
+        Guid invitedByUserId,
+        string publicBaseUrl,
+        CancellationToken cancellationToken = default)
+    {
+        ExternalReviewerInvitation existing = await dbContext.ExternalReviewerInvitations
+            .SingleAsync(item => item.Id == invitationId, cancellationToken);
+
+        existing.Revoke(DateTimeOffset.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(
+            invitedByUserId,
+            "ExternalReviewerReissued",
+            "ExternalReviewerInvitation",
+            existing.Id,
+            null,
+            $"email={existing.Email}; scope={existing.Scope}",
+            cancellationToken);
+
+        return await InviteAsync(
+            invitedByUserId,
+            existing.Email,
+            existing.DisplayName,
+            existing.Scope,
+            DateTimeOffset.UtcNow.AddHours(24),
+            publicBaseUrl,
             cancellationToken);
     }
 

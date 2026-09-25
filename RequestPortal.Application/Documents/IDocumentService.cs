@@ -34,6 +34,14 @@ public interface IDocumentService
         Stream content,
         CancellationToken cancellationToken = default);
 
+    Task<Guid> UploadDeliveryEvidenceAsync(
+        Guid requestId,
+        string originalFileName,
+        string contentType,
+        long sizeBytes,
+        Stream content,
+        CancellationToken cancellationToken = default);
+
     Task<Guid> UploadForOrganizationAsync(
         Guid userId,
         Guid organizationId,

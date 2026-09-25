@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Documents;
+using RequestPortal.Application.Delivery;
 using RequestPortal.Application.Integration;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
@@ -30,6 +31,7 @@ public sealed class DetailsModel : PageModel
     private readonly IRequestReferenceDataService referenceDataService;
     private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
     private readonly RequestPortalDbContext dbContext;
+    private readonly IDeliveryService deliveryService;
 
     public DetailsModel(
         UserManager<ApplicationUser> userManager,
@@ -40,7 +42,8 @@ public sealed class DetailsModel : PageModel
         IProjectPlanningService projectPlanningService,
         IRequestReferenceDataService referenceDataService,
         IFfpManagerIntegrationService ffpManagerIntegrationService,
-        RequestPortalDbContext dbContext)
+        RequestPortalDbContext dbContext,
+        IDeliveryService deliveryService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -51,6 +54,7 @@ public sealed class DetailsModel : PageModel
         this.referenceDataService = referenceDataService;
         this.ffpManagerIntegrationService = ffpManagerIntegrationService;
         this.dbContext = dbContext;
+        this.deliveryService = deliveryService;
     }
 
     public new RequestDetail? Request { get; private set; }
@@ -58,6 +62,7 @@ public sealed class DetailsModel : PageModel
     public ProjectPlanningDetail? ProjectPlanning { get; private set; }
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
+    public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
 
     [BindProperty]
     public ItemInput Item { get; set; } = new();
@@ -81,6 +86,7 @@ public sealed class DetailsModel : PageModel
     {
         ApplicationUser user = await GetUserAsync();
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
+        Deliveries = await deliveryService.GetForRequestAsync(id, HttpContext.RequestAborted);
 
         bool validUnit = UnitsOfMeasure.Any(unit => unit.Id == Item.UnitOfMeasureId);
         if (!validUnit)

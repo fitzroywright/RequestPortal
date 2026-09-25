@@ -1,0 +1,95 @@
+@page
+@model RequestPortal.Web.Pages.Management.DeliveriesModel
+@using RequestPortal.Application.Management
+@{
+    ViewData["Title"] = "Delivery Records";
+}
+<section class="section">
+<div class="shell" style="max-width:1400px">
+    <div class="section-heading">
+        <div class="eyebrow" style="color:#b45b09">FFP Jamaica management</div>
+        <h1>Delivery / Proof of Delivery Records</h1>
+        <p>Drill into the delivery activity behind the management dashboard.</p>
+    </div>
+
+    <section class="card">
+        <form method="get" class="form-grid">
+            <div class="grid-3">
+                <div class="field">
+                    <label asp-for="Status">Status</label>
+                    <select asp-for="Status">
+                        <option value="">All statuses</option>
+                        <option value="Ready">Awaiting acknowledgement</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="PartiallyDelivered">Partially delivered</option>
+                        <option value="Failed">Failed</option>
+                    </select>
+                </div>
+                <div class="field"><label asp-for="Organization">Organization</label><input asp-for="Organization" /></div>
+                <div class="field"><label asp-for="Program">Program</label><input asp-for="Program" /></div>
+            </div>
+            <div class="grid-3">
+                <div class="field"><label asp-for="Parish">Parish</label><input asp-for="Parish" /></div>
+                <div class="field"><label asp-for="FromDate">From</label><input asp-for="FromDate" type="date" /></div>
+                <div class="field"><label asp-for="ToDate">To</label><input asp-for="ToDate" type="date" /></div>
+            </div>
+            <div class="action-row">
+                <button class="button" type="submit">Apply filters</button>
+                <a class="button button-outline" asp-page="/Management/Deliveries">Clear</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+        <div class="action-row" style="justify-content:space-between;align-items:center">
+            <h2 style="margin:0">Delivery records</h2>
+            <span class="muted">@Model.Deliveries.Count record(s)</span>
+        </div>
+        @if (Model.Deliveries.Count == 0)
+        {
+            <p class="muted">No deliveries match the selected filters.</p>
+        }
+        else
+        {
+            <div class="table-wrap" style="margin-top:12px"><table>
+                <thead><tr><th>Delivery</th><th>Request</th><th>Organization</th><th>Program / parish</th><th>Recipient</th><th>Status</th><th>Acknowledged</th><th>Evidence</th></tr></thead>
+                <tbody>
+                @foreach (ManagementDeliveryRow delivery in Model.Deliveries)
+                {
+                    <tr>
+                        <td><strong>@delivery.DocumentReference</strong><br/><span class="muted">@delivery.DocumentType<br/>@delivery.CreatedUtc.ToLocalTime().ToString("g")</span></td>
+                        <td><a asp-page="/Staff/Review" asp-route-id="@delivery.RequestId">@delivery.RequestReference</a></td>
+                        <td>@delivery.OrganizationName</td>
+                        <td>@(delivery.Program ?? "—")<br/><span class="muted">@(delivery.Parish ?? "—")</span></td>
+                        <td>@delivery.RecipientName</td>
+                        <td>@(delivery.Status == "Ready" ? "Awaiting acknowledgement" : delivery.Status)</td>
+                        <td>
+                            @if (delivery.AcknowledgedUtc.HasValue)
+                            {
+                                <span>@delivery.AcknowledgedUtc.Value.ToLocalTime().ToString("g")</span>
+                                <br/><span class="muted">@delivery.AcknowledgedBy</span>
+                            }
+                            else { <span class="muted">—</span> }
+                        </td>
+                        <td>
+                            @if (delivery.EvidenceDocumentId.HasValue)
+                            {
+                                <a asp-page="/Staff/Review"
+                                   asp-page-handler="Download"
+                                   asp-route-id="@delivery.RequestId"
+                                   asp-route-documentId="@delivery.EvidenceDocumentId.Value">Download</a>
+                            }
+                            else { <span class="muted">—</span> }
+                        </td>
+                    </tr>
+                    @if (!string.IsNullOrWhiteSpace(delivery.Notes))
+                    {
+                        <tr><td colspan="8" class="muted"><strong>Delivery notes:</strong> @delivery.Notes</td></tr>
+                    }
+                }
+                </tbody>
+            </table></div>
+        }
+    </section>
+</div>
+</section>

@@ -18,8 +18,38 @@
             <div class="form-group"><label asp-for="DisplayName">Name</label><input asp-for="DisplayName" required /></div>
             <div class="form-group"><label asp-for="Email">Email</label><input asp-for="Email" type="email" required /></div>
             <div class="form-group"><label asp-for="ExpiresInHours">Expires in hours</label><input asp-for="ExpiresInHours" type="number" min="1" max="168" required /></div>
+            <div class="form-group">
+                <label asp-for="ScopeType">Scope</label>
+                <select asp-for="ScopeType" id="reviewScope">
+                    <option value="@ExternalReviewerScopes.ManagementDashboard">Management dashboard</option>
+                    <option value="@ExternalReviewerScopes.DeliverySummary">Delivery summary only</option>
+                    <option value="Organization">One organization</option>
+                    <option value="Request">One request</option>
+                    <option value="DateRange">Date range</option>
+                </select>
+            </div>
+            <div class="form-group scope-field" data-scope="Organization">
+                <label asp-for="OrganizationId">Organization ID</label>
+                <input asp-for="OrganizationId" placeholder="Organization GUID" />
+                <span asp-validation-for="OrganizationId" class="validation"></span>
+            </div>
+            <div class="form-group scope-field" data-scope="Request">
+                <label asp-for="RequestId">Request ID</label>
+                <input asp-for="RequestId" placeholder="Request GUID" />
+                <span asp-validation-for="RequestId" class="validation"></span>
+            </div>
+            <div class="form-group scope-field" data-scope="DateRange">
+                <label asp-for="FromDate">From</label>
+                <input asp-for="FromDate" type="date" />
+                <span asp-validation-for="FromDate" class="validation"></span>
+            </div>
+            <div class="form-group scope-field" data-scope="DateRange">
+                <label asp-for="ToDate">To</label>
+                <input asp-for="ToDate" type="date" />
+                <span asp-validation-for="ToDate" class="validation"></span>
+            </div>
         </div>
-        <p class="muted">Scope: Management Dashboard. Aggregate activity only; no editing or applicant contact information.</p>
+        <p class="muted">All external review access is read-only and expires automatically.</p>
         <button class="button" type="submit">Send secure invitation</button>
     </form>
 </section>
@@ -34,15 +64,18 @@
             string status = item.RevokedUtc.HasValue ? "Revoked" : item.ExpiresUtc <= DateTimeOffset.UtcNow ? "Expired" : item.RedeemedUtc.HasValue ? "Active" : "Invited";
             <tr>
                 <td><strong>@item.DisplayName</strong><br/><span class="muted">@item.Email</span></td>
-                <td>@item.Scope</td>
+                <td style="max-width:280px;overflow-wrap:anywhere">@item.Scope</td>
                 <td>@item.ExpiresUtc.ToLocalTime().ToString("g")</td>
                 <td>@(item.LastAccessUtc?.ToLocalTime().ToString("g") ?? "—")</td>
                 <td>@status</td>
                 <td>
+                    <div class="action-row">
                     @if (!item.RevokedUtc.HasValue && item.ExpiresUtc > DateTimeOffset.UtcNow)
                     {
                         <form method="post" asp-page-handler="Revoke"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-outline" type="submit">Revoke</button></form>
                     }
+                    <form method="post" asp-page-handler="Reissue"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-secondary" type="submit">Reissue</button></form>
+                    </div>
                 </td>
             </tr>
         }
@@ -50,3 +83,17 @@
     </table></div>
 </section>
 </div></section>
+
+@section Scripts {
+<script>
+(() => {
+    const select = document.getElementById('reviewScope');
+    const fields = Array.from(document.querySelectorAll('.scope-field'));
+    function refresh() {
+        fields.forEach(field => field.style.display = field.dataset.scope === select.value ? '' : 'none');
+    }
+    select.addEventListener('change', refresh);
+    refresh();
+})();
+</script>
+}

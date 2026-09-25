@@ -8,6 +8,7 @@ public sealed record ManagementDashboardSnapshot(
     IReadOnlyList<ManagementNamedCount> Categories,
     IReadOnlyList<ManagementNamedCount> Programs,
     ManagementDeliverySummary Delivery,
+    ManagementDeliveryAnalytics DeliveryAnalytics,
     ManagementPerformanceMetrics Performance,
     IReadOnlyList<ManagementTrendPoint> Trend,
     IReadOnlyList<ParishReachSummary> Parishes);
@@ -32,6 +33,14 @@ public sealed record ManagementDeliverySummary(
     int Failed,
     int PendingFfpManagerSync);
 
+public sealed record ManagementDeliveryTrendPoint(DateOnly WeekStarting, int Created, int Acknowledged);
+
+public sealed record ManagementDeliveryAnalytics(
+    IReadOnlyList<ManagementNamedCount> Organizations,
+    IReadOnlyList<ManagementNamedCount> Programs,
+    IReadOnlyList<ManagementNamedCount> Parishes,
+    IReadOnlyList<ManagementDeliveryTrendPoint> Trend);
+
 public sealed record ManagementPerformanceMetrics(
     double AverageProcessingDays,
     double MedianProcessingDays,
@@ -53,6 +62,7 @@ public sealed record CommunityReachSummary(string Community, int Requests);
 
 public sealed record ManagementRequestRow(
     Guid Id,
+    Guid OrganizationId,
     string PublicReference,
     string OrganizationName,
     string Status,
@@ -77,7 +87,36 @@ public sealed record ManagementRequestFilter(
     string? Category = null,
     string? Program = null,
     string? Parish = null,
-    string? Community = null);
+    string? Community = null,
+    Guid? OrganizationId = null,
+    Guid? RequestId = null,
+    DateTimeOffset? FromUtc = null,
+    DateTimeOffset? ToUtc = null);
+
+public sealed record ManagementDeliveryFilter(
+    string? Status = null,
+    string? Organization = null,
+    string? Program = null,
+    string? Parish = null,
+    DateTimeOffset? FromUtc = null,
+    DateTimeOffset? ToUtc = null);
+
+public sealed record ManagementDeliveryRow(
+    Guid DeliveryId,
+    Guid RequestId,
+    string RequestReference,
+    string OrganizationName,
+    string? Program,
+    string? Parish,
+    string DocumentReference,
+    string DocumentType,
+    string RecipientName,
+    string Status,
+    DateTimeOffset CreatedUtc,
+    DateTimeOffset? AcknowledgedUtc,
+    string? AcknowledgedBy,
+    string? Notes,
+    Guid? EvidenceDocumentId);
 
 public sealed record ParishDrillDown(
     string Parish,
@@ -89,6 +128,7 @@ public interface IManagementDashboardService
     Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ManagementRequestRow>> GetRequestsAsync(ManagementRequestFilter filter, CancellationToken cancellationToken = default);
     Task<ParishDrillDown> GetParishAsync(string parish, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ManagementDeliveryRow>> GetDeliveriesAsync(ManagementDeliveryFilter filter, CancellationToken cancellationToken = default);
 }
 
 public enum LocationPrecision

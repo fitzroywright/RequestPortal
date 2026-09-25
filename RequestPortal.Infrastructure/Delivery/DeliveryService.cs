@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Auditing;
+using RequestPortal.Application.Documents;
 using RequestPortal.Application.Delivery;
 using RequestPortal.Domain.Delivery;
 using RequestPortal.Infrastructure.Persistence;
@@ -18,11 +19,16 @@ public sealed class DeliveryService : IDeliveryService
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IBusinessAuditWriter auditWriter;
+    private readonly IDocumentService documentService;
 
-    public DeliveryService(RequestPortalDbContext dbContext, IBusinessAuditWriter auditWriter)
+    public DeliveryService(
+        RequestPortalDbContext dbContext,
+        IBusinessAuditWriter auditWriter,
+        IDocumentService documentService)
     {
         this.dbContext = dbContext;
         this.auditWriter = auditWriter;
+        this.documentService = documentService;
     }
 
     public async Task<CreateDeliveryResult> CreateAsync(CreateDeliveryCommand command, CancellationToken cancellationToken = default)
@@ -71,6 +77,45 @@ public sealed class DeliveryService : IDeliveryService
         return item is null || !TokenMatches(item.AccessTokenHash, accessToken) ? null : ToView(item);
     }
 
+    public async Task<Guid> UploadEvidenceAsync(
+        Guid deliveryId,
+        string accessToken,
+        string originalFileName,
+        string contentType,
+        long sizeBytes,
+        System.IO.Stream content,
+        CancellationToken cancellationToken = default)
+    {
+        DeliveryRecord delivery = await dbContext.Deliveries
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == deliveryId, cancellationToken);
+        if (!TokenMatches(delivery.AccessTokenHash, accessToken))
+        {
+            throw new UnauthorizedAccessException("The delivery access token is invalid.");
+        }
+        if (delivery.Status != DeliveryStatus.Ready)
+        {
+            throw new InvalidOperationException("Evidence cannot be added after a delivery has been acknowledged.");
+        }
+
+        Guid documentId = await documentService.UploadDeliveryEvidenceAsync(
+            delivery.RequestId,
+            originalFileName,
+            contentType,
+            sizeBytes,
+            content,
+            cancellationToken);
+        await auditWriter.WriteAsync(
+            Guid.Empty,
+            "DeliveryEvidenceLinked",
+            "Delivery",
+            delivery.Id,
+            null,
+            $"document={documentId:D}",
+            cancellationToken);
+        return documentId;
+    }
+
     public async Task AcknowledgeAsync(Guid deliveryId, string accessToken, string status, string acknowledgedBy, string? signatureData, Guid? evidenceDocumentId, string? notes, CancellationToken cancellationToken = default)
     {
         if (!Enum.TryParse(status, true, out DeliveryStatus deliveryStatus) || deliveryStatus == DeliveryStatus.Ready)
@@ -83,6 +128,16 @@ public sealed class DeliveryService : IDeliveryService
         delivery.Acknowledge(deliveryStatus, acknowledgedBy, DateTimeOffset.UtcNow, signatureData, evidenceDocumentId, notes);
         await dbContext.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync(Guid.Empty, "DeliveryAcknowledged", "Delivery", delivery.Id, null, $"status={delivery.Status}; acknowledgedBy={delivery.AcknowledgedBy}", cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DeliveryView>> GetForRequestAsync(Guid requestId, CancellationToken cancellationToken = default)
+    {
+        DeliveryRecord[] deliveries = await dbContext.Deliveries
+            .AsNoTracking()
+            .Where(item => item.RequestId == requestId)
+            .OrderByDescending(item => item.CreatedUtc)
+            .ToArrayAsync(cancellationToken);
+        return deliveries.Select(ToView).ToArray();
     }
 
     public async Task<IReadOnlyList<DeliveryConfirmation>> GetUnsyncedConfirmationsAsync(CancellationToken cancellationToken = default)
@@ -120,6 +175,36 @@ public sealed class DeliveryService : IDeliveryService
 
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
-    private static DeliveryView ToView(DeliveryRecord item) =>
-        new(item.Id, item.RequestId, item.DocumentType, item.DocumentReference, item.RecipientName, item.DeliveryPerson, item.Status.ToString(), item.CreatedUtc, item.SnapshotJson, item.AcknowledgedBy, item.AcknowledgedUtc, item.EvidenceDocumentId, item.Notes, item.SyncedToFfpManagerUtc);
+    private static DeliveryView ToView(DeliveryRecord item)
+    {
+        IReadOnlyList<DeliveryLineSnapshot> lines = Array.Empty<DeliveryLineSnapshot>();
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(item.SnapshotJson);
+            if (document.RootElement.TryGetProperty("Lines", out JsonElement element))
+            {
+                lines = JsonSerializer.Deserialize<DeliveryLineSnapshot[]>(element.GetRawText()) ?? Array.Empty<DeliveryLineSnapshot>();
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return new DeliveryView(
+            item.Id,
+            item.RequestId,
+            item.DocumentType,
+            item.DocumentReference,
+            item.RecipientName,
+            item.DeliveryPerson,
+            item.Status.ToString(),
+            item.CreatedUtc,
+            item.SnapshotJson,
+            lines,
+            item.AcknowledgedBy,
+            item.AcknowledgedUtc,
+            item.EvidenceDocumentId,
+            item.Notes,
+            item.SyncedToFfpManagerUtc);
+    }
 }

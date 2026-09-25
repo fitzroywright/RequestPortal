@@ -1,6 +1,7 @@
 @page "{id:guid}"
 @model RequestPortal.Web.Pages.Staff.ReviewModel
 @using RequestPortal.Application.Documents
+@using RequestPortal.Application.Delivery
 @using RequestPortal.Application.Requests
 @{
     ViewData["Title"] = "Review Request";
@@ -108,6 +109,38 @@
                         }
                     </section>
 
+                    @if (Model.Deliveries.Count > 0)
+                    {
+                        <section class="card" style="margin-top:1.5rem">
+                            <h2>Delivery / Proof of Delivery</h2>
+                            <div class="table-wrap"><table>
+                                <thead><tr><th>Reference</th><th>Recipient</th><th>Status</th><th>Acknowledged</th><th>Notes</th><th>Evidence</th></tr></thead>
+                                <tbody>
+                                @foreach (DeliveryView delivery in Model.Deliveries)
+                                {
+                                    <tr>
+                                        <td><strong>@delivery.DocumentReference</strong><br/><span class="muted">@delivery.DocumentType</span></td>
+                                        <td>@delivery.RecipientName</td>
+                                        <td>@(delivery.Status == "Ready" ? "Awaiting acknowledgement" : delivery.Status)</td>
+                                        <td>@(delivery.AcknowledgedUtc?.ToLocalTime().ToString("f") ?? "—")</td>
+                                        <td>@(delivery.Notes ?? "—")</td>
+                                        <td>
+                                        @if (delivery.EvidenceDocumentId.HasValue)
+                                        {
+                                            <a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@delivery.EvidenceDocumentId.Value">View evidence</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="muted">—</span>
+                                        }
+                                        </td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table></div>
+                        </section>
+                    }
+
                     @if (Model.Request.Status == "Submitted")
                     {
                         <section class="card" style="margin-top:1.5rem">
@@ -124,6 +157,14 @@
                     @foreach (RequestHistoryDetail history in Model.Request.History)
                     {
                         <div class="timeline-item"><strong>@history.Status</strong>@if (!string.IsNullOrWhiteSpace(history.Reason)){<span>@history.Reason</span>}<small>@history.ChangedUtc.ToLocalTime().ToString("f")</small></div>
+                    }
+                    @foreach (DeliveryView delivery in Model.Deliveries.OrderBy(item => item.CreatedUtc))
+                    {
+                        <div class="timeline-item"><strong>Delivery prepared</strong><span>@delivery.DocumentReference · @delivery.RecipientName</span><small>@delivery.CreatedUtc.ToLocalTime().ToString("f")</small></div>
+                        @if (delivery.AcknowledgedUtc.HasValue)
+                        {
+                            <div class="timeline-item"><strong>Delivery @delivery.Status</strong><span>Acknowledged by @delivery.AcknowledgedBy</span><small>@delivery.AcknowledgedUtc.Value.ToLocalTime().ToString("f")</small></div>
+                        }
                     }
                 </div></aside>
             </div>
