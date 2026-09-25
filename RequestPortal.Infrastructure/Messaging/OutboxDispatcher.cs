@@ -197,6 +197,11 @@ public sealed class OutboxDispatcher
             await SendFfpManagerInformationRequestedAsync(Deserialize<FfpManagerInformationRequestedMessage>(outbox.Payload), cancellationToken);
             return;
         }
+        if (outbox.MessageType.EndsWith(nameof(PortalMessageNotificationRequestedMessage), StringComparison.Ordinal))
+        {
+            await SendPortalMessageNotificationAsync(Deserialize<PortalMessageNotificationRequestedMessage>(outbox.Payload), cancellationToken);
+            return;
+        }
 
         logger.LogInformation("No notification projector registered for outbox type {MessageType}.", outbox.MessageType);
     }
@@ -439,6 +444,24 @@ public sealed class OutboxDispatcher
             request.OrganizationId,
             request.Id,
             $"Information required: {request.PublicReference}",
+            body,
+            cancellationToken);
+    }
+
+    private async Task SendPortalMessageNotificationAsync(
+        PortalMessageNotificationRequestedMessage message,
+        CancellationToken cancellationToken)
+    {
+        string body =
+            $"{message.SenderName} sent you a Request Portal message.\n\n" +
+            $"{message.Subject}\n\n" +
+            "Sign in to Request Portal to read and reply.";
+
+        await DeliverToRecipientsAsync(
+            message.RecipientUserIds,
+            message.OrganizationId,
+            message.RequestId,
+            $"New message: {message.Subject}",
             body,
             cancellationToken);
     }
