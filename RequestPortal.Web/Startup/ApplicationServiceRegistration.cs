@@ -15,10 +15,8 @@ using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Reviewers;
 using RequestPortal.Application.Reporting;
 using RequestPortal.Application.Requests;
-using RequestPortal.Common.Diagnostics;
-using RequestPortal.Infrastructure.Notifications;
-using RequestPortal.Infrastructure.Messaging;
 using RequestPortal.Common.Configuration;
+using RequestPortal.Common.Diagnostics;
 using RequestPortal.Infrastructure.Administration;
 using RequestPortal.Infrastructure.Auditing;
 using RequestPortal.Infrastructure.Beneficiaries;
@@ -31,6 +29,8 @@ using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Integration;
 using RequestPortal.Infrastructure.Management;
 using RequestPortal.Infrastructure.Messages;
+using RequestPortal.Infrastructure.Messaging;
+using RequestPortal.Infrastructure.Notifications;
 using RequestPortal.Infrastructure.Organizations;
 using RequestPortal.Infrastructure.Portal;
 using RequestPortal.Infrastructure.ReferenceData;
@@ -45,6 +45,16 @@ namespace RequestPortal.Web.Startup;
 internal static class ApplicationServiceRegistration
 {
     public static void Add(WebApplicationBuilder builder)
+    {
+        AddMessagingAndReferenceServices(builder);
+        AddOrganizationServices(builder);
+        AddStaffAndManagementServices(builder);
+        AddRequestServices(builder);
+        AddIntegrationAndRuntimeServices(builder);
+    }
+
+    private static void AddMessagingAndReferenceServices(
+        WebApplicationBuilder builder)
     {
         builder.Services.AddSignalR();
 
@@ -67,7 +77,11 @@ internal static class ApplicationServiceRegistration
         builder.Services.AddScoped<
             IRequestReferenceDataService
             , RequestReferenceDataService>();
+    }
 
+    private static void AddOrganizationServices(
+        WebApplicationBuilder builder)
+    {
         builder.Services.AddScoped<
             IOrganizationMembershipGovernanceService
             , OrganizationMembershipGovernanceService>();
@@ -81,7 +95,11 @@ internal static class ApplicationServiceRegistration
             , OrganizationProfileService>();
 
         builder.Services.AddScoped<PortalWorkflowService>();
+    }
 
+    private static void AddStaffAndManagementServices(
+        WebApplicationBuilder builder)
+    {
         builder.Services.AddScoped<
             IStaffOrganizationDirectoryService
             , StaffOrganizationDirectoryService>();
@@ -102,7 +120,8 @@ internal static class ApplicationServiceRegistration
             IExternalReviewerService
             , ExternalReviewerService>();
 
-        builder.Services.AddOptions<ManagementDashboardOptions>()
+        builder.Services
+            .AddOptions<ManagementDashboardOptions>()
             .Bind(
                 builder.Configuration.GetSection(
                     ManagementDashboardOptions.SectionName));
@@ -118,7 +137,11 @@ internal static class ApplicationServiceRegistration
         builder.Services.AddScoped<
             IBusinessAuditWriter
             , BusinessAuditWriter>();
+    }
 
+    private static void AddRequestServices(
+        WebApplicationBuilder builder)
+    {
         builder.Services.AddScoped<
             IDocumentService
             , DocumentService>();
@@ -150,7 +173,11 @@ internal static class ApplicationServiceRegistration
         builder.Services.AddScoped<
             IFulfilmentQueueService
             , FulfilmentQueueService>();
+    }
 
+    private static void AddIntegrationAndRuntimeServices(
+        WebApplicationBuilder builder)
+    {
         builder.Services.AddScoped<
             IIntegrationStatusService
             , IntegrationStatusService>();
@@ -166,9 +193,11 @@ internal static class ApplicationServiceRegistration
         builder.Services.AddScoped<DemoDataSeeder>();
         builder.Services.AddScoped<DemoReadinessValidator>();
         builder.Services.AddEngineeringDiagnostics();
+
         builder.Services.AddScoped<
             IStartupDiagnostic
             , PostgreSqlStartupDiagnostic>();
+
         builder.Services.AddScoped<StartupDiagnosticRunner>();
     }
 }
