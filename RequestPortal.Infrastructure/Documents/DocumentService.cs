@@ -69,6 +69,45 @@ public sealed class DocumentService : IDocumentService
         return documentId;
     }
 
+    public async Task<Guid> UploadDeliveryEvidenceAsync(Guid requestId, Guid deliveryId, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default)
+    {
+        Guid organizationId = await dbContext.AssistanceRequests
+            .AsNoTracking()
+            .Where(request => request.Id == requestId)
+            .Select(request => request.OrganizationId)
+            .SingleAsync(cancellationToken);
+
+        await uploadSecurity.ValidateAsync(originalFileName, contentType, sizeBytes, content, cancellationToken);
+        await malwareScanner.ScanAsync(content, cancellationToken);
+        Guid documentId = await StoreMetadataAsync(
+            Guid.Empty,
+            DocumentOwnerType.AssistanceRequest,
+            requestId,
+            organizationId,
+            DocumentType.DeliveryEvidence,
+            originalFileName,
+            contentType,
+            sizeBytes,
+            content,
+            cancellationToken);
+
+        await AuditAsync(
+            Guid.Empty,
+            "DeliveryEvidenceUploaded",
+            documentId,
+            organizationId,
+            $"Delivery={deliveryId:D}; size={sizeBytes} bytes.",
+            cancellationToken);
+
+        operationsFlowPublisher.TryEnqueue(
+            requestId,
+            "Delivery",
+            clock.UtcNow,
+            $"Delivery evidence {documentId:D} persisted for delivery {deliveryId:D}.");
+
+        return documentId;
+    }
+
     public async Task<Guid> UploadForOrganizationAsync(Guid userId, Guid organizationId, DocumentType documentType, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default)
     {
         Organization organization = await dbContext.Organizations.AsNoTracking().SingleAsync(item => item.Id == organizationId, cancellationToken);
