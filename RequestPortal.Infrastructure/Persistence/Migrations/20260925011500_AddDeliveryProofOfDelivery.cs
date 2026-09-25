@@ -19,6 +19,7 @@ public partial class AddDeliveryProofOfDelivery : Migration
                 DocumentType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                 DocumentReference = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: false),
                 SnapshotJson = table.Column<string>(type: "jsonb", nullable: false),
+                AccessTokenHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                 RecipientName = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: false),
                 DeliveryPerson = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: true),
                 Status = table.Column<int>(type: "integer", nullable: false),
