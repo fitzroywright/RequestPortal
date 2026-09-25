@@ -33,6 +33,12 @@ public sealed record MessageDetailView(
     DateTimeOffset SentUtc,
     bool IsMine);
 
+public sealed record MessageRecipientOption(
+    Guid UserId,
+    string DisplayName,
+    string? Email,
+    bool IsStaff);
+
 public sealed record PortalMessageCreated(
     Guid MessageId,
     Guid ThreadId,
@@ -82,6 +88,21 @@ public interface IPortalMessageService
         string subject,
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MessageRecipientOption>> GetOrganizationRecipientsAsync(
+        Guid userId,
+        bool isStaff,
+        Guid organizationId,
+        CancellationToken cancellationToken = default);
+
+    Task<Guid> SendToSharedStaffAsync(
+        Guid senderUserId,
+        Guid organizationId,
+        Guid? requestId,
+        Guid? threadId,
+        string subject,
+        string body,
         CancellationToken cancellationToken = default);
 
     Task<Guid> SendSystemMessageAsync(
