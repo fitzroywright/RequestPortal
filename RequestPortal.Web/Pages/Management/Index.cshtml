@@ -122,10 +122,6 @@
             @if (Model.Dashboard.DeliveryAnalytics.Programs.Count == 0) { <p class="muted">No program delivery activity yet.</p> }
             @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Programs)
             {
-                <h2>Deliveries by program</h2>
-            @if (Model.Dashboard.DeliveryAnalytics.Programs.Count == 0) { <p class="muted">No program delivery activity yet.</p> }
-            @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Programs)
-            {
                 <div class="bar-row"><a asp-page="/Management/Deliveries" asp-route-Program="@item.Name">@item.Name</a><div class="bar-track"><div class="bar-fill" style="width:@(item.Count * 100d / Math.Max(1, Model.Dashboard.DeliveryAnalytics.Programs.Max(x => x.Count))).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></div></div><strong>@item.Count</strong></div>
             }
         </section>
