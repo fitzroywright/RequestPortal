@@ -16,6 +16,8 @@ public sealed record CreateDeliveryCommand(
     IReadOnlyList<DeliveryLineSnapshot> Lines,
     string? DocumentPayloadJson);
 
+public sealed record CreateDeliveryResult(Guid DeliveryId, string AccessToken);
+
 public sealed record DeliveryView(
     Guid Id,
     Guid RequestId,
@@ -44,9 +46,9 @@ public sealed record DeliveryConfirmation(
 
 public interface IDeliveryService
 {
-    Task<Guid> CreateAsync(CreateDeliveryCommand command, CancellationToken cancellationToken = default);
-    Task<DeliveryView?> GetAsync(Guid deliveryId, CancellationToken cancellationToken = default);
-    Task AcknowledgeAsync(Guid deliveryId, string status, string acknowledgedBy, string? signatureData, Guid? evidenceDocumentId, string? notes, CancellationToken cancellationToken = default);
+    Task<CreateDeliveryResult> CreateAsync(CreateDeliveryCommand command, CancellationToken cancellationToken = default);
+    Task<DeliveryView?> GetAsync(Guid deliveryId, string accessToken, CancellationToken cancellationToken = default);
+    Task AcknowledgeAsync(Guid deliveryId, string accessToken, string status, string acknowledgedBy, string? signatureData, Guid? evidenceDocumentId, string? notes, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DeliveryConfirmation>> GetUnsyncedConfirmationsAsync(CancellationToken cancellationToken = default);
     Task MarkSyncedAsync(Guid deliveryId, CancellationToken cancellationToken = default);
 }
