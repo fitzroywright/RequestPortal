@@ -1,0 +1,70 @@
+@page
+@model RequestPortal.Web.Pages.Messages.NewModel
+@using RequestPortal.Application.Messages
+@{
+    ViewData["Title"] = "New Message";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Messages</div>
+            <h1>New message</h1>
+            <p>@(Model.IsStaff ? "Send a message from the shared FFP Staff mailbox. The representative will see your first name and FFP Staff, not your email address." : "Message FFP Staff or another approved representative in one of your organizations.")</p>
+        </div>
+
+        <form method="get" class="card" style="margin-bottom:20px">
+            <label for="organizationId">Organization</label>
+            <select id="organizationId" name="OrganizationId" onchange="this.form.submit()">
+                <option value="">Choose organization</option>
+                @foreach (var organization in Model.Organizations)
+                {
+                    <option value="@organization.Id" selected="@(Model.OrganizationId == organization.Id)">@organization.Name</option>
+                }
+            </select>
+            @if (Model.RequestId.HasValue)
+            {
+                <input type="hidden" name="RequestId" value="@Model.RequestId" />
+            }
+        </form>
+
+        @if (Model.OrganizationId.HasValue)
+        {
+            <form method="post" class="card">
+                <input type="hidden" asp-for="OrganizationId" />
+                <input type="hidden" asp-for="RequestId" />
+                <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+                <label>To</label>
+                @if (!Model.IsStaff)
+                {
+                    <label class="check-row">
+                        <input asp-for="ToFfpStaff" />
+                        <span><strong>FFP Staff</strong> · shared staff inbox</span>
+                    </label>
+                }
+
+                <select asp-for="RecipientUserId">
+                    <option value="">@(Model.IsStaff ? "Choose representative" : "Or choose an organization representative")</option>
+                    @foreach (MessageRecipientOption recipient in Model.Recipients)
+                    {
+                        <option value="@recipient.UserId">
+                            @recipient.DisplayName@if (Model.IsStaff && !string.IsNullOrWhiteSpace(recipient.Email)){<text> · @recipient.Email</text>}
+                        </option>
+                    }
+                </select>
+
+                <label asp-for="Subject">Subject</label>
+                <input asp-for="Subject" maxlength="300" />
+                <span asp-validation-for="Subject" class="validation"></span>
+
+                <label asp-for="Body">Message</label>
+                <textarea asp-for="Body" rows="9" maxlength="10000"></textarea>
+                <span asp-validation-for="Body" class="validation"></span>
+
+                <button class="button" type="submit">Send message</button>
+                <a class="button button-secondary" asp-page="/Messages/Inbox">Cancel</a>
+            </form>
+        }
+    </div>
+</section>
