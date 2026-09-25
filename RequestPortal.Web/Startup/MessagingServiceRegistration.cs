@@ -28,7 +28,7 @@ internal static class MessagingServiceRegistration
                 "App_Data"
                 , "common-messaging");
 
-        Common.Messaging.Hosting.ServiceCollectionExtensions
+        global::Common.Messaging.Hosting.ServiceCollectionExtensions
             .AddCommonMessagingSecrets(
                 builder.Services);
 
@@ -44,7 +44,7 @@ internal static class MessagingServiceRegistration
             builder
             , messagingQueuePath);
 
-        Common.Messaging.Hosting.ServiceCollectionExtensions
+        global::Common.Messaging.Hosting.ServiceCollectionExtensions
             .AddCommonMessagingDiagnostics(
                 builder.Services);
 
@@ -63,10 +63,10 @@ internal static class MessagingServiceRegistration
             return;
         }
 
-        Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+        global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
             .AddMicrosoftGraphEmailMessagingChannel(
                 builder.Services
-                , new Common.Messaging.Channels.MicrosoftGraph
+                , new global::Common.Messaging.Channels.MicrosoftGraph
                     .MicrosoftGraphEmailOptions
                 {
                     TenantId =
@@ -98,10 +98,10 @@ internal static class MessagingServiceRegistration
             return;
         }
 
-        Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+        global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
             .AddMicrosoftGraphTeamsMessagingChannel(
                 builder.Services
-                , new Common.Messaging.Channels.MicrosoftGraph
+                , new global::Common.Messaging.Channels.MicrosoftGraph
                     .MicrosoftGraphTeamsOptions
                 {
                     SenderUpn =
@@ -119,10 +119,10 @@ internal static class MessagingServiceRegistration
         WebApplicationBuilder builder
         , NotificationOptions options)
     {
-        Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+        global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
             .AddSmtpMessagingChannel(
                 builder.Services
-                , new Common.Messaging.Channels.Smtp
+                , new global::Common.Messaging.Channels.Smtp
                     .SmtpMessageOptions
                 {
                     Host = options.SmtpHost ?? string.Empty
@@ -146,10 +146,10 @@ internal static class MessagingServiceRegistration
             return;
         }
 
-        Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+        global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
             .AddWhatsAppMessagingChannel(
                 builder.Services
-                , new Common.Messaging.Channels.WhatsApp
+                , new global::Common.Messaging.Channels.WhatsApp
                     .WhatsAppMessageOptions
                 {
                     Endpoint = options.WhatsAppEndpoint
@@ -164,13 +164,13 @@ internal static class MessagingServiceRegistration
         WebApplicationBuilder builder
         , string messagingQueuePath)
     {
-        Common.Messaging.Hosting.ServiceCollectionExtensions
+        global::Common.Messaging.Hosting.ServiceCollectionExtensions
             .AddCommonMessagingQueuedDelivery(
                 builder.Services
-                , new Common.Messaging.ExternalDeliveryOptions
+                , new global::Common.Messaging.ExternalDeliveryOptions
                 {
                     DeliveryMode =
-                        Common.Messaging.ExternalDeliveryMode
+                        global::Common.Messaging.ExternalDeliveryMode
                             .ParallelByRecipient
                     , MaxConcurrency = 4
                     , MaxAttempts = 5
