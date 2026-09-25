@@ -59,11 +59,11 @@ internal static class PlatformServiceRegistration
         WebApplicationBuilder builder
         , CommonSecretsBootstrapRuntime secretsRuntime)
     {
-        global::global::Common.Security.Integration.SecurityServiceCollectionExtensions
+        global::Common.Security.Integration.SecurityServiceCollectionExtensions
             .AddCommonAuthorization<RequestPortalAuthorizationStore>(
                 builder.Services);
 
-        Common.Security.Integration.SecurityServiceCollectionExtensions
+        global::Common.Security.Integration.SecurityServiceCollectionExtensions
             .AddCommonSecurityDiagnostics(
                 builder.Services);
 

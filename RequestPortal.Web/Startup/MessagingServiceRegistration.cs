@@ -1,4 +1,5 @@
 using RequestPortal.Application.Notifications;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Infrastructure.Messaging;
 using RequestPortal.Infrastructure.Notifications;
 

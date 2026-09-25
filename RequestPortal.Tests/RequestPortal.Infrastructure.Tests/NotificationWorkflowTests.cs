@@ -340,27 +340,27 @@ public sealed class NotificationWorkflowTests
             => true;
     }
 
-    private sealed class DisabledFfpManagerIntegrationService : IFfpManagerIntegrationService
+    private sealed class DisabledFfpManagerIntegrationService : IExternalApplicationIntegrationService
     {
-        public Task<FfpManagerApplicationReference> SubmitRequestAsync(
+        public Task<ExternalApplicationReference> SubmitRequestAsync(
             Guid requestId,
             CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("FFP Manager is disabled for this test.");
 
-        public Task<FfpManagerApplicationStatus?> RefreshStatusAsync(
+        public Task<ExternalApplicationStatus?> RefreshStatusAsync(
             Guid requestId,
             CancellationToken cancellationToken = default)
-            => Task.FromResult<FfpManagerApplicationStatus?>(null);
+            => Task.FromResult<ExternalApplicationStatus?>(null);
 
         public Task ReceiveStatusAsync(
             Guid messageId,
             Guid requestId,
-            FfpManagerApplicationStatus status,
+            ExternalApplicationStatus status,
             CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
         public Task ReceiveInformationRequestAsync(
-            FfpManagerInformationRequest request,
+            ExternalInformationRequest request,
             CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
