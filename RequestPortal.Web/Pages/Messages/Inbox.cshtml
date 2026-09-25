@@ -1,0 +1,75 @@
+@page
+@model RequestPortal.Web.Pages.Messages.InboxModel
+@using RequestPortal.Application.Messages
+@{
+    ViewData["Title"] = Model.IsStaff ? "FFP Staff Inbox" : "Inbox";
+}
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Messages</div>
+            <h1>@(Model.IsStaff ? "FFP Staff Inbox" : "Inbox")</h1>
+            <p>@(Model.IsStaff ? "Shared correspondence from representatives and Request Portal processing." : "Messages from FFP and representatives in your organizations.")</p>
+        </div>
+
+        <div class="action-row" style="margin-bottom:20px">
+            <a class="button" asp-page="/Messages/New">New message</a>
+            <a class="button button-secondary" asp-page="/Messages/Sent">Sent items</a>
+            <span class="status">@Model.UnreadCount unread</span>
+        </div>
+
+        @if (Model.Messages.Count == 0)
+        {
+            <div class="card"><p class="muted">Your inbox is empty.</p></div>
+        }
+        else
+        {
+            <div class="card table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>From</th>
+                            <th>Subject</th>
+                            <th>Context</th>
+                            <th>Received</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (MailboxMessageView message in Model.Messages)
+                    {
+                        <tr class="@(message.ReadUtc is null ? "message-unread" : null)">
+                            <td>
+                                <strong>@message.SenderName</strong>
+                                @if (message.SenderKind == "FFP Staff")
+                                {
+                                    <div class="muted">FFP Staff</div>
+                                }
+                                @if (Model.IsStaff && !string.IsNullOrWhiteSpace(message.SenderEmail))
+                                {
+                                    <div class="muted">@message.SenderEmail</div>
+                                }
+                            </td>
+                            <td>
+                                <a asp-page="/Messages/Thread" asp-route-id="@message.ThreadId"><strong>@message.Subject</strong></a>
+                                <div class="muted">@message.Preview</div>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(message.OrganizationName))
+                                {
+                                    <div>@message.OrganizationName</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(message.RequestReference))
+                                {
+                                    <div class="muted">@message.RequestReference</div>
+                                }
+                            </td>
+                            <td>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
