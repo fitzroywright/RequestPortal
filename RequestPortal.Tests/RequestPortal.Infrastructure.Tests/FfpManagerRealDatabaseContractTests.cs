@@ -17,7 +17,7 @@ public sealed class FfpManagerRealDatabaseContractTests
         }
 
         await using SqlConnection connection = new(ConnectionString);
-        await connection.OpenAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         string[] requiredObjects =
         [
@@ -41,7 +41,7 @@ public sealed class FfpManagerRealDatabaseContractTests
 
             command.Parameters.AddWithValue("@name", objectName);
 
-            if (Convert.ToInt32(await command.ExecuteScalarAsync()) == 0)
+            if (Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)) == 0)
             {
                 missing.Add(objectName);
             }
@@ -56,7 +56,7 @@ public sealed class FfpManagerRealDatabaseContractTests
             """,
             connection))
         {
-            if (Convert.ToInt32(await column.ExecuteScalarAsync()) == 0)
+            if (Convert.ToInt32(await column.ExecuteScalarAsync(TestContext.Current.CancellationToken)) == 0)
             {
                 missing.Add("dbo.ApplicationLetters.ExternalRequestId");
             }
@@ -77,7 +77,7 @@ public sealed class FfpManagerRealDatabaseContractTests
         }
 
         await using SqlConnection connection = new(ConnectionString);
-        await connection.OpenAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         Dictionary<string, string> queries = new()
         {
@@ -89,7 +89,7 @@ public sealed class FfpManagerRealDatabaseContractTests
         foreach ((string name, string sql) in queries)
         {
             await using SqlCommand command = new(sql, connection);
-            int count = Convert.ToInt32(await command.ExecuteScalarAsync());
+            int count = Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
 
             Assert.True(
                 count > 0,
@@ -106,7 +106,7 @@ public sealed class FfpManagerRealDatabaseContractTests
         }
 
         await using SqlConnection connection = new(ConnectionString);
-        await connection.OpenAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         string[] procedures =
         [
@@ -124,7 +124,7 @@ public sealed class FfpManagerRealDatabaseContractTests
 
             command.Parameters.AddWithValue("@name", procedure);
 
-            if (Convert.ToInt32(await command.ExecuteScalarAsync()) == 0)
+            if (Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)) == 0)
             {
                 missing.Add(procedure);
             }
