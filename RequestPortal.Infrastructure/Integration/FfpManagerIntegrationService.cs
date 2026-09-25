@@ -3,10 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Integration;
+using RequestPortal.Application.Messages;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Integration;
+using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -22,19 +24,22 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
     private readonly IFfpManagerBridgeClient bridgeClient;
     private readonly FfpManagerBridgeOptions options;
     private readonly IClock clock;
+    private readonly IPortalMessageService portalMessageService;
 
     public FfpManagerIntegrationService(
         RequestPortalDbContext dbContext,
         IDocumentService documentService,
         IFfpManagerBridgeClient bridgeClient,
         IOptions<FfpManagerBridgeOptions> options,
-        IClock clock)
+        IClock clock,
+        IPortalMessageService portalMessageService)
     {
         this.dbContext = dbContext;
         this.documentService = documentService;
         this.bridgeClient = bridgeClient;
         this.options = options.Value;
         this.clock = clock;
+        this.portalMessageService = portalMessageService;
     }
 
     public async Task<FfpManagerApplicationReference> SubmitRequestAsync(
@@ -222,6 +227,46 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
             request.RequestMoreInformation(ExternalSystemActorId, informationRequest.RequestedUtc, informationRequest.Message);
         }
 
+        Guid primaryRecipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
+        Guid[] subscribedManagerIds = await dbContext.OrganizationMemberships
+            .AsNoTracking()
+            .Where(membership =>
+                membership.OrganizationId == request.OrganizationId &&
+                membership.Status == MembershipStatus.Approved &&
+                membership.Role == OrganizationRole.Administrator &&
+                membership.ReceiveRequestNotifications)
+            .Select(membership => membership.UserId)
+            .ToArrayAsync(cancellationToken);
+
+        Guid[] recipients = subscribedManagerIds
+            .Append(primaryRecipientUserId)
+            .Distinct()
+            .ToArray();
+
+        Guid? existingThreadId = await dbContext.MessageThreads
+            .AsNoTracking()
+            .Where(thread =>
+                thread.RequestId == request.Id &&
+                thread.StaffVisible)
+            .OrderByDescending(thread => thread.CreatedUtc)
+            .Select(thread => (Guid?)thread.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        string body = informationRequest.Message;
+        if (informationRequest.DueUtc.HasValue)
+        {
+            body += $"\n\nPlease respond by {informationRequest.DueUtc.Value:yyyy-MM-dd}.";
+        }
+
+        await portalMessageService.SendSystemMessageAsync(
+            request.OrganizationId,
+            request.Id,
+            existingThreadId,
+            $"Information required: {request.PublicReference}",
+            body,
+            recipients,
+            cancellationToken);
+
         FfpManagerInformationRequestedMessage message = new(
             Guid.NewGuid(),
             clock.UtcNow,
@@ -288,6 +333,25 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
         }
 
         await bridgeClient.SendInformationResponseAsync(response, cancellationToken);
+
+        Guid? existingThreadId = await dbContext.MessageThreads
+            .AsNoTracking()
+            .Where(thread =>
+                thread.RequestId == request.Id &&
+                thread.StaffVisible)
+            .OrderByDescending(thread => thread.CreatedUtc)
+            .Select(thread => (Guid?)thread.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        await portalMessageService.SendToSharedStaffAsync(
+            userId,
+            request.OrganizationId,
+            request.Id,
+            existingThreadId,
+            $"Information response: {request.PublicReference}",
+            message,
+            cancellationToken);
+
         if (request.Status == RequestStatus.MoreInformationRequired)
         {
             DateTimeOffset now = clock.UtcNow;
