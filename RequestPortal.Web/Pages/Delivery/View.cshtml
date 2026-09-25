@@ -1,5 +1,6 @@
 @page "/Delivery/{deliveryId:guid}"
 @model RequestPortal.Web.Pages.Delivery.ViewModel
+@using RequestPortal.Application.Delivery
 @{
     ViewData["Title"] = "Delivery Acknowledgement";
 }
@@ -7,65 +8,211 @@
 <div class="shell" style="max-width:900px">
     @if (Model.Delivery is null)
     {
-        <section class="card"><h1>Delivery link unavailable</h1><p class="muted">This delivery link is invalid or no longer available.</p></section>
+        <section class="card">
+            <h1>Delivery link unavailable</h1>
+            <p class="muted">This delivery link is invalid or no longer available.</p>
+        </section>
     }
     else
     {
         <div class="section-heading">
-            <div class="eyebrow" style="color:#b45b09">Delivery acknowledgement</div>
+            <div class="eyebrow" style="color:#b45b09">Proof of Delivery</div>
             <h1>@Model.Delivery.DocumentReference</h1>
-            <p>@Model.Delivery.DocumentType · Recipient: @Model.Delivery.RecipientName</p>
+            <p>@Model.Delivery.DocumentType</p>
         </div>
 
-        <section class="card" style="margin-bottom:16px">
-            <h2>Delivery details</h2>
-            <div class="table-wrap">
-                <table>
-                    <tbody>
-                        <tr><th>Recipient</th><td>@Model.Delivery.RecipientName</td></tr>
-                        <tr><th>Delivery person</th><td>@(Model.Delivery.DeliveryPerson ?? "Not specified")</td></tr>
-                        <tr><th>Reference</th><td>@Model.Delivery.DocumentReference</td></tr>
-                        <tr><th>Status</th><td>@Model.Delivery.Status</td></tr>
-                        <tr><th>Created</th><td>@Model.Delivery.CreatedUtc.ToLocalTime().ToString("f")</td></tr>
-                    </tbody>
-                </table>
+        <section class="card delivery-note">
+            <div class="delivery-note-header">
+                <div>
+                    <div class="muted">Recipient</div>
+                    <strong>@Model.Delivery.RecipientName</strong>
+                </div>
+                <div>
+                    <div class="muted">Delivery person</div>
+                    <strong>@(Model.Delivery.DeliveryPerson ?? "Not specified")</strong>
+                </div>
+                <div>
+                    <div class="muted">Created</div>
+                    <strong>@Model.Delivery.CreatedUtc.ToLocalTime().ToString("f")</strong>
+                </div>
+                <div>
+                    <div class="muted">Status</div>
+                    <strong>@Model.Delivery.Status</strong>
+                </div>
             </div>
-        </section>
 
-        <section class="card" style="margin-bottom:16px">
-            <h2>Items and document snapshot</h2>
-            <pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fa;padding:14px;border:1px solid #e2e7ea;border-radius:6px">@Model.FormattedSnapshot</pre>
-            <p class="muted">This snapshot is preserved exactly as received for this delivery and will not silently change if the source record later changes.</p>
+            <h2 style="margin-top:24px">Items</h2>
+            @if (Model.Delivery.Lines.Count == 0)
+            {
+                <p class="muted">No line-item detail was supplied with this delivery document.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Description</th><th style="text-align:right">Quantity</th><th>Unit</th></tr></thead>
+                        <tbody>
+                        @foreach (DeliveryLineSnapshot line in Model.Delivery.Lines)
+                        {
+                            <tr>
+                                <td>@line.Description</td>
+                                <td style="text-align:right">@line.Quantity.ToString("N3").TrimEnd('0').TrimEnd('.')</td>
+                                <td>@(line.UnitOfMeasure ?? "—")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </section>
 
         @if (Model.Delivery.Status == "Ready")
         {
-            <section class="card">
-                <h2>Acknowledge receipt</h2>
-                <form method="post">
+            <section class="card" style="margin-top:16px">
+                <h2>Acknowledge this delivery</h2>
+                <p class="muted">Confirm what actually arrived. Partial and failed deliveries are recorded explicitly.</p>
+                <form method="post" enctype="multipart/form-data" id="podForm">
                     <input type="hidden" asp-for="Token" />
-                    <div class="form-group"><label asp-for="AcknowledgedBy">Your name</label><input asp-for="AcknowledgedBy" required /></div>
-                    <div class="form-group"><label asp-for="Status">Delivery result</label>
+                    <input type="hidden" asp-for="SignatureData" id="SignatureData" />
+
+                    <div class="form-group">
+                        <label asp-for="AcknowledgedBy">Your name</label>
+                        <input asp-for="AcknowledgedBy" autocomplete="name" required />
+                        <span asp-validation-for="AcknowledgedBy" class="validation"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label asp-for="Status">Delivery result</label>
                         <select asp-for="Status" required>
                             <option value="Delivered">Delivered</option>
                             <option value="PartiallyDelivered">Partially delivered</option>
                             <option value="Failed">Failed / not delivered</option>
                         </select>
                     </div>
-                    <div class="form-group"><label asp-for="SignatureData">Signature / acknowledgement</label><textarea asp-for="SignatureData" rows="3" required placeholder="Type your name or acknowledgement mark"></textarea></div>
-                    <div class="form-group"><label asp-for="Notes">Notes</label><textarea asp-for="Notes" rows="4"></textarea></div>
+
+                    <div class="form-group">
+                        <label>Signature / acknowledgement</label>
+                        <canvas id="signaturePad" width="760" height="180" style="display:block;width:100%;height:180px;border:1px solid #bcc6cc;border-radius:6px;background:white;touch-action:none"></canvas>
+                        <div class="action-row" style="margin-top:8px">
+                            <button class="button button-small button-outline" type="button" id="clearSignature">Clear signature</button>
+                        </div>
+                        <label for="typedSignature" class="muted" style="margin-top:10px">If drawing is inconvenient, type your acknowledgement instead.</label>
+                        <input id="typedSignature" type="text" placeholder="Type your name to acknowledge" />
+                        <span asp-validation-for="SignatureData" class="validation"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label asp-for="Evidence">Photo or supporting evidence (optional)</label>
+                        <input asp-for="Evidence" type="file" accept="image/*,.pdf" capture="environment" />
+                        <small class="muted">Photo or PDF, maximum 10 MB.</small>
+                        <span asp-validation-for="Evidence" class="validation"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label asp-for="Notes">Notes</label>
+                        <textarea asp-for="Notes" rows="4" placeholder="Explain shortages, damage, refusal, or anything else FFP should know."></textarea>
+                    </div>
+
                     <button class="button" type="submit">Confirm delivery result</button>
                 </form>
             </section>
         }
         else
         {
-            <section class="card">
+            <section class="card" style="margin-top:16px">
                 <h2>Acknowledgement recorded</h2>
                 <p><strong>@Model.Delivery.Status</strong> by @Model.Delivery.AcknowledgedBy on @Model.Delivery.AcknowledgedUtc?.ToLocalTime().ToString("f").</p>
-                @if (!string.IsNullOrWhiteSpace(Model.Delivery.Notes)) { <p>@Model.Delivery.Notes</p> }
+                @if (!string.IsNullOrWhiteSpace(Model.Delivery.Notes))
+                {
+                    <p>@Model.Delivery.Notes</p>
+                }
+                @if (Model.Delivery.EvidenceDocumentId.HasValue)
+                {
+                    <p class="muted">Supporting delivery evidence was recorded with this acknowledgement.</p>
+                }
             </section>
         }
     }
 </div>
 </section>
+
+@section Scripts {
+<script>
+(() => {
+    const canvas = document.getElementById('signaturePad');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const hidden = document.getElementById('SignatureData');
+    const typed = document.getElementById('typedSignature');
+    const form = document.getElementById('podForm');
+    let drawing = false;
+    let hasInk = false;
+
+    function point(event) {
+        const rect = canvas.getBoundingClientRect();
+        const source = event.touches ? event.touches[0] : event;
+        return {
+            x: (source.clientX - rect.left) * (canvas.width / rect.width),
+            y: (source.clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    function start(event) {
+        drawing = true;
+        const p = point(event);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        event.preventDefault();
+    }
+
+    function move(event) {
+        if (!drawing) return;
+        const p = point(event);
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        hasInk = true;
+        event.preventDefault();
+    }
+
+    function stop() { drawing = false; }
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', stop);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', stop);
+
+    document.getElementById('clearSignature').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        hasInk = false;
+        hidden.value = '';
+    });
+
+    form.addEventListener('submit', event => {
+        const typedValue = typed.value.trim();
+        hidden.value = hasInk ? canvas.toDataURL('image/png') : typedValue;
+        if (!hidden.value) {
+            event.preventDefault();
+            typed.focus();
+            alert('Please sign or type your acknowledgement before submitting.');
+        }
+    });
+})();
+</script>
+}
+
+<style>
+.delivery-note-header {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:16px;
+}
+.delivery-note-header strong { display:block; margin-top:4px; }
+@media (max-width:640px) {
+    .delivery-note-header { grid-template-columns:1fr; }
+    .delivery-note { padding:18px; }
+}
+</style>
