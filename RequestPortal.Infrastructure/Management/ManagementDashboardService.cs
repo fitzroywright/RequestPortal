@@ -200,6 +200,61 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<ManagementDeliveryRow>> GetDeliveriesAsync(
+        ManagementDeliveryFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        IReadOnlyList<ManagementRequestRow> requests = await LoadRowsAsync(now, cancellationToken);
+        Dictionary<Guid, ManagementRequestRow> requestLookup = requests.ToDictionary(item => item.Id);
+
+        var deliveries = await dbContext.Deliveries
+            .AsNoTracking()
+            .OrderByDescending(item => item.CreatedUtc)
+            .ToListAsync(cancellationToken);
+
+        IEnumerable<ManagementDeliveryRow> rows = deliveries
+            .Where(item => requestLookup.ContainsKey(item.RequestId))
+            .Select(item =>
+            {
+                ManagementRequestRow request = requestLookup[item.RequestId];
+                return new ManagementDeliveryRow(
+                    item.Id,
+                    item.RequestId,
+                    request.PublicReference,
+                    request.OrganizationName,
+                    request.Program,
+                    request.Parish,
+                    item.DocumentReference,
+                    item.DocumentType,
+                    item.RecipientName,
+                    item.Status.ToString(),
+                    item.CreatedUtc,
+                    item.AcknowledgedUtc,
+                    item.AcknowledgedBy,
+                    item.Notes,
+                    item.EvidenceDocumentId);
+            });
+
+        if (!string.IsNullOrWhiteSpace(filter.Status))
+        {
+            string status = filter.Status.Trim();
+            rows = rows.Where(item => string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase));
+        }
+        if (!string.IsNullOrWhiteSpace(filter.Organization))
+            rows = rows.Where(item => string.Equals(item.OrganizationName, filter.Organization, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(filter.Program))
+            rows = rows.Where(item => string.Equals(item.Program, filter.Program, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(filter.Parish))
+            rows = rows.Where(item => string.Equals(item.Parish, filter.Parish, StringComparison.OrdinalIgnoreCase));
+        if (filter.FromUtc.HasValue)
+            rows = rows.Where(item => item.CreatedUtc >= filter.FromUtc.Value);
+        if (filter.ToUtc.HasValue)
+            rows = rows.Where(item => item.CreatedUtc <= filter.ToUtc.Value);
+
+        return rows.ToArray();
+    }
+
     public async Task<ParishDrillDown> GetParishAsync(string parish, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<ManagementRequestRow> requests = await GetRequestsAsync(
