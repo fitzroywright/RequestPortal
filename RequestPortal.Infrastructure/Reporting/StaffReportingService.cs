@@ -83,6 +83,12 @@ public sealed class StaffReportingService : IStaffReportingService
         return stream.ToArray();
     }
 
+    public async Task<byte[]> ExportPdfAsync(RequestReportFilter filter, CancellationToken cancellationToken = default)
+    {
+        List<RequestReportRow> rows = await ProjectRows(BuildQuery(filter)).ToListAsync(cancellationToken);
+        return BuildPdf(rows);
+    }
+
     public async Task<string> ExportPrintableHtmlAsync(RequestReportFilter filter, CancellationToken cancellationToken = default)
     {
         List<RequestReportRow> rows = await ProjectRows(BuildQuery(filter)).ToListAsync(cancellationToken);
@@ -131,6 +137,128 @@ public sealed class StaffReportingService : IStaffReportingService
                join organization in dbContext.Organizations.AsNoTracking() on request.OrganizationId equals organization.Id
                orderby request.CreatedUtc descending
                select new RequestReportRow(request.Id, request.PublicReference, organization.Name, organization.CountryCode, request.Summary ?? string.Empty, request.Kind.ToString(), request.Category ?? string.Empty, request.Priority.ToString(), request.Status.ToString(), request.CreatedUtc, request.SubmittedUtc);
+    }
+
+    private static byte[] BuildPdf(IReadOnlyList<RequestReportRow> rows)
+    {
+        const int rowsPerPage = 36;
+        RequestReportRow[][] pages = rows.Count == 0
+            ? [Array.Empty<RequestReportRow>()]
+            : rows.Chunk(rowsPerPage).Select(chunk => chunk.ToArray()).ToArray();
+
+        using MemoryStream stream = new();
+        using StreamWriter writer = new(stream, Encoding.ASCII, 1024, leaveOpen: true)
+        {
+            NewLine = "\n"
+        };
+
+        Dictionary<int, long> offsets = new();
+        int catalogId = 1;
+        int pagesId = 2;
+        int fontId = 3;
+        int maxId = 3 + (pages.Length * 2);
+
+        writer.WriteLine("%PDF-1.4");
+        writer.Flush();
+
+        void WriteObject(int id, string body)
+        {
+            writer.Flush();
+            offsets[id] = stream.Position;
+            writer.WriteLine($"{id} 0 obj");
+            writer.WriteLine(body);
+            writer.WriteLine("endobj");
+            writer.Flush();
+        }
+
+        string kids = string.Join(" ", Enumerable.Range(0, pages.Length).Select(index => $"{4 + (index * 2)} 0 R"));
+        WriteObject(catalogId, $"<< /Type /Catalog /Pages {pagesId} 0 R >>");
+        WriteObject(pagesId, $"<< /Type /Pages /Count {pages.Length} /Kids [{kids}] >>");
+        WriteObject(fontId, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+        for (int pageIndex = 0; pageIndex < pages.Length; pageIndex++)
+        {
+            int pageId = 4 + (pageIndex * 2);
+            int contentId = pageId + 1;
+            string content = BuildPdfPageContent(pages[pageIndex], pageIndex + 1, pages.Length, rows.Count);
+            WriteObject(pageId, $"<< /Type /Page /Parent {pagesId} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 {fontId} 0 R >> >> /Contents {contentId} 0 R >>");
+
+            writer.Flush();
+            offsets[contentId] = stream.Position;
+            writer.WriteLine($"{contentId} 0 obj");
+            writer.WriteLine($"<< /Length {Encoding.ASCII.GetByteCount(content)} >>");
+            writer.WriteLine("stream");
+            writer.Flush();
+            byte[] bytes = Encoding.ASCII.GetBytes(content);
+            stream.Write(bytes, 0, bytes.Length);
+            writer.WriteLine();
+            writer.WriteLine("endstream");
+            writer.WriteLine("endobj");
+            writer.Flush();
+        }
+
+        long xrefOffset = stream.Position;
+        writer.WriteLine("xref");
+        writer.WriteLine($"0 {maxId + 1}");
+        writer.WriteLine("0000000000 65535 f ");
+        for (int id = 1; id <= maxId; id++)
+        {
+            writer.WriteLine($"{offsets[id]:D10} 00000 n ");
+        }
+        writer.WriteLine("trailer");
+        writer.WriteLine($"<< /Size {maxId + 1} /Root {catalogId} 0 R >>");
+        writer.WriteLine("startxref");
+        writer.WriteLine(xrefOffset);
+        writer.WriteLine("%%EOF");
+        writer.Flush();
+        return stream.ToArray();
+    }
+
+    private static string BuildPdfPageContent(
+        IReadOnlyList<RequestReportRow> rows,
+        int pageNumber,
+        int pageCount,
+        int totalRows)
+    {
+        StringBuilder content = new();
+        content.AppendLine("BT");
+        content.AppendLine("/F1 12 Tf");
+        content.AppendLine("40 760 Td");
+        content.AppendLine($"({PdfText("Request Portal Management Report")}) Tj");
+        content.AppendLine("0 -16 Td");
+        content.AppendLine("/F1 8 Tf");
+        content.AppendLine($"({PdfText($"Generated {DateTimeOffset.UtcNow:u} | {totalRows} matching requests | Page {pageNumber} of {pageCount}")}) Tj");
+        content.AppendLine("0 -20 Td");
+        content.AppendLine("/F1 7 Tf");
+        content.AppendLine($"({PdfText("Reference | Organization | Status | Category | Created UTC")}) Tj");
+
+        foreach (RequestReportRow row in rows)
+        {
+            content.AppendLine("0 -15 Td");
+            string line = $"{Clip(row.Reference, 18)} | {Clip(row.Organization, 28)} | {Clip(row.Status, 16)} | {Clip(row.Category, 20)} | {row.CreatedUtc:u}";
+            content.AppendLine($"({PdfText(line)}) Tj");
+        }
+
+        content.AppendLine("ET");
+        return content.ToString();
+    }
+
+    private static string Clip(string? value, int max)
+    {
+        string normalized = string.IsNullOrWhiteSpace(value) ? "-" : value.Replace("\r", " ").Replace("\n", " ").Trim();
+        return normalized.Length <= max ? normalized : normalized[..Math.Max(1, max - 3)] + "...";
+    }
+
+    private static string PdfText(string value)
+    {
+        StringBuilder output = new(value.Length);
+        foreach (char ch in value)
+        {
+            char safe = ch is >= ' ' and <= '~' ? ch : '?';
+            if (safe is '\\' or '(' or ')') output.Append('\\');
+            output.Append(safe);
+        }
+        return output.ToString();
     }
 
     private static Row CreateRow(params string[] values)
