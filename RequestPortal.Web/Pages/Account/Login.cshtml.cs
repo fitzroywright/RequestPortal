@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Configuration;
+using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Notifications;
 using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Identity;
@@ -27,6 +28,7 @@ public sealed class LoginModel : PageModel
     private readonly IClock clock;
     private readonly IDiagnosticOperationsRouter diagnostics;
     private readonly INotificationPreferenceService notificationPreferences;
+    private readonly IBusinessAuditWriter auditWriter;
 
     public LoginModel(
         SignInManager<ApplicationUser> signInManager,
@@ -35,7 +37,8 @@ public sealed class LoginModel : PageModel
         IConfiguration configuration,
         IClock clock,
         IDiagnosticOperationsRouter diagnostics,
-        INotificationPreferenceService notificationPreferences)
+        INotificationPreferenceService notificationPreferences,
+        IBusinessAuditWriter auditWriter)
     {
         this.signInManager = signInManager;
         this.userManager = userManager;
@@ -44,6 +47,7 @@ public sealed class LoginModel : PageModel
         this.clock = clock;
         this.diagnostics = diagnostics;
         this.notificationPreferences = notificationPreferences;
+        this.auditWriter = auditWriter;
     }
 
     public IReadOnlyList<ExternalProviderOption> ExternalProviders { get; private set; } = Array.Empty<ExternalProviderOption>();
@@ -126,6 +130,17 @@ public sealed class LoginModel : PageModel
                     HttpContext.RequestAborted);
             }
 
+            if (existingUser is not null)
+            {
+                await auditWriter.WriteAsync(
+                    existingUser.Id,
+                    "UserSignedIn",
+                    "User",
+                    existingUser.Id,
+                    null,
+                    $"surface=Representative; provider={loginInfo.LoginProvider}",
+                    HttpContext.RequestAborted);
+            }
             await EmitAsync("RP-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
             return LocalRedirect(ReturnUrl);
         }
@@ -179,6 +194,14 @@ public sealed class LoginModel : PageModel
             user.Email,
             HttpContext.RequestAborted);
         await signInManager.SignInAsync(user, isPersistent: false);
+        await auditWriter.WriteAsync(
+            user.Id,
+            "UserSignedIn",
+            "User",
+            user.Id,
+            null,
+            $"surface=Representative; provider={loginInfo.LoginProvider}",
+            HttpContext.RequestAborted);
         await EmitAsync("RP-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
 
         return LocalRedirect(ReturnUrl);
@@ -214,6 +237,14 @@ public sealed class LoginModel : PageModel
             user.Email,
             HttpContext.RequestAborted);
         await signInManager.SignInAsync(user, isPersistent: false);
+        await auditWriter.WriteAsync(
+            user.Id,
+            "UserSignedIn",
+            "User",
+            user.Id,
+            null,
+            "surface=Representative; provider=Demo",
+            HttpContext.RequestAborted);
         await EmitAsync("RP-AUTH-DEMO-REP", "Demo representative signed in.", demoEmail);
 
         return LocalRedirect(LocalReturnUrl(returnUrl));
