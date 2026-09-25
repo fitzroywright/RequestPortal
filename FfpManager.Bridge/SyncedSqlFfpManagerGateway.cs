@@ -27,9 +27,9 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         await using SqlTransaction transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
-        await using (SqlCommand existing = new("SELECT TOP (1) ID, Code, ReferenceNo, DateCreated FROM dbo.ApplicationLetters WITH (UPDLOCK, HOLDLOCK) WHERE MessageID=@MessageID AND GCRecord IS NULL ORDER BY ID", connection, transaction))
+        await using (SqlCommand existing = new("SELECT TOP (1) ID, Code, ReferenceNo, DateCreated FROM dbo.ApplicationLetters WITH (UPDLOCK, HOLDLOCK) WHERE ExternalRequestId=@ExternalRequestId AND GCRecord IS NULL ORDER BY ID", connection, transaction))
         {
-            existing.Parameters.Add("@MessageID", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
+            existing.Parameters.Add("@ExternalRequestId", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
             await using SqlDataReader reader = await existing.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
@@ -48,10 +48,10 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         long statusId = await referenceData.ResolveApplicationStatusIdAsync(options.InitialApplicationStatus, cancellationToken);
         const string insert = """
             INSERT INTO dbo.ApplicationLetters
-            (Code,ReferenceNo,Name,ContactPerson,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,MessageID)
+            (Code,ReferenceNo,Name,ContactPerson,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId)
             OUTPUT INSERTED.ID
             VALUES
-            (@Code,@ReferenceNo,@Name,@ContactPerson,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@MessageID);
+            (@Code,@ReferenceNo,@Name,@ContactPerson,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId);
             """;
         await using SqlCommand command = new(insert, connection, transaction);
         AddNullable(command, "@Code", submission.PublicReference, SqlDbType.NVarChar, 500);
@@ -70,7 +70,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
         AddNullable(command, "@AuditID", $"RequestPortal:{submission.PortalRequestId:D}", SqlDbType.NVarChar, 100);
         AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
-        command.Parameters.Add("@MessageID", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
+        command.Parameters.Add("@ExternalRequestId", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
         long applicationId = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
 
         foreach (ExternalApplicationItem item in submission.Items)
