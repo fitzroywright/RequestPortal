@@ -178,11 +178,47 @@ public sealed class PortalMessageService : IPortalMessageService
             })
             .ToListAsync(cancellationToken);
 
+        Guid[] messageIds = messages
+            .Select(row => row.Message.Id)
+            .ToArray();
+
+        var attachmentRows = await (
+            from attachment in dbContext.MessageAttachments.AsNoTracking()
+            join document in dbContext.Documents.AsNoTracking()
+                on attachment.DocumentId equals document.Id
+            where messageIds.Contains(attachment.MessageId)
+            select new
+            {
+                attachment.MessageId,
+                document.Id,
+                document.OriginalFileName,
+                document.ContentType,
+                document.SizeBytes
+            })
+            .ToListAsync(cancellationToken);
+
+        Dictionary<Guid, MessageAttachmentView[]> attachmentsByMessage = attachmentRows
+            .GroupBy(row => row.MessageId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(row => new MessageAttachmentView(
+                        row.Id,
+                        row.OriginalFileName,
+                        row.ContentType,
+                        row.SizeBytes))
+                    .ToArray());
+
         MessageDetailView[] projected = messages
             .Select(row =>
             {
                 (string senderName, string? senderEmail, string senderKind) =
                     ProjectSender(row.Message, row.Sender, isStaff);
+                IReadOnlyList<MessageAttachmentView> attachments =
+                    attachmentsByMessage.TryGetValue(row.Message.Id, out MessageAttachmentView[]? values)
+                        ? values
+                        : Array.Empty<MessageAttachmentView>();
+
                 return new MessageDetailView(
                     row.Message.Id,
                     senderName,
@@ -190,7 +226,8 @@ public sealed class PortalMessageService : IPortalMessageService
                     senderKind,
                     row.Message.Body,
                     row.Message.SentUtc,
-                    row.Message.SenderUserId == userId);
+                    row.Message.SenderUserId == userId,
+                    attachments);
             })
             .ToArray();
 
