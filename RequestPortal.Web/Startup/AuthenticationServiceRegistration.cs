@@ -1,3 +1,4 @@
+using RequestPortal.Infrastructure.Security;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
