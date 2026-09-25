@@ -16,7 +16,9 @@ public sealed class AuditEntry
         Guid entityId,
         Guid? organizationId,
         DateTimeOffset occurredUtc,
-        string? detail = null)
+        string? detail = null,
+        string applicationContext = "RequestPortal",
+        string outcome = "Succeeded")
     {
         Id = id;
         ActorUserId = actorUserId;
@@ -26,6 +28,8 @@ public sealed class AuditEntry
         OrganizationId = organizationId;
         OccurredUtc = occurredUtc;
         Detail = detail;
+        ApplicationContext = applicationContext.Trim();
+        Outcome = outcome.Trim();
     }
 
     public Guid Id { get; private set; }
@@ -43,4 +47,8 @@ public sealed class AuditEntry
     public DateTimeOffset OccurredUtc { get; private set; }
 
     public string? Detail { get; private set; }
+
+    public string ApplicationContext { get; private set; } = "RequestPortal";
+
+    public string Outcome { get; private set; } = "Succeeded";
 }
