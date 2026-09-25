@@ -16,15 +16,18 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
     private readonly IServiceScopeFactory scopeFactory;
     private readonly IConfiguration configuration;
     private readonly ISecretProvider secrets;
+    private readonly ICommonSecretsHealthCheck secretsHealth;
 
     public RequestPortalEngineeringDiagnosticCatalog(
         IServiceScopeFactory scopeFactory,
         IConfiguration configuration,
-        ISecretProvider secrets)
+        ISecretProvider secrets,
+        ICommonSecretsHealthCheck secretsHealth)
     {
         this.scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
         this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
+        this.secretsHealth = secretsHealth ?? throw new ArgumentNullException(nameof(secretsHealth));
     }
 
     public IReadOnlyList<EngineeringDiagnosticCheckDefinition> Build()
@@ -215,9 +218,9 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
     private async Task<EngineeringDiagnosticCheckResult> CheckIntegrationConfigurationAsync(
         CancellationToken cancellationToken)
     {
-        bool openBaoConfigured =
-            !string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]) &&
-            !string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:RoleId"]);
+        CommonSecretsHealth secretHealth =
+            await secretsHealth.CheckAsync(cancellationToken);
+        bool secretsConfigured = secretHealth.IsConfigured && secretHealth.IsAvailable;
         bool malwareScannerConfigured = configuration.GetValue("Uploads:MalwareScanning:Enabled", false) &&
             !string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]);
         bool externalIdentityConfigured =
@@ -241,7 +244,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
              !string.IsNullOrWhiteSpace(ffpSecret));
 
         List<string> missing = [];
-        if (!openBaoConfigured) missing.Add("OpenBao workload credentials");
+        if (!secretsConfigured) missing.Add($"Common.Secrets provider ({secretHealth.ProviderName}: {secretHealth.Message})");
         if (!malwareScannerConfigured) missing.Add("malware scanner");
         if (!externalIdentityConfigured) missing.Add("representative identity provider");
         if (!ffpManagerConfigured) missing.Add("FFP Manager adapter");
@@ -257,7 +260,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
         return Passed(
             "requestportal-l2-integrations",
             "RequestPortal integration readiness",
-            "OpenBao, malware scanning, representative identity and commissioned adapter configuration checks are satisfied.");
+            "Common.Secrets, malware scanning, representative identity and commissioned adapter configuration checks are satisfied.");
     }
 
     private bool HasPair(string firstKey, string secondKey)
