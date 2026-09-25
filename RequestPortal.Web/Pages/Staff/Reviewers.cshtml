@@ -69,10 +69,13 @@
                 <td>@(item.LastAccessUtc?.ToLocalTime().ToString("g") ?? "—")</td>
                 <td>@status</td>
                 <td>
+                    <div class="action-row">
                     @if (!item.RevokedUtc.HasValue && item.ExpiresUtc > DateTimeOffset.UtcNow)
                     {
                         <form method="post" asp-page-handler="Revoke"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-outline" type="submit">Revoke</button></form>
                     }
+                    <form method="post" asp-page-handler="Reissue"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-secondary" type="submit">Reissue</button></form>
+                    </div>
                 </td>
             </tr>
         }
