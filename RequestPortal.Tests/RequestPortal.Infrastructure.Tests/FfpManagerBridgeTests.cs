@@ -133,6 +133,33 @@ public sealed class FfpManagerBridgeTests
     }
 
     [Fact]
+    public async Task SyncedSqlGateway_RejectsFractionalQuantityBeforeOpeningSql()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        IOptions<BridgeOptions> options = Options.Create(new BridgeOptions());
+        SyncedSqlFfpManagerGateway gateway = new(
+            options,
+            new FfpManagerReferenceDataCatalog(options));
+
+        FfpManagerApplicationSubmission submission = CreateSubmission(Guid.NewGuid()) with
+        {
+            Items =
+            [
+                new FfpManagerApplicationItem(
+                    Guid.NewGuid(),
+                    "Fractional test item",
+                    1.5m,
+                    "EA")
+            ]
+        };
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gateway.CreateApplicationAsync(submission, cancellationToken));
+
+        Assert.Contains("Quantity is an integer", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SqlGateway_RequiresConnectionString()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
