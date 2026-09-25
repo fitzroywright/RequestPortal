@@ -399,7 +399,7 @@ public sealed class IntegrationOutboxDispatcher : BackgroundService
             or "DECLINED"
             or "CLOSED";
 
-        FfpManagerApplicationStatus status = new(
+        ExternalApplicationStatus status = new(
             message.ApplicationId
             , statusCode
             , message.StatusText ?? statusCode
@@ -407,7 +407,7 @@ public sealed class IntegrationOutboxDispatcher : BackgroundService
             , message.Detail
             , terminal);
 
-        FfpManagerStatusCallback callback = new(
+        ExternalStatusCallback callback = new(
             message.EventId
             , message.PortalRequestId
             , status);
@@ -430,7 +430,7 @@ public sealed class IntegrationOutboxDispatcher : BackgroundService
                 "InformationRequested outbox event contains no message.");
         }
 
-        FfpManagerInformationRequest callback = new(
+        ExternalInformationRequest callback = new(
             message.EventId
             , message.PortalRequestId
             , message.ApplicationId
