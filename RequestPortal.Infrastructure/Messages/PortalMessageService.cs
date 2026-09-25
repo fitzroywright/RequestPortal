@@ -497,6 +497,32 @@ public sealed class PortalMessageService : IPortalMessageService
         return thread.Id;
     }
 
+    public async Task<bool> CanAccessAttachmentAsync(
+        Guid userId,
+        bool isStaff,
+        Guid threadId,
+        Guid documentId,
+        CancellationToken cancellationToken = default)
+    {
+        MessageThread? thread = await dbContext.MessageThreads
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == threadId, cancellationToken);
+
+        if (thread is null || !await CanViewThreadAsync(userId, isStaff, thread, cancellationToken))
+        {
+            return false;
+        }
+
+        return await (
+            from attachment in dbContext.MessageAttachments.AsNoTracking()
+            join message in dbContext.PortalMessages.AsNoTracking()
+                on attachment.MessageId equals message.Id
+            where message.ThreadId == threadId &&
+                  attachment.DocumentId == documentId
+            select attachment)
+            .AnyAsync(cancellationToken);
+    }
+
     public async Task MarkThreadReadAsync(
         Guid userId,
         Guid threadId,
