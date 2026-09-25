@@ -110,6 +110,53 @@
 
     <div class="mg-grid-3" style="margin-top:16px">
         <section class="mg-panel">
+            <h2>Deliveries by organization</h2>
+            @if (Model.Dashboard.DeliveryAnalytics.Organizations.Count == 0) { <p class="muted">No delivery activity yet.</p> }
+            @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Organizations)
+            {
+                <div class="bar-row"><span>@item.Name</span><div class="bar-track"><div class="bar-fill" style="width:@(item.Count * 100d / Math.Max(1, Model.Dashboard.DeliveryAnalytics.Organizations.Max(x => x.Count))).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></div></div><strong>@item.Count</strong></div>
+            }
+        </section>
+        <section class="mg-panel">
+            <h2>Deliveries by program</h2>
+            @if (Model.Dashboard.DeliveryAnalytics.Programs.Count == 0) { <p class="muted">No program delivery activity yet.</p> }
+            @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Programs)
+            {
+                <div class="bar-row"><span>@item.Name</span><div class="bar-track"><div class="bar-fill" style="width:@(item.Count * 100d / Math.Max(1, Model.Dashboard.DeliveryAnalytics.Programs.Max(x => x.Count))).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></div></div><strong>@item.Count</strong></div>
+            }
+        </section>
+        <section class="mg-panel">
+            <h2>Delivery trend</h2>
+            @{
+                int maxDeliveryTrend = Math.Max(1, Model.Dashboard.DeliveryAnalytics.Trend.SelectMany(x => new[] { x.Created, x.Acknowledged }).DefaultIfEmpty(1).Max());
+            }
+            @foreach (ManagementDeliveryTrendPoint point in Model.Dashboard.DeliveryAnalytics.Trend)
+            {
+                <div class="trend-row">
+                    <span class="muted">@point.WeekStarting.ToString("MMM d")</span>
+                    <div class="trend-bar" title="Created"><span style="width:@(point.Created * 100d / maxDeliveryTrend).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></span><span>@point.Created</span></div>
+                    <div class="trend-bar completed" title="Acknowledged"><span style="width:@(point.Acknowledged * 100d / maxDeliveryTrend).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></span><span>@point.Acknowledged</span></div>
+                </div>
+            }
+            <p class="muted" style="margin-bottom:0">Navy = created &nbsp; Orange = acknowledged</p>
+        </section>
+    </div>
+
+    @if (Model.Dashboard.DeliveryAnalytics.Parishes.Count > 0)
+    {
+        <section class="mg-panel" style="margin-top:16px">
+            <h2>Deliveries by parish</h2>
+            <div class="parish-list">
+            @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Parishes)
+            {
+                <div style="padding:10px 12px;background:#f8fafb;border-radius:6px;display:flex;justify-content:space-between"><span>@item.Name</span><strong>@item.Count</strong></div>
+            }
+            </div>
+        </section>
+    }
+
+    <div class="mg-grid-3" style="margin-top:16px">
+        <section class="mg-panel">
             <h2>Requests by category</h2>
             @if (Model.Dashboard.Categories.Count == 0) { <p class="muted">No categorized requests yet.</p> }
             @foreach (ManagementNamedCount item in Model.Dashboard.Categories)
