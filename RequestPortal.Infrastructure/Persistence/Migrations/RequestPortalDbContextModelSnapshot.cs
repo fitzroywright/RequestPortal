@@ -874,6 +874,18 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("InvitedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("FromUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ToUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("LastAccessUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -900,6 +912,10 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.HasIndex("ExpiresUtc");
 
                     b.HasIndex("RevokedUtc");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("RequestId");
 
                     b.ToTable("external_reviewer_invitations", (string)null);
                 });
