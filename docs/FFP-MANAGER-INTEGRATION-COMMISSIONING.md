@@ -28,9 +28,10 @@ Normal FFP Manager -> Request Portal delivery uses `dbo.RequestPortalIntegration
 The bridge no longer discovers normal status changes by repeatedly scanning
 `ApplicationLetters`.
 
-Install:
+Install in order:
 
-`FfpManager.Bridge/Sql/001_RequestPortalIntegrationOutbox.sql`
+1. `FfpManager.Bridge/Sql/000_ApplicationLetterExternalRequestId.sql`
+2. `FfpManager.Bridge/Sql/001_RequestPortalIntegrationOutbox.sql`
 
 FFP Manager must call the supplied enqueue procedures using the SAME SQL connection
 and transaction as the ApplicationLetter business change.
