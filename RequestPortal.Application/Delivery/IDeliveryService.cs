@@ -15,9 +15,14 @@ public sealed record CreateDeliveryCommand(
     string RecipientName,
     string? DeliveryPerson,
     IReadOnlyList<DeliveryLineSnapshot> Lines,
-    string? DocumentPayloadJson);
+    string? DocumentPayloadJson,
+    string? RecipientEmail = null,
+    string? PublicBaseUrl = null);
 
-public sealed record CreateDeliveryResult(Guid DeliveryId, string AccessToken);
+public sealed record CreateDeliveryResult(
+    Guid DeliveryId,
+    string AccessToken,
+    bool NotificationQueued = false);
 
 public sealed record DeliveryView(
     Guid Id,
