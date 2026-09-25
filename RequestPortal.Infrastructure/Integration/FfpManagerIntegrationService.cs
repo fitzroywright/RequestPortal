@@ -267,7 +267,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             recipients,
             cancellationToken);
 
-        ExternalInformationRequestedMessage message = new(
+        FfpManagerInformationRequestedMessage message = new(
             Guid.NewGuid(),
             clock.UtcNow,
             request.Id,
