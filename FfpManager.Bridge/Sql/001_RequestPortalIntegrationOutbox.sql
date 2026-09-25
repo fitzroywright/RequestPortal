@@ -7,6 +7,28 @@ ApplicationLetter. The bridge drains this table after the business transaction c
 Do not add a trigger. The application explicitly calls the procedures below.
 */
 
+IF COL_LENGTH(N'dbo.ApplicationLetters', N'ExternalRequestId') IS NULL
+BEGIN
+    ALTER TABLE dbo.ApplicationLetters
+        ADD ExternalRequestId uniqueidentifier NULL;
+END;
+GO
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE
+        object_id = OBJECT_ID(N'dbo.ApplicationLetters')
+        AND name = N'UX_ApplicationLetters_ExternalRequestId'
+)
+BEGIN
+    CREATE UNIQUE INDEX UX_ApplicationLetters_ExternalRequestId
+        ON dbo.ApplicationLetters (ExternalRequestId)
+        WHERE ExternalRequestId IS NOT NULL;
+END;
+GO
+
 IF OBJECT_ID(N'dbo.RequestPortalIntegrationOutbox', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.RequestPortalIntegrationOutbox
@@ -95,7 +117,7 @@ BEGIN
         @ResolvedEventId,
         N'ApplicationStatusChanged',
         al.ID,
-        al.MessageID,
+        al.ExternalRequestId,
         COALESCE(ast.Code, ast.Name, N'RECEIVED'),
         COALESCE(ast.Name, ast.Code, N'Received'),
         ast.Description,
@@ -107,7 +129,7 @@ BEGIN
     WHERE
         al.ID = @ApplicationLetterId
         AND al.GCRecord IS NULL
-        AND al.MessageID IS NOT NULL;
+        AND al.ExternalRequestId IS NOT NULL;
 
     IF @@ROWCOUNT <> 1
     BEGIN
@@ -163,7 +185,7 @@ BEGIN
         @ResolvedEventId,
         N'InformationRequested',
         al.ID,
-        al.MessageID,
+        al.ExternalRequestId,
         @Message,
         @RequestedBy,
         @DueUtc,
@@ -173,7 +195,7 @@ BEGIN
     WHERE
         al.ID = @ApplicationLetterId
         AND al.GCRecord IS NULL
-        AND al.MessageID IS NOT NULL;
+        AND al.ExternalRequestId IS NOT NULL;
 
     IF @@ROWCOUNT <> 1
     BEGIN
