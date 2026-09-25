@@ -7,14 +7,7 @@ namespace RequestPortal.Web.Startup;
 
 internal static class StartupTasks
 {
-    public static async Task RunAsync(WebApplication app)
-    {
-        await ApplyDatabaseMigrationsAsync(app);
-        await PrepareDemoAsync(app);
-        await ReportStartupDiagnosticsAsync(app);
-    }
-
-    private static async Task ApplyDatabaseMigrationsAsync(
+    public static async Task ApplyDatabaseMigrationsAsync(
         WebApplication app)
     {
         await using AsyncServiceScope scope =
@@ -34,6 +27,13 @@ internal static class StartupTasks
         }
 
         await db.Database.MigrateAsync();
+    }
+
+    public static async Task CompleteAsync(
+        WebApplication app)
+    {
+        await PrepareDemoAsync(app);
+        await ReportStartupDiagnosticsAsync(app);
     }
 
     private static async Task PrepareDemoAsync(
