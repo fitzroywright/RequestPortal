@@ -8,6 +8,7 @@ public sealed record ManagementDashboardSnapshot(
     IReadOnlyList<ManagementNamedCount> Categories,
     IReadOnlyList<ManagementNamedCount> Programs,
     ManagementDeliverySummary Delivery,
+    ManagementDeliveryAnalytics DeliveryAnalytics,
     ManagementPerformanceMetrics Performance,
     IReadOnlyList<ManagementTrendPoint> Trend,
     IReadOnlyList<ParishReachSummary> Parishes);
@@ -31,6 +32,14 @@ public sealed record ManagementDeliverySummary(
     int PartiallyDelivered,
     int Failed,
     int PendingFfpManagerSync);
+
+public sealed record ManagementDeliveryTrendPoint(DateOnly WeekStarting, int Created, int Acknowledged);
+
+public sealed record ManagementDeliveryAnalytics(
+    IReadOnlyList<ManagementNamedCount> Organizations,
+    IReadOnlyList<ManagementNamedCount> Programs,
+    IReadOnlyList<ManagementNamedCount> Parishes,
+    IReadOnlyList<ManagementDeliveryTrendPoint> Trend);
 
 public sealed record ManagementPerformanceMetrics(
     double AverageProcessingDays,
