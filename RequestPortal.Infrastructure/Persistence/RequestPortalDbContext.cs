@@ -7,6 +7,7 @@ using RequestPortal.Domain.Beneficiaries;
 using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Integration;
+using RequestPortal.Domain.Messages;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.ReferenceData;
@@ -36,6 +37,9 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RequestFulfilment> Fulfilments => Set<RequestFulfilment>();
     public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
+    public DbSet<MessageThread> MessageThreads => Set<MessageThread>();
+    public DbSet<PortalMessage> PortalMessages => Set<PortalMessage>();
+    public DbSet<MessageRecipient> MessageRecipients => Set<MessageRecipient>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
