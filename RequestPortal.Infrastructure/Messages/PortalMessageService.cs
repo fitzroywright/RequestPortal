@@ -798,6 +798,11 @@ public sealed class PortalMessageService : IPortalMessageService
             ? email?.Split('@')[0] ?? "User"
             : displayName.Trim();
 
+        if (candidate.Contains('@', StringComparison.Ordinal))
+        {
+            candidate = candidate.Split('@')[0];
+        }
+
         int separator = candidate.IndexOfAny([' ', '\t', ',']);
         return separator > 0 ? candidate[..separator] : candidate;
     }
