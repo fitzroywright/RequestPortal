@@ -27,7 +27,7 @@ public static class FfpManagerIntegrationServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 5, 300));
         });
 
-        services.AddHttpClient("FfpManagerBridgeHealth", client =>
+        services.AddHttpClient("FfpManagerBridgeReadiness", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(10);
         });
