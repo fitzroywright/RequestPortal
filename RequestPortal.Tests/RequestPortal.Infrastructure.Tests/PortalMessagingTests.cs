@@ -71,6 +71,15 @@ public sealed class PortalMessagingTests
         Assert.Equal("David", staffReply.SenderName);
         Assert.Null(staffReply.SenderEmail);
 
+        MailboxMessageView sharedSent = Assert.Single(
+            await service.GetSentAsync(
+                staff.Id,
+                isStaff: true,
+                cancellationToken: cancellationToken),
+            item => item.ThreadId == threadId);
+
+        Assert.Equal("David Brown", sharedSent.SenderName);
+
         PortalMessage persistedStaffMessage = Assert.Single(
             database.Db.PortalMessages,
             item => item.SenderUserId == staff.Id);
