@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using RequestPortal.Application.Security;
 using RequestPortal.Common.Security;
 using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Infrastructure.Security;
 using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Startup;
