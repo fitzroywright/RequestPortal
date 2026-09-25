@@ -1,5 +1,27 @@
 # FFP Manager <-> Request Portal Integration Commissioning
 
+## Application correlation identity
+
+Request Portal correlation uses the dedicated nullable
+`dbo.ApplicationLetters.ExternalRequestId` column.
+
+The outbox installation script creates the column and a unique index when they are
+missing. Request Portal submissions write the Portal Request GUID to
+`ExternalRequestId`.
+
+Do not reuse `MessageID` for Request Portal correlation. Existing FFP Manager
+meaning attached to `MessageID` remains untouched.
+
+The bridge treats `ExternalRequestId` as the idempotency key:
+
+- a retry with the same Portal Request GUID returns the existing ApplicationLetter
+- a new Portal Request GUID creates a new ApplicationLetter
+- outbound status and information-request events read the Portal identity from
+  `ExternalRequestId`
+
+No automatic backfill from `MessageID` is performed. Any historical Request Portal
+records must be reviewed before a migration is approved.
+
 ## Durable outbound events
 
 Normal FFP Manager -> Request Portal delivery uses `dbo.RequestPortalIntegrationOutbox`.
