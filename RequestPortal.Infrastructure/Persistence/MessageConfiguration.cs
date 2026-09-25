@@ -47,3 +47,18 @@ internal sealed class MessageRecipientConfiguration : IEntityTypeConfiguration<M
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+
+internal sealed class MessageAttachmentConfiguration : IEntityTypeConfiguration<MessageAttachment>
+{
+    public void Configure(EntityTypeBuilder<MessageAttachment> builder)
+    {
+        builder.ToTable("message_attachments");
+        builder.HasKey(attachment => new { attachment.MessageId, attachment.DocumentId });
+        builder.HasIndex(attachment => attachment.DocumentId);
+        builder.HasOne<PortalMessage>()
+            .WithMany()
+            .HasForeignKey(attachment => attachment.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
