@@ -116,8 +116,7 @@ internal static class PlatformServiceRegistration
                 PartitionedRateLimiter.Create<HttpContext, string>(
                     context =>
                         RateLimitPartition.GetFixedWindowLimiter(
-                            context.Connection.RemoteIpAddress?
-                                .ToString()
+                            context.Connection.RemoteIpAddress?.ToString()
                                 ?? "unknown"
                             , _ => new FixedWindowRateLimiterOptions
                             {
