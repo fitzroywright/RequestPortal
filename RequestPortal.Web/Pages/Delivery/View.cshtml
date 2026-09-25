@@ -1,5 +1,6 @@
 @page "/Delivery/{deliveryId:guid}"
 @model RequestPortal.Web.Pages.Delivery.ViewModel
+@using RequestPortal.Application.Delivery
 @{
     ViewData["Title"] = "Delivery Acknowledgement";
 }
@@ -7,12 +8,12 @@
 <div class="shell" style="max-width:900px">
     @if (Model.Delivery is null)
     {
-        <section class="card"><h1>Delivery link unavailable</h1><p class="muted">This delivery link is invalid or no longer available.</p></section>
+        <section class="card"><h1>Delivery link unavailable</h1><p class="muted">This delivery link is invalid, expired, or no longer available.</p></section>
     }
     else
     {
         <div class="section-heading">
-            <div class="eyebrow" style="color:#b45b09">Delivery acknowledgement</div>
+            <div class="eyebrow" style="color:#b45b09">Proof of Delivery</div>
             <h1>@Model.Delivery.DocumentReference</h1>
             <p>@Model.Delivery.DocumentType · Recipient: @Model.Delivery.RecipientName</p>
         </div>
@@ -25,35 +26,84 @@
                         <tr><th>Recipient</th><td>@Model.Delivery.RecipientName</td></tr>
                         <tr><th>Delivery person</th><td>@(Model.Delivery.DeliveryPerson ?? "Not specified")</td></tr>
                         <tr><th>Reference</th><td>@Model.Delivery.DocumentReference</td></tr>
-                        <tr><th>Status</th><td>@Model.Delivery.Status</td></tr>
-                        <tr><th>Created</th><td>@Model.Delivery.CreatedUtc.ToLocalTime().ToString("f")</td></tr>
+                        <tr><th>Status</th><td><strong>@Model.Delivery.Status</strong></td></tr>
+                        <tr><th>Prepared</th><td>@Model.Delivery.CreatedUtc.ToLocalTime().ToString("f")</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
 
         <section class="card" style="margin-bottom:16px">
-            <h2>Items and document snapshot</h2>
-            <pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fa;padding:14px;border:1px solid #e2e7ea;border-radius:6px">@Model.FormattedSnapshot</pre>
-            <p class="muted">This snapshot is preserved exactly as received for this delivery and will not silently change if the source record later changes.</p>
+            <h2>Items for this delivery</h2>
+            @if (Model.Lines.Count == 0)
+            {
+                <p class="muted">No line items were supplied with this delivery record.</p>
+            }
+            else
+            {
+                <div class="table-wrap"><table>
+                    <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
+                    <tbody>
+                    @foreach (DeliveryLineSnapshot line in Model.Lines)
+                    {
+                        <tr><td>@line.Description</td><td>@line.Quantity</td><td>@(line.UnitOfMeasure ?? "—")</td></tr>
+                    }
+                    </tbody>
+                </table></div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.SourceDocumentSummary))
+            {
+                <details style="margin-top:14px">
+                    <summary>Source document details</summary>
+                    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fa;padding:14px;border:1px solid #e2e7ea;border-radius:6px">@Model.SourceDocumentSummary</pre>
+                </details>
+            }
+            <p class="muted">This delivery snapshot is preserved as received and will not silently change if the source record changes later.</p>
         </section>
 
         @if (Model.Delivery.Status == "Ready")
         {
             <section class="card">
-                <h2>Acknowledge receipt</h2>
-                <form method="post">
+                <h2>Acknowledge delivery</h2>
+                <form method="post" enctype="multipart/form-data" id="deliveryForm">
                     <input type="hidden" asp-for="Token" />
-                    <div class="form-group"><label asp-for="AcknowledgedBy">Your name</label><input asp-for="AcknowledgedBy" required /></div>
-                    <div class="form-group"><label asp-for="Status">Delivery result</label>
+                    <input type="hidden" asp-for="SignatureData" id="SignatureData" />
+                    <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+                    <div class="form-group">
+                        <label asp-for="AcknowledgedBy">Person acknowledging delivery</label>
+                        <input asp-for="AcknowledgedBy" autocomplete="name" required />
+                        <span asp-validation-for="AcknowledgedBy" class="validation"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label asp-for="Status">Delivery result</label>
                         <select asp-for="Status" required>
-                            <option value="Delivered">Delivered</option>
+                            <option value="Delivered">Delivered in full</option>
                             <option value="PartiallyDelivered">Partially delivered</option>
-                            <option value="Failed">Failed / not delivered</option>
+                            <option value="Failed">Not delivered / delivery failed</option>
                         </select>
                     </div>
-                    <div class="form-group"><label asp-for="SignatureData">Signature / acknowledgement</label><textarea asp-for="SignatureData" rows="3" required placeholder="Type your name or acknowledgement mark"></textarea></div>
-                    <div class="form-group"><label asp-for="Notes">Notes</label><textarea asp-for="Notes" rows="4"></textarea></div>
+
+                    <div class="form-group">
+                        <label asp-for="SignatureText">Typed acknowledgement</label>
+                        <input asp-for="SignatureText" placeholder="Type your name if you do not sign below" />
+                        <span asp-validation-for="SignatureText" class="validation"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Signature (optional when typed acknowledgement is provided)</label>
+                        <canvas id="signaturePad" width="760" height="190" style="max-width:100%;width:100%;height:190px;border:1px solid #b8c1c8;border-radius:6px;touch-action:none;background:white"></canvas>
+                        <div class="action-row" style="margin-top:8px"><button type="button" class="button button-small button-outline" id="clearSignature">Clear signature</button></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label asp-for="EvidenceFile">Photo or supporting evidence (optional)</label>
+                        <input asp-for="EvidenceFile" type="file" accept="image/*,.pdf" capture="environment" />
+                        <p class="muted">You may attach a delivery photo, signed receipt, or PDF. Uploads use the same protected storage and security checks as Request Portal documents.</p>
+                    </div>
+
+                    <div class="form-group"><label asp-for="Notes">Delivery notes</label><textarea asp-for="Notes" rows="4" placeholder="Record shortages, damaged items, refusal, or other delivery details."></textarea></div>
                     <button class="button" type="submit">Confirm delivery result</button>
                 </form>
             </section>
@@ -63,9 +113,77 @@
             <section class="card">
                 <h2>Acknowledgement recorded</h2>
                 <p><strong>@Model.Delivery.Status</strong> by @Model.Delivery.AcknowledgedBy on @Model.Delivery.AcknowledgedUtc?.ToLocalTime().ToString("f").</p>
+                @if (Model.Delivery.EvidenceDocumentId.HasValue)
+                {
+                    <p><strong>Evidence:</strong> Supporting evidence was attached to this acknowledgement.</p>
+                }
                 @if (!string.IsNullOrWhiteSpace(Model.Delivery.Notes)) { <p>@Model.Delivery.Notes</p> }
             </section>
         }
     }
 </div>
 </section>
+
+@if (Model.Delivery?.Status == "Ready")
+{
+<script>
+(() => {
+    const canvas = document.getElementById('signaturePad');
+    const clear = document.getElementById('clearSignature');
+    const form = document.getElementById('deliveryForm');
+    const target = document.getElementById('SignatureData');
+    if (!canvas || !target || !form) return;
+
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let hasInk = false;
+
+    function point(event) {
+        const rect = canvas.getBoundingClientRect();
+        const source = event.touches ? event.touches[0] : event;
+        return {
+            x: (source.clientX - rect.left) * (canvas.width / rect.width),
+            y: (source.clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    function start(event) {
+        event.preventDefault();
+        drawing = true;
+        const p = point(event);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+    }
+
+    function move(event) {
+        if (!drawing) return;
+        event.preventDefault();
+        const p = point(event);
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        hasInk = true;
+    }
+
+    function stop(event) {
+        if (event) event.preventDefault();
+        drawing = false;
+    }
+
+    ['mousedown','touchstart'].forEach(name => canvas.addEventListener(name, start, { passive:false }));
+    ['mousemove','touchmove'].forEach(name => canvas.addEventListener(name, move, { passive:false }));
+    ['mouseup','mouseleave','touchend','touchcancel'].forEach(name => canvas.addEventListener(name, stop, { passive:false }));
+
+    clear?.addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        hasInk = false;
+        target.value = '';
+    });
+
+    form.addEventListener('submit', () => {
+        target.value = hasInk ? canvas.toDataURL('image/png') : '';
+    });
+})();
+</script>
+}
