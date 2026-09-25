@@ -56,7 +56,7 @@ public sealed class FfpManagerStatusReconciliationWorker : BackgroundService
     {
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
         RequestPortalDbContext dbContext = scope.ServiceProvider.GetRequiredService<RequestPortalDbContext>();
-        IFfpManagerIntegrationService integrationService = scope.ServiceProvider.GetRequiredService<IFfpManagerIntegrationService>();
+        IExternalApplicationIntegrationService integrationService = scope.ServiceProvider.GetRequiredService<IExternalApplicationIntegrationService>();
         IIntegrationStatusService statusService = scope.ServiceProvider.GetRequiredService<IIntegrationStatusService>();
 
         var links = await dbContext.IntegrationLinks
@@ -71,7 +71,7 @@ public sealed class FfpManagerStatusReconciliationWorker : BackgroundService
         {
             try
             {
-                FfpManagerApplicationStatus? status = await integrationService.RefreshStatusAsync(
+                ExternalApplicationStatus? status = await integrationService.RefreshStatusAsync(
                     link.RequestId,
                     cancellationToken);
                 if (status is null)
