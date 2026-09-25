@@ -29,6 +29,7 @@ using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Beneficiaries;
 using RequestPortal.Application.Countries;
 using RequestPortal.Application.Documents;
+using RequestPortal.Application.Delivery;
 using RequestPortal.Application.Fulfilment;
 using RequestPortal.Application.Integration;
 using RequestPortal.Application.Management;
@@ -51,6 +52,7 @@ using RequestPortal.Infrastructure.Beneficiaries;
 using RequestPortal.Infrastructure.Countries;
 using RequestPortal.Infrastructure.Diagnostics;
 using RequestPortal.Infrastructure.Documents;
+using RequestPortal.Infrastructure.Delivery;
 using RequestPortal.Infrastructure.Fulfilment;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Integration;
@@ -472,6 +474,7 @@ builder.Services.AddScoped<IManagementDashboardService, ManagementDashboardServi
 builder.Services.AddScoped<IRequestLocationService, RequestLocationService>();
 builder.Services.AddScoped<IBusinessAuditWriter, BusinessAuditWriter>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
 builder.Services.AddScoped<IRequestDraftService, RequestDraftService>();
 builder.Services.AddScoped<IProjectProposalService, ProjectProposalService>();
@@ -578,6 +581,7 @@ app.MapGet(
     })
     .RequireAuthorization("PortalMessages");
 app.MapFfpManagerIntegrationEndpoints();
+app.MapDeliveryEndpoints();
 
 await PrepareDemoAsync(app);
 await ReportStartupDiagnosticsAsync(app);
