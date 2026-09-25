@@ -15,7 +15,8 @@ public enum DocumentType
     Identification = 2,
     BeneficiarySupport = 3,
     RequestSupport = 4,
-    FfpCorrespondence = 5
+    FfpCorrespondence = 5,
+    DeliveryEvidence = 6
 }
 
 public enum DocumentVerificationStatus
