@@ -7,7 +7,7 @@ using RequestPortal.Application.Integration;
 
 namespace RequestPortal.Infrastructure.Integration;
 
-public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
+public sealed class FfpManagerBridgeClient : IExternalApplicationBridgeClient
 {
     private readonly HttpClient httpClient;
     private readonly FfpManagerBridgeOptions options;
@@ -23,20 +23,20 @@ public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
         this.secrets = secrets;
     }
 
-    public async Task<FfpManagerApplicationReference> SubmitApplicationAsync(
-        FfpManagerApplicationSubmission submission,
+    public async Task<ExternalApplicationReference> SubmitApplicationAsync(
+        ExternalApplicationSubmission submission,
         CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = await CreateRequestAsync(HttpMethod.Post, "api/applications", cancellationToken);
         request.Content = JsonContent.Create(submission);
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
-        return await ReadRequiredAsync<FfpManagerApplicationReference>(response, cancellationToken);
+        return await ReadRequiredAsync<ExternalApplicationReference>(response, cancellationToken);
     }
 
     public async Task UploadArtifactAsync(
         string applicationId,
-        FfpManagerArtifactDescriptor descriptor,
+        ExternalArtifactDescriptor descriptor,
         Stream content,
         CancellationToken cancellationToken = default)
     {
@@ -54,7 +54,7 @@ public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task<FfpManagerApplicationStatus> GetStatusAsync(
+    public async Task<ExternalApplicationStatus> GetStatusAsync(
         string applicationId,
         CancellationToken cancellationToken = default)
     {
@@ -62,11 +62,11 @@ public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
         using HttpRequestMessage request = await CreateRequestAsync(HttpMethod.Get, path, cancellationToken);
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
-        return await ReadRequiredAsync<FfpManagerApplicationStatus>(response, cancellationToken);
+        return await ReadRequiredAsync<ExternalApplicationStatus>(response, cancellationToken);
     }
 
     public async Task SendInformationResponseAsync(
-        FfpManagerInformationResponse responsePayload,
+        ExternalInformationResponse responsePayload,
         CancellationToken cancellationToken = default)
     {
         string path = $"api/applications/{Uri.EscapeDataString(responsePayload.ApplicationId)}/information-responses";
