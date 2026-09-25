@@ -108,3 +108,14 @@ public sealed record FfpManagerInformationRequestedMessage(
     Guid RequestId,
     string Message,
     DateTimeOffset? DueUtc) : IMessage;
+
+public sealed record PortalMessageNotificationRequestedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid PortalMessageId,
+    Guid ThreadId,
+    Guid? OrganizationId,
+    Guid? RequestId,
+    string SenderName,
+    string Subject,
+    IReadOnlyCollection<Guid> RecipientUserIds) : IMessage;
