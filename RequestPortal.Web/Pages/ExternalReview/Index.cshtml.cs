@@ -21,6 +21,7 @@ public sealed class IndexModel : PageModel
     }
 
     public ManagementDashboardSnapshot Dashboard { get; private set; } = null!;
+    public ExternalReviewerInvitationView ReviewerScope { get; private set; } = null!;
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -31,7 +32,22 @@ public sealed class IndexModel : PageModel
             return RedirectToPage("/ExternalReview/AccessDenied");
         }
 
-        Dashboard = await dashboardService.GetDashboardAsync(HttpContext.RequestAborted);
+        ExternalReviewerInvitationView? scope =
+            await reviewerService.GetActiveSessionAsync(invitationId, HttpContext.RequestAborted);
+        if (scope is null)
+        {
+            await HttpContext.SignOutAsync("ExternalReviewer");
+            return RedirectToPage("/ExternalReview/AccessDenied");
+        }
+
+        ReviewerScope = scope;
+        Dashboard = await dashboardService.GetDashboardAsync(
+            new ManagementDashboardFilter(
+                scope.OrganizationId,
+                scope.RequestId,
+                scope.FromUtc,
+                scope.ToUtc),
+            HttpContext.RequestAborted);
         return Page();
     }
 
