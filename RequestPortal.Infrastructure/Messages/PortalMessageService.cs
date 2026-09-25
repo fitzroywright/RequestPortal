@@ -106,7 +106,9 @@ public sealed class PortalMessageService : IPortalMessageService
             join request in dbContext.AssistanceRequests.AsNoTracking()
                 on thread.RequestId equals request.Id into requests
             from request in requests.DefaultIfEmpty()
-            where message.SenderUserId == userId
+            where isStaff
+                ? message.SenderKind == PortalMessageSenderKind.FfpStaff
+                : message.SenderUserId == userId
             orderby message.SentUtc descending
             select new
             {
