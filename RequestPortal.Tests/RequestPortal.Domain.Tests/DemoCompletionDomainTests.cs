@@ -81,6 +81,47 @@ public sealed class DemoCompletionDomainTests
     }
 
     [Fact]
+    public void ReviewerScopeIsPreservedAndInvalidDateRangeIsRejected()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        Guid organizationId = Guid.NewGuid();
+        Guid requestId = Guid.NewGuid();
+
+        ExternalReviewerInvitation invitation = new(
+            Guid.NewGuid(),
+            "reviewer@example.org",
+            "Reviewer",
+            "Request",
+            new string('E', 64),
+            Guid.NewGuid(),
+            now,
+            now.AddHours(24),
+            organizationId,
+            requestId,
+            now.AddDays(-7),
+            now);
+
+        Assert.Equal(organizationId, invitation.OrganizationId);
+        Assert.Equal(requestId, invitation.RequestId);
+        Assert.Equal(now.AddDays(-7), invitation.FromUtc);
+        Assert.Equal(now, invitation.ToUtc);
+
+        Assert.Throws<ArgumentException>(() => new ExternalReviewerInvitation(
+            Guid.NewGuid(),
+            "reviewer@example.org",
+            "Reviewer",
+            "DateRange",
+            new string('F', 64),
+            Guid.NewGuid(),
+            now,
+            now.AddHours(24),
+            null,
+            null,
+            now,
+            now.AddDays(-1)));
+    }
+
+    [Fact]
     public void RevokedReviewerSessionIsInactive()
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
