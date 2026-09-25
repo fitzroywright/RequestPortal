@@ -41,14 +41,14 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             (
                 Code, ReferenceNo, Name, ContactPerson, MainContactNo, ApplicationDate, DateReceived,
                 Comments, Programme, Requirements, ApplicationStatus, UserName, DateCreated, DateUpdated,
-                AuditID, CreatedBy, MessageID
+                AuditID, CreatedBy, ExternalRequestId
             )
             OUTPUT INSERTED.ID
             VALUES
             (
                 @Code, @ReferenceNo, @Name, @ContactPerson, @MainContactNo, @ApplicationDate, @DateReceived,
                 @Comments, @Programme, @Requirements, @ApplicationStatus, @UserName, @DateCreated, @DateUpdated,
-                @AuditID, @CreatedBy, @MessageID
+                @AuditID, @CreatedBy, @ExternalRequestId
             );
             """;
 
@@ -69,7 +69,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
         AddNullable(command, "@AuditID", $"RequestPortal:{submission.PortalRequestId:D}", SqlDbType.NVarChar, 100);
         AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
-        command.Parameters.Add("@MessageID", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
+        command.Parameters.Add("@ExternalRequestId", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
 
         object? inserted = await command.ExecuteScalarAsync(cancellationToken);
         long applicationId = Convert.ToInt64(inserted, System.Globalization.CultureInfo.InvariantCulture);
@@ -274,7 +274,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         const string sql = """
             SELECT ID, Code, ReferenceNo, Name, MainContactNo, ApplicationDate, DateCreated,
-                   Comments, Programme, Requirements, MessageID
+                   Comments, Programme, Requirements, ExternalRequestId
             FROM dbo.ApplicationLetters
             WHERE ID = @ID AND GCRecord IS NULL;
             """;
@@ -483,11 +483,11 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         const string sql = """
             SELECT TOP (1) ID, Code, ReferenceNo, DateCreated
             FROM dbo.ApplicationLetters WITH (UPDLOCK, HOLDLOCK)
-            WHERE MessageID = @MessageID AND GCRecord IS NULL
+            WHERE ExternalRequestId = @ExternalRequestId AND GCRecord IS NULL
             ORDER BY ID;
             """;
         await using SqlCommand command = new(sql, connection, transaction);
-        command.Parameters.Add("@MessageID", SqlDbType.UniqueIdentifier).Value = portalRequestId;
+        command.Parameters.Add("@ExternalRequestId", SqlDbType.UniqueIdentifier).Value = portalRequestId;
         await using SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
