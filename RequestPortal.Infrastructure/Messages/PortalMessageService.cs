@@ -325,6 +325,80 @@ public sealed class PortalMessageService : IPortalMessageService
             cancellationToken);
     }
 
+    public async Task<Guid> ReplyAsync(
+        Guid senderUserId,
+        bool senderIsStaff,
+        Guid threadId,
+        string body,
+        CancellationToken cancellationToken = default)
+    {
+        MessageThread thread = await dbContext.MessageThreads
+            .SingleAsync(item => item.Id == threadId, cancellationToken);
+
+        if (!await CanViewThreadAsync(senderUserId, senderIsStaff, thread, cancellationToken))
+        {
+            throw new UnauthorizedAccessException("The current user cannot reply to this conversation.");
+        }
+
+        Guid[] participantUserIds = await (
+            from message in dbContext.PortalMessages.AsNoTracking()
+            where message.ThreadId == threadId && message.SenderUserId != null
+            select message.SenderUserId!.Value)
+            .Union(
+                from recipient in dbContext.MessageRecipients.AsNoTracking()
+                join message in dbContext.PortalMessages.AsNoTracking()
+                    on recipient.MessageId equals message.Id
+                where message.ThreadId == threadId
+                select recipient.UserId)
+            .Distinct()
+            .ToArrayAsync(cancellationToken);
+
+        Guid[] recipients;
+        if (senderIsStaff)
+        {
+            recipients = await dbContext.Users
+                .AsNoTracking()
+                .Where(user =>
+                    participantUserIds.Contains(user.Id) &&
+                    !user.IsInternalStaff &&
+                    user.Id != senderUserId)
+                .Select(user => user.Id)
+                .ToArrayAsync(cancellationToken);
+        }
+        else if (thread.StaffVisible)
+        {
+            recipients = await dbContext.Users
+                .AsNoTracking()
+                .Where(user => user.IsInternalStaff)
+                .Select(user => user.Id)
+                .ToArrayAsync(cancellationToken);
+        }
+        else
+        {
+            recipients = participantUserIds
+                .Where(id => id != senderUserId)
+                .Distinct()
+                .ToArray();
+        }
+
+        if (recipients.Length == 0)
+        {
+            throw new InvalidOperationException("No eligible recipients are available for this conversation.");
+        }
+
+        return await SendInternalAsync(
+            senderUserId,
+            senderIsStaff ? PortalMessageSenderKind.FfpStaff : PortalMessageSenderKind.Representative,
+            thread.OrganizationId,
+            thread.RequestId,
+            thread.Id,
+            thread.Subject,
+            body,
+            recipients,
+            thread.StaffVisible,
+            cancellationToken);
+    }
+
     public async Task<Guid> SendSystemMessageAsync(
         Guid? organizationId,
         Guid? requestId,
