@@ -182,6 +182,83 @@ public sealed class PortalMessagingTests
             item.RecipientUserIds.Contains(staff.Id));
     }
 
+    [Fact]
+    public async Task MessageAttachment_StaysWithinThreadAndOrganizationScope()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+
+        ApplicationUser representative = CreateUser("Maria Johnson", "maria@example.org", false);
+        ApplicationUser staff = CreateUser("David Brown", "david.brown@foodforthepoorja.org", true);
+        database.Db.Users.AddRange(representative, staff);
+
+        Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
+        database.Db.Organizations.Add(organization);
+
+        var request = new RequestPortal.Domain.Requests.AssistanceRequest(
+            Guid.NewGuid(),
+            "RP-ATTACH-001",
+            organization.Id,
+            representative.Id,
+            Now);
+        request.SetSummary("Attachment test");
+        database.Db.AssistanceRequests.Add(request);
+
+        Guid documentId = Guid.NewGuid();
+        database.Db.Documents.Add(
+            new RequestPortal.Domain.Documents.StoredDocument(
+                documentId,
+                RequestPortal.Domain.Documents.DocumentOwnerType.AssistanceRequest,
+                request.Id,
+                organization.Id,
+                RequestPortal.Domain.Documents.DocumentType.RequestSupport,
+                "authorization.pdf",
+                "application/pdf",
+                1024,
+                "test/authorization.pdf",
+                representative.Id,
+                Now));
+
+        await database.Db.SaveChangesAsync(cancellationToken);
+
+        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+
+        Guid threadId = await service.SendToSharedStaffAsync(
+            representative.Id,
+            organization.Id,
+            request.Id,
+            threadId: null,
+            subject: "Authorization",
+            body: "The authorization is attached.",
+            cancellationToken: cancellationToken,
+            attachmentDocumentIds: [documentId]);
+
+        MessageThreadView thread = Assert.IsType<MessageThreadView>(
+            await service.GetThreadAsync(
+                staff.Id,
+                isStaff: true,
+                threadId,
+                cancellationToken));
+
+        MessageDetailView message = Assert.Single(thread.Messages);
+        MessageAttachmentView attachment = Assert.Single(message.Attachments);
+        Assert.Equal(documentId, attachment.DocumentId);
+        Assert.Equal("authorization.pdf", attachment.FileName);
+
+        Assert.True(await service.CanAccessAttachmentAsync(
+            representative.Id,
+            isStaff: false,
+            threadId,
+            documentId,
+            cancellationToken));
+        Assert.True(await service.CanAccessAttachmentAsync(
+            staff.Id,
+            isStaff: true,
+            threadId,
+            documentId,
+            cancellationToken));
+    }
+
     private static ApplicationUser CreateUser(
         string displayName,
         string email,
