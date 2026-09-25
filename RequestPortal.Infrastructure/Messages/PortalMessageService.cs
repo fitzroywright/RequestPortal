@@ -51,7 +51,7 @@ public sealed class PortalMessageService : IPortalMessageService
             join thread in dbContext.MessageThreads.AsNoTracking()
                 on message.ThreadId equals thread.Id
             join sender in dbContext.Users.AsNoTracking()
-                on message.SenderUserId equals sender.Id into senders
+                on message.SenderUserId equals (Guid?)sender.Id into senders
             from sender in senders.DefaultIfEmpty()
             join organization in dbContext.Organizations.AsNoTracking()
                 on thread.OrganizationId equals organization.Id into organizations
@@ -98,7 +98,7 @@ public sealed class PortalMessageService : IPortalMessageService
             join thread in dbContext.MessageThreads.AsNoTracking()
                 on message.ThreadId equals thread.Id
             join sender in dbContext.Users.AsNoTracking()
-                on message.SenderUserId equals sender.Id into senders
+                on message.SenderUserId equals (Guid?)sender.Id into senders
             from sender in senders.DefaultIfEmpty()
             join organization in dbContext.Organizations.AsNoTracking()
                 on thread.OrganizationId equals organization.Id into organizations
@@ -165,7 +165,7 @@ public sealed class PortalMessageService : IPortalMessageService
         var messages = await (
             from message in dbContext.PortalMessages.AsNoTracking()
             join sender in dbContext.Users.AsNoTracking()
-                on message.SenderUserId equals sender.Id into senders
+                on message.SenderUserId equals (Guid?)sender.Id into senders
             from sender in senders.DefaultIfEmpty()
             where message.ThreadId == threadId
             orderby message.SentUtc
