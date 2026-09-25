@@ -46,11 +46,17 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         this.options = options.Value;
     }
 
-    public async Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default)
+    public Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default) =>
+        GetDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
+
+    public async Task<ManagementDashboardSnapshot> GetDashboardAsync(
+        ManagementDashboardFilter filter,
+        CancellationToken cancellationToken = default)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        List<ManagementRequestRow> rows = await LoadRowsAsync(now, cancellationToken);
-        List<LifecycleTiming> timings = await LoadLifecycleTimingsAsync(cancellationToken);
+        List<ManagementRequestRow> rows = await LoadRowsAsync(now, filter, cancellationToken);
+        Guid[] scopedRequestIds = rows.Select(row => row.Id).ToArray();
+        List<LifecycleTiming> timings = await LoadLifecycleTimingsAsync(scopedRequestIds, cancellationToken);
 
         DateTimeOffset today = new(now.Year, now.Month, now.Day, 0, 0, 0, TimeSpan.Zero);
         int daysSinceMonday = ((int)now.DayOfWeek + 6) % 7;
@@ -72,7 +78,8 @@ public sealed class ManagementDashboardService : IManagementDashboardService
 
         IReadOnlyList<ManagementNamedCount> categories = GroupNamed(rows, row => row.Category);
         IReadOnlyList<ManagementNamedCount> programs = GroupNamed(rows, row => row.Program);
-        ManagementDeliverySummary delivery = await BuildDeliverySummaryAsync(cancellationToken);
+        ManagementDeliverySummary delivery = await BuildDeliverySummaryAsync(scopedRequestIds, cancellationToken);
+        ManagementDeliveryAnalytics deliveryAnalytics = await BuildDeliveryAnalyticsAsync(rows, now, cancellationToken);
         ManagementPerformanceMetrics performance = BuildPerformance(rows, timings, now);
         IReadOnlyList<ManagementTrendPoint> trend = BuildTrend(rows, timings, now);
         IReadOnlyList<ParishReachSummary> parishes = BuildParishes(rows);
@@ -85,21 +92,89 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             categories,
             programs,
             delivery,
+            deliveryAnalytics,
             performance,
             trend,
             parishes);
     }
 
-    private async Task<ManagementDeliverySummary> BuildDeliverySummaryAsync(CancellationToken cancellationToken)
+    private async Task<ManagementDeliverySummary> BuildDeliverySummaryAsync(
+        IReadOnlyCollection<Guid> requestIds,
+        CancellationToken cancellationToken)
     {
-        int awaiting = await dbContext.Deliveries.AsNoTracking().CountAsync(item => item.Status == DeliveryStatus.Ready, cancellationToken);
-        int delivered = await dbContext.Deliveries.AsNoTracking().CountAsync(item => item.Status == DeliveryStatus.Delivered, cancellationToken);
-        int partial = await dbContext.Deliveries.AsNoTracking().CountAsync(item => item.Status == DeliveryStatus.PartiallyDelivered, cancellationToken);
-        int failed = await dbContext.Deliveries.AsNoTracking().CountAsync(item => item.Status == DeliveryStatus.Failed, cancellationToken);
-        int pendingSync = await dbContext.Deliveries.AsNoTracking().CountAsync(
+        IQueryable<DeliveryRecord> query = dbContext.Deliveries.AsNoTracking()
+            .Where(item => requestIds.Contains(item.RequestId));
+
+        int awaiting = await query.CountAsync(item => item.Status == DeliveryStatus.Ready, cancellationToken);
+        int delivered = await query.CountAsync(item => item.Status == DeliveryStatus.Delivered, cancellationToken);
+        int partial = await query.CountAsync(item => item.Status == DeliveryStatus.PartiallyDelivered, cancellationToken);
+        int failed = await query.CountAsync(item => item.Status == DeliveryStatus.Failed, cancellationToken);
+        int pendingSync = await query.CountAsync(
             item => item.Status != DeliveryStatus.Ready && item.SyncedToFfpManagerUtc == null,
             cancellationToken);
         return new ManagementDeliverySummary(awaiting, delivered, partial, failed, pendingSync);
+    }
+
+    private async Task<ManagementDeliveryAnalytics> BuildDeliveryAnalyticsAsync(
+        IReadOnlyList<ManagementRequestRow> rows,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        Guid[] requestIds = rows.Select(row => row.Id).ToArray();
+        var deliveries = await dbContext.Deliveries
+            .AsNoTracking()
+            .Where(item => requestIds.Contains(item.RequestId))
+            .Select(item => new
+            {
+                item.RequestId,
+                item.Status,
+                OccurredUtc = item.AcknowledgedUtc ?? item.CreatedUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        Dictionary<Guid, ManagementRequestRow> requests = rows.ToDictionary(row => row.Id);
+
+        IReadOnlyList<ManagementDeliveryDimension> BuildDimension(Func<ManagementRequestRow, string?> selector) =>
+            deliveries
+                .Where(item => requests.ContainsKey(item.RequestId))
+                .Select(item => new { Delivery = item, Name = selector(requests[item.RequestId]) })
+                .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+                .GroupBy(item => item.Name!, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new ManagementDeliveryDimension(
+                    group.Key,
+                    group.Count(item => item.Delivery.Status == DeliveryStatus.Ready),
+                    group.Count(item => item.Delivery.Status == DeliveryStatus.Delivered),
+                    group.Count(item => item.Delivery.Status == DeliveryStatus.PartiallyDelivered),
+                    group.Count(item => item.Delivery.Status == DeliveryStatus.Failed)))
+                .OrderByDescending(item => item.AwaitingAcknowledgement + item.Delivered + item.PartiallyDelivered + item.Failed)
+                .ThenBy(item => item.Name)
+                .Take(12)
+                .ToArray();
+
+        int weeks = Math.Clamp(options.TrendWeeks, 4, 52);
+        DateTimeOffset today = new(now.Year, now.Month, now.Day, 0, 0, 0, TimeSpan.Zero);
+        int daysSinceMonday = ((int)today.DayOfWeek + 6) % 7;
+        DateTimeOffset currentWeek = today.AddDays(-daysSinceMonday);
+        DateTimeOffset firstWeek = currentWeek.AddDays(-7 * (weeks - 1));
+
+        IReadOnlyList<ManagementDeliveryTrendPoint> trend = Enumerable.Range(0, weeks)
+            .Select(index =>
+            {
+                DateTimeOffset start = firstWeek.AddDays(index * 7);
+                DateTimeOffset end = start.AddDays(7);
+                return new ManagementDeliveryTrendPoint(
+                    DateOnly.FromDateTime(start.UtcDateTime),
+                    deliveries.Count(item => item.Status == DeliveryStatus.Delivered && item.OccurredUtc >= start && item.OccurredUtc < end),
+                    deliveries.Count(item => item.Status == DeliveryStatus.PartiallyDelivered && item.OccurredUtc >= start && item.OccurredUtc < end),
+                    deliveries.Count(item => item.Status == DeliveryStatus.Failed && item.OccurredUtc >= start && item.OccurredUtc < end));
+            })
+            .ToArray();
+
+        return new ManagementDeliveryAnalytics(
+            BuildDimension(row => row.OrganizationName),
+            BuildDimension(row => row.Program),
+            BuildDimension(row => row.Parish),
+            trend);
     }
 
     public async Task<IReadOnlyList<ManagementRequestRow>> GetRequestsAsync(
@@ -107,7 +182,12 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         CancellationToken cancellationToken = default)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        IEnumerable<ManagementRequestRow> rows = await LoadRowsAsync(now, cancellationToken);
+        ManagementDashboardFilter dashboardFilter = new(
+            filter.OrganizationId,
+            filter.RequestId,
+            filter.FromUtc,
+            filter.ToUtc);
+        IEnumerable<ManagementRequestRow> rows = await LoadRowsAsync(now, dashboardFilter, cancellationToken);
 
         rows = ApplyPeriod(rows, filter.Period, now);
         rows = ApplyStatus(rows, filter.Status, now);
@@ -144,9 +224,12 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         return new ParishDrillDown(parish, communities, requests);
     }
 
-    private async Task<List<ManagementRequestRow>> LoadRowsAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<List<ManagementRequestRow>> LoadRowsAsync(
+        DateTimeOffset now,
+        ManagementDashboardFilter filter,
+        CancellationToken cancellationToken)
     {
-        var baseRows = await (
+        var query =
             from request in dbContext.AssistanceRequests.AsNoTracking()
             join organization in dbContext.Organizations.AsNoTracking() on request.OrganizationId equals organization.Id
             where request.Status != RequestStatus.Draft && request.Status != RequestStatus.Cancelled && request.Status != RequestStatus.Duplicate
@@ -154,6 +237,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             {
                 request.Id,
                 request.PublicReference,
+                request.OrganizationId,
                 OrganizationName = organization.Name,
                 request.Status,
                 request.Category,
@@ -161,7 +245,18 @@ public sealed class ManagementDashboardService : IManagementDashboardService
                 request.Location,
                 request.CreatedUtc,
                 request.SubmittedUtc
-            }).ToListAsync(cancellationToken);
+            };
+
+        if (filter.OrganizationId.HasValue)
+            query = query.Where(row => row.OrganizationId == filter.OrganizationId.Value);
+        if (filter.RequestId.HasValue)
+            query = query.Where(row => row.Id == filter.RequestId.Value);
+        if (filter.FromUtc.HasValue)
+            query = query.Where(row => row.CreatedUtc >= filter.FromUtc.Value);
+        if (filter.ToUtc.HasValue)
+            query = query.Where(row => row.CreatedUtc <= filter.ToUtc.Value);
+
+        var baseRows = await query.ToListAsync(cancellationToken);
 
         Guid[] requestIds = baseRows.Select(row => row.Id).ToArray();
         Dictionary<Guid, DateTimeOffset> lastActivity = await dbContext.RequestStatusHistory
@@ -211,6 +306,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             return new ManagementRequestRow(
                 row.Id,
                 row.PublicReference,
+                row.OrganizationId,
                 row.OrganizationName,
                 row.Status.ToString(),
                 ToManagementStatus(row.Status, row.SubmittedUtc, now),
@@ -245,10 +341,13 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         }
     }
 
-    private async Task<List<LifecycleTiming>> LoadLifecycleTimingsAsync(CancellationToken cancellationToken)
+    private async Task<List<LifecycleTiming>> LoadLifecycleTimingsAsync(
+        IReadOnlyCollection<Guid> requestIds,
+        CancellationToken cancellationToken)
     {
         var history = await dbContext.RequestStatusHistory
             .AsNoTracking()
+            .Where(item => requestIds.Contains(item.RequestId))
             .Where(item => item.Status == RequestStatus.Submitted || ProcessingTerminalStatuses.Contains(item.Status) || CompletedStatuses.Contains(item.Status))
             .OrderBy(item => item.ChangedUtc)
             .Select(item => new { item.RequestId, item.Status, item.ChangedUtc })
