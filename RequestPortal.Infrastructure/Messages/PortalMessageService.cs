@@ -434,11 +434,21 @@ public sealed class PortalMessageService : IPortalMessageService
             body,
             DateTimeOffset.UtcNow);
 
+        Guid[] staffUserIds = await dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.IsInternalStaff)
+            .Select(user => user.Id)
+            .ToArrayAsync(cancellationToken);
+        Guid[] allRecipients = recipientUserIds
+            .Concat(staffUserIds)
+            .Distinct()
+            .ToArray();
+
         dbContext.PortalMessages.Add(message);
-        AddRecipients(message.Id, recipientUserIds, senderUserId: null);
+        AddRecipients(message.Id, allRecipients, senderUserId: null);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await NotifyAsync(message, thread, recipientUserIds, cancellationToken);
+        await NotifyAsync(message, thread, allRecipients, cancellationToken);
         return thread.Id;
     }
 
