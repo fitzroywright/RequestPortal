@@ -32,6 +32,7 @@ using RequestPortal.Application.Documents;
 using RequestPortal.Application.Fulfilment;
 using RequestPortal.Application.Integration;
 using RequestPortal.Application.Management;
+using RequestPortal.Application.Messages;
 using RequestPortal.Application.Notifications;
 using RequestPortal.Application.Organizations;
 using RequestPortal.Application.Portal;
@@ -54,6 +55,7 @@ using RequestPortal.Infrastructure.Fulfilment;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Integration;
 using RequestPortal.Infrastructure.Management;
+using RequestPortal.Infrastructure.Messages;
 using RequestPortal.Infrastructure.Messaging;
 using RequestPortal.Infrastructure.Notifications;
 using RequestPortal.Infrastructure.Organizations;
@@ -66,6 +68,7 @@ using RequestPortal.Infrastructure.Security;
 using RequestPortal.Web;
 using RequestPortal.Web.Demo;
 using RequestPortal.Web.Diagnostics;
+using RequestPortal.Web.Messaging;
 using RequestPortal.Web.Security;
 using RequestPortal.Web.Services;
 
@@ -451,6 +454,9 @@ Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingQueuedDel
 Common.Messaging.Hosting.ServiceCollectionExtensions.AddCommonMessagingDiagnostics(builder.Services);
 builder.Services.AddScoped<INotificationSender, CommonQueuedNotificationSender>();
 
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IPortalMessageRealtimeNotifier, SignalRPortalMessageRealtimeNotifier>();
+builder.Services.AddScoped<IPortalMessageService, PortalMessageService>();
 builder.Services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
 builder.Services.AddScoped<ICountryPolicyService, CountryPolicyService>();
 builder.Services.AddScoped<IRequestReferenceDataService, RequestReferenceDataService>();
@@ -501,6 +507,12 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
         policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ViewManagementDashboard);
     });
+    options.AddPolicy("PortalMessages", policy =>
+    {
+        policy.AuthenticationSchemes.Add(IdentityConstants.ApplicationScheme);
+        policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);
+        policy.RequireAuthenticatedUser();
+    });
 });
 
 builder.Services.AddRazorPages(options =>
@@ -510,6 +522,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Management", PortalPolicies.ManagementDashboard);
     options.Conventions.AuthorizeFolder("/Organizations");
     options.Conventions.AuthorizeFolder("/Requests");
+    options.Conventions.AuthorizeFolder("/Messages", "PortalMessages");
 });
 
 WebApplication app = builder.Build();
@@ -540,6 +553,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
+app.MapHub<PortalMessageHub>("/hubs/messages").RequireAuthorization("PortalMessages");
 app.MapFfpManagerIntegrationEndpoints();
 
 await PrepareDemoAsync(app);
