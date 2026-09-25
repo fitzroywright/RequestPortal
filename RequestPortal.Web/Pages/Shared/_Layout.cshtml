@@ -23,11 +23,19 @@
                     bool isFfpStaff = User.Identity?.IsAuthenticated == true &&
                         User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim, RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
                     bool canViewManagement = User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard);
+                    bool isExternalReviewer = User.HasClaim("requestportal.external-review", "true");
                 }
                 <a asp-page="/Index">Home</a>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
-                    if (isFfpStaff)
+                    if (isExternalReviewer)
+                    {
+                        <a asp-page="/ExternalReview/Index">External Review</a>
+                        <form method="post" asp-page="/ExternalReview/Index" asp-page-handler="SignOut" class="nav-form">
+                            <button type="submit" class="nav-link-button">End review session</button>
+                        </form>
+                    }
+                    else if (isFfpStaff)
                     {
                         if (canViewManagement)
                         {
@@ -36,6 +44,7 @@
                         <a asp-page="/Staff/Index">FFP Staff</a>
                         <a asp-page="/Staff/Operations">Operations</a>
                         <a asp-page="/Staff/Reports">Reports</a>
+                        <a asp-page="/Staff/Reviewers">External Reviewers</a>
                         <a asp-page="/Messages/Inbox" class="messages-nav-link">Messages <span id="messageUnreadBadge" class="message-badge" hidden>0</span></a>
                     }
                     else
@@ -55,7 +64,7 @@
                     <a asp-page="/Account/StaffLogin">FFP Staff Sign-In</a>
                     <a class="button button-small" asp-page="/Account/Login">Sign in</a>
                 }
-                @if (!isFfpStaff)
+                @if (!isFfpStaff && !isExternalReviewer)
                 {
                     <a class="button button-small donate-button" href="https://www.foodforthepoorja.org/hurricane-melissa-relief/" target="_blank" rel="noopener noreferrer">Donate</a>
                 }
