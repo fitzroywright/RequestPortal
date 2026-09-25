@@ -50,7 +50,8 @@ public sealed class ExternalReviewerInvitation
     public void RecordRedemption(DateTimeOffset now)
     {
         if (!IsActive(now)) throw new InvalidOperationException("Reviewer invitation is expired or revoked.");
-        RedeemedUtc ??= now;
+        if (RedeemedUtc.HasValue) throw new InvalidOperationException("Reviewer invitation link has already been used.");
+        RedeemedUtc = now;
         LastAccessUtc = now;
     }
 
