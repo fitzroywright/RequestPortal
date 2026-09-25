@@ -21,7 +21,9 @@ if (!gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase) &&
 builder.Services.AddSingleton<FakeFfpManagerGateway>();
 builder.Services.AddSingleton<SqlFfpManagerGateway>();
 builder.Services.AddSingleton<IFfpManagerReferenceDataCatalog, FfpManagerReferenceDataCatalog>();
+builder.Services.AddSingleton<IApplicationLetterSyncSource, SqlApplicationLetterSyncSource>();
 builder.Services.AddSingleton<SyncedSqlFfpManagerGateway>();
+builder.Services.AddHostedService<ApplicationLetterStatusPushWorker>();
 builder.Services.AddSingleton<IFfpManagerGateway>(services =>
     gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase)
         ? services.GetRequiredService<SyncedSqlFfpManagerGateway>()
@@ -211,6 +213,41 @@ api.MapPost("/applications/{applicationId}/information-responses", async (
     return Results.Accepted();
 });
 
+api.MapPost("/applications/{applicationId}/information-requests", async (
+    string applicationId,
+    CreateInformationRequest request,
+    IFfpManagerGateway gateway,
+    IHttpClientFactory httpClientFactory,
+    CancellationToken cancellationToken) =>
+{
+    FfpManagerApplicationSubmission? application =
+        await gateway.GetApplicationAsync(applicationId, cancellationToken);
+    if (application is null)
+    {
+        return Results.NotFound();
+    }
+
+    Guid messageId = request.MessageId ?? Guid.NewGuid();
+    FfpManagerInformationRequest callback = new(
+        messageId,
+        application.PortalRequestId,
+        applicationId,
+        request.Message,
+        request.RequestedUtc ?? DateTimeOffset.UtcNow,
+        request.RequestedBy,
+        request.RequestedArtifacts,
+        request.DueUtc);
+
+    await PostCallbackAsync(
+        httpClientFactory,
+        "api/integration/ffpmanager/information-requests",
+        callback,
+        sharedSecret,
+        cancellationToken);
+
+    return Results.Accepted(value: callback);
+});
+
 if (app.Environment.IsDevelopment())
 {
     api.MapPost("/dev/applications/{applicationId}/status", async (
@@ -332,6 +369,8 @@ public sealed class BridgeOptions
     public string DefaultDocumentType { get; set; } = string.Empty;
     public string InformationResponseNoteType { get; set; } = "RequestPortal.InformationResponse";
     public int ReferenceDataRefreshSeconds { get; set; } = 300;
+    public bool EnableStatusPush { get; set; } = true;
+    public int StatusPushIntervalSeconds { get; set; } = 30;
     public Dictionary<string, string> DocumentTypeMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> StatusMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
@@ -346,4 +385,6 @@ public sealed record CreateInformationRequest(
     string Message,
     string? RequestedBy = null,
     IReadOnlyList<string>? RequestedArtifacts = null,
-    DateTimeOffset? DueUtc = null);
+    DateTimeOffset? DueUtc = null,
+    Guid? MessageId = null,
+    DateTimeOffset? RequestedUtc = null);
