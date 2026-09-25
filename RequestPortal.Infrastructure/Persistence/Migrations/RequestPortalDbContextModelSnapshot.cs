@@ -49,6 +49,21 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetRoles", (string)null);
                 });
 
+            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageAttachment", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("MessageId", "DocumentId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.ToTable("message_attachments", (string)null);
+                });
+
             modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
                 {
                     b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
@@ -1021,6 +1036,15 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.HasIndex("RequestId", "ChangedUtc");
 
                     b.ToTable("request_status_history", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageAttachment", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
