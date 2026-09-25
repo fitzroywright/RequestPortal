@@ -185,6 +185,14 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             rows = rows.Where(row => string.Equals(row.Parish, filter.Parish, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(filter.Community))
             rows = rows.Where(row => string.Equals(row.Community, filter.Community, StringComparison.OrdinalIgnoreCase));
+        if (filter.OrganizationId.HasValue)
+            rows = rows.Where(row => row.OrganizationId == filter.OrganizationId.Value);
+        if (filter.RequestId.HasValue)
+            rows = rows.Where(row => row.Id == filter.RequestId.Value);
+        if (filter.FromUtc.HasValue)
+            rows = rows.Where(row => (row.SubmittedUtc ?? row.CreatedUtc) >= filter.FromUtc.Value);
+        if (filter.ToUtc.HasValue)
+            rows = rows.Where(row => (row.SubmittedUtc ?? row.CreatedUtc) <= filter.ToUtc.Value);
 
         return rows
             .OrderByDescending(row => row.SubmittedUtc ?? row.CreatedUtc)
@@ -219,6 +227,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
                 request.Id,
                 request.PublicReference,
                 OrganizationName = organization.Name,
+                request.OrganizationId,
                 request.Status,
                 request.Category,
                 Program = request.ProgramCategory,
@@ -274,6 +283,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
 
             return new ManagementRequestRow(
                 row.Id,
+                row.OrganizationId,
                 row.PublicReference,
                 row.OrganizationName,
                 row.Status.ToString(),
