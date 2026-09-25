@@ -34,7 +34,7 @@ public static class FfpManagerIntegrationServiceCollectionExtensions
 
         services.AddScoped<IFfpManagerIntegrationService, FfpManagerIntegrationService>();
         services.AddScoped<IStartupDiagnostic, FfpManagerBridgeStartupDiagnostic>();
-        services.AddHostedService<FfpManagerStatusPollingWorker>();
+        services.AddHostedService<FfpManagerStatusReconciliationWorker>();
         return services;
     }
 }
