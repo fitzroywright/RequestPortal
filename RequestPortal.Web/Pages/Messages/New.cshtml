@@ -19,7 +19,7 @@
                 <option value="">Choose organization</option>
                 @foreach (var organization in Model.Organizations)
                 {
-                    <option value="@organization.Id" selected="@(Model.OrganizationId == organization.Id)">@organization.Name</option>
+                    <option value="@organization.Id" selected="@(Model.OrganizationId == organization.Id ? "selected" : null)">@organization.Name</option>
                 }
             </select>
             @if (Model.RequestId.HasValue)
@@ -48,9 +48,7 @@
                     <option value="">@(Model.IsStaff ? "Choose representative" : "Or choose an organization representative")</option>
                     @foreach (MessageRecipientOption recipient in Model.Recipients)
                     {
-                        <option value="@recipient.UserId">
-                            @recipient.DisplayName@if (Model.IsStaff && !string.IsNullOrWhiteSpace(recipient.Email)){<text> · @recipient.Email</text>}
-                        </option>
+                        <option value="@recipient.UserId">@(Model.IsStaff && !string.IsNullOrWhiteSpace(recipient.Email) ? $"{recipient.DisplayName} · {recipient.Email}" : recipient.DisplayName)</option>
                     }
                 </select>
 
