@@ -9,8 +9,6 @@ namespace RequestPortal.Infrastructure.Integration;
 
 public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
 {
-    private const string SharedSecretName = "FfpManagerIntegration:SharedSecret";
-
     private readonly HttpClient httpClient;
     private readonly FfpManagerBridgeOptions options;
     private readonly ISecretProvider secrets;
@@ -84,7 +82,10 @@ public sealed class FfpManagerBridgeClient : IFfpManagerBridgeClient
         CancellationToken cancellationToken)
     {
         HttpRequestMessage request = new(method, path);
-        string? sharedSecret = await secrets.GetAsync(SharedSecretName, cancellationToken);
+        string secretName = string.IsNullOrWhiteSpace(options.SharedSecretName)
+            ? "FfpManagerIntegration:SharedSecret"
+            : options.SharedSecretName;
+        string? sharedSecret = await secrets.GetAsync(secretName, cancellationToken);
         if (!string.IsNullOrWhiteSpace(sharedSecret))
         {
             request.Headers.TryAddWithoutValidation("X-FFP-Integration-Key", sharedSecret);
