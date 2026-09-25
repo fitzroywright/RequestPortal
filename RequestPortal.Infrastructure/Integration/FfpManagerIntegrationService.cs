@@ -350,7 +350,8 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
             existingThreadId,
             $"Information response: {request.PublicReference}",
             message,
-            cancellationToken);
+            cancellationToken: cancellationToken,
+            attachmentDocumentIds: documentIds);
 
         if (request.Status == RequestStatus.MoreInformationRequired)
         {
