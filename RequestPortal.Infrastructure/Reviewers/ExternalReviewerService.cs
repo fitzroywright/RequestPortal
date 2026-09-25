@@ -89,7 +89,7 @@ public sealed class ExternalReviewerService : IExternalReviewerService
         ExternalReviewerInvitation? invitation = await dbContext.ExternalReviewerInvitations
             .SingleOrDefaultAsync(item => item.Id == invitationId, cancellationToken);
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        if (invitation is null || !invitation.IsActive(now) || !TokenMatches(invitation.TokenHash, token))
+        if (invitation is null || invitation.RedeemedUtc.HasValue || !invitation.IsActive(now) || !TokenMatches(invitation.TokenHash, token))
         {
             return null;
         }
