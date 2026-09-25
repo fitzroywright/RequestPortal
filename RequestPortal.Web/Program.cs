@@ -543,7 +543,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
     await next();
 });
@@ -554,6 +554,29 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
 app.MapHub<PortalMessageHub>("/hubs/messages").RequireAuthorization("PortalMessages");
+app.MapGet(
+    "/api/messages/unread-count",
+    async (
+        ClaimsPrincipal user,
+        IPortalMessageService messageService,
+        HttpContext context) =>
+    {
+        string? userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdValue, out Guid userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        bool isStaff = user.HasClaim(
+            StaffOidcOptions.StaffSurfaceClaim,
+            StaffOidcOptions.StaffSurfaceValue);
+        int unread = await messageService.GetUnreadCountAsync(
+            userId,
+            isStaff,
+            context.RequestAborted);
+        return Results.Ok(new { unread });
+    })
+    .RequireAuthorization("PortalMessages");
 app.MapFfpManagerIntegrationEndpoints();
 
 await PrepareDemoAsync(app);
