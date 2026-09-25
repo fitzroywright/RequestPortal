@@ -13,10 +13,10 @@ public sealed class FfpManagerBridgeTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         FakeFfpManagerGateway gateway = new();
-        FfpManagerApplicationSubmission submission = CreateSubmission(Guid.NewGuid());
+        ExternalApplicationSubmission submission = CreateSubmission(Guid.NewGuid());
 
-        FfpManagerApplicationReference first = await gateway.CreateApplicationAsync(submission, cancellationToken);
-        FfpManagerApplicationReference second = await gateway.CreateApplicationAsync(submission, cancellationToken);
+        ExternalApplicationReference first = await gateway.CreateApplicationAsync(submission, cancellationToken);
+        ExternalApplicationReference second = await gateway.CreateApplicationAsync(submission, cancellationToken);
 
         Assert.Equal(first.ApplicationId, second.ApplicationId);
         Assert.False(first.AlreadyExisted);
@@ -28,18 +28,18 @@ public sealed class FfpManagerBridgeTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         FakeFfpManagerGateway gateway = new();
-        FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(
+        ExternalApplicationReference reference = await gateway.CreateApplicationAsync(
             CreateSubmission(Guid.NewGuid()),
             cancellationToken);
 
-        FfpManagerApplicationStatus changed = await gateway.SetStatusAsync(
+        ExternalApplicationStatus changed = await gateway.SetStatusAsync(
             reference.ApplicationId,
             "APPROVED",
             "Approved",
             "Approved in FFP Manager test workflow.",
             terminal: false,
             cancellationToken: cancellationToken);
-        FfpManagerApplicationStatus? current = await gateway.GetStatusAsync(reference.ApplicationId, cancellationToken);
+        ExternalApplicationStatus? current = await gateway.GetStatusAsync(reference.ApplicationId, cancellationToken);
 
         Assert.NotNull(current);
         Assert.Equal(reference.ApplicationId, changed.ApplicationId);
@@ -52,12 +52,12 @@ public sealed class FfpManagerBridgeTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         FakeFfpManagerGateway gateway = new();
-        FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(
+        ExternalApplicationReference reference = await gateway.CreateApplicationAsync(
             CreateSubmission(Guid.NewGuid()),
             cancellationToken);
         Guid documentId = Guid.NewGuid();
         byte[] bytes = Encoding.UTF8.GetBytes("sample supporting document");
-        FfpManagerArtifactDescriptor descriptor = new(
+        ExternalArtifactDescriptor descriptor = new(
             documentId,
             "RequestSupport",
             "quotation.txt",
@@ -69,7 +69,7 @@ public sealed class FfpManagerBridgeTests
         await gateway.SaveArtifactAsync(reference.ApplicationId, descriptor, content, cancellationToken);
 
         FakeFfpManagerApplicationSnapshot snapshot = gateway.GetSnapshot(reference.ApplicationId);
-        FfpManagerArtifactDescriptor artifact = Assert.Single(snapshot.Artifacts);
+        ExternalArtifactDescriptor artifact = Assert.Single(snapshot.Artifacts);
         Assert.Equal(documentId, artifact.PortalDocumentId);
         Assert.Equal("quotation.txt", artifact.FileName);
     }
@@ -79,12 +79,12 @@ public sealed class FfpManagerBridgeTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         FakeFfpManagerGateway gateway = new();
-        FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(
+        ExternalApplicationReference reference = await gateway.CreateApplicationAsync(
             CreateSubmission(Guid.NewGuid()),
             cancellationToken);
         Guid documentId = Guid.NewGuid();
-        FfpManagerArtifactDescriptor first = new(documentId, "RequestSupport", "first.txt", "text/plain", 3, DateTimeOffset.UtcNow);
-        FfpManagerArtifactDescriptor replacement = first with { FileName = "replacement.txt" };
+        ExternalArtifactDescriptor first = new(documentId, "RequestSupport", "first.txt", "text/plain", 3, DateTimeOffset.UtcNow);
+        ExternalArtifactDescriptor replacement = first with { FileName = "replacement.txt" };
 
         await using (MemoryStream content = new(Encoding.UTF8.GetBytes("one")))
         {
@@ -96,7 +96,7 @@ public sealed class FfpManagerBridgeTests
         }
 
         FakeFfpManagerApplicationSnapshot snapshot = gateway.GetSnapshot(reference.ApplicationId);
-        FfpManagerArtifactDescriptor artifact = Assert.Single(snapshot.Artifacts);
+        ExternalArtifactDescriptor artifact = Assert.Single(snapshot.Artifacts);
         Assert.Equal("replacement.txt", artifact.FileName);
     }
 
@@ -105,16 +105,16 @@ public sealed class FfpManagerBridgeTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         FakeFfpManagerGateway gateway = new();
-        FfpManagerApplicationSubmission submission = CreateSubmission(Guid.NewGuid());
-        FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(submission, cancellationToken);
-        FfpManagerArtifactDescriptor artifact = new(
+        ExternalApplicationSubmission submission = CreateSubmission(Guid.NewGuid());
+        ExternalApplicationReference reference = await gateway.CreateApplicationAsync(submission, cancellationToken);
+        ExternalArtifactDescriptor artifact = new(
             Guid.NewGuid(),
             "RequestSupport",
             "beneficiary-list.pdf",
             "application/pdf",
             100,
             DateTimeOffset.UtcNow);
-        FfpManagerInformationResponse response = new(
+        ExternalInformationResponse response = new(
             Guid.NewGuid(),
             submission.PortalRequestId,
             reference.ApplicationId,
@@ -126,7 +126,7 @@ public sealed class FfpManagerBridgeTests
         await gateway.SaveInformationResponseAsync(response, cancellationToken);
 
         FakeFfpManagerApplicationSnapshot snapshot = gateway.GetSnapshot(reference.ApplicationId);
-        FfpManagerInformationResponse captured = Assert.Single(snapshot.Responses);
+        ExternalInformationResponse captured = Assert.Single(snapshot.Responses);
         Assert.Equal(response.MessageId, captured.MessageId);
         Assert.Equal(submission.PortalRequestId, captured.PortalRequestId);
         Assert.Single(captured.Artifacts);
@@ -141,11 +141,11 @@ public sealed class FfpManagerBridgeTests
             options,
             new FfpManagerReferenceDataCatalog(options));
 
-        FfpManagerApplicationSubmission submission = CreateSubmission(Guid.NewGuid()) with
+        ExternalApplicationSubmission submission = CreateSubmission(Guid.NewGuid()) with
         {
             Items =
             [
-                new FfpManagerApplicationItem(
+                new ExternalApplicationItem(
                     Guid.NewGuid(),
                     "Fractional test item",
                     1.5m,
@@ -171,7 +171,7 @@ public sealed class FfpManagerBridgeTests
         Assert.Contains("SqlConnectionString", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static FfpManagerApplicationSubmission CreateSubmission(Guid correlationId) => new(
+    private static ExternalApplicationSubmission CreateSubmission(Guid correlationId) => new(
         correlationId,
         Guid.NewGuid(),
         "RP-TEST-001",
@@ -191,6 +191,6 @@ public sealed class FfpManagerBridgeTests
         null,
         "Jamaica",
         "Test circumstances",
-        [new FfpManagerApplicationItem(Guid.NewGuid(), "Roofing material", 10, "EA")],
+        [new ExternalApplicationItem(Guid.NewGuid(), "Roofing material", 10, "EA")],
         []);
 }
