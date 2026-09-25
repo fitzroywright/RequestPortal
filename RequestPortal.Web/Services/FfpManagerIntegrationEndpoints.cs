@@ -17,8 +17,8 @@ public static class FfpManagerIntegrationEndpoints
 
         group.MapPost("/status", async (
             HttpRequest httpRequest,
-            FfpManagerStatusCallback callback,
-            IFfpManagerIntegrationService integrationService,
+            ExternalStatusCallback callback,
+            IExternalApplicationIntegrationService integrationService,
             RequestPortalDbContext dbContext,
             IOptions<FfpManagerBridgeOptions> options,
             ISecretProvider secrets,
@@ -51,8 +51,8 @@ public static class FfpManagerIntegrationEndpoints
 
         group.MapPost("/information-requests", async (
             HttpRequest httpRequest,
-            FfpManagerInformationRequest informationRequest,
-            IFfpManagerIntegrationService integrationService,
+            ExternalInformationRequest informationRequest,
+            IExternalApplicationIntegrationService integrationService,
             RequestPortalDbContext dbContext,
             IOptions<FfpManagerBridgeOptions> options,
             ISecretProvider secrets,
