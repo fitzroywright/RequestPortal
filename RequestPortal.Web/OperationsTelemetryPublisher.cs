@@ -1,3 +1,4 @@
+using Common.Diagnostics;
 using RequestPortal.Common.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -97,6 +98,14 @@ public sealed class OperationsTelemetryPublisher(
                             "Operations heartbeat returned HTTP {StatusCode}; application remains operational.",
                             (int)response.StatusCode);
                     }
+
+                    await PublishLifecycleHeartbeatAsync(
+                        client,
+                        operationsUrl,
+                        identity,
+                        instanceId,
+                        operationalState,
+                        stoppingToken);
 
                     await PublishFlowDefinitionAsync(
                         client,
@@ -208,6 +217,48 @@ public sealed class OperationsTelemetryPublisher(
             if (!response.IsSuccessStatusCode)
                 break;
         }
+    }
+
+    private static async Task PublishLifecycleHeartbeatAsync(
+        HttpClient client,
+        string operationsUrl,
+        RegistrationIdentityDocument identity,
+        string instanceId,
+        string operationalState,
+        CancellationToken ct)
+    {
+        LifecycleEventOutcome outcome = operationalState switch
+        {
+            "Healthy" => LifecycleEventOutcome.Succeeded,
+            "Warning" or "Degraded" => LifecycleEventOutcome.Warning,
+            "Failed" or "Offline" => LifecycleEventOutcome.Failed,
+            _ => LifecycleEventOutcome.Started
+        };
+
+        var sink = new HttpLifecycleEventSink(
+            client,
+            new HttpLifecycleEventSinkOptions(
+                new Uri(operationsUrl.TrimEnd('/') + "/api/operations/lifecycle/events")),
+            (request, item, _) =>
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
+                request.Headers.TryAddWithoutValidation("X-Aegis-Application-Id", identity.ApplicationId);
+                request.Headers.TryAddWithoutValidation("X-Aegis-Instance-Id", identity.InstanceId);
+                request.Headers.TryAddWithoutValidation("X-Aegis-Installation-Id", identity.InstallationId);
+                return Task.CompletedTask;
+            });
+
+        var telemetry = new LifecycleTelemetry(sink);
+        await telemetry.EmitAsync(
+            LifecycleEvent.Create(
+                ApplicationId,
+                instanceId,
+                "ApplicationLifecycle",
+                operationalState,
+                outcome,
+                Guid.NewGuid().ToString("N"),
+                code: "Heartbeat"),
+            ct);
     }
 
 }
