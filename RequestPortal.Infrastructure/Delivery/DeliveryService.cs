@@ -75,7 +75,11 @@ public sealed class DeliveryService : IDeliveryService
     {
         DeliveryRecord? item = await dbContext.Deliveries.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == deliveryId, cancellationToken);
-        return item is null || !TokenMatches(item.AccessTokenHash, accessToken) ? null : ToView(item);
+        return item is null ||
+               !item.IsAccessActive(DateTimeOffset.UtcNow) ||
+               !TokenMatches(item.AccessTokenHash, accessToken)
+            ? null
+            : ToView(item);
     }
 
     public async Task<IReadOnlyList<DeliveryView>> GetForRequestAsync(Guid requestId, CancellationToken cancellationToken = default)
@@ -115,9 +119,10 @@ public sealed class DeliveryService : IDeliveryService
             .AsNoTracking()
             .SingleAsync(item => item.Id == deliveryId, cancellationToken);
 
-        if (!TokenMatches(delivery.AccessTokenHash, accessToken))
+        if (!delivery.IsAccessActive(DateTimeOffset.UtcNow) ||
+            !TokenMatches(delivery.AccessTokenHash, accessToken))
         {
-            throw new UnauthorizedAccessException("The delivery access token is invalid.");
+            throw new UnauthorizedAccessException("The delivery access token is invalid or expired.");
         }
 
         if (delivery.Status != DeliveryStatus.Ready)
@@ -143,7 +148,9 @@ public sealed class DeliveryService : IDeliveryService
         }
 
         DeliveryRecord delivery = await dbContext.Deliveries.SingleAsync(item => item.Id == deliveryId, cancellationToken);
-        if (!TokenMatches(delivery.AccessTokenHash, accessToken)) throw new UnauthorizedAccessException("The delivery access token is invalid.");
+        if (!delivery.IsAccessActive(DateTimeOffset.UtcNow) ||
+            !TokenMatches(delivery.AccessTokenHash, accessToken))
+            throw new UnauthorizedAccessException("The delivery access token is invalid or expired.");
         delivery.Acknowledge(deliveryStatus, acknowledgedBy, DateTimeOffset.UtcNow, signatureData, evidenceDocumentId, notes);
         await dbContext.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync(Guid.Empty, "DeliveryAcknowledged", "Delivery", delivery.Id, null, $"status={delivery.Status}; acknowledgedBy={delivery.AcknowledgedBy}", cancellationToken);
