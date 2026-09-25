@@ -6,6 +6,7 @@ using RequestPortal.Domain.Auditing;
 using RequestPortal.Domain.Beneficiaries;
 using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Documents;
+using RequestPortal.Domain.Delivery;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Messages;
 using RequestPortal.Domain.Notifications;
@@ -34,6 +35,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
     public DbSet<CountryConfiguration> CountryConfigurations => Set<CountryConfiguration>();
     public DbSet<StoredDocument> Documents => Set<StoredDocument>();
+    public DbSet<DeliveryRecord> Deliveries => Set<DeliveryRecord>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RequestFulfilment> Fulfilments => Set<RequestFulfilment>();
     public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
