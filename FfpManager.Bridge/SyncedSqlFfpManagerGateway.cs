@@ -20,7 +20,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         legacy = new SqlFfpManagerGateway(options);
     }
 
-    public async Task<FfpManagerApplicationReference> CreateApplicationAsync(FfpManagerApplicationSubmission submission, CancellationToken cancellationToken = default)
+    public async Task<ExternalApplicationReference> CreateApplicationAsync(ExternalApplicationSubmission submission, CancellationToken cancellationToken = default)
     {
         ValidateSubmission(submission);
 
@@ -41,7 +41,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
                     : new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(3), DateTimeKind.Utc));
                 await reader.CloseAsync();
                 await transaction.CommitAsync(cancellationToken);
-                return new FfpManagerApplicationReference(id.ToString(), referenceNo ?? code ?? id.ToString(), accepted, true);
+                return new ExternalApplicationReference(id.ToString(), referenceNo ?? code ?? id.ToString(), accepted, true);
             }
         }
 
@@ -73,7 +73,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         command.Parameters.Add("@MessageID", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
         long applicationId = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
 
-        foreach (FfpManagerApplicationItem item in submission.Items)
+        foreach (ExternalApplicationItem item in submission.Items)
         {
             long unitId = await referenceData.ResolveUnitOfMeasureIdAsync(item.UnitOfMeasure, cancellationToken);
             const string itemSql = "INSERT INTO dbo.ItemsRequested (Code,Name,Description,UserName,DateCreated,DateUpdated,Quantity,ApplicationLetterID,UnitOfMeasure,CreatedBy) VALUES (@Code,@Name,@Description,@UserName,@DateCreated,@DateUpdated,@Quantity,@ApplicationLetterID,@UnitOfMeasure,@CreatedBy);";
@@ -92,10 +92,10 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         }
 
         await transaction.CommitAsync(cancellationToken);
-        return new FfpManagerApplicationReference(applicationId.ToString(), submission.PublicReference, submission.SubmittedUtc, false);
+        return new ExternalApplicationReference(applicationId.ToString(), submission.PublicReference, submission.SubmittedUtc, false);
     }
 
-    public async Task SaveArtifactAsync(string applicationId, FfpManagerArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default)
+    public async Task SaveArtifactAsync(string applicationId, ExternalArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default)
     {
         long id = ParseApplicationId(applicationId);
         if (string.IsNullOrWhiteSpace(options.SupportingDocumentRoot)) throw new InvalidOperationException("Bridge:SupportingDocumentRoot is required.");
@@ -138,7 +138,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    public async Task<FfpManagerApplicationStatus?> GetStatusAsync(string applicationId, CancellationToken cancellationToken = default)
+    public async Task<ExternalApplicationStatus?> GetStatusAsync(string applicationId, CancellationToken cancellationToken = default)
     {
         long id = ParseApplicationId(applicationId);
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
@@ -151,13 +151,13 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         string canonical = MapStatus(name);
         DateTime changed = !reader.IsDBNull(1) ? reader.GetDateTime(1) : !reader.IsDBNull(0) ? reader.GetDateTime(0) : DateTime.UtcNow;
         string? detail = reader.IsDBNull(4) ? null : reader.GetString(4);
-        return new FfpManagerApplicationStatus(id.ToString(), canonical, name, new DateTimeOffset(DateTime.SpecifyKind(changed, DateTimeKind.Utc)), detail, false);
+        return new ExternalApplicationStatus(id.ToString(), canonical, name, new DateTimeOffset(DateTime.SpecifyKind(changed, DateTimeKind.Utc)), detail, false);
     }
 
-    public Task SaveInformationResponseAsync(FfpManagerInformationResponse response, CancellationToken cancellationToken = default) => legacy.SaveInformationResponseAsync(response, cancellationToken);
-    public Task<FfpManagerApplicationSubmission?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken = default) => legacy.GetApplicationAsync(applicationId, cancellationToken);
+    public Task SaveInformationResponseAsync(ExternalInformationResponse response, CancellationToken cancellationToken = default) => legacy.SaveInformationResponseAsync(response, cancellationToken);
+    public Task<ExternalApplicationSubmission?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken = default) => legacy.GetApplicationAsync(applicationId, cancellationToken);
 
-    public async Task<FfpManagerApplicationStatus> SetStatusAsync(string applicationId, string statusCode, string statusText, string? detail, bool terminal, CancellationToken cancellationToken = default)
+    public async Task<ExternalApplicationStatus> SetStatusAsync(string applicationId, string statusCode, string statusText, string? detail, bool terminal, CancellationToken cancellationToken = default)
     {
         long id = ParseApplicationId(applicationId);
         string requestedName = string.IsNullOrWhiteSpace(statusText) ? statusCode : statusText;
@@ -171,9 +171,9 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         return await GetStatusAsync(applicationId, cancellationToken) ?? throw new KeyNotFoundException($"FFP Manager application '{applicationId}' was not found after status update.");
     }
 
-    private static void ValidateSubmission(FfpManagerApplicationSubmission submission)
+    private static void ValidateSubmission(ExternalApplicationSubmission submission)
     {
-        foreach (FfpManagerApplicationItem item in submission.Items)
+        foreach (ExternalApplicationItem item in submission.Items)
         {
             if (item.Quantity != decimal.Truncate(item.Quantity) ||
                 item.Quantity < int.MinValue ||
@@ -203,7 +203,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
     private static long ParseApplicationId(string value) => long.TryParse(value, out long id) && id > 0 ? id : throw new ArgumentException($"'{value}' is not a valid FFP Manager ApplicationLetters.ID.");
     private static string SanitizeFileName(string value) { string name = Path.GetFileName(value); foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_'); return string.IsNullOrWhiteSpace(name) ? "document.bin" : name; }
     private static string? Truncate(string? value, int max) => string.IsNullOrWhiteSpace(value) ? null : value.Length <= max ? value : value[..max];
-    private static string? CombineComments(FfpManagerApplicationSubmission s) => Truncate(string.Join(Environment.NewLine, new[] { s.Summary, s.Circumstances, s.OrganizationAddress, s.OrganizationEmail }.Where(x => !string.IsNullOrWhiteSpace(x))), 2500);
-    private static string? CombineRequirements(FfpManagerApplicationSubmission s) => Truncate(string.Join(" / ", new[] { s.Category, s.Subcategory }.Where(x => !string.IsNullOrWhiteSpace(x))), 255);
+    private static string? CombineComments(ExternalApplicationSubmission s) => Truncate(string.Join(Environment.NewLine, new[] { s.Summary, s.Circumstances, s.OrganizationAddress, s.OrganizationEmail }.Where(x => !string.IsNullOrWhiteSpace(x))), 2500);
+    private static string? CombineRequirements(ExternalApplicationSubmission s) => Truncate(string.Join(" / ", new[] { s.Category, s.Subcategory }.Where(x => !string.IsNullOrWhiteSpace(x))), 255);
     private static void AddNullable(SqlCommand command, string name, string? value, SqlDbType type, int size) { SqlParameter p = size == -1 ? command.Parameters.Add(name, type, -1) : command.Parameters.Add(name, type, size); p.Value = string.IsNullOrWhiteSpace(value) ? DBNull.Value : value; }
 }
