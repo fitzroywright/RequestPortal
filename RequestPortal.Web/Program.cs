@@ -90,7 +90,7 @@ builder.Services.AddSingleton<IRequestPortalOperationsFlowPublisher>(sp => sp.Ge
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RequestPortalOperationsFlowPublisher>());
 await using Common.Secrets.CommonSecretsBootstrapRuntime secretsRuntime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(builder.Configuration);
 secretsRuntime.Register(builder.Services);
-RuntimeSecrets runtimeSecrets = await LoadRuntimeSecretsAsync(
+RuntimeSecrets runtimeSecrets = await ProductionCommissioning.LoadRuntimeSecretsAsync(
     secretsRuntime.Provider,
     builder.Configuration);
 
@@ -133,10 +133,10 @@ if (!registrationSucceeded)
 
 if (builder.Environment.IsProduction())
 {
-    IReadOnlyList<ProductionConfigurationFailure> failures = ValidateProductionConfiguration(builder.Configuration, runtimeSecrets);
+    IReadOnlyList<ProductionConfigurationFailure> failures = ProductionCommissioning.Validate(builder.Configuration, runtimeSecrets);
     if (failures.Count > 0)
     {
-        throw new InvalidOperationException(BuildProductionValidationMessage(failures));
+        throw new InvalidOperationException(ProductionCommissioning.BuildFailureMessage(failures));
     }
 }
 
@@ -614,122 +614,6 @@ await PrepareDemoAsync(app);
 await ReportStartupDiagnosticsAsync(app);
 await app.RunAsync();
 
-static async Task<RuntimeSecrets> LoadRuntimeSecretsAsync(
-    Common.Secrets.ISecretProvider provider,
-    IConfiguration configuration)
-{
-    string ffpManagerSharedSecretName =
-        configuration["FfpManagerIntegration:SharedSecretName"]?.Trim()
-        ?? "FfpManagerIntegration:SharedSecret";
-
-    return new RuntimeSecrets(
-        await provider.GetAsync("ConnectionStrings:RequestPortal"),
-        await provider.GetAsync("Authentication:Google:ClientSecret"),
-        await provider.GetAsync("Authentication:Microsoft:ClientSecret"),
-        await provider.GetAsync("Authentication:Facebook:AppSecret"),
-        await provider.GetAsync("Authentication:Yahoo:ClientSecret"),
-        await provider.GetAsync("Authentication:Apple:ClientSecret"),
-        await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
-        await provider.GetAsync(ffpManagerSharedSecretName));
-}
-
-static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfiguration(
-    IConfiguration configuration,
-    RuntimeSecrets secrets)
-{
-    var failures = new List<ProductionConfigurationFailure>();
-    string connectionString = secrets.ConnectionString ?? string.Empty;
-    string storageRoot = configuration["Storage:Local:RootPath"] ?? string.Empty;
-    string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
-    string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
-    bool malwareScanningEnabled = configuration.GetValue("Uploads:MalwareScanning:Enabled", false);
-    bool notificationsEnabled = configuration.GetValue("Notifications:Enabled", false);
-    bool ffpManagerEnabled = configuration.GetValue("FfpManagerIntegration:Enabled", false);
-    string[] reviewerGroups = configuration.GetSection("Authentication:ActiveDirectory:ReviewerGroups").Get<string[]>() ?? Array.Empty<string>();
-    string[] administratorGroups = configuration.GetSection("Authentication:ActiveDirectory:AdministratorGroups").Get<string[]>() ?? Array.Empty<string>();
-    string? googleClientId = configuration["Authentication:Google:ClientId"];
-    string? googleClientSecret = secrets.GoogleClientSecret;
-    string? microsoftClientId = configuration["Authentication:Microsoft:ClientId"];
-    string? microsoftClientSecret = secrets.MicrosoftClientSecret;
-    string? facebookAppId = configuration["Authentication:Facebook:AppId"];
-    string? facebookAppSecret = secrets.FacebookAppSecret;
-    string? yahooClientId = configuration["Authentication:Yahoo:ClientId"];
-    string? yahooClientSecret = secrets.YahooClientSecret;
-    string? appleClientId = configuration["Authentication:Apple:ClientId"];
-    string? appleClientSecret = secrets.AppleClientSecret;
-    string? staffOidcClientSecret = secrets.StaffOidcClientSecret;
-    string? ffpManagerSharedSecret = secrets.FfpManagerSharedSecret;
-    bool hasExternalProvider =
-        (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret)) ||
-        (!string.IsNullOrWhiteSpace(microsoftClientId) && !string.IsNullOrWhiteSpace(microsoftClientSecret)) ||
-        (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(facebookAppSecret)) ||
-        (!string.IsNullOrWhiteSpace(yahooClientId) && !string.IsNullOrWhiteSpace(yahooClientSecret)) ||
-        (!string.IsNullOrWhiteSpace(appleClientId) && !string.IsNullOrWhiteSpace(appleClientSecret));
-    bool staffOidcEnabled = configuration.GetValue("Authentication:StaffOidc:Enabled", false);
-
-    AddIf(string.IsNullOrWhiteSpace(connectionString),
-        "RP-CONFIG-DB-001",
-        "PostgreSQL connection string 'RequestPortal' is not configured through Common.Secrets.");
-    AddIf(string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase),
-        "RP-PROD-STORAGE-001",
-        "Production document storage must be a durable external filesystem path or network share.");
-    AddIf(string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase),
-        "RP-PROD-DP-001",
-        "Production Data Protection keys must be persisted outside the application deployment directory.");
-    AddIf(allowedHosts == "*" || string.IsNullOrWhiteSpace(allowedHosts),
-        "RP-PROD-HOSTS-001",
-        "AllowedHosts must be restricted in production.");
-    AddIf(!malwareScanningEnabled || string.IsNullOrWhiteSpace(configuration["Uploads:MalwareScanning:Host"]),
-        "RP-PROD-UPLOAD-001",
-        "Malware scanning must be configured and enabled in production.");
-    AddIf(reviewerGroups.Length == 0 || administratorGroups.Length == 0,
-        "RP-PROD-STAFF-GROUPS-001",
-        "FFP staff directory-group mappings must be configured for Common.Security.");
-    AddIf(!staffOidcEnabled ||
-          string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:Authority"]) ||
-          string.IsNullOrWhiteSpace(configuration["Authentication:StaffOidc:ClientId"]) ||
-          string.IsNullOrWhiteSpace(staffOidcClientSecret),
-        "RP-PROD-OIDC-001",
-        "FFP staff OIDC Authority, ClientId and Common.Secrets-backed ClientSecret must be commissioned.");
-    AddIf(!hasExternalProvider,
-        "RP-PROD-OAUTH-001",
-        "At least one external representative identity provider must be commissioned.");
-    AddIf(!notificationsEnabled || string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) || string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]),
-        "RP-PROD-SMTP-001",
-        "SMTP notifications must be commissioned for production.");
-    AddIf(string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]),
-        "RP-PROD-MESSAGING-001",
-        "Common.Messaging durable queue path must be configured in production.");
-    AddIf(string.IsNullOrWhiteSpace(configuration["Site:Id"]),
-        "RP-PROD-SITE-001",
-        "Site:Id must identify the production deployment.");
-    string? ffpManagerBaseUrl = configuration["FfpManagerIntegration:BaseUrl"];
-    bool ffpManagerHttps =
-        Uri.TryCreate(ffpManagerBaseUrl, UriKind.Absolute, out Uri? ffpManagerUri) &&
-        ffpManagerUri.Scheme == Uri.UriSchemeHttps;
-    AddIf(ffpManagerEnabled &&
-          (!ffpManagerHttps ||
-           string.IsNullOrWhiteSpace(ffpManagerSharedSecret)),
-        "RP-PROD-FFPMANAGER-001",
-        "FFP Manager integration requires an HTTPS BaseUrl and a Common.Secrets-backed SharedSecret when enabled.");
-
-    return failures;
-
-    void AddIf(bool condition, string code, string message)
-    {
-        if (condition)
-        {
-            failures.Add(new ProductionConfigurationFailure(code, message));
-        }
-    }
-}
-
-static string BuildProductionValidationMessage(IReadOnlyList<ProductionConfigurationFailure> failures)
-{
-    return "RequestPortal production commissioning failed with " + failures.Count + " issue(s):\n"
-        + string.Join("\n", failures.Select(failure => $"{failure.Code}: {failure.Message}"));
-}
-
 static async Task ApplyDatabaseMigrationsAsync(WebApplication app)
 {
     await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
@@ -758,16 +642,5 @@ static async Task ReportStartupDiagnosticsAsync(WebApplication app)
         throw new InvalidOperationException($"RP-STARTUP-DB-001: PostgreSQL startup diagnostic failed. {databaseResult.Detail}");
 }
 
-internal sealed record RuntimeSecrets(
-    string? ConnectionString,
-    string? GoogleClientSecret,
-    string? MicrosoftClientSecret,
-    string? FacebookAppSecret,
-    string? YahooClientSecret,
-    string? AppleClientSecret,
-    string? StaffOidcClientSecret,
-    string? FfpManagerSharedSecret);
-
-internal sealed record ProductionConfigurationFailure(string Code, string Message);
 
 public partial class Program { }
