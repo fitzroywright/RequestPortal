@@ -29,7 +29,7 @@ public sealed class DetailsModel : PageModel
     private readonly IProjectProposalService projectProposalService;
     private readonly IProjectPlanningService projectPlanningService;
     private readonly IRequestReferenceDataService referenceDataService;
-    private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
+    private readonly IExternalApplicationIntegrationService ffpManagerIntegrationService;
     private readonly IDeliveryService deliveryService;
     private readonly RequestPortalDbContext dbContext;
 
@@ -41,7 +41,7 @@ public sealed class DetailsModel : PageModel
         IProjectProposalService projectProposalService,
         IProjectPlanningService projectPlanningService,
         IRequestReferenceDataService referenceDataService,
-        IFfpManagerIntegrationService ffpManagerIntegrationService,
+        IExternalApplicationIntegrationService ffpManagerIntegrationService,
         IDeliveryService deliveryService,
         RequestPortalDbContext dbContext)
     {

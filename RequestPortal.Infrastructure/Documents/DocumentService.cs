@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Common.Storage;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Portal;
@@ -39,7 +38,7 @@ public sealed class DocumentService : IDocumentService
         IFileStorage fileStorage,
         IClock clock,
         IDocumentUploadSecurity uploadSecurity,
-        IConfiguration configuration,
+        IMalwareScanner malwareScanner,
         IBusinessAuditWriter auditWriter,
         IRequestPortalOperationsFlowPublisher operationsFlowPublisher)
     {
@@ -48,9 +47,9 @@ public sealed class DocumentService : IDocumentService
         this.fileStorage = fileStorage;
         this.clock = clock;
         this.uploadSecurity = uploadSecurity;
+        this.malwareScanner = malwareScanner;
         this.auditWriter = auditWriter;
         this.operationsFlowPublisher = operationsFlowPublisher;
-        malwareScanner = new ClamAvMalwareScanner(configuration);
     }
 
     public async Task<Guid> UploadForRequestAsync(Guid userId, Guid requestId, DocumentType documentType, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default)

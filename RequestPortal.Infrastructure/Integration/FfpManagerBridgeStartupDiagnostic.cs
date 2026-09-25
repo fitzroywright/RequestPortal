@@ -34,28 +34,28 @@ public sealed class FfpManagerBridgeStartupDiagnostic : IStartupDiagnostic
 
         try
         {
-            HttpClient client = httpClientFactory.CreateClient("FfpManagerBridgeHealth");
-            using HttpRequestMessage request = new(HttpMethod.Get, new Uri(baseUri, "health"));
+            HttpClient client = httpClientFactory.CreateClient("FfpManagerBridgeReadiness");
+            using HttpRequestMessage request = new(HttpMethod.Get, new Uri(baseUri, "ready"));
             using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return new DiagnosticCheckResult(
                     Name,
                     false,
-                    $"Bridge health endpoint returned HTTP {(int)response.StatusCode} {response.ReasonPhrase}.");
+                    $"Bridge readiness endpoint returned HTTP {(int)response.StatusCode} {response.ReasonPhrase}.");
             }
 
-            BridgeHealthResponse? health = await response.Content.ReadFromJsonAsync<BridgeHealthResponse>(
+            BridgeReadinessResponse? health = await response.Content.ReadFromJsonAsync<BridgeReadinessResponse>(
                 cancellationToken: cancellationToken);
-            if (health is null || !string.Equals(health.Status, "ok", StringComparison.OrdinalIgnoreCase))
+            if (health is null || !string.Equals(health.Status, "ready", StringComparison.OrdinalIgnoreCase))
             {
-                return new DiagnosticCheckResult(Name, false, "Bridge health response was empty or unhealthy.");
+                return new DiagnosticCheckResult(Name, false, "Bridge readiness response was empty or not ready.");
             }
 
             return new DiagnosticCheckResult(
                 Name,
                 true,
-                $"Reachable. Gateway={health.Gateway ?? "unknown"}; MaxArtifactBytes={health.MaxArtifactBytes?.ToString() ?? "unknown"}.");
+                $"Ready. Gateway={health.Gateway ?? "unknown"}; OutboxSchema={health.OutboxSchema?.ToString() ?? "n/a"}; ReferenceDataReady={health.ReferenceDataReady?.ToString() ?? "n/a"}.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -67,5 +67,5 @@ public sealed class FfpManagerBridgeStartupDiagnostic : IStartupDiagnostic
         }
     }
 
-    private sealed record BridgeHealthResponse(string Status, string? Gateway, long? MaxArtifactBytes);
+    private sealed record BridgeReadinessResponse(string Status, string? Gateway, bool? OutboxSchema, bool? ReferenceDataReady);
 }

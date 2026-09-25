@@ -1,7 +1,7 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
     {
@@ -345,6 +345,34 @@
       "purpose": "Identifies the deployment site represented by this Request Portal instance.",
       "configurationKey": "Site:Id",
       "isConfigured": false
+    },
+    {
+      "id": "ffp-manager-integration-enabled",
+      "displayName": "FFP Manager integration enabled",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Enables the commissioned Application integration adapter when FFP Manager connectivity is ready.",
+      "configurationKey": "FfpManagerIntegration:Enabled",
+      "isConfigured": false
+    },
+    {
+      "id": "ffp-manager-integration-url",
+      "displayName": "FFP Manager bridge URL",
+      "kind": "ExternalService",
+      "required": false,
+      "purpose": "Defines the HTTPS bridge endpoint used when FFP Manager integration is enabled.",
+      "configurationKey": "FfpManagerIntegration:BaseUrl",
+      "isConfigured": false
+    },
+    {
+      "id": "ffp-manager-integration-secret",
+      "displayName": "FFP Manager bridge shared secret",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Authenticates Request Portal to the bridge through Common.Secrets when the integration is enabled.",
+      "secretName": "FfpManagerIntegration:SharedSecret",
+      "isConfigured": false,
+      "sensitive": true
     }
   ],
   "runbookReference": "docs/RUNBOOK.md",

@@ -2,14 +2,76 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Common.Diagnostics;
+using Common.Secrets;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Integration;
 using FfpManager.Bridge;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-builder.Services.Configure<JsonOptions>(options => options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
-builder.Services.Configure<BridgeOptions>(builder.Configuration.GetSection(BridgeOptions.SectionName));
+
+await using CommonSecretsBootstrapRuntime secretsRuntime =
+    CommonSecretsBootstrapRuntime.Create(builder.Configuration);
+secretsRuntime.Register(builder.Services);
+
+string sharedSecretName =
+    builder.Configuration["Bridge:SharedSecretSecretName"]?.Trim()
+    ?? "FfpManagerIntegration:SharedSecret";
+string sqlConnectionSecretName =
+    builder.Configuration["Bridge:SqlConnectionStringSecretName"]?.Trim()
+    ?? "FfpManagerBridge:SqlConnectionString";
+
+string? resolvedSharedSecret =
+    await secretsRuntime.Provider.GetAsync(sharedSecretName);
+string? resolvedSqlConnection =
+    await secretsRuntime.Provider.GetAsync(sqlConnectionSecretName);
+
+if (!builder.Environment.IsProduction())
+{
+    resolvedSharedSecret ??= builder.Configuration["Bridge:SharedSecret"];
+    resolvedSqlConnection ??= builder.Configuration["Bridge:SqlConnectionString"];
+}
+
+builder.Configuration["Bridge:SharedSecret"] = resolvedSharedSecret ?? string.Empty;
+builder.Configuration["Bridge:SqlConnectionString"] = resolvedSqlConnection ?? string.Empty;
+
+builder.Services.Configure<JsonOptions>(
+    options => options.SerializerOptions.PropertyNamingPolicy =
+        JsonNamingPolicy.CamelCase);
+builder.Services.Configure<BridgeOptions>(
+    builder.Configuration.GetSection(BridgeOptions.SectionName));
+
+string serviceIdentity =
+    builder.Configuration["Bridge:ServiceIdentity"]?.Trim()
+    ?? string.Empty;
+
+builder.Services.AddCommonDiagnostics();
+builder.Services.AddCommonSecretsDiagnostics();
+builder.Services.AddSingleton(new DiagnosticLevelExecutionOptions
+{
+    Application = "RequestPortal",
+    Component = "FfpManager.Bridge",
+    InstanceId = string.IsNullOrWhiteSpace(serviceIdentity)
+        ? Environment.MachineName
+        : serviceIdentity,
+    CatalogVersion = "1"
+});
+builder.Services.AddSingleton(new DiagnosticLevelStoreOptions
+{
+    Path = builder.Configuration["Aegis:Diagnostics:StorePath"]?.Trim()
+        ?? Path.Combine(
+            builder.Environment.ContentRootPath,
+            "data",
+            "diagnostic-level",
+            "ffpmanager-bridge.db")
+});
+builder.Services.AddSingleton<IDiagnosticLevelRequestCredentialProvider, CommonSecretsDiagnosticLevelRequestCredentialProvider>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeConfigurationDiagnosticLevelTest>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeSqlAndOutboxDiagnosticLevelTest>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeReferenceDataDiagnosticLevelTest>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeCallbackDiagnosticLevelTest>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeRecoveryDiagnosticLevelTest>();
 
 string gatewayMode = (builder.Configuration["Bridge:Gateway"] ?? "Fake").Trim();
 if (!gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase) &&
@@ -21,7 +83,9 @@ if (!gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase) &&
 builder.Services.AddSingleton<FakeFfpManagerGateway>();
 builder.Services.AddSingleton<SqlFfpManagerGateway>();
 builder.Services.AddSingleton<IFfpManagerReferenceDataCatalog, FfpManagerReferenceDataCatalog>();
+builder.Services.AddSingleton<IIntegrationOutboxStore, SqlIntegrationOutboxStore>();
 builder.Services.AddSingleton<SyncedSqlFfpManagerGateway>();
+builder.Services.AddHostedService<IntegrationOutboxDispatcher>();
 builder.Services.AddSingleton<IFfpManagerGateway>(services =>
     gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase)
         ? services.GetRequiredService<SyncedSqlFfpManagerGateway>()
@@ -62,6 +126,16 @@ if (gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
 
 if (builder.Environment.IsProduction())
 {
+    if (secretsRuntime.CommonOptions.Mode != SecretsEnvironmentMode.Production)
+    {
+        throw new InvalidOperationException("Common.Secrets must run in Production mode for the production bridge.");
+    }
+
+    if (string.IsNullOrWhiteSpace(serviceIdentity))
+    {
+        throw new InvalidOperationException("Bridge:ServiceIdentity is required in production.");
+    }
+
     if (string.IsNullOrWhiteSpace(sharedSecret))
     {
         throw new InvalidOperationException("Bridge:SharedSecret is required in production.");
@@ -78,6 +152,22 @@ if (builder.Environment.IsProduction())
         throw new InvalidOperationException("Bridge:RequestPortalBaseUrl must be an absolute HTTPS URL in production.");
     }
 
+    BridgeOptions productionOptions = builder.Configuration
+        .GetSection(BridgeOptions.SectionName)
+        .Get<BridgeOptions>() ?? new BridgeOptions();
+    if (!productionOptions.EnableOutboxDispatch)
+    {
+        throw new InvalidOperationException("Bridge:EnableOutboxDispatch must be enabled in production.");
+    }
+    if (productionOptions.StatusMap.Count == 0)
+    {
+        throw new InvalidOperationException("Bridge:StatusMap must define the FFP-to-Portal status contract in production.");
+    }
+    if (productionOptions.DocumentTypeMap.Count == 0)
+    {
+        throw new InvalidOperationException("Bridge:DocumentTypeMap must define the Portal-to-FFP document contract in production.");
+    }
+
     string allowedHosts = builder.Configuration["AllowedHosts"] ?? string.Empty;
     if (string.IsNullOrWhiteSpace(allowedHosts) || allowedHosts == "*")
     {
@@ -86,6 +176,7 @@ if (builder.Environment.IsProduction())
 }
 
 WebApplication app = builder.Build();
+app.MapDiagnosticLevelRuntime();
 app.UseHttpsRedirection();
 
 if (gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
@@ -98,8 +189,69 @@ app.MapGet("/health", () => Results.Ok(new
 {
     status = "ok",
     gateway = gatewayMode,
+    serviceIdentity,
+    outbox = builder.Configuration.GetValue("Bridge:EnableOutboxDispatch", true),
     maxArtifactBytes
 }));
+
+app.MapGet("/ready", async (
+    IIntegrationOutboxStore outbox,
+    IFfpManagerReferenceDataCatalog referenceData,
+    CancellationToken cancellationToken) =>
+{
+    if (!gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.Ok(new
+        {
+            status = "ready",
+            gateway = gatewayMode,
+            detail = "Non-SQL gateway is ready for its configured environment."
+        });
+    }
+
+    try
+    {
+        bool outboxSchema = await outbox.SchemaExistsAsync(cancellationToken);
+        FfpManagerReferenceDataSnapshot snapshot =
+            await referenceData.GetSnapshotAsync(cancellationToken);
+        bool referenceDataReady =
+            snapshot.ApplicationStatuses.Count > 0 &&
+            snapshot.DocumentTypes.Count > 0 &&
+            snapshot.UnitsOfMeasure.Count > 0;
+
+        if (!outboxSchema || !referenceDataReady)
+        {
+            return Results.Json(
+                new
+                {
+                    status = "not-ready",
+                    gateway = gatewayMode,
+                    outboxSchema,
+                    referenceDataReady
+                },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return Results.Ok(new
+        {
+            status = "ready",
+            gateway = gatewayMode,
+            outboxSchema,
+            referenceDataReady
+        });
+    }
+    catch (Exception exception)
+    {
+        return Results.Json(
+            new
+            {
+                status = "not-ready",
+                gateway = gatewayMode,
+                failureType = exception.GetType().Name
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
 
 RouteGroupBuilder api = app.MapGroup("/api");
 api.AddEndpointFilter(async (context, next) =>
@@ -138,11 +290,11 @@ api.MapPost("/reference-data/refresh", async (
 });
 
 api.MapPost("/applications", async (
-    FfpManagerApplicationSubmission submission,
+    ExternalApplicationSubmission submission,
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
-    FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(submission, cancellationToken);
+    ExternalApplicationReference reference = await gateway.CreateApplicationAsync(submission, cancellationToken);
     return Results.Ok(reference);
 });
 
@@ -160,7 +312,7 @@ api.MapPut("/applications/{applicationId}/artifacts/{documentId:guid}", async (
 
     IFormCollection form = await request.ReadFormAsync(cancellationToken);
     string metadataJson = form["metadata"].ToString();
-    FfpManagerArtifactDescriptor? descriptor = JsonSerializer.Deserialize<FfpManagerArtifactDescriptor>(
+    ExternalArtifactDescriptor? descriptor = JsonSerializer.Deserialize<ExternalArtifactDescriptor>(
         metadataJson,
         new JsonSerializerOptions(JsonSerializerDefaults.Web));
     IFormFile? file = form.Files.GetFile("file");
@@ -183,7 +335,7 @@ api.MapGet("/applications/{applicationId}", async (
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
-    FfpManagerApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
+    ExternalApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
     return application is null ? Results.NotFound() : Results.Ok(application);
 });
 
@@ -192,13 +344,13 @@ api.MapGet("/applications/{applicationId}/status", async (
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
-    FfpManagerApplicationStatus? status = await gateway.GetStatusAsync(applicationId, cancellationToken);
+    ExternalApplicationStatus? status = await gateway.GetStatusAsync(applicationId, cancellationToken);
     return status is null ? Results.NotFound() : Results.Ok(status);
 });
 
 api.MapPost("/applications/{applicationId}/information-responses", async (
     string applicationId,
-    FfpManagerInformationResponse response,
+    ExternalInformationResponse response,
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
@@ -220,20 +372,20 @@ if (app.Environment.IsDevelopment())
         IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken) =>
     {
-        FfpManagerApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
+        ExternalApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
         if (application is null)
         {
             return Results.NotFound();
         }
 
-        FfpManagerApplicationStatus status = await gateway.SetStatusAsync(
+        ExternalApplicationStatus status = await gateway.SetStatusAsync(
             applicationId,
             request.StatusCode,
             request.StatusText,
             request.Detail,
             request.IsTerminal,
             cancellationToken);
-        FfpManagerStatusCallback callback = new(Guid.NewGuid(), application.PortalRequestId, status);
+        ExternalStatusCallback callback = new(Guid.NewGuid(), application.PortalRequestId, status);
         await PostCallbackAsync(
             httpClientFactory,
             "api/integration/ffpmanager/status",
@@ -250,13 +402,13 @@ if (app.Environment.IsDevelopment())
         IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken) =>
     {
-        FfpManagerApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
+        ExternalApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
         if (application is null)
         {
             return Results.NotFound();
         }
 
-        FfpManagerInformationRequest callback = new(
+        ExternalInformationRequest callback = new(
             Guid.NewGuid(),
             application.PortalRequestId,
             applicationId,
@@ -319,6 +471,9 @@ static async Task PostCallbackAsync<T>(
 public sealed class BridgeOptions
 {
     public const string SectionName = "Bridge";
+    public string ServiceIdentity { get; set; } = string.Empty;
+    public string SharedSecretSecretName { get; set; } = "FfpManagerIntegration:SharedSecret";
+    public string SqlConnectionStringSecretName { get; set; } = "FfpManagerBridge:SqlConnectionString";
     public string SharedSecret { get; set; } = string.Empty;
     public string RequestPortalBaseUrl { get; set; } = string.Empty;
     public int CallbackTimeoutSeconds { get; set; } = 30;
@@ -332,6 +487,14 @@ public sealed class BridgeOptions
     public string DefaultDocumentType { get; set; } = string.Empty;
     public string InformationResponseNoteType { get; set; } = "RequestPortal.InformationResponse";
     public int ReferenceDataRefreshSeconds { get; set; } = 300;
+    public bool EnableOutboxDispatch { get; set; } = true;
+    public int OutboxDispatchIntervalSeconds { get; set; } = 5;
+    public int OutboxBatchSize { get; set; } = 20;
+    public int OutboxLockSeconds { get; set; } = 60;
+    public int OutboxMaxAttempts { get; set; } = 10;
+    public int OutboxRetryInitialSeconds { get; set; } = 5;
+    public int OutboxRetryMaxSeconds { get; set; } = 900;
+    public int OutboxStaleAfterMinutes { get; set; } = 15;
     public Dictionary<string, string> DocumentTypeMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> StatusMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
@@ -346,4 +509,6 @@ public sealed record CreateInformationRequest(
     string Message,
     string? RequestedBy = null,
     IReadOnlyList<string>? RequestedArtifacts = null,
-    DateTimeOffset? DueUtc = null);
+    DateTimeOffset? DueUtc = null,
+    Guid? MessageId = null,
+    DateTimeOffset? RequestedUtc = null);

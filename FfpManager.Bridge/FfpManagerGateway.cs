@@ -5,29 +5,29 @@ namespace FfpManager.Bridge;
 
 public interface IFfpManagerGateway
 {
-    Task<FfpManagerApplicationReference> CreateApplicationAsync(
-        FfpManagerApplicationSubmission submission,
+    Task<ExternalApplicationReference> CreateApplicationAsync(
+        ExternalApplicationSubmission submission,
         CancellationToken cancellationToken = default);
 
     Task SaveArtifactAsync(
         string applicationId,
-        FfpManagerArtifactDescriptor descriptor,
+        ExternalArtifactDescriptor descriptor,
         Stream content,
         CancellationToken cancellationToken = default);
 
-    Task<FfpManagerApplicationStatus?> GetStatusAsync(
+    Task<ExternalApplicationStatus?> GetStatusAsync(
         string applicationId,
         CancellationToken cancellationToken = default);
 
     Task SaveInformationResponseAsync(
-        FfpManagerInformationResponse response,
+        ExternalInformationResponse response,
         CancellationToken cancellationToken = default);
 
-    Task<FfpManagerApplicationSubmission?> GetApplicationAsync(
+    Task<ExternalApplicationSubmission?> GetApplicationAsync(
         string applicationId,
         CancellationToken cancellationToken = default);
 
-    Task<FfpManagerApplicationStatus> SetStatusAsync(
+    Task<ExternalApplicationStatus> SetStatusAsync(
         string applicationId,
         string statusCode,
         string statusText,
@@ -37,42 +37,42 @@ public interface IFfpManagerGateway
 }
 
 public sealed record FakeFfpManagerApplicationSnapshot(
-    FfpManagerApplicationSubmission Submission,
-    FfpManagerApplicationReference Reference,
-    FfpManagerApplicationStatus Status,
-    IReadOnlyList<FfpManagerArtifactDescriptor> Artifacts,
-    IReadOnlyList<FfpManagerInformationResponse> Responses);
+    ExternalApplicationSubmission Submission,
+    ExternalApplicationReference Reference,
+    ExternalApplicationStatus Status,
+    IReadOnlyList<ExternalArtifactDescriptor> Artifacts,
+    IReadOnlyList<ExternalInformationResponse> Responses);
 
 public sealed class FakeFfpManagerGateway : IFfpManagerGateway
 {
     private sealed class FakeApplication
     {
         public FakeApplication(
-            FfpManagerApplicationSubmission submission,
-            FfpManagerApplicationReference reference)
+            ExternalApplicationSubmission submission,
+            ExternalApplicationReference reference)
         {
             Submission = submission;
             Reference = reference;
-            Status = new FfpManagerApplicationStatus(
+            Status = new ExternalApplicationStatus(
                 reference.ApplicationId,
                 "RECEIVED",
                 "Received by FFP Manager",
                 reference.AcceptedUtc);
         }
 
-        public FfpManagerApplicationSubmission Submission { get; }
-        public FfpManagerApplicationReference Reference { get; }
-        public ConcurrentDictionary<Guid, FfpManagerArtifactDescriptor> Artifacts { get; } = new();
-        public ConcurrentBag<FfpManagerInformationResponse> Responses { get; } = new();
-        public FfpManagerApplicationStatus Status { get; set; }
+        public ExternalApplicationSubmission Submission { get; }
+        public ExternalApplicationReference Reference { get; }
+        public ConcurrentDictionary<Guid, ExternalArtifactDescriptor> Artifacts { get; } = new();
+        public ConcurrentBag<ExternalInformationResponse> Responses { get; } = new();
+        public ExternalApplicationStatus Status { get; set; }
     }
 
     private readonly ConcurrentDictionary<Guid, FakeApplication> byCorrelation = new();
     private readonly ConcurrentDictionary<string, FakeApplication> byApplicationId = new(StringComparer.OrdinalIgnoreCase);
     private long sequence = 1000;
 
-    public Task<FfpManagerApplicationReference> CreateApplicationAsync(
-        FfpManagerApplicationSubmission submission,
+    public Task<ExternalApplicationReference> CreateApplicationAsync(
+        ExternalApplicationSubmission submission,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -84,7 +84,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
         long number = Interlocked.Increment(ref sequence);
         string applicationId = $"APP-{number}";
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        FfpManagerApplicationReference reference = new(applicationId, applicationId, now);
+        ExternalApplicationReference reference = new(applicationId, applicationId, now);
         FakeApplication created = new(submission, reference);
 
         FakeApplication actual = byCorrelation.GetOrAdd(submission.CorrelationId, created);
@@ -94,7 +94,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
 
     public async Task SaveArtifactAsync(
         string applicationId,
-        FfpManagerArtifactDescriptor descriptor,
+        ExternalArtifactDescriptor descriptor,
         Stream content,
         CancellationToken cancellationToken = default)
     {
@@ -103,7 +103,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
         application.Artifacts[descriptor.PortalDocumentId] = descriptor;
     }
 
-    public Task<FfpManagerApplicationStatus?> GetStatusAsync(
+    public Task<ExternalApplicationStatus?> GetStatusAsync(
         string applicationId,
         CancellationToken cancellationToken = default)
     {
@@ -115,7 +115,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
     }
 
     public Task SaveInformationResponseAsync(
-        FfpManagerInformationResponse response,
+        ExternalInformationResponse response,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -123,7 +123,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
         return Task.CompletedTask;
     }
 
-    public Task<FfpManagerApplicationSubmission?> GetApplicationAsync(
+    public Task<ExternalApplicationSubmission?> GetApplicationAsync(
         string applicationId,
         CancellationToken cancellationToken = default)
     {
@@ -134,7 +134,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
                 : null);
     }
 
-    public Task<FfpManagerApplicationStatus> SetStatusAsync(
+    public Task<ExternalApplicationStatus> SetStatusAsync(
         string applicationId,
         string statusCode,
         string statusText,
@@ -144,7 +144,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
     {
         cancellationToken.ThrowIfCancellationRequested();
         FakeApplication application = GetRequired(applicationId);
-        application.Status = new FfpManagerApplicationStatus(
+        application.Status = new ExternalApplicationStatus(
             applicationId,
             statusCode,
             statusText,

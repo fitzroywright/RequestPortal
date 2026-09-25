@@ -15,7 +15,7 @@ public static class FfpManagerIntegrationServiceCollectionExtensions
         services.AddOptions<FfpManagerBridgeOptions>()
             .Bind(configuration.GetSection(FfpManagerBridgeOptions.SectionName));
 
-        services.AddHttpClient<IFfpManagerBridgeClient, FfpManagerBridgeClient>((serviceProvider, client) =>
+        services.AddHttpClient<IExternalApplicationBridgeClient, FfpManagerBridgeClient>((serviceProvider, client) =>
         {
             FfpManagerBridgeOptions options = serviceProvider
                 .GetRequiredService<IOptions<FfpManagerBridgeOptions>>()
@@ -27,14 +27,14 @@ public static class FfpManagerIntegrationServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 5, 300));
         });
 
-        services.AddHttpClient("FfpManagerBridgeHealth", client =>
+        services.AddHttpClient("FfpManagerBridgeReadiness", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(10);
         });
 
-        services.AddScoped<IFfpManagerIntegrationService, FfpManagerIntegrationService>();
+        services.AddScoped<IExternalApplicationIntegrationService, FfpManagerIntegrationService>();
         services.AddScoped<IStartupDiagnostic, FfpManagerBridgeStartupDiagnostic>();
-        services.AddHostedService<FfpManagerStatusPollingWorker>();
+        services.AddHostedService<FfpManagerStatusReconciliationWorker>();
         return services;
     }
 }

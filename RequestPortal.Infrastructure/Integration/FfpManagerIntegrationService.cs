@@ -14,14 +14,14 @@ using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Integration;
 
-public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
+public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrationService
 {
     private const string ConsumerName = "FfpManagerIntegration";
     private static readonly Guid ExternalSystemActorId = new("00000000-0000-0000-0000-00000000f001");
 
     private readonly RequestPortalDbContext dbContext;
     private readonly IDocumentService documentService;
-    private readonly IFfpManagerBridgeClient bridgeClient;
+    private readonly IExternalApplicationBridgeClient bridgeClient;
     private readonly FfpManagerBridgeOptions options;
     private readonly IClock clock;
     private readonly IPortalMessageService portalMessageService;
@@ -29,7 +29,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
     public FfpManagerIntegrationService(
         RequestPortalDbContext dbContext,
         IDocumentService documentService,
-        IFfpManagerBridgeClient bridgeClient,
+        IExternalApplicationBridgeClient bridgeClient,
         IOptions<FfpManagerBridgeOptions> options,
         IClock clock,
         IPortalMessageService portalMessageService)
@@ -42,7 +42,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
         this.portalMessageService = portalMessageService;
     }
 
-    public async Task<FfpManagerApplicationReference> SubmitRequestAsync(
+    public async Task<ExternalApplicationReference> SubmitRequestAsync(
         Guid requestId,
         CancellationToken cancellationToken = default)
     {
@@ -95,19 +95,19 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
                 .OrderBy(document => document.UploadedUtc)
                 .ToListAsync(cancellationToken);
 
-            List<FfpManagerApplicationItem> items = request.Items
-                .Select(item => new FfpManagerApplicationItem(
+            List<ExternalApplicationItem> items = request.Items
+                .Select(item => new ExternalApplicationItem(
                     item.Id,
                     item.Description,
                     item.Quantity,
                     units.TryGetValue(item.UnitOfMeasureId, out string? unit) ? unit : item.UnitOfMeasureId.ToString("D")))
                 .ToList();
 
-            List<FfpManagerArtifactDescriptor> artifacts = documents
+            List<ExternalArtifactDescriptor> artifacts = documents
                 .Select(ToArtifactDescriptor)
                 .ToList();
 
-            FfpManagerApplicationSubmission submission = new(
+            ExternalApplicationSubmission submission = new(
                 link.Id,
                 request.Id,
                 request.PublicReference,
@@ -130,7 +130,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
                 items,
                 artifacts);
 
-            FfpManagerApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
+            ExternalApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
 
             Guid documentAccessUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
             foreach (StoredDocument document in documents)
@@ -165,7 +165,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
         }
     }
 
-    public async Task<FfpManagerApplicationStatus?> RefreshStatusAsync(
+    public async Task<ExternalApplicationStatus?> RefreshStatusAsync(
         Guid requestId,
         CancellationToken cancellationToken = default)
     {
@@ -186,7 +186,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
     public async Task ReceiveStatusAsync(
         Guid messageId,
         Guid requestId,
-        FfpManagerApplicationStatus status,
+        ExternalApplicationStatus status,
         CancellationToken cancellationToken = default)
     {
         if (!await BeginInboxAsync(messageId, cancellationToken))
@@ -210,7 +210,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
     }
 
     public async Task ReceiveInformationRequestAsync(
-        FfpManagerInformationRequest informationRequest,
+        ExternalInformationRequest informationRequest,
         CancellationToken cancellationToken = default)
     {
         if (!await BeginInboxAsync(informationRequest.MessageId, cancellationToken))
@@ -310,8 +310,8 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
             throw new InvalidOperationException("One or more response documents do not belong to this request.");
         }
 
-        List<FfpManagerArtifactDescriptor> artifacts = documents.Select(ToArtifactDescriptor).ToList();
-        FfpManagerInformationResponse response = new(
+        List<ExternalArtifactDescriptor> artifacts = documents.Select(ToArtifactDescriptor).ToList();
+        ExternalInformationResponse response = new(
             Guid.NewGuid(),
             requestId,
             applicationId,
@@ -407,7 +407,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
         inbox.ProcessedUtc = clock.UtcNow;
     }
 
-    private static FfpManagerArtifactDescriptor ToArtifactDescriptor(StoredDocument document) =>
+    private static ExternalArtifactDescriptor ToArtifactDescriptor(StoredDocument document) =>
         new(
             document.Id,
             document.DocumentType.ToString(),
@@ -416,7 +416,7 @@ public sealed class FfpManagerIntegrationService : IFfpManagerIntegrationService
             document.SizeBytes,
             document.UploadedUtc);
 
-    private static void ApplyCanonicalStatus(AssistanceRequest request, FfpManagerApplicationStatus status)
+    private static void ApplyCanonicalStatus(AssistanceRequest request, ExternalApplicationStatus status)
     {
         string code = status.StatusCode.Trim().Replace('-', '_').Replace(' ', '_').ToUpperInvariant();
         if (code is "MORE_INFORMATION_REQUIRED" or "MORE_INFORMATION" or "AWAITING_INFORMATION")

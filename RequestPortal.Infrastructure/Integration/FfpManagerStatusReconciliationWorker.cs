@@ -10,16 +10,16 @@ using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Integration;
 
-public sealed class FfpManagerStatusPollingWorker : BackgroundService
+public sealed class FfpManagerStatusReconciliationWorker : BackgroundService
 {
     private readonly IServiceScopeFactory scopeFactory;
     private readonly IOptions<FfpManagerBridgeOptions> options;
-    private readonly ILogger<FfpManagerStatusPollingWorker> logger;
+    private readonly ILogger<FfpManagerStatusReconciliationWorker> logger;
 
-    public FfpManagerStatusPollingWorker(
+    public FfpManagerStatusReconciliationWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<FfpManagerBridgeOptions> options,
-        ILogger<FfpManagerStatusPollingWorker> logger)
+        ILogger<FfpManagerStatusReconciliationWorker> logger)
     {
         this.scopeFactory = scopeFactory;
         this.options = options;
@@ -43,7 +43,7 @@ public sealed class FfpManagerStatusPollingWorker : BackgroundService
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "FFP Manager status polling cycle failed.");
+                    logger.LogError(exception, "FFP Manager status reconciliation cycle failed.");
                 }
             }
 
@@ -56,7 +56,7 @@ public sealed class FfpManagerStatusPollingWorker : BackgroundService
     {
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
         RequestPortalDbContext dbContext = scope.ServiceProvider.GetRequiredService<RequestPortalDbContext>();
-        IFfpManagerIntegrationService integrationService = scope.ServiceProvider.GetRequiredService<IFfpManagerIntegrationService>();
+        IExternalApplicationIntegrationService integrationService = scope.ServiceProvider.GetRequiredService<IExternalApplicationIntegrationService>();
         IIntegrationStatusService statusService = scope.ServiceProvider.GetRequiredService<IIntegrationStatusService>();
 
         var links = await dbContext.IntegrationLinks
@@ -71,7 +71,7 @@ public sealed class FfpManagerStatusPollingWorker : BackgroundService
         {
             try
             {
-                FfpManagerApplicationStatus? status = await integrationService.RefreshStatusAsync(
+                ExternalApplicationStatus? status = await integrationService.RefreshStatusAsync(
                     link.RequestId,
                     cancellationToken);
                 if (status is null)
@@ -90,7 +90,7 @@ public sealed class FfpManagerStatusPollingWorker : BackgroundService
                     cancellationToken);
 
                 // A successful refresh proves the external link is reachable again. Marking the
-                // existing reference synchronized clears any durable failure recorded by a prior poll.
+                // existing reference synchronized clears any durable failure recorded by a prior reconciliation check.
                 await statusService.MarkSynchronizedAsync(
                     link.Id,
                     link.ExternalReference!,
@@ -111,7 +111,7 @@ public sealed class FfpManagerStatusPollingWorker : BackgroundService
                 {
                     logger.LogError(
                         persistenceException,
-                        "Unable to persist FFP Manager polling failure state for integration link {IntegrationLinkId}.",
+                        "Unable to persist FFP Manager reconciliation failure state for integration link {IntegrationLinkId}.",
                         link.Id);
                 }
 

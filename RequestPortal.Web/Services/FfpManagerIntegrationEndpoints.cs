@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Common.Secrets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Integration;
@@ -16,14 +17,16 @@ public static class FfpManagerIntegrationEndpoints
 
         group.MapPost("/status", async (
             HttpRequest httpRequest,
-            FfpManagerStatusCallback callback,
-            IFfpManagerIntegrationService integrationService,
+            ExternalStatusCallback callback,
+            IExternalApplicationIntegrationService integrationService,
             RequestPortalDbContext dbContext,
             IOptions<FfpManagerBridgeOptions> options,
+            ISecretProvider secrets,
             CancellationToken cancellationToken) =>
         {
             FfpManagerBridgeOptions current = options.Value;
-            if (!IsAuthorized(httpRequest, current.SharedSecret))
+            string? expectedSecret = await ResolveSharedSecretAsync(current, secrets, cancellationToken);
+            if (!IsAuthorized(httpRequest, expectedSecret))
             {
                 return Results.Unauthorized();
             }
@@ -48,14 +51,16 @@ public static class FfpManagerIntegrationEndpoints
 
         group.MapPost("/information-requests", async (
             HttpRequest httpRequest,
-            FfpManagerInformationRequest informationRequest,
-            IFfpManagerIntegrationService integrationService,
+            ExternalInformationRequest informationRequest,
+            IExternalApplicationIntegrationService integrationService,
             RequestPortalDbContext dbContext,
             IOptions<FfpManagerBridgeOptions> options,
+            ISecretProvider secrets,
             CancellationToken cancellationToken) =>
         {
             FfpManagerBridgeOptions current = options.Value;
-            if (!IsAuthorized(httpRequest, current.SharedSecret))
+            string? expectedSecret = await ResolveSharedSecretAsync(current, secrets, cancellationToken);
+            if (!IsAuthorized(httpRequest, expectedSecret))
             {
                 return Results.Unauthorized();
             }
@@ -74,7 +79,42 @@ public static class FfpManagerIntegrationEndpoints
             return Results.NoContent();
         }).AllowAnonymous();
 
+        group.MapGet("/probe", async (
+            HttpRequest httpRequest,
+            IOptions<FfpManagerBridgeOptions> options,
+            ISecretProvider secrets,
+            CancellationToken cancellationToken) =>
+        {
+            FfpManagerBridgeOptions current = options.Value;
+            string? expectedSecret = await ResolveSharedSecretAsync(current, secrets, cancellationToken);
+            if (!IsAuthorized(httpRequest, expectedSecret))
+            {
+                return Results.Unauthorized();
+            }
+
+            return Results.Ok(new
+            {
+                status = "ok",
+                systemName = current.SystemName
+            });
+        }).AllowAnonymous();
+
         return endpoints;
+    }
+
+    private static async Task<string?> ResolveSharedSecretAsync(
+        FfpManagerBridgeOptions options,
+        ISecretProvider secrets,
+        CancellationToken cancellationToken)
+    {
+        string secretName = string.IsNullOrWhiteSpace(options.SharedSecretName)
+            ? "FfpManagerIntegration:SharedSecret"
+            : options.SharedSecretName;
+
+        string? secret = await secrets.GetAsync(secretName, cancellationToken);
+        return string.IsNullOrWhiteSpace(secret)
+            ? options.SharedSecret
+            : secret;
     }
 
     private static Task<bool> MatchesIntegrationLinkAsync(

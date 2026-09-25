@@ -53,7 +53,7 @@ The following pieces are implemented:
 `SqlFfpManagerGateway` maps the stable bridge contract to the supplied FFP Manager schema:
 
 - `ApplicationLetters` is the master application record.
-- `ApplicationLetters.MessageID` stores the RequestPortal request GUID and is used as the idempotency/reverse-correlation key.
+- `ApplicationLetters.ExternalRequestId` stores the RequestPortal request GUID and is used as the idempotency/reverse-correlation key.
 - `ItemsRequested.ApplicationLetterID` links requested items to the application.
 - `ItemsRequested.UnitOfMeasure` is resolved through `UnitsOfMeasure` by `Code` or `Name`.
 - `SupportingDocument.ApplicationLetter` links artifacts to the application.
@@ -145,7 +145,7 @@ GET /health
 5. The RequestPortal database transaction writes `RequestSubmittedMessage` to the outbox.
 6. The outbox dispatcher creates a deterministic `FfpManagerSubmissionRequestedMessage` and independently sends the normal portal notification.
 7. The integration outbox message submits the application to the bridge.
-8. The SQL gateway creates the FFP Manager `ApplicationLetters` row and associated `ItemsRequested` rows, or returns the existing row when the RequestPortal request GUID already exists in `MessageID`.
+8. The SQL gateway creates the FFP Manager `ApplicationLetters` row and associated `ItemsRequested` rows, or returns the existing row when the RequestPortal request GUID already exists in `ExternalRequestId`.
 9. Uploaded RequestPortal documents are copied to the FFP Manager supporting-document share and upserted into `SupportingDocument`.
 10. RequestPortal stores the returned FFP Manager `ApplicationLetters.ID` in `integration_links`.
 11. RequestPortal polls the bridge for status; the bridge reads `ApplicationStatusTypes` and maps configured legacy values to the canonical portal lifecycle.

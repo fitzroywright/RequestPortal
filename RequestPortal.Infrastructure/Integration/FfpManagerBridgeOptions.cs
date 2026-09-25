@@ -10,6 +10,8 @@ public sealed class FfpManagerBridgeOptions
 
     public string? SharedSecret { get; set; }
 
+    public string SharedSecretName { get; set; } = "FfpManagerIntegration:SharedSecret";
+
     public int TimeoutSeconds { get; set; } = 30;
 
     public int PollIntervalSeconds { get; set; } = 60;

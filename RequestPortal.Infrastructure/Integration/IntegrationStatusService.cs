@@ -19,14 +19,14 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IClock clock;
-    private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
+    private readonly IExternalApplicationIntegrationService ffpManagerIntegrationService;
     private readonly FfpManagerBridgeOptions ffpManagerOptions;
     private readonly IBusinessAuditWriter auditWriter;
 
     public IntegrationStatusService(
         RequestPortalDbContext dbContext,
         IClock clock,
-        IFfpManagerIntegrationService ffpManagerIntegrationService,
+        IExternalApplicationIntegrationService ffpManagerIntegrationService,
         IOptions<FfpManagerBridgeOptions> ffpManagerOptions,
         IBusinessAuditWriter auditWriter)
     {
@@ -119,7 +119,7 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
 
         try
         {
-            FfpManagerApplicationStatus? status = await ffpManagerIntegrationService.RefreshStatusAsync(link.RequestId, cancellationToken);
+            ExternalApplicationStatus? status = await ffpManagerIntegrationService.RefreshStatusAsync(link.RequestId, cancellationToken);
             if (status is null)
             {
                 throw new InvalidOperationException("The external system did not return a status for this request.");
