@@ -27,7 +27,7 @@ public sealed class OutboxDispatcher
     private const string RetryAtPrefix = "RETRY_AT=";
     private readonly RequestPortalDbContext dbContext;
     private readonly INotificationSender notificationSender;
-    private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
+    private readonly IExternalApplicationIntegrationService ffpManagerIntegrationService;
     private readonly FfpManagerBridgeOptions ffpManagerOptions;
     private readonly NotificationOptions notificationOptions;
     private readonly ILogger<OutboxDispatcher> logger;
@@ -36,7 +36,7 @@ public sealed class OutboxDispatcher
     public OutboxDispatcher(
         RequestPortalDbContext dbContext,
         INotificationSender notificationSender,
-        IFfpManagerIntegrationService ffpManagerIntegrationService,
+        IExternalApplicationIntegrationService ffpManagerIntegrationService,
         IOptions<FfpManagerBridgeOptions> ffpManagerOptions,
         IOptions<NotificationOptions> notificationOptions,
         ILogger<OutboxDispatcher> logger,
