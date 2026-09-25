@@ -70,4 +70,5 @@ public interface IExternalReviewerService
     Task<bool> ValidateSessionAsync(Guid invitationId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ExternalReviewerInvitationView>> ListAsync(CancellationToken cancellationToken = default);
     Task RevokeAsync(Guid invitationId, Guid revokedByUserId, CancellationToken cancellationToken = default);
+    Task<ExternalReviewerInvitationView> ReissueAsync(Guid invitationId, Guid invitedByUserId, string publicBaseUrl, CancellationToken cancellationToken = default);
 }
