@@ -62,6 +62,7 @@ public sealed record CommunityReachSummary(string Community, int Requests);
 
 public sealed record ManagementRequestRow(
     Guid Id,
+    Guid OrganizationId,
     string PublicReference,
     string OrganizationName,
     string Status,
@@ -86,7 +87,11 @@ public sealed record ManagementRequestFilter(
     string? Category = null,
     string? Program = null,
     string? Parish = null,
-    string? Community = null);
+    string? Community = null,
+    Guid? OrganizationId = null,
+    Guid? RequestId = null,
+    DateTimeOffset? FromUtc = null,
+    DateTimeOffset? ToUtc = null);
 
 public sealed record ParishDrillDown(
     string Parish,
