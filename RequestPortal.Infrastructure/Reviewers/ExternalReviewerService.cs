@@ -39,7 +39,7 @@ public sealed class ExternalReviewerService : IExternalReviewerService
         string publicBaseUrl,
         CancellationToken cancellationToken = default)
     {
-        if (!string.Equals(scope, ExternalReviewerScopes.ManagementDashboard, StringComparison.Ordinal))
+        if (!ExternalReviewerScopes.IsSupported(scope))
         {
             throw new ArgumentException("Unsupported external reviewer scope.", nameof(scope));
         }
