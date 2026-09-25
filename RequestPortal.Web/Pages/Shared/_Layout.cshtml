@@ -36,6 +36,7 @@
                         <a asp-page="/Staff/Index">FFP Staff</a>
                         <a asp-page="/Staff/Operations">Operations</a>
                         <a asp-page="/Staff/Reports">Reports</a>
+                        <a asp-page="/Messages/Inbox" class="messages-nav-link">Messages <span id="messageUnreadBadge" class="message-badge" hidden>0</span></a>
                     }
                     else
                     {
@@ -43,6 +44,7 @@
                         <a asp-page="/Organizations/Index">Organizations</a>
                         <a asp-page="/Requests/Index">Requests</a>
                         <a asp-page="/Account/Notifications">Notifications</a>
+                        <a asp-page="/Messages/Inbox" class="messages-nav-link">Messages <span id="messageUnreadBadge" class="message-badge" hidden>0</span></a>
                     }
                     <form method="post" asp-page="/Account/Logout" class="nav-form">
                         <button type="submit" class="nav-link-button">Sign out</button>
@@ -94,6 +96,18 @@
         </div>
     </footer>
 
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div id="messageToast" class="message-toast" hidden>
+            <div>
+                <strong id="messageToastTitle">New message</strong>
+                <div id="messageToastBody"></div>
+            </div>
+            <a id="messageToastLink" class="button button-small" href="/Messages/Inbox">View</a>
+        </div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+        <script src="~/js/messages.js" asp-append-version="true"></script>
+    }
     <script src="~/js/contextual-training.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
