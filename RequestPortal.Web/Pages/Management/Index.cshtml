@@ -97,10 +97,10 @@
     <section class="mg-panel" style="margin-top:16px">
         <h2>Delivery / Proof of Delivery</h2>
         <div class="performance">
-            <div><strong>@Model.Dashboard.Delivery.AwaitingAcknowledgement</strong><span class="muted">Awaiting acknowledgement</span></div>
-            <div><strong>@Model.Dashboard.Delivery.Delivered</strong><span class="muted">Delivered</span></div>
-            <div><strong>@Model.Dashboard.Delivery.PartiallyDelivered</strong><span class="muted">Partially delivered</span></div>
-            <div><strong>@Model.Dashboard.Delivery.Failed</strong><span class="muted">Failed / not delivered</span></div>
+            <div><a asp-page="/Management/Deliveries" asp-route-status="Ready" style="color:inherit;text-decoration:none"><strong>@Model.Dashboard.Delivery.AwaitingAcknowledgement</strong><span class="muted">Awaiting acknowledgement</span></a></div>
+            <div><a asp-page="/Management/Deliveries" asp-route-status="Delivered" style="color:inherit;text-decoration:none"><strong>@Model.Dashboard.Delivery.Delivered</strong><span class="muted">Delivered</span></a></div>
+            <div><a asp-page="/Management/Deliveries" asp-route-status="PartiallyDelivered" style="color:inherit;text-decoration:none"><strong>@Model.Dashboard.Delivery.PartiallyDelivered</strong><span class="muted">Partially delivered</span></a></div>
+            <div><a asp-page="/Management/Deliveries" asp-route-status="Failed" style="color:inherit;text-decoration:none"><strong>@Model.Dashboard.Delivery.Failed</strong><span class="muted">Failed / not delivered</span></a></div>
         </div>
         @if (Model.Dashboard.Delivery.PendingFfpManagerSync > 0)
         {
@@ -114,7 +114,7 @@
             @if (Model.Dashboard.DeliveryAnalytics.Organizations.Count == 0) { <p class="muted">No delivery activity yet.</p> }
             @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Organizations)
             {
-                <div class="bar-row"><span>@item.Name</span><div class="bar-track"><div class="bar-fill" style="width:@(item.Count * 100d / Math.Max(1, Model.Dashboard.DeliveryAnalytics.Organizations.Max(x => x.Count))).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></div></div><strong>@item.Count</strong></div>
+                <div class="bar-row"><a asp-page="/Management/Deliveries" asp-route-Organization="@item.Name">@item.Name</a><div class="bar-track"><div class="bar-fill" style="width:@(item.Count * 100d / Math.Max(1, Model.Dashboard.DeliveryAnalytics.Organizations.Max(x => x.Count))).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></div></div><strong>@item.Count</strong></div>
             }
         </section>
         <section class="mg-panel">
@@ -122,7 +122,11 @@
             @if (Model.Dashboard.DeliveryAnalytics.Programs.Count == 0) { <p class="muted">No program delivery activity yet.</p> }
             @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Programs)
             {
-                <div class="bar-row"><span>@item.Name</span><div class="bar-track"><div class="bar-fill" style="width:@(item.Count * 100d / Math.Max(1, Model.Dashboard.DeliveryAnalytics.Programs.Max(x => x.Count))).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></div></div><strong>@item.Count</strong></div>
+                <h2>Deliveries by program</h2>
+            @if (Model.Dashboard.DeliveryAnalytics.Programs.Count == 0) { <p class="muted">No program delivery activity yet.</p> }
+            @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Programs)
+            {
+                <div class="bar-row"><a asp-page="/Management/Deliveries" asp-route-Program="@item.Name">@item.Name</a><div class="bar-track"><div class="bar-fill" style="width:@(item.Count * 100d / Math.Max(1, Model.Dashboard.DeliveryAnalytics.Programs.Max(x => x.Count))).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></div></div><strong>@item.Count</strong></div>
             }
         </section>
         <section class="mg-panel">
@@ -149,7 +153,7 @@
             <div class="parish-list">
             @foreach (ManagementNamedCount item in Model.Dashboard.DeliveryAnalytics.Parishes)
             {
-                <div style="padding:10px 12px;background:#f8fafb;border-radius:6px;display:flex;justify-content:space-between"><span>@item.Name</span><strong>@item.Count</strong></div>
+                <a asp-page="/Management/Deliveries" asp-route-Parish="@item.Name" style="padding:10px 12px;background:#f8fafb;border-radius:6px;display:flex;justify-content:space-between;text-decoration:none;color:inherit"><span>@item.Name</span><strong>@item.Count</strong></a>
             }
             </div>
         </section>
