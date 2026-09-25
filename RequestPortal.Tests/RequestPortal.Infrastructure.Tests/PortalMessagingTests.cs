@@ -1,0 +1,231 @@
+using RequestPortal.Application.Messages;
+using RequestPortal.Domain.Messages;
+using RequestPortal.Domain.Organizations;
+using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Infrastructure.Messages;
+using Xunit;
+
+namespace RequestPortal.Infrastructure.Tests;
+
+public sealed class PortalMessagingTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 9, 24, 23, 59, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task SharedStaffMailbox_PreservesAuditIdentity_ButHidesStaffEmailExternally()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+
+        ApplicationUser representative = CreateUser(
+            "Maria Johnson",
+            "maria@example.org",
+            isStaff: false);
+        ApplicationUser staff = CreateUser(
+            "David Brown",
+            "david.brown@foodforthepoorja.org",
+            isStaff: true);
+        database.Db.Users.AddRange(representative, staff);
+
+        Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
+        database.Db.Organizations.Add(organization);
+        await database.Db.SaveChangesAsync(cancellationToken);
+
+        CapturingRealtimeNotifier realtime = new();
+        PortalMessageService service = new(database.Db, realtime);
+
+        Guid threadId = await service.SendToSharedStaffAsync(
+            representative.Id,
+            organization.Id,
+            requestId: null,
+            threadId: null,
+            subject: "Question about our request",
+            body: "Can FFP confirm the next step?",
+            cancellationToken);
+
+        MailboxMessageView staffInbox = Assert.Single(
+            await service.GetInboxAsync(staff.Id, isStaff: true, cancellationToken: cancellationToken));
+
+        Assert.Equal("Maria Johnson", staffInbox.SenderName);
+        Assert.Equal("maria@example.org", staffInbox.SenderEmail);
+        Assert.Equal("Representative", staffInbox.SenderKind);
+
+        await service.ReplyAsync(
+            staff.Id,
+            senderIsStaff: true,
+            threadId,
+            "I will review it and update you.",
+            cancellationToken);
+
+        MessageThreadView representativeView = Assert.IsType<MessageThreadView>(
+            await service.GetThreadAsync(
+                representative.Id,
+                isStaff: false,
+                threadId,
+                cancellationToken));
+
+        MessageDetailView staffReply = Assert.Single(
+            representativeView.Messages,
+            item => item.SenderKind == "FFP Staff");
+
+        Assert.Equal("David", staffReply.SenderName);
+        Assert.Null(staffReply.SenderEmail);
+
+        PortalMessage persistedStaffMessage = Assert.Single(
+            database.Db.PortalMessages,
+            item => item.SenderUserId == staff.Id);
+
+        Assert.Equal(staff.Id, persistedStaffMessage.SenderUserId);
+        Assert.Equal(PortalMessageSenderKind.FfpStaff, persistedStaffMessage.SenderKind);
+    }
+
+    [Fact]
+    public async Task RepresentativeToRepresentative_UsesFirstNameExternally_AndRequiresSameOrganization()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+
+        ApplicationUser maria = CreateUser("Maria Johnson", "maria@example.org", false);
+        ApplicationUser andre = CreateUser("Andre Williams", "andre@example.org", false);
+        ApplicationUser outsider = CreateUser("Peter Brown", "peter@other.example", false);
+        database.Db.Users.AddRange(maria, andre, outsider);
+
+        Organization organization = CreateApprovedOrganization(maria.Id, "Community Group");
+        OrganizationMembership andreMembership =
+            organization.RequestMembership(Guid.NewGuid(), andre.Id, Now.AddMinutes(2));
+        andreMembership.Approve(maria.Id, Now.AddMinutes(3));
+
+        Organization otherOrganization = CreateApprovedOrganization(outsider.Id, "Other Group");
+        database.Db.Organizations.AddRange(organization, otherOrganization);
+        await database.Db.SaveChangesAsync(cancellationToken);
+
+        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+
+        Guid threadId = await service.SendAsync(
+            maria.Id,
+            senderIsStaff: false,
+            organization.Id,
+            requestId: null,
+            threadId: null,
+            subject: "Meeting documents",
+            body: "Andre, I uploaded the final documents.",
+            [andre.Id],
+            cancellationToken);
+
+        MailboxMessageView andreInbox = Assert.Single(
+            await service.GetInboxAsync(andre.Id, isStaff: false, cancellationToken: cancellationToken));
+
+        Assert.Equal("Maria", andreInbox.SenderName);
+        Assert.Null(andreInbox.SenderEmail);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => service.SendAsync(
+                maria.Id,
+                senderIsStaff: false,
+                organization.Id,
+                requestId: null,
+                threadId: null,
+                subject: "Not allowed",
+                body: "This must not cross organization boundaries.",
+                [outsider.Id],
+                cancellationToken));
+
+        Assert.Equal(threadId, andreInbox.ThreadId);
+    }
+
+    [Fact]
+    public async Task SystemMessage_AppearsForRepresentativeAndSharedStaffInbox()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+
+        ApplicationUser representative = CreateUser("Maria Johnson", "maria@example.org", false);
+        ApplicationUser staff = CreateUser("David Brown", "david.brown@foodforthepoorja.org", true);
+        database.Db.Users.AddRange(representative, staff);
+
+        Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
+        database.Db.Organizations.Add(organization);
+        await database.Db.SaveChangesAsync(cancellationToken);
+
+        CapturingRealtimeNotifier realtime = new();
+        PortalMessageService service = new(database.Db, realtime);
+
+        Guid threadId = await service.SendSystemMessageAsync(
+            organization.Id,
+            requestId: null,
+            threadId: null,
+            subject: "Information required",
+            body: "Please upload the signed authorization letter.",
+            [representative.Id],
+            cancellationToken);
+
+        MailboxMessageView representativeInbox = Assert.Single(
+            await service.GetInboxAsync(representative.Id, false, cancellationToken: cancellationToken));
+        MailboxMessageView staffInbox = Assert.Single(
+            await service.GetInboxAsync(staff.Id, true, cancellationToken: cancellationToken));
+
+        Assert.Equal("FFP Request Processing", representativeInbox.SenderName);
+        Assert.Equal("FFP", representativeInbox.SenderKind);
+        Assert.Equal(threadId, staffInbox.ThreadId);
+        Assert.Contains(realtime.Messages, item =>
+            item.ThreadId == threadId &&
+            item.RecipientUserIds.Contains(representative.Id) &&
+            item.RecipientUserIds.Contains(staff.Id));
+    }
+
+    private static ApplicationUser CreateUser(
+        string displayName,
+        string email,
+        bool isStaff)
+    {
+        return new ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = email,
+            NormalizedUserName = email.ToUpperInvariant(),
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            EmailConfirmed = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            DisplayName = displayName,
+            IsInternalStaff = isStaff,
+            CreatedUtc = Now
+        };
+    }
+
+    private static Organization CreateApprovedOrganization(
+        Guid ownerUserId,
+        string name)
+    {
+        Organization organization = new(
+            Guid.NewGuid(),
+            name,
+            "JM",
+            ownerUserId,
+            Now);
+
+        organization.RequestMembership(
+            Guid.NewGuid(),
+            ownerUserId,
+            Now);
+
+        organization.Approve(
+            Guid.NewGuid(),
+            Now.AddMinutes(1));
+
+        return organization;
+    }
+
+    private sealed class CapturingRealtimeNotifier : IPortalMessageRealtimeNotifier
+    {
+        public List<PortalMessageCreated> Messages { get; } = [];
+
+        public Task NotifyAsync(
+            PortalMessageCreated message,
+            CancellationToken cancellationToken = default)
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+}
