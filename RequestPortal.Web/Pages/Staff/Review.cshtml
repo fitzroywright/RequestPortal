@@ -91,6 +91,30 @@
                         </section>
                     }
 
+
+                    @if (Model.Deliveries.Count > 0)
+                    {
+                        <section class="card" style="margin-top:1.5rem">
+                            <h2>Delivery / Proof of Delivery</h2>
+                            <div class="table-wrap"><table>
+                                <thead><tr><th>Reference</th><th>Recipient</th><th>Status</th><th>Acknowledged</th><th>Evidence</th><th>Notes</th></tr></thead>
+                                <tbody>
+                                @foreach (RequestPortal.Application.Delivery.DeliveryView delivery in Model.Deliveries)
+                                {
+                                    <tr>
+                                        <td>@delivery.DocumentReference</td>
+                                        <td>@delivery.RecipientName</td>
+                                        <td><strong>@delivery.Status</strong></td>
+                                        <td>@(delivery.AcknowledgedUtc?.ToLocalTime().ToString("g") ?? "Awaiting acknowledgement")</td>
+                                        <td>@(delivery.EvidenceDocumentId.HasValue ? "Attached" : "—")</td>
+                                        <td>@(delivery.Notes ?? "—")</td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table></div>
+                        </section>
+                    }
+
                     <section class="card" style="margin-top:1.5rem">
                         <h2>Supporting documents</h2>
                         @if (Model.Documents.Count == 0)
