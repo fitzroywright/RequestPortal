@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Documents;
+using RequestPortal.Application.Delivery;
 using RequestPortal.Application.Integration;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
@@ -29,6 +30,7 @@ public sealed class DetailsModel : PageModel
     private readonly IProjectPlanningService projectPlanningService;
     private readonly IRequestReferenceDataService referenceDataService;
     private readonly IFfpManagerIntegrationService ffpManagerIntegrationService;
+    private readonly IDeliveryService deliveryService;
     private readonly RequestPortalDbContext dbContext;
 
     public DetailsModel(
@@ -40,6 +42,7 @@ public sealed class DetailsModel : PageModel
         IProjectPlanningService projectPlanningService,
         IRequestReferenceDataService referenceDataService,
         IFfpManagerIntegrationService ffpManagerIntegrationService,
+        IDeliveryService deliveryService,
         RequestPortalDbContext dbContext)
     {
         this.userManager = userManager;
@@ -50,6 +53,7 @@ public sealed class DetailsModel : PageModel
         this.projectPlanningService = projectPlanningService;
         this.referenceDataService = referenceDataService;
         this.ffpManagerIntegrationService = ffpManagerIntegrationService;
+        this.deliveryService = deliveryService;
         this.dbContext = dbContext;
     }
 
@@ -57,6 +61,7 @@ public sealed class DetailsModel : PageModel
     public ProjectProposalDetail? ProjectProposal { get; private set; }
     public ProjectPlanningDetail? ProjectPlanning { get; private set; }
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
+    public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
 
     [BindProperty]
@@ -262,6 +267,7 @@ public sealed class DetailsModel : PageModel
             id,
             isStaff: false,
             HttpContext.RequestAborted);
+        Deliveries = await deliveryService.GetForRequestAsync(id, HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
 
         if (Item.UnitOfMeasureId == Guid.Empty && UnitsOfMeasure.Count > 0)
