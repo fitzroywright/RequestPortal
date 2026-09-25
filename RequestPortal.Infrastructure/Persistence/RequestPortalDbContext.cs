@@ -12,6 +12,7 @@ using RequestPortal.Domain.Messages;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.ReferenceData;
+using RequestPortal.Domain.Reviewers;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
 using RequestFulfilment = RequestPortal.Domain.Fulfilment.Fulfilment;
@@ -47,5 +48,6 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
+    public DbSet<ExternalReviewerInvitation> ExternalReviewerInvitations => Set<ExternalReviewerInvitation>();
     protected override void OnModelCreating(ModelBuilder modelBuilder) { base.OnModelCreating(modelBuilder); modelBuilder.ApplyConfigurationsFromAssembly(typeof(RequestPortalDbContext).Assembly); }
 }
