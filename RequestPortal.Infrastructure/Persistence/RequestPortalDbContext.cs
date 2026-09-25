@@ -40,6 +40,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<MessageThread> MessageThreads => Set<MessageThread>();
     public DbSet<PortalMessage> PortalMessages => Set<PortalMessage>();
     public DbSet<MessageRecipient> MessageRecipients => Set<MessageRecipient>();
+    public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
