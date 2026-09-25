@@ -386,3 +386,28 @@
 .message-body {
     white-space: pre-wrap;
 }
+
+
+.message-attachments {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.message-attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid #d7e0e6;
+    border-radius: 10px;
+    background: #f8fafb;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.message-attachment small {
+    font-weight: 500;
+    color: #6d7b86;
+}
