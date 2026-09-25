@@ -49,6 +49,24 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetRoles", (string)null);
                 });
 
+            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Messages.PortalMessage", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.PortalMessage", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Messages.MessageThread", null)
+                        .WithMany()
+                        .HasForeignKey("ThreadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -1003,6 +1021,100 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.HasIndex("RequestId", "ChangedUtc");
 
                     b.ToTable("request_status_history", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageRecipient", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ArchivedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReadUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("MessageId", "UserId");
+
+                    b.HasIndex("UserId", "ReadUtc");
+
+                    b.ToTable("message_recipients", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.MessageThread", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ClosedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("StaffVisible")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex("StaffVisible", "CreatedUtc");
+
+                    b.ToTable("message_threads", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Messages.PortalMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("SenderUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SenderDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("SenderKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("SentUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ThreadId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ThreadId", "SentUtc");
+
+                    b.ToTable("portal_messages", (string)null);
                 });
 
             modelBuilder.Entity("RequestPortal.Infrastructure.Identity.ApplicationUser", b =>
