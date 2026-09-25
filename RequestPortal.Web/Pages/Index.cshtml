@@ -223,6 +223,13 @@
     </div>
 </section>
 
+<script src="~/js/carousel-extra/craig-1.js"></script>
+<script src="~/js/carousel-extra/kivette-1.js"></script>
+<script src="~/js/carousel-extra/mair-1.js"></script>
+<script src="~/js/carousel-extra/mair-2.js"></script>
+<script src="~/js/carousel-extra/mair-3.js"></script>
+<script src="~/js/carousel-extra/massias-1.js"></script>
+
 <script>
 (() => {
     const slides = [
@@ -242,6 +249,7 @@
         ['Development','Building for the future','Long-term solutions help communities move from crisis toward stability.','/img/carousel/Splash13.jpg'],
         ['Partnerships','Stronger when we work together','Partners, representatives and communities working together to restore hope.','/img/carousel/Splash14.jpg']
     ];
+    slides.push(...(window.requestPortalCarouselExtraSlides || []));
 
     const splash = document.querySelector('[data-startup-splash]');
     if (splash) {
