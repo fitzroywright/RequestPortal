@@ -105,6 +105,13 @@ public interface IPortalMessageService
         string body,
         CancellationToken cancellationToken = default);
 
+    Task<Guid> ReplyAsync(
+        Guid senderUserId,
+        bool senderIsStaff,
+        Guid threadId,
+        string body,
+        CancellationToken cancellationToken = default);
+
     Task<Guid> SendSystemMessageAsync(
         Guid? organizationId,
         Guid? requestId,
