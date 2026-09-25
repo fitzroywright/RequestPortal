@@ -290,11 +290,11 @@ api.MapPost("/reference-data/refresh", async (
 });
 
 api.MapPost("/applications", async (
-    FfpManagerApplicationSubmission submission,
+    ExternalApplicationSubmission submission,
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
-    FfpManagerApplicationReference reference = await gateway.CreateApplicationAsync(submission, cancellationToken);
+    ExternalApplicationReference reference = await gateway.CreateApplicationAsync(submission, cancellationToken);
     return Results.Ok(reference);
 });
 
@@ -312,7 +312,7 @@ api.MapPut("/applications/{applicationId}/artifacts/{documentId:guid}", async (
 
     IFormCollection form = await request.ReadFormAsync(cancellationToken);
     string metadataJson = form["metadata"].ToString();
-    FfpManagerArtifactDescriptor? descriptor = JsonSerializer.Deserialize<FfpManagerArtifactDescriptor>(
+    ExternalArtifactDescriptor? descriptor = JsonSerializer.Deserialize<ExternalArtifactDescriptor>(
         metadataJson,
         new JsonSerializerOptions(JsonSerializerDefaults.Web));
     IFormFile? file = form.Files.GetFile("file");
@@ -335,7 +335,7 @@ api.MapGet("/applications/{applicationId}", async (
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
-    FfpManagerApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
+    ExternalApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
     return application is null ? Results.NotFound() : Results.Ok(application);
 });
 
@@ -344,13 +344,13 @@ api.MapGet("/applications/{applicationId}/status", async (
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
-    FfpManagerApplicationStatus? status = await gateway.GetStatusAsync(applicationId, cancellationToken);
+    ExternalApplicationStatus? status = await gateway.GetStatusAsync(applicationId, cancellationToken);
     return status is null ? Results.NotFound() : Results.Ok(status);
 });
 
 api.MapPost("/applications/{applicationId}/information-responses", async (
     string applicationId,
-    FfpManagerInformationResponse response,
+    ExternalInformationResponse response,
     IFfpManagerGateway gateway,
     CancellationToken cancellationToken) =>
 {
@@ -372,20 +372,20 @@ if (app.Environment.IsDevelopment())
         IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken) =>
     {
-        FfpManagerApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
+        ExternalApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
         if (application is null)
         {
             return Results.NotFound();
         }
 
-        FfpManagerApplicationStatus status = await gateway.SetStatusAsync(
+        ExternalApplicationStatus status = await gateway.SetStatusAsync(
             applicationId,
             request.StatusCode,
             request.StatusText,
             request.Detail,
             request.IsTerminal,
             cancellationToken);
-        FfpManagerStatusCallback callback = new(Guid.NewGuid(), application.PortalRequestId, status);
+        ExternalStatusCallback callback = new(Guid.NewGuid(), application.PortalRequestId, status);
         await PostCallbackAsync(
             httpClientFactory,
             "api/integration/ffpmanager/status",
@@ -402,13 +402,13 @@ if (app.Environment.IsDevelopment())
         IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken) =>
     {
-        FfpManagerApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
+        ExternalApplicationSubmission? application = await gateway.GetApplicationAsync(applicationId, cancellationToken);
         if (application is null)
         {
             return Results.NotFound();
         }
 
-        FfpManagerInformationRequest callback = new(
+        ExternalInformationRequest callback = new(
             Guid.NewGuid(),
             application.PortalRequestId,
             applicationId,
