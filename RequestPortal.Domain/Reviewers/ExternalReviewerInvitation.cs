@@ -14,7 +14,11 @@ public sealed class ExternalReviewerInvitation
         string tokenHash,
         Guid invitedByUserId,
         DateTimeOffset createdUtc,
-        DateTimeOffset expiresUtc)
+        DateTimeOffset expiresUtc,
+        Guid? organizationId = null,
+        Guid? requestId = null,
+        DateTimeOffset? fromUtc = null,
+        DateTimeOffset? toUtc = null)
     {
         if (id == Guid.Empty) throw new ArgumentException("Invitation id is required.", nameof(id));
         if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException("Reviewer email is required.", nameof(email));
@@ -31,6 +35,13 @@ public sealed class ExternalReviewerInvitation
         InvitedByUserId = invitedByUserId;
         CreatedUtc = createdUtc;
         ExpiresUtc = expiresUtc;
+        OrganizationId = organizationId;
+        RequestId = requestId;
+        FromUtc = fromUtc;
+        ToUtc = toUtc;
+
+        if (fromUtc.HasValue && toUtc.HasValue && toUtc.Value < fromUtc.Value)
+            throw new ArgumentException("Reviewer date scope end must not be earlier than its start.");
     }
 
     public Guid Id { get; private set; }
@@ -44,6 +55,10 @@ public sealed class ExternalReviewerInvitation
     public DateTimeOffset? RedeemedUtc { get; private set; }
     public DateTimeOffset? RevokedUtc { get; private set; }
     public DateTimeOffset? LastAccessUtc { get; private set; }
+    public Guid? OrganizationId { get; private set; }
+    public Guid? RequestId { get; private set; }
+    public DateTimeOffset? FromUtc { get; private set; }
+    public DateTimeOffset? ToUtc { get; private set; }
 
     public bool IsActive(DateTimeOffset now) => RevokedUtc is null && ExpiresUtc > now;
 
