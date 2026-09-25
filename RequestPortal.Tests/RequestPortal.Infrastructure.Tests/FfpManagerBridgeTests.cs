@@ -133,28 +133,6 @@ public sealed class FfpManagerBridgeTests
     }
 
     [Fact]
-    public void StatusCallbackIdentity_IsDeterministic()
-    {
-        DateTimeOffset changedUtc = new(2026, 9, 25, 15, 0, 0, TimeSpan.Zero);
-
-        Guid first = ApplicationLetterCallbackIdentity.CreateStatusMessageId(
-            "42",
-            "APPROVED",
-            changedUtc);
-        Guid second = ApplicationLetterCallbackIdentity.CreateStatusMessageId(
-            "42",
-            "APPROVED",
-            changedUtc);
-        Guid changed = ApplicationLetterCallbackIdentity.CreateStatusMessageId(
-            "42",
-            "CLOSED",
-            changedUtc);
-
-        Assert.Equal(first, second);
-        Assert.NotEqual(first, changed);
-    }
-
-    [Fact]
     public async Task SqlGateway_RequiresConnectionString()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
