@@ -40,7 +40,7 @@ public sealed class DeliveryService : IDeliveryService
             command.DeliveryPerson,
             Lines = command.Lines,
             DocumentPayload = string.IsNullOrWhiteSpace(command.DocumentPayloadJson)
-                ? null
+                ? (JsonElement?)null
                 : JsonDocument.Parse(command.DocumentPayloadJson).RootElement.Clone()
         };
 
