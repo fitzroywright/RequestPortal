@@ -248,7 +248,8 @@ public sealed class PortalMessageService : IPortalMessageService
         Guid? threadId,
         string subject,
         string body,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
     {
         await EnsureApprovedMembershipAsync(senderUserId, organizationId, cancellationToken);
         await ValidateRequestScopeAsync(organizationId, requestId, cancellationToken);
@@ -274,7 +275,8 @@ public sealed class PortalMessageService : IPortalMessageService
             body,
             staffUserIds,
             staffVisible: true,
-            cancellationToken);
+            cancellationToken,
+            attachmentDocumentIds);
     }
 
     public async Task<Guid> SendAsync(
@@ -286,7 +288,8 @@ public sealed class PortalMessageService : IPortalMessageService
         string subject,
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
     {
         if (recipientUserIds.Count == 0)
         {
@@ -326,7 +329,8 @@ public sealed class PortalMessageService : IPortalMessageService
             body,
             recipientUserIds,
             staffVisible,
-            cancellationToken);
+            cancellationToken,
+            attachmentDocumentIds);
     }
 
     public async Task<Guid> ReplyAsync(
@@ -334,7 +338,8 @@ public sealed class PortalMessageService : IPortalMessageService
         bool senderIsStaff,
         Guid threadId,
         string body,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
     {
         MessageThread thread = await dbContext.MessageThreads
             .SingleAsync(item => item.Id == threadId, cancellationToken);
@@ -400,7 +405,8 @@ public sealed class PortalMessageService : IPortalMessageService
             body,
             recipients,
             thread.StaffVisible,
-            cancellationToken);
+            cancellationToken,
+            attachmentDocumentIds);
     }
 
     public async Task<Guid> SendSystemMessageAsync(
@@ -499,7 +505,8 @@ public sealed class PortalMessageService : IPortalMessageService
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
         bool staffVisible,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
     {
         ApplicationUserProjection sender = await dbContext.Users
             .AsNoTracking()
@@ -534,6 +541,25 @@ public sealed class PortalMessageService : IPortalMessageService
             .Distinct()
             .ToArray();
         AddRecipients(message.Id, recipients, senderUserId);
+
+        Guid[] attachments = attachmentDocumentIds?
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToArray() ?? Array.Empty<Guid>();
+        if (attachments.Length > 0)
+        {
+            await ValidateAttachmentDocumentsAsync(
+                attachments,
+                organizationId,
+                requestId,
+                cancellationToken);
+            foreach (Guid documentId in attachments)
+            {
+                dbContext.MessageAttachments.Add(
+                    new MessageAttachment(message.Id, documentId));
+            }
+        }
+
         AddExternalNotificationOutbox(message, thread, recipients);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -709,6 +735,36 @@ public sealed class PortalMessageService : IPortalMessageService
         if (approvedRecipients != distinctRecipients.Length)
         {
             throw new UnauthorizedAccessException("Representatives may only message approved members of the same organization.");
+        }
+    }
+
+    private async Task ValidateAttachmentDocumentsAsync(
+        IReadOnlyCollection<Guid> documentIds,
+        Guid? organizationId,
+        Guid? requestId,
+        CancellationToken cancellationToken)
+    {
+        if (!organizationId.HasValue)
+        {
+            throw new InvalidOperationException("Attachments require an organization-scoped conversation.");
+        }
+
+        int validDocuments = await dbContext.Documents
+            .AsNoTracking()
+            .CountAsync(
+                document =>
+                    documentIds.Contains(document.Id) &&
+                    !document.IsArchived &&
+                    document.OrganizationId == organizationId.Value &&
+                    (!requestId.HasValue ||
+                     document.OwnerType == RequestPortal.Domain.Documents.DocumentOwnerType.Organization ||
+                     (document.OwnerType == RequestPortal.Domain.Documents.DocumentOwnerType.AssistanceRequest &&
+                      document.OwnerId == requestId.Value)),
+                cancellationToken);
+
+        if (validDocuments != documentIds.Count)
+        {
+            throw new UnauthorizedAccessException("One or more attachments are outside the conversation scope.");
         }
     }
 
