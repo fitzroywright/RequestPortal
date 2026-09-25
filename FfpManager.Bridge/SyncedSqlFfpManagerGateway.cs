@@ -22,6 +22,8 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
 
     public async Task<FfpManagerApplicationReference> CreateApplicationAsync(FfpManagerApplicationSubmission submission, CancellationToken cancellationToken = default)
     {
+        ValidateSubmission(submission);
+
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         await using SqlTransaction transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
@@ -73,10 +75,6 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
 
         foreach (FfpManagerApplicationItem item in submission.Items)
         {
-            if (item.Quantity != decimal.Truncate(item.Quantity) || item.Quantity < int.MinValue || item.Quantity > int.MaxValue)
-            {
-                throw new InvalidOperationException($"FFP Manager ItemsRequested.Quantity is an integer; portal item {item.PortalItemId:D} has quantity {item.Quantity}.");
-            }
             long unitId = await referenceData.ResolveUnitOfMeasureIdAsync(item.UnitOfMeasure, cancellationToken);
             const string itemSql = "INSERT INTO dbo.ItemsRequested (Code,Name,Description,UserName,DateCreated,DateUpdated,Quantity,ApplicationLetterID,UnitOfMeasure,CreatedBy) VALUES (@Code,@Name,@Description,@UserName,@DateCreated,@DateUpdated,@Quantity,@ApplicationLetterID,@UnitOfMeasure,@CreatedBy);";
             await using SqlCommand itemCommand = new(itemSql, connection, transaction);
@@ -171,6 +169,20 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         command.Parameters.Add("@ID", SqlDbType.BigInt).Value = id;
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1) throw new KeyNotFoundException($"FFP Manager application '{applicationId}' was not found.");
         return await GetStatusAsync(applicationId, cancellationToken) ?? throw new KeyNotFoundException($"FFP Manager application '{applicationId}' was not found after status update.");
+    }
+
+    private static void ValidateSubmission(FfpManagerApplicationSubmission submission)
+    {
+        foreach (FfpManagerApplicationItem item in submission.Items)
+        {
+            if (item.Quantity != decimal.Truncate(item.Quantity) ||
+                item.Quantity < int.MinValue ||
+                item.Quantity > int.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    $"FFP Manager ItemsRequested.Quantity is an integer; portal item {item.PortalItemId:D} has quantity {item.Quantity}.");
+            }
+        }
     }
 
     private string MapStatus(string rawName)
