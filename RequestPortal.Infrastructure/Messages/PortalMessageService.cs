@@ -13,12 +13,12 @@ public sealed class PortalMessageService : IPortalMessageService
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IPortalMessageRealtimeNotifier realtimeNotifier;
-    private readonly IBusinessAuditWriter auditWriter;
+    private readonly IBusinessAuditWriter? auditWriter;
 
     public PortalMessageService(
         RequestPortalDbContext dbContext,
         IPortalMessageRealtimeNotifier realtimeNotifier,
-        IBusinessAuditWriter auditWriter)
+        IBusinessAuditWriter? auditWriter = null)
     {
         this.dbContext = dbContext;
         this.realtimeNotifier = realtimeNotifier;
@@ -559,7 +559,9 @@ public sealed class PortalMessageService : IPortalMessageService
         if (recipients.Count > 0)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-            await auditWriter.WriteAsync(
+            if (auditWriter is not null)
+            {
+                await auditWriter.WriteAsync(
                 userId,
                 "MessageThreadRead",
                 "MessageThread",
@@ -567,6 +569,7 @@ public sealed class PortalMessageService : IPortalMessageService
                 null,
                 $"Unread messages marked read={recipients.Count}",
                 cancellationToken);
+            }
         }
     }
 
@@ -637,7 +640,9 @@ public sealed class PortalMessageService : IPortalMessageService
 
         AddExternalNotificationOutbox(message, thread, recipients);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await auditWriter.WriteAsync(
+        if (auditWriter is not null)
+        {
+            await auditWriter.WriteAsync(
             senderUserId,
             "MessageSent",
             "PortalMessage",
@@ -645,6 +650,7 @@ public sealed class PortalMessageService : IPortalMessageService
             thread.OrganizationId,
             $"thread={thread.Id:D}; request={thread.RequestId}; recipients={recipients.Length}; attachments={attachments.Length}",
             cancellationToken);
+        }
 
         await NotifyAsync(message, thread, recipients, cancellationToken);
         return thread.Id;
