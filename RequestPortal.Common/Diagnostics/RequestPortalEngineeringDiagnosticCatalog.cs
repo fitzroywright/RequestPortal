@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Common.Diagnostics;
+using Common.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -14,11 +15,16 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
 {
     private readonly IServiceScopeFactory scopeFactory;
     private readonly IConfiguration configuration;
+    private readonly ISecretProvider secrets;
 
-    public RequestPortalEngineeringDiagnosticCatalog(IServiceScopeFactory scopeFactory, IConfiguration configuration)
+    public RequestPortalEngineeringDiagnosticCatalog(
+        IServiceScopeFactory scopeFactory,
+        IConfiguration configuration,
+        ISecretProvider secrets)
     {
         this.scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
         this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
     }
 
     public IReadOnlyList<EngineeringDiagnosticCheckDefinition> Build()
@@ -92,7 +98,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 "requestportal-l2-integrations",
                 "RequestPortal integration readiness",
                 EngineeringDiagnosticLevel.Level2Repair,
-                _ => Task.FromResult(CheckIntegrationConfiguration())),
+                CheckIntegrationConfigurationAsync),
 
             new EngineeringDiagnosticCheckDefinition(
                 "requestportal-l1-full-system",
@@ -206,7 +212,8 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
             "Durable storage, durable messaging, SMTP notifications and staff OIDC/group mappings are configured.");
     }
 
-    private EngineeringDiagnosticCheckResult CheckIntegrationConfiguration()
+    private async Task<EngineeringDiagnosticCheckResult> CheckIntegrationConfigurationAsync(
+        CancellationToken cancellationToken)
     {
         bool openBaoConfigured =
             !string.IsNullOrWhiteSpace(configuration["CommonSecrets:OpenBao:Address"]) &&
@@ -219,8 +226,19 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
             HasPair("Authentication:Facebook:AppId", "Authentication:Facebook:AppSecret");
 
         bool ffpManagerEnabled = configuration.GetValue("FfpManagerIntegration:Enabled", false);
+        string ffpSecretName =
+            configuration["FfpManagerIntegration:SharedSecretName"]?.Trim()
+            ?? "FfpManagerIntegration:SharedSecret";
+        string? ffpSecret = ffpManagerEnabled
+            ? await secrets.GetAsync(ffpSecretName, cancellationToken)
+            : null;
         bool ffpManagerConfigured = !ffpManagerEnabled ||
-            (HasPair("FfpManagerIntegration:BaseUrl", "FfpManagerIntegration:SharedSecret"));
+            (Uri.TryCreate(
+                 configuration["FfpManagerIntegration:BaseUrl"],
+                 UriKind.Absolute,
+                 out Uri? bridgeUri) &&
+             bridgeUri.Scheme == Uri.UriSchemeHttps &&
+             !string.IsNullOrWhiteSpace(ffpSecret));
 
         List<string> missing = [];
         if (!openBaoConfigured) missing.Add("OpenBao workload credentials");
