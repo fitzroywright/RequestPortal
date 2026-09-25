@@ -90,7 +90,9 @@ builder.Services.AddSingleton<IRequestPortalOperationsFlowPublisher>(sp => sp.Ge
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RequestPortalOperationsFlowPublisher>());
 await using Common.Secrets.CommonSecretsBootstrapRuntime secretsRuntime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(builder.Configuration);
 secretsRuntime.Register(builder.Services);
-RuntimeSecrets runtimeSecrets = await LoadRuntimeSecretsAsync(secretsRuntime.Provider);
+RuntimeSecrets runtimeSecrets = await LoadRuntimeSecretsAsync(
+    secretsRuntime.Provider,
+    builder.Configuration);
 
 builder.Services.AddCommonDiagnostics();
 builder.Services.AddSingleton(new DiagnosticLevelExecutionOptions
@@ -611,8 +613,14 @@ await PrepareDemoAsync(app);
 await ReportStartupDiagnosticsAsync(app);
 await app.RunAsync();
 
-static async Task<RuntimeSecrets> LoadRuntimeSecretsAsync(Common.Secrets.ISecretProvider provider)
+static async Task<RuntimeSecrets> LoadRuntimeSecretsAsync(
+    Common.Secrets.ISecretProvider provider,
+    IConfiguration configuration)
 {
+    string ffpManagerSharedSecretName =
+        configuration["FfpManagerIntegration:SharedSecretName"]?.Trim()
+        ?? "FfpManagerIntegration:SharedSecret";
+
     return new RuntimeSecrets(
         await provider.GetAsync("ConnectionStrings:RequestPortal"),
         await provider.GetAsync("Authentication:Google:ClientSecret"),
@@ -621,7 +629,7 @@ static async Task<RuntimeSecrets> LoadRuntimeSecretsAsync(Common.Secrets.ISecret
         await provider.GetAsync("Authentication:Yahoo:ClientSecret"),
         await provider.GetAsync("Authentication:Apple:ClientSecret"),
         await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
-        await provider.GetAsync("FfpManagerIntegration:SharedSecret"));
+        await provider.GetAsync(ffpManagerSharedSecretName));
 }
 
 static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfiguration(
@@ -694,11 +702,15 @@ static IReadOnlyList<ProductionConfigurationFailure> ValidateProductionConfigura
     AddIf(string.IsNullOrWhiteSpace(configuration["Site:Id"]),
         "RP-PROD-SITE-001",
         "Site:Id must identify the production deployment.");
+    string? ffpManagerBaseUrl = configuration["FfpManagerIntegration:BaseUrl"];
+    bool ffpManagerHttps =
+        Uri.TryCreate(ffpManagerBaseUrl, UriKind.Absolute, out Uri? ffpManagerUri) &&
+        ffpManagerUri.Scheme == Uri.UriSchemeHttps;
     AddIf(ffpManagerEnabled &&
-          (string.IsNullOrWhiteSpace(configuration["FfpManagerIntegration:BaseUrl"]) ||
+          (!ffpManagerHttps ||
            string.IsNullOrWhiteSpace(ffpManagerSharedSecret)),
         "RP-PROD-FFPMANAGER-001",
-        "FFP Manager integration requires BaseUrl and a Common.Secrets-backed SharedSecret when enabled.");
+        "FFP Manager integration requires an HTTPS BaseUrl and a Common.Secrets-backed SharedSecret when enabled.");
 
     return failures;
 
