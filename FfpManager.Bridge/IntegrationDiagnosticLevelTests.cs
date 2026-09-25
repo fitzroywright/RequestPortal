@@ -179,11 +179,55 @@ public sealed class BridgeReferenceDataDiagnosticLevelTest(
                     , cancellationToken);
             }
 
+            foreach ((string sourceStatus, string canonicalStatus) in current.StatusMap)
+            {
+                bool exists = snapshot.ApplicationStatuses.Any(item =>
+                    string.Equals(item.Name, sourceStatus, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(item.Code) &&
+                     string.Equals(item.Code, sourceStatus, StringComparison.OrdinalIgnoreCase)));
+                if (!exists)
+                {
+                    problems.Add($"status mapping source '{sourceStatus}' does not exist");
+                }
+
+                if (string.IsNullOrWhiteSpace(canonicalStatus))
+                {
+                    problems.Add($"status mapping '{sourceStatus}' has an empty target");
+                }
+            }
+
+            foreach ((string sourceDocumentType, string targetDocumentType) in current.DocumentTypeMap)
+            {
+                if (string.IsNullOrWhiteSpace(sourceDocumentType))
+                {
+                    problems.Add("document type mapping contains an empty source");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(targetDocumentType))
+                {
+                    problems.Add($"document type mapping '{sourceDocumentType}' has an empty target");
+                    continue;
+                }
+
+                try
+                {
+                    await catalog.ResolveDocumentTypeIdAsync(
+                        targetDocumentType
+                        , cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    problems.Add(
+                        $"document type mapping '{sourceDocumentType}' -> '{targetDocumentType}' does not resolve ({exception.GetType().Name})");
+                }
+            }
+
             return problems.Count == 0
                 ? EngineeringDiagnosticPolicy.Passed(
                     TestId
                     , Name
-                    , "Reference data loaded and configured default mappings resolve."
+                    , "Reference data loaded and configured status/document mappings resolve."
                     , $"Statuses={snapshot.ApplicationStatuses.Count}; DocumentTypes={snapshot.DocumentTypes.Count}; Units={snapshot.UnitsOfMeasure.Count}")
                 : EngineeringDiagnosticPolicy.Failed(
                     TestId
