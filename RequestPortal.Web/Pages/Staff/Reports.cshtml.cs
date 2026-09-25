@@ -49,6 +49,13 @@ public sealed class ReportsModel : PageModel
         return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"request-portal-report-{DateTime.UtcNow:yyyyMMdd-HHmm}.xlsx");
     }
 
+    public async Task<IActionResult> OnGetPdfAsync()
+    {
+        byte[] content = await reportingService.ExportPdfAsync(BuildFilter(), HttpContext.RequestAborted);
+        await AuditExportAsync("PDF");
+        return File(content, "application/pdf", $"request-portal-report-{DateTime.UtcNow:yyyyMMdd-HHmm}.pdf");
+    }
+
     public async Task<IActionResult> OnGetPrintAsync()
     {
         string html = await reportingService.ExportPrintableHtmlAsync(BuildFilter(), HttpContext.RequestAborted);
