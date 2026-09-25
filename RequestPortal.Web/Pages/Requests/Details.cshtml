@@ -318,6 +318,22 @@
                                 <small>@history.ChangedUtc.ToLocalTime().ToString("f")</small>
                             </div>
                         }
+                        @foreach (DeliveryView delivery in Model.Deliveries.OrderBy(item => item.CreatedUtc))
+                        {
+                            <div class="timeline-item">
+                                <strong>Delivery prepared</strong>
+                                <span>@delivery.DocumentReference · @delivery.RecipientName</span>
+                                <small>@delivery.CreatedUtc.ToLocalTime().ToString("f")</small>
+                            </div>
+                            @if (delivery.AcknowledgedUtc.HasValue)
+                            {
+                                <div class="timeline-item">
+                                    <strong>Delivery @delivery.Status</strong>
+                                    <span>Acknowledged by @delivery.AcknowledgedBy</span>
+                                    <small>@delivery.AcknowledgedUtc.Value.ToLocalTime().ToString("f")</small>
+                                </div>
+                            }
+                        }
                     </div>
                 </aside>
             </div>
