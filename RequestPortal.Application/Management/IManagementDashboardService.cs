@@ -8,6 +8,7 @@ public sealed record ManagementDashboardSnapshot(
     IReadOnlyList<ManagementNamedCount> Categories,
     IReadOnlyList<ManagementNamedCount> Programs,
     ManagementDeliverySummary Delivery,
+    ManagementDeliveryAnalytics DeliveryAnalytics,
     ManagementPerformanceMetrics Performance,
     IReadOnlyList<ManagementTrendPoint> Trend,
     IReadOnlyList<ParishReachSummary> Parishes);
@@ -32,6 +33,25 @@ public sealed record ManagementDeliverySummary(
     int Failed,
     int PendingFfpManagerSync);
 
+public sealed record ManagementDeliveryDimension(
+    string Name,
+    int AwaitingAcknowledgement,
+    int Delivered,
+    int PartiallyDelivered,
+    int Failed);
+
+public sealed record ManagementDeliveryTrendPoint(
+    DateOnly WeekStarting,
+    int Delivered,
+    int PartiallyDelivered,
+    int Failed);
+
+public sealed record ManagementDeliveryAnalytics(
+    IReadOnlyList<ManagementDeliveryDimension> Organizations,
+    IReadOnlyList<ManagementDeliveryDimension> Programs,
+    IReadOnlyList<ManagementDeliveryDimension> Parishes,
+    IReadOnlyList<ManagementDeliveryTrendPoint> Trend);
+
 public sealed record ManagementPerformanceMetrics(
     double AverageProcessingDays,
     double MedianProcessingDays,
@@ -54,6 +74,7 @@ public sealed record CommunityReachSummary(string Community, int Requests);
 public sealed record ManagementRequestRow(
     Guid Id,
     string PublicReference,
+    Guid OrganizationId,
     string OrganizationName,
     string Status,
     string ManagementStatus,
@@ -77,16 +98,27 @@ public sealed record ManagementRequestFilter(
     string? Category = null,
     string? Program = null,
     string? Parish = null,
-    string? Community = null);
+    string? Community = null,
+    Guid? OrganizationId = null,
+    Guid? RequestId = null,
+    DateTimeOffset? FromUtc = null,
+    DateTimeOffset? ToUtc = null);
 
 public sealed record ParishDrillDown(
     string Parish,
     IReadOnlyList<CommunityReachSummary> Communities,
     IReadOnlyList<ManagementRequestRow> Requests);
 
+public sealed record ManagementDashboardFilter(
+    Guid? OrganizationId = null,
+    Guid? RequestId = null,
+    DateTimeOffset? FromUtc = null,
+    DateTimeOffset? ToUtc = null);
+
 public interface IManagementDashboardService
 {
     Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default);
+    Task<ManagementDashboardSnapshot> GetDashboardAsync(ManagementDashboardFilter filter, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ManagementRequestRow>> GetRequestsAsync(ManagementRequestFilter filter, CancellationToken cancellationToken = default);
     Task<ParishDrillDown> GetParishAsync(string parish, CancellationToken cancellationToken = default);
 }
