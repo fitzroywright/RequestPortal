@@ -70,6 +70,7 @@ using RequestPortal.Infrastructure.Reporting;
 using RequestPortal.Infrastructure.Requests;
 using RequestPortal.Infrastructure.Security;
 using RequestPortal.Web;
+using RequestPortal.Web.Configuration;
 using RequestPortal.Web.Demo;
 using RequestPortal.Web.Diagnostics;
 using RequestPortal.Web.Messaging;
