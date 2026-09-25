@@ -45,5 +45,6 @@ public interface IStaffReportingService
     Task<RequestReportResult> SearchRequestsAsync(RequestReportFilter filter, CancellationToken cancellationToken = default);
     Task<byte[]> ExportCsvAsync(RequestReportFilter filter, CancellationToken cancellationToken = default);
     Task<byte[]> ExportXlsxAsync(RequestReportFilter filter, CancellationToken cancellationToken = default);
+    Task<byte[]> ExportPdfAsync(RequestReportFilter filter, CancellationToken cancellationToken = default);
     Task<string> ExportPrintableHtmlAsync(RequestReportFilter filter, CancellationToken cancellationToken = default);
 }
