@@ -25,11 +25,15 @@
         {
             <div class="card table-wrap">
                 <table>
-                    <thead><tr><th>Subject</th><th>Context</th><th>Sent</th></tr></thead>
+                    <thead><tr>@if (Model.IsStaff){<th>Sent by</th>}<th>Subject</th><th>Context</th><th>Sent</th></tr></thead>
                     <tbody>
                     @foreach (MailboxMessageView message in Model.Messages)
                     {
                         <tr>
+                            @if (Model.IsStaff)
+                            {
+                                <td><strong>@message.SenderName</strong></td>
+                            }
                             <td>
                                 <a asp-page="/Messages/Thread" asp-route-id="@message.ThreadId"><strong>@message.Subject</strong></a>
                                 <div class="muted">@message.Preview</div>
