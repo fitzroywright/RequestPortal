@@ -1,3 +1,4 @@
+using RequestPortal.Web.Security;
 using RequestPortal.Application.Administration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Beneficiaries;
