@@ -397,6 +397,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<DateTimeOffset>("AccessExpiresUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("AcknowledgedBy")
                         .HasMaxLength(240)
                         .HasColumnType("character varying(240)");
