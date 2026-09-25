@@ -454,7 +454,7 @@ public sealed class FfpManagerBridgeReadinessDiagnosticLevelTest(
 
         DiagnosticCheckResult result = await bridge.CheckAsync(cancellationToken);
         return result.IsHealthy
-            ? EngineeringDiagnosticPolicy.Passed(TestId, Name, result.Detail)
+            ? EngineeringDiagnosticPolicy.Passed(TestId, Name, result.Detail ?? "FFP Manager bridge readiness check passed.")
             : EngineeringDiagnosticPolicy.Failed(TestId, Name, "FFP Manager bridge readiness check failed.", result.Detail);
     }
 }
