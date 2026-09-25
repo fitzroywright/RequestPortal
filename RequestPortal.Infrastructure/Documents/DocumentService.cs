@@ -144,6 +144,13 @@ public sealed class DocumentService : IDocumentService
         if (document is null) return null;
         if (!isStaff) await EnsureApprovedMemberAsync(userId, document.OrganizationId, cancellationToken);
         Stream stream = await fileStorage.OpenReadAsync(document.StorageKey, cancellationToken);
+        await AuditAsync(
+            userId,
+            "DocumentDownloaded",
+            document.Id,
+            document.OrganizationId,
+            $"File={document.OriginalFileName}; staff={isStaff}",
+            cancellationToken);
         return new DocumentDownload(stream, document.ContentType, document.OriginalFileName);
     }
 
