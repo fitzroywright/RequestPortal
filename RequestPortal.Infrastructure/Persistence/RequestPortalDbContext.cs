@@ -6,11 +6,13 @@ using RequestPortal.Domain.Auditing;
 using RequestPortal.Domain.Beneficiaries;
 using RequestPortal.Domain.Countries;
 using RequestPortal.Domain.Documents;
+using RequestPortal.Domain.Delivery;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.Messages;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.ReferenceData;
+using RequestPortal.Domain.Reviewers;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
 using RequestFulfilment = RequestPortal.Domain.Fulfilment.Fulfilment;
@@ -34,6 +36,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<Beneficiary> Beneficiaries => Set<Beneficiary>();
     public DbSet<CountryConfiguration> CountryConfigurations => Set<CountryConfiguration>();
     public DbSet<StoredDocument> Documents => Set<StoredDocument>();
+    public DbSet<DeliveryRecord> Deliveries => Set<DeliveryRecord>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RequestFulfilment> Fulfilments => Set<RequestFulfilment>();
     public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
@@ -45,5 +48,6 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
+    public DbSet<ExternalReviewerInvitation> ExternalReviewerInvitations => Set<ExternalReviewerInvitation>();
     protected override void OnModelCreating(ModelBuilder modelBuilder) { base.OnModelCreating(modelBuilder); modelBuilder.ApplyConfigurationsFromAssembly(typeof(RequestPortalDbContext).Assembly); }
 }

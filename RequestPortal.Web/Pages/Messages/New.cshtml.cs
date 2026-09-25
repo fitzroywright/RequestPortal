@@ -120,7 +120,7 @@ public sealed class NewModel(
 
         if (IsStaff)
         {
-            IReadOnlyList<StaffOrganizationSummary> organizations =
+            IReadOnlyList<RequestPortal.Application.Administration.StaffOrganizationSummary> organizations =
                 await staffOrganizationService.GetAllAsync(HttpContext.RequestAborted);
             Organizations = organizations
                 .Select(item => new OrganizationOption(item.Id, item.Name))

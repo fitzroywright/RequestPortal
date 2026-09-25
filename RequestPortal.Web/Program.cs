@@ -29,6 +29,7 @@ using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Beneficiaries;
 using RequestPortal.Application.Countries;
 using RequestPortal.Application.Documents;
+using RequestPortal.Application.Delivery;
 using RequestPortal.Application.Fulfilment;
 using RequestPortal.Application.Integration;
 using RequestPortal.Application.Management;
@@ -37,6 +38,7 @@ using RequestPortal.Application.Notifications;
 using RequestPortal.Application.Organizations;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
+using RequestPortal.Application.Reviewers;
 using RequestPortal.Application.Reporting;
 using RequestPortal.Application.Requests;
 using RequestPortal.Application.Security;
@@ -51,6 +53,7 @@ using RequestPortal.Infrastructure.Beneficiaries;
 using RequestPortal.Infrastructure.Countries;
 using RequestPortal.Infrastructure.Diagnostics;
 using RequestPortal.Infrastructure.Documents;
+using RequestPortal.Infrastructure.Delivery;
 using RequestPortal.Infrastructure.Fulfilment;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Integration;
@@ -62,6 +65,7 @@ using RequestPortal.Infrastructure.Organizations;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Portal;
 using RequestPortal.Infrastructure.ReferenceData;
+using RequestPortal.Infrastructure.Reviewers;
 using RequestPortal.Infrastructure.Reporting;
 using RequestPortal.Infrastructure.Requests;
 using RequestPortal.Infrastructure.Security;
@@ -175,6 +179,18 @@ authentication.AddCookie(StaffOidcOptions.StaffCookieScheme, options =>
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.SlidingExpiration = false;
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
+});
+
+authentication.AddCookie("ExternalReviewer", options =>
+{
+    options.LoginPath = "/ExternalReview/AccessDenied";
+    options.AccessDeniedPath = "/ExternalReview/AccessDenied";
+    options.Cookie.Name = "RequestPortal.ExternalReview";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.SlidingExpiration = false;
+    options.ExpireTimeSpan = TimeSpan.FromHours(4);
 });
 
 string? googleClientId = builder.Configuration["Authentication:Google:ClientId"];
@@ -468,10 +484,12 @@ builder.Services.AddScoped<IStaffOrganizationDirectoryService, StaffOrganization
 builder.Services.AddScoped<IStaffOrganizationService, StaffOrganizationService>();
 builder.Services.AddScoped<IStaffOperationsService, StaffOperationsService>();
 builder.Services.AddScoped<IStaffReportingService, StaffReportingService>();
+builder.Services.AddScoped<IExternalReviewerService, ExternalReviewerService>();
 builder.Services.AddScoped<IManagementDashboardService, ManagementDashboardService>();
 builder.Services.AddScoped<IRequestLocationService, RequestLocationService>();
 builder.Services.AddScoped<IBusinessAuditWriter, BusinessAuditWriter>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
 builder.Services.AddScoped<IRequestDraftService, RequestDraftService>();
 builder.Services.AddScoped<IProjectProposalService, ProjectProposalService>();
@@ -507,6 +525,13 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
         policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ViewManagementDashboard);
     });
+    options.AddPolicy("ExternalReview", policy =>
+    {
+        policy.AuthenticationSchemes.Add("ExternalReviewer");
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim("requestportal.external-review", "true");
+        policy.RequireClaim("requestportal.external-review.scope", ExternalReviewerScopes.ManagementDashboard);
+    });
     options.AddPolicy("PortalMessages", policy =>
     {
         policy.AuthenticationSchemes.Add(IdentityConstants.ApplicationScheme);
@@ -519,10 +544,12 @@ builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/Dashboard");
     options.Conventions.AuthorizeFolder("/Staff", PortalPolicies.FfpStaff);
+    options.Conventions.AuthorizePage("/Staff/Reviewers", PortalPolicies.ManagementDashboard);
     options.Conventions.AuthorizeFolder("/Management", PortalPolicies.ManagementDashboard);
     options.Conventions.AuthorizeFolder("/Organizations");
     options.Conventions.AuthorizeFolder("/Requests");
     options.Conventions.AuthorizeFolder("/Messages", "PortalMessages");
+    options.Conventions.AuthorizePage("/ExternalReview/Index", "ExternalReview");
 });
 
 WebApplication app = builder.Build();
@@ -578,6 +605,7 @@ app.MapGet(
     })
     .RequireAuthorization("PortalMessages");
 app.MapFfpManagerIntegrationEndpoints();
+app.MapDeliveryEndpoints();
 
 await PrepareDemoAsync(app);
 await ReportStartupDiagnosticsAsync(app);

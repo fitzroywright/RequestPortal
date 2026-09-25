@@ -7,6 +7,7 @@ public sealed record ManagementDashboardSnapshot(
     ManagementAttentionSummary Attention,
     IReadOnlyList<ManagementNamedCount> Categories,
     IReadOnlyList<ManagementNamedCount> Programs,
+    ManagementDeliverySummary Delivery,
     ManagementPerformanceMetrics Performance,
     IReadOnlyList<ManagementTrendPoint> Trend,
     IReadOnlyList<ParishReachSummary> Parishes);
@@ -23,6 +24,13 @@ public sealed record ManagementStatusMetric(string Key, string Label, int Count)
 public sealed record ManagementAttentionSummary(int Overdue, int Stalled, int MissingDocuments);
 
 public sealed record ManagementNamedCount(string Name, int Count);
+
+public sealed record ManagementDeliverySummary(
+    int AwaitingAcknowledgement,
+    int Delivered,
+    int PartiallyDelivered,
+    int Failed,
+    int PendingFfpManagerSync);
 
 public sealed record ManagementPerformanceMetrics(
     double AverageProcessingDays,

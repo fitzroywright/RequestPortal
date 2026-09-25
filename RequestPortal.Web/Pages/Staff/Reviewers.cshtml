@@ -1,0 +1,52 @@
+@page
+@model RequestPortal.Web.Pages.Staff.ReviewersModel
+@using RequestPortal.Application.Reviewers
+@{
+    ViewData["Title"] = "External Reviewers";
+}
+<section class="section"><div class="shell">
+<div class="section-heading">
+    <div class="eyebrow" style="color:#b45b09">FFP internal</div>
+    <h1>External Reviewers</h1>
+    <p>Create short-lived, passwordless, read-only access for authorized outside reviewers. There is no public reviewer registration.</p>
+</div>
+
+<section class="card" style="margin-bottom:18px">
+    <h2>Invite reviewer</h2>
+    <form method="post" asp-page-handler="Invite">
+        <div class="form-grid">
+            <div class="form-group"><label asp-for="DisplayName">Name</label><input asp-for="DisplayName" required /></div>
+            <div class="form-group"><label asp-for="Email">Email</label><input asp-for="Email" type="email" required /></div>
+            <div class="form-group"><label asp-for="ExpiresInHours">Expires in hours</label><input asp-for="ExpiresInHours" type="number" min="1" max="168" required /></div>
+        </div>
+        <p class="muted">Scope: Management Dashboard. Aggregate activity only; no editing or applicant contact information.</p>
+        <button class="button" type="submit">Send secure invitation</button>
+    </form>
+</section>
+
+<section class="card">
+    <h2>Invitations</h2>
+    <div class="table-wrap"><table>
+        <thead><tr><th>Reviewer</th><th>Scope</th><th>Expires</th><th>Last access</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        @foreach (ExternalReviewerInvitationView item in Model.Invitations)
+        {
+            string status = item.RevokedUtc.HasValue ? "Revoked" : item.ExpiresUtc <= DateTimeOffset.UtcNow ? "Expired" : item.RedeemedUtc.HasValue ? "Active" : "Invited";
+            <tr>
+                <td><strong>@item.DisplayName</strong><br/><span class="muted">@item.Email</span></td>
+                <td>@item.Scope</td>
+                <td>@item.ExpiresUtc.ToLocalTime().ToString("g")</td>
+                <td>@(item.LastAccessUtc?.ToLocalTime().ToString("g") ?? "—")</td>
+                <td>@status</td>
+                <td>
+                    @if (!item.RevokedUtc.HasValue && item.ExpiresUtc > DateTimeOffset.UtcNow)
+                    {
+                        <form method="post" asp-page-handler="Revoke"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-outline" type="submit">Revoke</button></form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</section>
+</div></section>
