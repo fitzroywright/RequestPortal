@@ -1,0 +1,73 @@
+@page
+@model RequestPortal.Web.Pages.ExternalReview.IndexModel
+@using RequestPortal.Application.Management
+@{
+    ViewData["Title"] = "External Review";
+    int maxTrend = Math.Max(1, Model.Dashboard.Trend.SelectMany(point => new[] { point.Received, point.Completed }).DefaultIfEmpty(1).Max());
+}
+<section class="section">
+<div class="shell" style="max-width:1200px">
+    <div style="border:2px solid #b45b09;padding:12px 16px;margin-bottom:18px;background:#fff8f2">
+        <strong>External Review / Read Only</strong>
+        <span class="muted"> — aggregate operational information only. Editing, approvals, messaging, administration and record changes are unavailable.</span>
+    </div>
+
+    <div class="section-heading">
+        <div class="eyebrow" style="color:#b45b09">Authorized external review</div>
+        <h1>Request Portal activity</h1>
+        <p>Management-level service activity without applicant contact details or operational controls.</p>
+    </div>
+
+    <div class="report-summary-grid">
+        <section class="card"><div class="muted">Received today</div><h2>@Model.Dashboard.Executive.Today</h2></section>
+        <section class="card"><div class="muted">This month</div><h2>@Model.Dashboard.Executive.ThisMonth</h2></section>
+        <section class="card"><div class="muted">Outstanding</div><h2>@Model.Dashboard.Executive.Outstanding</h2></section>
+        <section class="card"><div class="muted">Completed</div><h2>@Model.Dashboard.Executive.Completed</h2></section>
+    </div>
+
+    <div class="two-column" style="margin-top:18px">
+        <section class="card">
+            <h2>Processing performance</h2>
+            <div class="table-wrap"><table><tbody>
+                <tr><th>Average processing</th><td>@Model.Dashboard.Performance.AverageProcessingDays days</td></tr>
+                <tr><th>Median processing</th><td>@Model.Dashboard.Performance.MedianProcessingDays days</td></tr>
+                <tr><th>Average outstanding age</th><td>@Model.Dashboard.Performance.AverageOutstandingAgeDays days</td></tr>
+                <tr><th>Completion rate</th><td>@Model.Dashboard.Performance.CompletionRatePercent%</td></tr>
+            </tbody></table></div>
+        </section>
+        <section class="card">
+            <h2>Needs attention</h2>
+            <div class="table-wrap"><table><tbody>
+                <tr><th>Overdue</th><td>@Model.Dashboard.Attention.Overdue</td></tr>
+                <tr><th>Stalled</th><td>@Model.Dashboard.Attention.Stalled</td></tr>
+                <tr><th>Missing documents</th><td>@Model.Dashboard.Attention.MissingDocuments</td></tr>
+            </tbody></table></div>
+        </section>
+    </div>
+
+    <section class="card" style="margin-top:18px">
+        <h2>Received vs. completed</h2>
+        <div class="table-wrap"><table><thead><tr><th>Week</th><th>Received</th><th>Completed</th></tr></thead><tbody>
+        @foreach (ManagementTrendPoint point in Model.Dashboard.Trend)
+        {
+            <tr><td>@point.WeekStarting.ToString("MMM d, yyyy")</td><td>@point.Received</td><td>@point.Completed</td></tr>
+        }
+        </tbody></table></div>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+        <h2>Geographic service reach</h2>
+        <p class="muted">Parish-level information only; no GPS precision is inferred or exposed here.</p>
+        <div class="table-wrap"><table><thead><tr><th>Parish</th><th>Requests</th><th>Communities represented</th></tr></thead><tbody>
+        @foreach (ParishReachSummary parish in Model.Dashboard.Parishes)
+        {
+            <tr><td>@parish.Parish</td><td>@parish.Requests</td><td>@parish.Communities</td></tr>
+        }
+        </tbody></table></div>
+    </section>
+
+    <form method="post" asp-page-handler="SignOut" style="margin-top:18px">
+        <button class="button button-secondary" type="submit">End external review session</button>
+    </form>
+</div>
+</section>
