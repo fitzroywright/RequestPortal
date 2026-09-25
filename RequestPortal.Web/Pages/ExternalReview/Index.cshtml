@@ -46,6 +46,16 @@
     </div>
 
     <section class="card" style="margin-top:18px">
+        <h2>Delivery outcomes</h2>
+        <div class="table-wrap"><table><tbody>
+            <tr><th>Awaiting acknowledgement</th><td>@Model.Dashboard.Delivery.AwaitingAcknowledgement</td></tr>
+            <tr><th>Delivered</th><td>@Model.Dashboard.Delivery.Delivered</td></tr>
+            <tr><th>Partially delivered</th><td>@Model.Dashboard.Delivery.PartiallyDelivered</td></tr>
+            <tr><th>Failed / not delivered</th><td>@Model.Dashboard.Delivery.Failed</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section class="card" style="margin-top:18px">
         <h2>Received vs. completed</h2>
         <div class="table-wrap"><table><thead><tr><th>Week</th><th>Received</th><th>Completed</th></tr></thead><tbody>
         @foreach (ManagementTrendPoint point in Model.Dashboard.Trend)
