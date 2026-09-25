@@ -59,7 +59,7 @@ internal static class PlatformServiceRegistration
         WebApplicationBuilder builder
         , CommonSecretsBootstrapRuntime secretsRuntime)
     {
-        Common.Security.Integration.SecurityServiceCollectionExtensions
+        global::global::Common.Security.Integration.SecurityServiceCollectionExtensions
             .AddCommonAuthorization<RequestPortalAuthorizationStore>(
                 builder.Services);
 
@@ -69,7 +69,7 @@ internal static class PlatformServiceRegistration
 
         secretsRuntime.Register(builder.Services);
 
-        Common.Secrets.ServiceCollectionExtensions
+        global::Common.Secrets.ServiceCollectionExtensions
             .AddCommonSecretsDiagnostics(
                 builder.Services);
     }
@@ -141,7 +141,7 @@ internal static class PlatformServiceRegistration
                 "Storage:Local:RootPath"]
             ?? "App_Data/storage";
 
-        Common.Storage.StorageServiceCollectionExtensions
+        global::Common.Storage.StorageServiceCollectionExtensions
             .AddCommonStorage(
                 builder.Services
                 , storageRoot);
