@@ -15,6 +15,7 @@ public sealed class DeliveryConfiguration : IEntityTypeConfiguration<DeliveryRec
         builder.Property(item => item.RecipientName).HasMaxLength(240).IsRequired();
         builder.Property(item => item.DeliveryPerson).HasMaxLength(240);
         builder.Property(item => item.SnapshotJson).HasColumnType("jsonb").IsRequired();
+        builder.Property(item => item.AccessTokenHash).HasMaxLength(64).IsRequired();
         builder.Property(item => item.AcknowledgedBy).HasMaxLength(240);
         builder.Property(item => item.SignatureData).HasColumnType("text");
         builder.Property(item => item.Notes).HasMaxLength(2000);
