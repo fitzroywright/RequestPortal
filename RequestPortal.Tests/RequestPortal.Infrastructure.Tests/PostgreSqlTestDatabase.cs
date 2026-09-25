@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RequestPortal.Infrastructure.Persistence;
+using Xunit;
 
 namespace RequestPortal.Infrastructure.Tests;
 
@@ -24,10 +25,16 @@ internal sealed class PostgreSqlTestDatabase : IAsyncDisposable
     public static async Task<PostgreSqlTestDatabase> CreateAsync(
         CancellationToken cancellationToken = default)
     {
-        string baseConnectionString =
-            Environment.GetEnvironmentVariable("REQUESTPORTAL_POSTGRES")
-            ?? throw new InvalidOperationException(
-                "REQUESTPORTAL_POSTGRES must be configured for Request Portal PostgreSQL integration tests.");
+        string? baseConnectionString =
+            Environment.GetEnvironmentVariable("REQUESTPORTAL_POSTGRES") ??
+            Environment.GetEnvironmentVariable("ConnectionStrings__RequestPortalTest");
+
+        if (string.IsNullOrWhiteSpace(baseConnectionString))
+        {
+            Assert.Skip(
+                "PostgreSQL integration test skipped. Set REQUESTPORTAL_POSTGRES or ConnectionStrings__RequestPortalTest to run it locally.");
+            throw new InvalidOperationException("Unreachable after dynamic skip.");
+        }
 
         string schemaName = "rp_test_" + Guid.NewGuid().ToString("N");
 
