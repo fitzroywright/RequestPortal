@@ -101,9 +101,11 @@ public sealed class DetailsModel : PageModel
         await workflowService.AddRequestItemAsync(
             user.Id,
             id,
+            Item.ItemName,
             Item.Description,
             Item.Quantity,
             Item.UnitOfMeasureId,
+            Item.Notes,
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Requested item added.";
@@ -295,6 +297,9 @@ public sealed class DetailsModel : PageModel
 
         [Required]
         public Guid UnitOfMeasureId { get; set; }
+
+        [StringLength(2000)]
+        public string? Notes { get; set; }
     }
 
     public sealed class DocumentInput
