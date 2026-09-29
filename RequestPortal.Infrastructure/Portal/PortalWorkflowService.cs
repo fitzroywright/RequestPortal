@@ -276,6 +276,15 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         return request.Id;
     }
 
+    public Task AddRequestItemAsync(
+        Guid userId,
+        Guid requestId,
+        string description,
+        decimal quantity,
+        Guid unitOfMeasureId,
+        CancellationToken cancellationToken = default) =>
+        AddRequestItemAsync(userId, requestId, description, description, quantity, unitOfMeasureId, null, cancellationToken);
+
     public async Task AddRequestItemAsync(
         Guid userId,
         Guid requestId,
