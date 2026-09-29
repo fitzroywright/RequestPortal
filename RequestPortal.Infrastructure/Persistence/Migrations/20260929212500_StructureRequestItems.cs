@@ -26,7 +26,7 @@ public partial class StructureRequestItems : Migration
 
         migrationBuilder.Sql("""
             UPDATE assistance_request_items
-            SET "ItemName" = "Description"
+            SET "ItemName" = LEFT("Description", 250)
             WHERE "ItemName" IS NULL OR BTRIM("ItemName") = '';
             """);
 
