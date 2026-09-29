@@ -279,9 +279,11 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
     public async Task AddRequestItemAsync(
         Guid userId,
         Guid requestId,
+        string itemName,
         string description,
         decimal quantity,
         Guid unitOfMeasureId,
+        string? notes,
         CancellationToken cancellationToken = default)
     {
         AssistanceRequest request = await dbContext.AssistanceRequests
@@ -293,9 +295,11 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         AssistanceRequestItem requestItem = new(
             Guid.NewGuid(),
             request.Id,
+            itemName,
             description,
             quantity,
-            unitOfMeasureId);
+            unitOfMeasureId,
+            notes);
 
         request.AddItem(requestItem);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -427,7 +431,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
             .SingleAsync(cancellationToken);
 
         List<RequestItemDetail> items = request.Items
-            .Select(item => new RequestItemDetail(item.Id, item.Description, item.Quantity, item.UnitOfMeasureId))
+            .Select(item => new RequestItemDetail(item.Id, item.ItemName, item.Description, item.Quantity, item.UnitOfMeasureId, item.Notes))
             .ToList();
 
         List<RequestHistoryDetail> history = request.StatusHistory
