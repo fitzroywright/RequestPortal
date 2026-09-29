@@ -373,6 +373,12 @@
         const project = !selected || selected.value === 'Project';
         projectPanel.hidden = !project;
         goodsPanel.hidden = project;
+        projectPanel.querySelectorAll('input,select,textarea,button').forEach(control => {
+            if (control.type !== 'button') control.disabled = !project;
+        });
+        goodsPanel.querySelectorAll('input,select,textarea,button').forEach(control => {
+            if (control.type !== 'button') control.disabled = project;
+        });
         if (projectEditor && project) projectHtml.value = projectEditor.innerHTML;
     }
 
