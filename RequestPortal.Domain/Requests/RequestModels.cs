@@ -30,7 +30,29 @@ public sealed class AssistanceRequestItem
     }
 
     public AssistanceRequestItem(Guid id, Guid requestId, string description, decimal quantity, Guid unitOfMeasureId)
+        : this(id, requestId, description, description, quantity, unitOfMeasureId, null)
     {
+    }
+
+    public AssistanceRequestItem(
+        Guid id,
+        Guid requestId,
+        string itemName,
+        string description,
+        decimal quantity,
+        Guid unitOfMeasureId,
+        string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(itemName))
+        {
+            throw new ArgumentException("Item or service name is required.", nameof(itemName));
+        }
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            throw new ArgumentException("Description or specification is required.", nameof(description));
+        }
+
         if (quantity <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be greater than zero.");
@@ -38,16 +60,22 @@ public sealed class AssistanceRequestItem
 
         Id = id;
         RequestId = requestId;
+        ItemName = itemName.Trim();
         Description = description.Trim();
         Quantity = quantity;
         UnitOfMeasureId = unitOfMeasureId;
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 
     public Guid Id { get; private set; }
 
     public Guid RequestId { get; private set; }
 
+    public string ItemName { get; private set; } = string.Empty;
+
     public string Description { get; private set; } = string.Empty;
+
+    public string? Notes { get; private set; }
 
     public decimal Quantity { get; private set; }
 

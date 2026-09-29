@@ -23,6 +23,8 @@
                     <h2>Registration details</h2>
                     <form method="post" asp-page-handler="Save" class="form-grid">
                         <input type="hidden" name="id" value="@Model.Organization.Id" />
+                        <input type="hidden" asp-for="ReturnUrl" />
+                        <input type="hidden" asp-for="ReturnUrl" />
                         <div class="field">
                             <label asp-for="Input.RegistrationNumber">Registration number</label>
                             <input asp-for="Input.RegistrationNumber" />

@@ -43,9 +43,17 @@ public sealed record RequestDetail(
 
 public sealed record RequestItemDetail(
     Guid Id,
+    string ItemName,
     string Description,
     decimal Quantity,
-    Guid UnitOfMeasureId);
+    Guid UnitOfMeasureId,
+    string? Notes)
+{
+    public RequestItemDetail(Guid id, string description, decimal quantity, Guid unitOfMeasureId)
+        : this(id, description, description, quantity, unitOfMeasureId, null)
+    {
+    }
+}
 
 public sealed record RequestHistoryDetail(
     string Status,
@@ -104,6 +112,16 @@ public interface IPortalWorkflowService
         string description,
         decimal quantity,
         Guid unitOfMeasureId,
+        CancellationToken cancellationToken = default);
+
+    Task AddRequestItemAsync(
+        Guid userId,
+        Guid requestId,
+        string itemName,
+        string description,
+        decimal quantity,
+        Guid unitOfMeasureId,
+        string? notes,
         CancellationToken cancellationToken = default);
 
     Task SubmitRequestAsync(

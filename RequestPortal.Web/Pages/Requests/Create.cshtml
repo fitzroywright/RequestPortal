@@ -3,173 +3,525 @@
 @using RequestPortal.Application.ReferenceData
 @using RequestPortal.Domain.Requests
 @{
-    ViewData["Title"] = "Create Request";
+    ViewData["Title"] = "New Request";
 }
 
-<section class="section">
+<section class="new-request-page">
     <div class="shell">
-        <div class="section-heading">
-            <div class="eyebrow" style="color:#b45b09">New assistance request</div>
-            <h1>Tell FFP what is needed.</h1>
-            <p>
-                The organization selected here becomes the permanent owner of this request. Choose whether you are
-                requesting goods/services or proposing a project that needs a full narrative proposal.
-            </p>
-        </div>
+        <form method="post" enctype="multipart/form-data" id="new-request-form">
+            <div asp-validation-summary="ModelOnly" class="validation request-validation"></div>
 
-        <div class="grid-2">
-            <section class="card">
-                @if (Model.Organizations.Count == 0)
-                {
-                    <h2>No approved organization membership</h2>
-                    <p class="muted">Register an organization or request membership before creating a request.</p>
+            @if (Model.Organizations.Count == 0)
+            {
+                <section class="request-empty-state">
+                    <h1>New Request</h1>
+                    <p>You need an approved organization membership before you can submit an organization request.</p>
                     <a class="button" asp-page="/Organizations/Index">Manage organizations</a>
-                }
-                else
-                {
-                    <form method="post" class="form-grid">
-                        <div asp-validation-summary="ModelOnly" class="validation"></div>
+                </section>
+            }
+            else
+            {
+                <header class="request-topbar">
+                    <div>
+                        <div class="eyebrow request-eyebrow">New request</div>
+                        <h1>Request application</h1>
+                    </div>
+                    <div class="request-submit-actions">
+                        <button class="button button-outline" type="button" id="review-request">Review</button>
+                        <button class="button" type="submit">Submit Request</button>
+                    </div>
+                </header>
 
-                        <div class="field">
-                            <label asp-for="Input.OrganizationId">Acting on behalf of</label>
-                            <select asp-for="Input.OrganizationId">
-                                <option value="">Select an organization</option>
-                                @foreach (OrganizationSummary organization in Model.Organizations)
-                                {
-                                    <option value="@organization.Id">@organization.Name</option>
-                                }
-                            </select>
-                            <span asp-validation-for="Input.OrganizationId" class="validation"></span>
-                        </div>
+                <section class="requester-strip" aria-label="Requester summary">
+                    <div class="requester-field requester-org">
+                        <span class="requester-label">Requesting as</span>
+                        <select asp-for="Input.OrganizationId" id="requester-select" aria-describedby="profile-status">
+                            @foreach (var organization in Model.Organizations)
+                            {
+                                <option value="@organization.Id"
+                                        data-name="@organization.Name"
+                                        data-role="@organization.Role"
+                                        data-complete="@organization.ProfileComplete.ToString().ToLowerInvariant()"
+                                        data-missing="@organization.MissingProfileFields">
+                                    @organization.Name
+                                </option>
+                            }
+                        </select>
+                        <span asp-validation-for="Input.OrganizationId" class="validation"></span>
+                    </div>
+                    <div class="requester-field">
+                        <span class="requester-label">Submitted by</span>
+                        <strong>@Model.SubmittedByName</strong>
+                    </div>
+                    <div class="requester-field">
+                        <span class="requester-label">Profile</span>
+                        <span id="profile-status" class="status">Checking…</span>
+                    </div>
+                    <a id="edit-profile-link"
+                       class="request-profile-link"
+                       asp-page="/Organizations/Profile"
+                       asp-route-id="@Model.Input.OrganizationId"
+                       asp-route-returnUrl="/Requests/Create">Review / edit profile</a>
+                </section>
 
-                        <div class="field">
-                            <label asp-for="Input.Kind">Request type</label>
-                            <select asp-for="Input.Kind" asp-items="Html.GetEnumSelectList<RequestKind>()"></select>
-                            <div class="muted">Choose Project when the organization needs to submit a full proposal with narrative, tables and photos.</div>
-                        </div>
+                <section id="profile-warning" class="profile-warning" hidden>
+                    <strong>Complete Your Profile</strong>
+                    <span id="profile-warning-text"></span>
+                    <a id="complete-profile-link" class="button button-small" href="#">Complete profile</a>
+                </section>
 
-                        <div class="field">
-                            <label asp-for="Input.Summary">Request summary</label>
-                            <textarea asp-for="Input.Summary" placeholder="Briefly describe the need, project or intended beneficiaries."></textarea>
-                            <span asp-validation-for="Input.Summary" class="validation"></span>
-                        </div>
-
-                        <div class="grid-2">
-                            <div class="field">
-                                <label asp-for="Input.Category">Category</label>
-                                <select asp-for="Input.Category">
-                                    <option value="">Select a category</option>
-                                    @foreach (RequestCategoryOption category in Model.Categories)
-                                    {
-                                        <option value="@category.Name">@category.Name</option>
-                                    }
-                                </select>
-                                <span asp-validation-for="Input.Category" class="validation"></span>
-                            </div>
-                            <div class="field">
-                                <label asp-for="Input.Subcategory">Subcategory</label>
-                                <input asp-for="Input.Subcategory" placeholder="e.g. School supplies, Rehabilitation" />
-                            </div>
-                        </div>
-
-                        <div class="grid-2">
-                            <div class="field">
-                                <label asp-for="Input.ProgramCategory">Program category</label>
-                                <select asp-for="Input.ProgramCategory">
-                                    <option value="">Select a program</option>
-                                    @foreach (ProgramClassificationOption program in Model.Programs)
-                                    {
-                                        <option value="@program.Name">@program.Name</option>
-                                    }
-                                </select>
-                                <span asp-validation-for="Input.ProgramCategory" class="validation"></span>
-                            </div>
-                            <div class="field">
-                                <label asp-for="Input.Priority">Priority</label>
-                                <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label asp-for="Input.Location">Location</label>
+                <section class="request-common-grid">
+                    <div class="field request-summary-field">
+                        <label asp-for="Input.Summary">Request summary</label>
+                        <input asp-for="Input.Summary" placeholder="A short title or one-line summary of the need" />
+                        <span asp-validation-for="Input.Summary" class="validation"></span>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Input.Category">Category</label>
+                        <select asp-for="Input.Category">
+                            <option value="">Select category</option>
+                            @foreach (RequestCategoryOption category in Model.Categories)
+                            {
+                                <option value="@category.Name">@category.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Input.ProgramCategory">Program</label>
+                        <select asp-for="Input.ProgramCategory">
+                            <option value="">Select program</option>
+                            @foreach (ProgramClassificationOption program in Model.Programs)
+                            {
+                                <option value="@program.Name">@program.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Input.Priority">Priority</label>
+                        <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Input.Location">Location</label>
+                        <div class="inline-location">
                             <input asp-for="Input.Location" placeholder="Community, parish or address" />
-                            <input asp-for="Input.Latitude" type="hidden" />
-                            <input asp-for="Input.Longitude" type="hidden" />
-                            <div class="action-row" style="margin-top:8px;align-items:center">
-                                <button class="button button-secondary button-small" type="button" id="use-location">Use device location</button>
-                                <span id="location-status" class="muted">Optional. If GPS is unavailable, the community/parish text is used at lower precision.</span>
+                            <button class="button button-outline button-small" type="button" id="use-location">Use location</button>
+                        </div>
+                        <input asp-for="Input.Latitude" type="hidden" />
+                        <input asp-for="Input.Longitude" type="hidden" />
+                        <small id="location-status" class="muted"></small>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Input.Subcategory">Subcategory</label>
+                        <input asp-for="Input.Subcategory" />
+                    </div>
+                </section>
+
+                <section class="request-type-row" aria-label="Request type">
+                    <span class="request-type-label">Request type</span>
+                    <label class="request-type-option">
+                        <input asp-for="Input.Kind" type="radio" value="@RequestKind.Project" />
+                        <span>Project</span>
+                    </label>
+                    <label class="request-type-option">
+                        <input asp-for="Input.Kind" type="radio" value="@RequestKind.GoodsAndServices" />
+                        <span>Goods &amp; Services</span>
+                    </label>
+                </section>
+
+                <main class="request-workspace">
+                    <section id="project-workspace" class="request-mode-panel">
+                        <div class="workspace-heading">
+                            <div>
+                                <h2>Project description</h2>
+                                <p>Write the proposal here and attach supporting records below.</p>
+                            </div>
+                            <div class="field compact-title-field">
+                                <label asp-for="Project.Title">Proposal title</label>
+                                <input asp-for="Project.Title" />
                             </div>
                         </div>
 
-                        <div class="field">
-                            <label asp-for="Input.Circumstances">Request circumstances</label>
-                            <textarea asp-for="Input.Circumstances" rows="4" placeholder="Provide enough context for FFP to understand the need."></textarea>
+                        <div class="rich-editor-shell">
+                            <div class="rich-editor-toolbar" role="toolbar" aria-label="Project description formatting">
+                                <button type="button" data-command="undo" title="Undo">↶</button>
+                                <button type="button" data-command="redo" title="Redo">↷</button>
+                                <button type="button" data-command="bold"><strong>B</strong></button>
+                                <button type="button" data-command="italic"><em>I</em></button>
+                                <button type="button" data-block="p">Paragraph</button>
+                                <button type="button" data-block="h2">Heading</button>
+                                <button type="button" data-command="insertUnorderedList">Bullets</button>
+                                <button type="button" data-command="insertOrderedList">Numbers</button>
+                                <button type="button" id="insert-table">Table</button>
+                            </div>
+                            <div id="project-editor"
+                                 class="rich-project-editor"
+                                 contenteditable="true"
+                                 role="textbox"
+                                 aria-multiline="true"
+                                 aria-label="Project description">@Model.Project.RichContentHtml</div>
+                            <input asp-for="Project.RichContentHtml" type="hidden" id="project-html" />
+                            <span asp-validation-for="Project.RichContentHtml" class="validation"></span>
                         </div>
 
-                        <hr style="border:0;border-top:1px solid #dde3e8;margin:24px 0" />
-                        <h2>Beneficiary</h2>
-                        <p class="muted">Optional for organization-wide or community projects.</p>
+                        <div class="project-bottom-grid">
+                            <section class="supporting-documents">
+                                <div class="workspace-subheading">
+                                    <h3>Supporting documents</h3>
+                                    <span class="muted">Check a category when you are providing documents for it.</span>
+                                </div>
 
-                        <div class="grid-2">
-                            <div class="field"><label asp-for="Input.BeneficiaryFirstName">First name</label><input asp-for="Input.BeneficiaryFirstName" /></div>
-                            <div class="field"><label asp-for="Input.BeneficiaryLastName">Last name</label><input asp-for="Input.BeneficiaryLastName" /></div>
+                                <div class="document-category-list">
+                                    <label class="document-category">
+                                        <span><input asp-for="SupportingDocuments.HasEvidence" class="doc-check" data-files="evidence-files" /> Evidence / Supporting Evidence</span>
+                                        <input asp-for="SupportingDocuments.EvidenceFiles" id="evidence-files" type="file" multiple />
+                                    </label>
+                                    <label class="document-category">
+                                        <span><input asp-for="SupportingDocuments.HasEligibilityDocuments" class="doc-check" data-files="eligibility-files" /> Eligibility Documents</span>
+                                        <input asp-for="SupportingDocuments.EligibilityFiles" id="eligibility-files" type="file" multiple />
+                                    </label>
+                                    <label class="document-category">
+                                        <span><input asp-for="SupportingDocuments.HasRegistrationMaterial" class="doc-check" data-files="registration-files" /> Registration Certificate / Registration Material</span>
+                                        <input asp-for="SupportingDocuments.RegistrationFiles" id="registration-files" type="file" multiple />
+                                    </label>
+                                    <label class="document-category">
+                                        <span><input asp-for="SupportingDocuments.HasBudgetDocumentation" class="doc-check" data-files="budget-files" /> Budget / Budget Documentation</span>
+                                        <input asp-for="SupportingDocuments.BudgetFiles" id="budget-files" type="file" multiple />
+                                    </label>
+                                    <label class="document-category">
+                                        <span><input asp-for="SupportingDocuments.HasProjectSchedule" class="doc-check" data-files="schedule-files" /> Milestones / Project Schedule</span>
+                                        <input asp-for="SupportingDocuments.ScheduleFiles" id="schedule-files" type="file" multiple />
+                                    </label>
+                                    <label class="document-category">
+                                        <span><input asp-for="SupportingDocuments.HasAdditionalDocuments" class="doc-check" data-files="additional-files" /> Follow-up / Additional Supporting Documents</span>
+                                        <input asp-for="SupportingDocuments.AdditionalFiles" id="additional-files" type="file" multiple />
+                                    </label>
+                                </div>
+                                <span asp-validation-for="SupportingDocuments" class="validation"></span>
+                            </section>
+
+                            <section class="field circumstances-field">
+                                <label asp-for="Input.Circumstances">Additional context</label>
+                                <textarea asp-for="Input.Circumstances" rows="8" placeholder="Optional context that does not belong in the proposal itself."></textarea>
+                            </section>
+                        </div>
+                    </section>
+
+                    <section id="goods-workspace" class="request-mode-panel" hidden>
+                        <div class="workspace-heading">
+                            <div>
+                                <h2>Requested goods &amp; services</h2>
+                                <p>Add each requested item or service as a separate row.</p>
+                            </div>
+                            <button class="button button-outline button-small" type="button" id="add-item-row">Add row</button>
                         </div>
 
-                        <div class="grid-2">
-                            <div class="field"><label asp-for="Input.BeneficiaryDateOfBirth">Date of birth</label><input asp-for="Input.BeneficiaryDateOfBirth" type="date" /></div>
-                            <div class="field"><label asp-for="Input.ParentOrGuardian">Parent or guardian</label><input asp-for="Input.ParentOrGuardian" /></div>
+                        <div class="goods-grid-wrap">
+                            <table class="goods-grid" id="goods-grid">
+                                <thead>
+                                    <tr>
+                                        <th>Item / Service</th>
+                                        <th>Description / Specification</th>
+                                        <th>Quantity</th>
+                                        <th>Unit</th>
+                                        <th>Notes</th>
+                                        <th><span class="sr-only">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="goods-rows">
+                                    @if (Model.Items.Count == 0)
+                                    {
+                                        <tr data-item-row>
+                                            <td><input name="Items[0].ItemName" aria-label="Item or service" /></td>
+                                            <td><input name="Items[0].Description" aria-label="Description or specification" /></td>
+                                            <td><input name="Items[0].Quantity" type="number" min="0.001" step="0.001" value="1" aria-label="Quantity" /></td>
+                                            <td>
+                                                <select name="Items[0].UnitOfMeasureId" aria-label="Unit">
+                                                    <option value="">Select</option>
+                                                    @foreach (UnitOfMeasureOption unit in Model.UnitsOfMeasure)
+                                                    {
+                                                        <option value="@unit.Id">@unit.Name (@unit.Code)</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td><input name="Items[0].Notes" aria-label="Notes" /></td>
+                                            <td><button class="icon-button remove-item" type="button" aria-label="Remove row">×</button></td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @for (int index = 0; index < Model.Items.Count; index++)
+                                        {
+                                            <tr data-item-row>
+                                                <td><input asp-for="Items[index].ItemName" aria-label="Item or service" /></td>
+                                                <td><input asp-for="Items[index].Description" aria-label="Description or specification" /></td>
+                                                <td><input asp-for="Items[index].Quantity" type="number" min="0.001" step="0.001" aria-label="Quantity" /></td>
+                                                <td>
+                                                    <select asp-for="Items[index].UnitOfMeasureId" aria-label="Unit">
+                                                        <option value="">Select</option>
+                                                        @foreach (UnitOfMeasureOption unit in Model.UnitsOfMeasure)
+                                                        {
+                                                            <option value="@unit.Id">@unit.Name (@unit.Code)</option>
+                                                        }
+                                                    </select>
+                                                </td>
+                                                <td><input asp-for="Items[index].Notes" aria-label="Notes" /></td>
+                                                <td><button class="icon-button remove-item" type="button" aria-label="Remove row">×</button></td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
                         </div>
+                        <span asp-validation-for="Items" class="validation"></span>
 
-                        <button class="button" type="submit">Create draft</button>
-                    </form>
-                }
-            </section>
+                        <div class="field goods-context">
+                            <label asp-for="Input.Circumstances">Relevant supporting information</label>
+                            <textarea asp-for="Input.Circumstances" rows="4" placeholder="Optional delivery, use, beneficiary or service context."></textarea>
+                        </div>
+                    </section>
+                </main>
 
-            <aside class="card">
-                <h2>Two request paths</h2>
-                <p><strong>Goods &amp; Services</strong></p>
-                <p class="muted">Use line items for tangible assistance, materials, equipment or services.</p>
-                <p><strong>Project</strong></p>
-                <p class="muted">Opens a Word-like proposal workspace for a long narrative with formatting, tables and inline photos. Supporting files can still be attached separately.</p>
-                <ul>
-                    <li>Select the correct organization. It cannot be changed after creation.</li>
-                    <li>Add a beneficiary when the request is for a specific person.</li>
-                    <li>Use category, location and priority to help FFP triage the request.</li>
-                    <li>GPS is optional and is used only to improve service-reach reporting.</li>
-                    <li>After submission, FFP can approve, reject, request more information, or mark a duplicate.</li>
-                </ul>
-            </aside>
-        </div>
+                <section id="review-panel" class="request-review" hidden aria-live="polite">
+                    <div class="workspace-heading">
+                        <div>
+                            <h2>Review request</h2>
+                            <p>Confirm the requester, request type, content and attachments before submitting.</p>
+                        </div>
+                        <button class="button button-outline button-small" type="button" id="close-review">Back to editing</button>
+                    </div>
+                    <dl class="review-list">
+                        <div><dt>Requesting as</dt><dd id="review-requester"></dd></div>
+                        <div><dt>Submitted by</dt><dd>@Model.SubmittedByName</dd></div>
+                        <div><dt>Request type</dt><dd id="review-type"></dd></div>
+                        <div><dt>Summary</dt><dd id="review-summary"></dd></div>
+                        <div><dt>Request content</dt><dd id="review-content"></dd></div>
+                        <div><dt>Attachments</dt><dd id="review-files"></dd></div>
+                    </dl>
+                    <div class="request-submit-actions review-submit">
+                        <button class="button" type="submit">Submit Request</button>
+                    </div>
+                </section>
+
+                <footer class="request-sticky-submit">
+                    <span id="sticky-profile-state" class="muted"></span>
+                    <div class="request-submit-actions">
+                        <button class="button button-outline" type="button" id="review-request-bottom">Review</button>
+                        <button class="button" type="submit">Submit Request</button>
+                    </div>
+                </footer>
+            }
+        </form>
     </div>
 </section>
 
+<template id="goods-row-template">
+    <tr data-item-row>
+        <td><input data-field="ItemName" aria-label="Item or service" /></td>
+        <td><input data-field="Description" aria-label="Description or specification" /></td>
+        <td><input data-field="Quantity" type="number" min="0.001" step="0.001" value="1" aria-label="Quantity" /></td>
+        <td>
+            <select data-field="UnitOfMeasureId" aria-label="Unit">
+                <option value="">Select</option>
+                @foreach (UnitOfMeasureOption unit in Model.UnitsOfMeasure)
+                {
+                    <option value="@unit.Id">@unit.Name (@unit.Code)</option>
+                }
+            </select>
+        </td>
+        <td><input data-field="Notes" aria-label="Notes" /></td>
+        <td><button class="icon-button remove-item" type="button" aria-label="Remove row">×</button></td>
+    </tr>
+</template>
+
 <script>
 (() => {
-    const button = document.getElementById('use-location');
-    const status = document.getElementById('location-status');
-    const latitude = document.getElementById('Input_Latitude');
-    const longitude = document.getElementById('Input_Longitude');
-    if (!button || !status || !latitude || !longitude) return;
+    const form = document.getElementById('new-request-form');
+    if (!form) return;
 
-    button.addEventListener('click', () => {
-        if (!navigator.geolocation) {
-            status.textContent = 'Location services are not available in this browser. The typed location will be used.';
+    const requester = document.getElementById('requester-select');
+    const profileStatus = document.getElementById('profile-status');
+    const profileWarning = document.getElementById('profile-warning');
+    const profileWarningText = document.getElementById('profile-warning-text');
+    const editProfile = document.getElementById('edit-profile-link');
+    const completeProfile = document.getElementById('complete-profile-link');
+    const stickyProfileState = document.getElementById('sticky-profile-state');
+    const projectPanel = document.getElementById('project-workspace');
+    const goodsPanel = document.getElementById('goods-workspace');
+    const projectEditor = document.getElementById('project-editor');
+    const projectHtml = document.getElementById('project-html');
+    const reviewPanel = document.getElementById('review-panel');
+    const rows = document.getElementById('goods-rows');
+    const rowTemplate = document.getElementById('goods-row-template');
+
+    function updateProfile() {
+        if (!requester || !requester.selectedOptions.length) return;
+        const option = requester.selectedOptions[0];
+        const complete = option.dataset.complete === 'true';
+        const id = option.value;
+        const profileUrl = '/Organizations/Profile?id=' + encodeURIComponent(id) + '&returnUrl=' + encodeURIComponent('/Requests/Create');
+        profileStatus.textContent = complete ? 'Complete' : 'Incomplete';
+        profileStatus.className = 'status ' + (complete ? 'status-Approved' : 'status-rejected');
+        profileWarning.hidden = complete;
+        profileWarningText.textContent = complete ? '' : ' Missing: ' + (option.dataset.missing || 'required organization information') + '.';
+        editProfile.href = profileUrl;
+        completeProfile.href = profileUrl;
+        stickyProfileState.textContent = complete ? 'Profile complete' : 'Profile incomplete — complete it before submission';
+    }
+
+    function updateMode() {
+        const selected = form.querySelector('input[name="Input.Kind"]:checked');
+        const project = !selected || selected.value === 'Project';
+        projectPanel.hidden = !project;
+        goodsPanel.hidden = project;
+        projectPanel.querySelectorAll('input,select,textarea,button').forEach(control => {
+            if (control.type !== 'button') control.disabled = !project;
+        });
+        goodsPanel.querySelectorAll('input,select,textarea,button').forEach(control => {
+            if (control.type !== 'button') control.disabled = project;
+        });
+        if (projectEditor && project) projectHtml.value = projectEditor.innerHTML;
+    }
+
+    function syncEditor() {
+        if (projectEditor && projectHtml) projectHtml.value = projectEditor.innerHTML;
+    }
+
+    form.querySelectorAll('[data-command]').forEach(button => {
+        button.addEventListener('click', () => {
+            projectEditor.focus();
+            document.execCommand(button.dataset.command, false);
+            syncEditor();
+        });
+    });
+
+    form.querySelectorAll('[data-block]').forEach(button => {
+        button.addEventListener('click', () => {
+            projectEditor.focus();
+            document.execCommand('formatBlock', false, button.dataset.block);
+            syncEditor();
+        });
+    });
+
+    document.getElementById('insert-table')?.addEventListener('click', () => {
+        projectEditor.focus();
+        document.execCommand('insertHTML', false, '<table><tbody><tr><th>Heading</th><th>Heading</th></tr><tr><td>Value</td><td>Value</td></tr></tbody></table><p><br></p>');
+        syncEditor();
+    });
+
+    projectEditor?.addEventListener('input', syncEditor);
+
+    function renumberRows() {
+        rows?.querySelectorAll('[data-item-row]').forEach((row, index) => {
+            row.querySelectorAll('input,select,textarea').forEach(control => {
+                const field = control.dataset.field || control.name?.replace(/^Items\[\d+\]\./, '');
+                if (!field) return;
+                control.dataset.field = field;
+                control.name = 'Items[' + index + '].' + field;
+            });
+        });
+    }
+
+    document.getElementById('add-item-row')?.addEventListener('click', () => {
+        const fragment = rowTemplate.content.cloneNode(true);
+        rows.appendChild(fragment);
+        renumberRows();
+        rows.lastElementChild?.querySelector('input')?.focus();
+    });
+
+    rows?.addEventListener('click', event => {
+        const button = event.target.closest('.remove-item');
+        if (!button) return;
+        const allRows = rows.querySelectorAll('[data-item-row]');
+        if (allRows.length === 1) {
+            allRows[0].querySelectorAll('input').forEach(input => input.value = input.type === 'number' ? '1' : '');
+            allRows[0].querySelectorAll('select').forEach(select => select.selectedIndex = 0);
             return;
         }
-        button.disabled = true;
-        status.textContent = 'Getting location…';
+        button.closest('[data-item-row]')?.remove();
+        renumberRows();
+    });
+
+    document.querySelectorAll('.doc-check').forEach(check => {
+        const fileInput = document.getElementById(check.dataset.files);
+        const update = () => {
+            fileInput.disabled = !check.checked;
+            if (!check.checked) fileInput.value = '';
+        };
+        check.addEventListener('change', update);
+        fileInput?.addEventListener('change', () => {
+            if (fileInput.files.length > 0) check.checked = true;
+            update();
+        });
+        update();
+    });
+
+    function showReview() {
+        syncEditor();
+        const option = requester?.selectedOptions[0];
+        document.getElementById('review-requester').textContent = option?.dataset.name || option?.textContent?.trim() || '';
+        const kind = form.querySelector('input[name="Input.Kind"]:checked')?.value || 'Project';
+        document.getElementById('review-type').textContent = kind === 'GoodsAndServices' ? 'Goods & Services' : 'Project';
+        document.getElementById('review-summary').textContent = document.getElementById('Input_Summary')?.value || '—';
+
+        if (kind === 'GoodsAndServices') {
+            const itemCount = rows?.querySelectorAll('[data-item-row]').length || 0;
+            document.getElementById('review-content').textContent = itemCount + (itemCount === 1 ? ' requested item/service' : ' requested items/services');
+        } else {
+            const text = projectEditor?.innerText.trim() || '';
+            document.getElementById('review-content').textContent = text ? text.slice(0, 500) + (text.length > 500 ? '…' : '') : 'No project description entered';
+        }
+
+        const fileNames = [];
+        form.querySelectorAll('input[type="file"]').forEach(input => {
+            Array.from(input.files || []).forEach(file => fileNames.push(file.name));
+        });
+        document.getElementById('review-files').textContent = fileNames.length ? fileNames.join(', ') : 'None';
+        reviewPanel.hidden = false;
+        reviewPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.getElementById('review-request')?.addEventListener('click', showReview);
+    document.getElementById('review-request-bottom')?.addEventListener('click', showReview);
+    document.getElementById('close-review')?.addEventListener('click', () => {
+        reviewPanel.hidden = true;
+        document.querySelector('.request-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    requester?.addEventListener('change', updateProfile);
+    form.querySelectorAll('input[name="Input.Kind"]').forEach(input => input.addEventListener('change', updateMode));
+    form.addEventListener('submit', () => {
+        syncEditor();
+        renumberRows();
+    });
+
+    const locationButton = document.getElementById('use-location');
+    const locationStatus = document.getElementById('location-status');
+    const latitude = document.getElementById('Input_Latitude');
+    const longitude = document.getElementById('Input_Longitude');
+    locationButton?.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+            locationStatus.textContent = 'Location services are not available. The typed location will be used.';
+            return;
+        }
+        locationButton.disabled = true;
+        locationStatus.textContent = 'Getting location…';
         navigator.geolocation.getCurrentPosition(
             position => {
                 latitude.value = position.coords.latitude.toFixed(6);
                 longitude.value = position.coords.longitude.toFixed(6);
-                status.textContent = 'Exact device location captured for service-reach reporting.';
-                button.disabled = false;
+                locationStatus.textContent = 'Device location captured.';
+                locationButton.disabled = false;
             },
             () => {
-                status.textContent = 'Location was not available. The typed community/parish will be used instead.';
-                button.disabled = false;
+                locationStatus.textContent = 'Location was unavailable. The typed location will be used.';
+                locationButton.disabled = false;
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 });
     });
+
+    updateProfile();
+    updateMode();
+    syncEditor();
+    renumberRows();
 })();
 </script>

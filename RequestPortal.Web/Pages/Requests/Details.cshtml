@@ -117,14 +117,16 @@
                             {
                                 <div class="table-wrap">
                                     <table>
-                                        <thead><tr><th>Description</th><th>Quantity</th><th>Unit</th></tr></thead>
+                                        <thead><tr><th>Item / Service</th><th>Description / Specification</th><th>Quantity</th><th>Unit</th><th>Notes</th></tr></thead>
                                         <tbody>
                                         @foreach (RequestItemDetail item in Model.Request.Items)
                                         {
                                             <tr>
+                                                <td>@item.ItemName</td>
                                                 <td>@item.Description</td>
                                                 <td>@item.Quantity</td>
                                                 <td>@Model.UnitName(item.UnitOfMeasureId)</td>
+                                                <td>@(item.Notes ?? "—")</td>
                                             </tr>
                                         }
                                         </tbody>
@@ -139,8 +141,13 @@
                                 <form method="post" asp-page-handler="AddItem" class="form-grid">
                                     <input type="hidden" name="id" value="@Model.Request.Id" />
                                     <div class="field">
-                                        <label asp-for="Item.Description">Description</label>
-                                        <input asp-for="Item.Description" placeholder="e.g. School bags" />
+                                        <label asp-for="Item.ItemName">Item / Service</label>
+                                        <input asp-for="Item.ItemName" placeholder="e.g. School bags" />
+                                        <span asp-validation-for="Item.ItemName" class="validation"></span>
+                                    </div>
+                                    <div class="field">
+                                        <label asp-for="Item.Description">Description / Specification</label>
+                                        <input asp-for="Item.Description" placeholder="Size, model, service scope or other specification" />
                                         <span asp-validation-for="Item.Description" class="validation"></span>
                                     </div>
                                     <div class="grid-2">
@@ -159,6 +166,10 @@
                                             </select>
                                             <span asp-validation-for="Item.UnitOfMeasureId" class="validation"></span>
                                         </div>
+                                    </div>
+                                    <div class="field">
+                                        <label asp-for="Item.Notes">Notes</label>
+                                        <input asp-for="Item.Notes" />
                                     </div>
                                     <button class="button button-outline" type="submit">Add item</button>
                                 </form>
