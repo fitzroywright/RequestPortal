@@ -289,7 +289,11 @@ public sealed class DetailsModel : PageModel
     public sealed class ItemInput
     {
         [Required]
-        [StringLength(1000, MinimumLength = 2)]
+        [StringLength(250, MinimumLength = 1)]
+        public string ItemName { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(2000, MinimumLength = 2)]
         public string Description { get; set; } = string.Empty;
 
         [Range(typeof(decimal), "0.001", "999999999999")]
