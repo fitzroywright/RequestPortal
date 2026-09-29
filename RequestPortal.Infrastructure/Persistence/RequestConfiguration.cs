@@ -35,7 +35,9 @@ internal sealed class AssistanceRequestItemConfiguration : IEntityTypeConfigurat
     {
         builder.ToTable("assistance_request_items");
         builder.HasKey(item => item.Id);
-        builder.Property(item => item.Description).HasMaxLength(1000).IsRequired();
+        builder.Property(item => item.ItemName).HasMaxLength(250).IsRequired();
+        builder.Property(item => item.Description).HasMaxLength(2000).IsRequired();
+        builder.Property(item => item.Notes).HasMaxLength(2000);
         builder.Property(item => item.Quantity).HasPrecision(18, 3);
     }
 }
