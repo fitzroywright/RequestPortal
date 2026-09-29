@@ -16,7 +16,13 @@ public enum DocumentType
     BeneficiarySupport = 3,
     RequestSupport = 4,
     FfpCorrespondence = 5,
-    DeliveryEvidence = 6
+    DeliveryEvidence = 6,
+    Evidence = 7,
+    EligibilityDocuments = 8,
+    RegistrationMaterial = 9,
+    BudgetDocumentation = 10,
+    ProjectSchedule = 11,
+    AdditionalSupportingDocuments = 12
 }
 
 public enum DocumentVerificationStatus
