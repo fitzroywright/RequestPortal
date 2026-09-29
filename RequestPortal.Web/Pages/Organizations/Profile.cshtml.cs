@@ -36,6 +36,9 @@ public sealed class ProfileModel : PageModel
     [BindProperty]
     public IFormFile? RegistrationCertificate { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
         ApplicationUser user = await GetUserAsync();
@@ -82,7 +85,12 @@ public sealed class ProfileModel : PageModel
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Organization profile updated.";
-        return RedirectToPage(new { id });
+        if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
+        {
+            return LocalRedirect(ReturnUrl);
+        }
+
+        return RedirectToPage(new { id, returnUrl = ReturnUrl });
     }
 
     public async Task<IActionResult> OnPostUploadCertificateAsync(Guid id)
@@ -92,7 +100,7 @@ public sealed class ProfileModel : PageModel
         if (RegistrationCertificate is null || RegistrationCertificate.Length <= 0)
         {
             TempData["Error"] = "Select a registration certificate to upload.";
-            return RedirectToPage(new { id });
+            return RedirectToPage(new { id, returnUrl = ReturnUrl });
         }
 
         await using System.IO.Stream content = RegistrationCertificate.OpenReadStream();
@@ -107,7 +115,7 @@ public sealed class ProfileModel : PageModel
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Registration certificate uploaded.";
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, returnUrl = ReturnUrl });
     }
 
     private async Task<ApplicationUser> GetUserAsync()
