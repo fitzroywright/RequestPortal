@@ -174,7 +174,7 @@ public sealed class CreateModel : PageModel
                 user.Id,
                 requestId,
                 string.IsNullOrWhiteSpace(Project.Title) ? "Project Proposal" : Project.Title,
-                Project.RichContentHtml,
+                Project.RichContentHtml ?? string.Empty,
                 HttpContext.RequestAborted);
             await UploadProjectDocumentsAsync(user.Id, requestId);
         }
