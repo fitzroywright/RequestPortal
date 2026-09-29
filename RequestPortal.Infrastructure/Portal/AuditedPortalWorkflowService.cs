@@ -101,6 +101,28 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     public Task AddRequestItemAsync(Guid userId, Guid requestId, string description, decimal quantity, Guid unitOfMeasureId, CancellationToken cancellationToken = default)
         => inner.AddRequestItemAsync(userId, requestId, description, quantity, unitOfMeasureId, cancellationToken);
 
+    public async Task AddRequestItemAsync(
+        Guid userId,
+        Guid requestId,
+        string itemName,
+        string description,
+        decimal quantity,
+        Guid unitOfMeasureId,
+        string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        await inner.AddRequestItemAsync(userId, requestId, itemName, description, quantity, unitOfMeasureId, notes, cancellationToken);
+        RequestDetail? request = await inner.GetRequestAsync(userId, requestId, false, cancellationToken);
+        await auditWriter.WriteAsync(
+            userId,
+            "RequestItemAdded",
+            "AssistanceRequest",
+            requestId,
+            request?.OrganizationId,
+            itemName,
+            cancellationToken);
+    }
+
     public async Task SubmitRequestAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default)
     {
         RequestDetail? request = await inner.GetRequestAsync(userId, requestId, false, cancellationToken);
