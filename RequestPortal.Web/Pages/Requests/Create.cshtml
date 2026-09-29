@@ -158,7 +158,7 @@
                                  contenteditable="true"
                                  role="textbox"
                                  aria-multiline="true"
-                                 aria-label="Project description">@Html.Raw(Model.Project.RichContentHtml)</div>
+                                 aria-label="Project description">@Model.Project.RichContentHtml</div>
                             <input asp-for="Project.RichContentHtml" type="hidden" id="project-html" />
                             <span asp-validation-for="Project.RichContentHtml" class="validation"></span>
                         </div>
