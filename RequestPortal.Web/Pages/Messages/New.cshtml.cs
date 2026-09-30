@@ -7,6 +7,7 @@ using RequestPortal.Application.Documents;
 using RequestPortal.Application.Messages;
 using RequestPortal.Application.Portal;
 using RequestPortal.Web.Security;
+using RequestPortal.Domain.Messages;
 
 namespace RequestPortal.Web.Pages.Messages;
 
@@ -37,6 +38,9 @@ public sealed class NewModel(
     public bool ToFfpStaff { get; set; }
 
     [BindProperty]
+    public MessageAudience Audience { get; set; } = MessageAudience.Individual;
+
+    [BindProperty]
     public List<Guid> AttachmentDocumentIds { get; set; } = [];
 
     [BindProperty]
@@ -64,14 +68,11 @@ public sealed class NewModel(
             ModelState.AddModelError(nameof(OrganizationId), "Choose an organization.");
         }
 
-        if (IsStaff)
+        if (IsStaff && Audience == MessageAudience.Individual && !RecipientUserId.HasValue)
         {
-            if (!RecipientUserId.HasValue)
-            {
-                ModelState.AddModelError(nameof(RecipientUserId), "Choose a representative.");
-            }
+            ModelState.AddModelError(nameof(RecipientUserId), "Choose an individual recipient.");
         }
-        else if (!ToFfpStaff && !RecipientUserId.HasValue)
+        else if (!IsStaff && !ToFfpStaff && Audience == MessageAudience.Individual && !RecipientUserId.HasValue)
         {
             ModelState.AddModelError(nameof(RecipientUserId), "Choose FFP Staff or an organization representative.");
         }
@@ -105,8 +106,9 @@ public sealed class NewModel(
                 null,
                 Subject,
                 Body,
-                [RecipientUserId!.Value],
+                RecipientUserId.HasValue ? [RecipientUserId.Value] : Array.Empty<Guid>(),
                 cancellationToken: HttpContext.RequestAborted,
+                audience: Audience,
                 attachmentDocumentIds: AttachmentDocumentIds);
         }
 
