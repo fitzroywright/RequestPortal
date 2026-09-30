@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Common.Secrets;
+using Common.Storage;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -27,7 +28,8 @@ internal static class PlatformServiceRegistration
 
     public static void AddPlatform(
         WebApplicationBuilder builder
-        , CommonSecretsBootstrapRuntime secretsRuntime)
+        , CommonSecretsBootstrapRuntime secretsRuntime
+        , RuntimeSecrets runtimeSecrets)
     {
         AddSecurityServices(
             builder
@@ -35,7 +37,7 @@ internal static class PlatformServiceRegistration
         AddDataProtection(builder);
         AddProxyHeaders(builder);
         AddRateLimiting(builder);
-        AddStorage(builder);
+        AddStorage(builder, runtimeSecrets);
     }
 
     private static void AddUploadLimits(
@@ -130,21 +132,33 @@ internal static class PlatformServiceRegistration
     }
 
     private static void AddStorage(
-        WebApplicationBuilder builder)
+        WebApplicationBuilder builder
+        , RuntimeSecrets runtimeSecrets)
     {
         builder.Services.AddSingleton<
             IClock
             , SystemClock>();
 
-        string storageRoot =
-            builder.Configuration[
-                "Storage:Local:RootPath"]
-            ?? "App_Data/storage";
+        StorageTargetOptions target = StorageTargetOptions.FromConfiguration(
+            builder.Configuration
+            , runtimeSecrets.StorageSharePointClientSecret);
+
+        if (target.Kind is StorageTargetKind.LocalFolder or StorageTargetKind.NetworkFolder &&
+            !Path.IsPathRooted(target.RootPath))
+        {
+            target = target with
+            {
+                RootPath = Path.GetFullPath(
+                    Path.Combine(
+                        builder.Environment.ContentRootPath
+                        , target.RootPath!))
+            };
+        }
 
         global::Common.Storage.StorageServiceCollectionExtensions
             .AddCommonStorage(
                 builder.Services
-                , storageRoot);
+                , target);
 
         builder.Services.AddSingleton<
             IDocumentUploadSecurity
