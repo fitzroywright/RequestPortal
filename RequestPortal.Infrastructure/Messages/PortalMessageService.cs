@@ -294,7 +294,8 @@ public sealed class PortalMessageService : IPortalMessageService
         string subject,
         string body,
         CancellationToken cancellationToken = default,
-        IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null,
+        Guid? stableMessageId = null)
     {
         await EnsureApprovedMembershipAsync(senderUserId, organizationId, cancellationToken);
         await ValidateRequestScopeAsync(organizationId, requestId, cancellationToken);
@@ -321,7 +322,8 @@ public sealed class PortalMessageService : IPortalMessageService
             staffUserIds,
             staffVisible: true,
             cancellationToken,
-            attachmentDocumentIds);
+            attachmentDocumentIds,
+            stableMessageId: stableMessageId);
     }
 
     public async Task<Guid> SendAsync(
@@ -505,7 +507,8 @@ public sealed class PortalMessageService : IPortalMessageService
         string subject,
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? stableMessageId = null)
     {
         if (recipientUserIds.Count == 0)
         {
@@ -522,8 +525,14 @@ public sealed class PortalMessageService : IPortalMessageService
             staffVisible: true,
             cancellationToken);
 
+        Guid messageId = stableMessageId ?? Guid.NewGuid();
+        if (await dbContext.PortalMessages.AsNoTracking().AnyAsync(item => item.Id == messageId, cancellationToken))
+        {
+            return thread.Id;
+        }
+
         PortalMessage message = new(
-            Guid.NewGuid(),
+            messageId,
             thread.Id,
             null,
             PortalMessageSenderKind.System,
@@ -645,7 +654,8 @@ public sealed class PortalMessageService : IPortalMessageService
         bool staffVisible,
         CancellationToken cancellationToken,
         IReadOnlyCollection<Guid>? attachmentDocumentIds = null,
-        MessageAudience audience = MessageAudience.Individual)
+        MessageAudience audience = MessageAudience.Individual,
+        Guid? stableMessageId = null)
     {
         ApplicationUserProjection sender = await dbContext.Users
             .AsNoTracking()
@@ -666,8 +676,14 @@ public sealed class PortalMessageService : IPortalMessageService
             cancellationToken,
             audience);
 
+        Guid messageId = stableMessageId ?? Guid.NewGuid();
+        if (await dbContext.PortalMessages.AsNoTracking().AnyAsync(item => item.Id == messageId, cancellationToken))
+        {
+            return thread.Id;
+        }
+
         PortalMessage message = new(
-            Guid.NewGuid(),
+            messageId,
             thread.Id,
             senderUserId,
             senderKind,
