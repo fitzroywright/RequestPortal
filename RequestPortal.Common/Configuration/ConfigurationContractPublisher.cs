@@ -262,6 +262,7 @@ public sealed class ConfigurationContractPublisher(
                     "storage-network-root" => OptionalDependencyState(storageNetwork, storageNetworkConfigured, "RP-PROD-STORAGE-NET-001: NetworkFolder production storage requires a durable UNC or mounted path."),
                     "storage-sharepoint-tenant" => OptionalDependencyState(storageSharePoint, HasValue(configuration, "Storage:SharePoint:TenantId"), "RP-PROD-STORAGE-SP-001: SharePoint storage requires TenantId."),
                     "storage-sharepoint-client" => OptionalDependencyState(storageSharePoint, HasValue(configuration, "Storage:SharePoint:ClientId"), "RP-PROD-STORAGE-SP-002: SharePoint storage requires ClientId."),
+                    "storage-sharepoint-site-id" => OptionalFeatureState(storageSharePoint && HasValue(configuration, "Storage:SharePoint:SiteId")),
                     "storage-sharepoint-host" => OptionalDependencyState(storageSharePoint && !HasValue(configuration, "Storage:SharePoint:SiteId"), HasValue(configuration, "Storage:SharePoint:HostName"), "RP-PROD-STORAGE-SP-003: SharePoint storage requires HostName when SiteId is not configured."),
                     "storage-sharepoint-site" => OptionalFeatureState(storageSharePoint),
                     "storage-sharepoint-drive" => OptionalDependencyState(storageSharePoint, HasValue(configuration, "Storage:SharePoint:DriveId") || HasValue(configuration, "Storage:SharePoint:DriveName"), "RP-PROD-STORAGE-SP-004: SharePoint storage requires DriveId or DriveName."),
