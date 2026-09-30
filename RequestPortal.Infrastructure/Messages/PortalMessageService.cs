@@ -269,7 +269,8 @@ public sealed class PortalMessageService : IPortalMessageService
                 user.Id,
                 user.DisplayName,
                 user.Email,
-                user.IsInternalStaff
+                user.IsInternalStaff,
+                membership.Role
             })
             .ToListAsync(cancellationToken);
 
@@ -278,7 +279,7 @@ public sealed class PortalMessageService : IPortalMessageService
                 row.Id,
                 string.IsNullOrWhiteSpace(row.DisplayName) ? "Organization representative" : row.DisplayName,
                 row.IsInternalStaff,
-                false))
+                row.Role == OrganizationRole.Administrator))
             .ToArray();
     }
 
@@ -355,11 +356,53 @@ public sealed class PortalMessageService : IPortalMessageService
 
         await ValidateRequestScopeAsync(organizationId, requestId, cancellationToken);
 
-        bool staffVisible = senderIsStaff ||
-            await dbContext.Users.AsNoTracking()
+        if (audience == MessageAudience.FfpInternal && !senderIsStaff)
+        {
+            throw new UnauthorizedAccessException("Only FFP staff can create internal conversations.");
+        }
+
+        Guid[] effectiveRecipients = recipientUserIds.Distinct().ToArray();
+        if (organizationId.HasValue && audience == MessageAudience.Organization)
+        {
+            effectiveRecipients = await dbContext.OrganizationMemberships.AsNoTracking()
+                .Where(membership =>
+                    membership.OrganizationId == organizationId.Value &&
+                    membership.Status == MembershipStatus.Approved &&
+                    membership.UserId != senderUserId)
+                .Select(membership => membership.UserId)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
+        }
+        else if (organizationId.HasValue && audience == MessageAudience.OrganizationManager)
+        {
+            effectiveRecipients = await dbContext.OrganizationMemberships.AsNoTracking()
+                .Where(membership =>
+                    membership.OrganizationId == organizationId.Value &&
+                    membership.Status == MembershipStatus.Approved &&
+                    membership.Role == OrganizationRole.Administrator &&
+                    membership.UserId != senderUserId)
+                .Select(membership => membership.UserId)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
+        }
+        else if (audience == MessageAudience.FfpInternal)
+        {
+            effectiveRecipients = await dbContext.Users.AsNoTracking()
+                .Where(user => user.IsInternalStaff && user.Id != senderUserId)
+                .Select(user => user.Id)
+                .ToArrayAsync(cancellationToken);
+        }
+
+        if (effectiveRecipients.Length == 0)
+        {
+            throw new InvalidOperationException("No eligible recipients are available for the selected audience.");
+        }
+
+        bool staffVisible = audience == MessageAudience.FfpInternal ||
+            (!senderIsStaff && await dbContext.Users.AsNoTracking()
                 .AnyAsync(
-                    user => recipientUserIds.Contains(user.Id) && user.IsInternalStaff,
-                    cancellationToken);
+                    user => effectiveRecipients.Contains(user.Id) && user.IsInternalStaff,
+                    cancellationToken));
 
         return await SendInternalAsync(
             senderUserId,
@@ -369,7 +412,7 @@ public sealed class PortalMessageService : IPortalMessageService
             threadId,
             subject,
             body,
-            recipientUserIds,
+            effectiveRecipients,
             staffVisible,
             cancellationToken,
             attachmentDocumentIds,
