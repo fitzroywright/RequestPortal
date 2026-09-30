@@ -189,15 +189,17 @@ public sealed class PortalMessageService : IPortalMessageService
         var attachmentRows = await (
             from attachment in dbContext.MessageAttachments.AsNoTracking()
             join document in dbContext.Documents.AsNoTracking()
-                on attachment.DocumentId equals document.Id
+                on attachment.DocumentId equals document.Id into documents
+            from document in documents.DefaultIfEmpty()
             where messageIds.Contains(attachment.MessageId)
             select new
             {
                 attachment.MessageId,
-                document.Id,
-                document.OriginalFileName,
-                document.ContentType,
-                document.SizeBytes
+                DocumentId = attachment.DocumentId,
+                FileName = document == null ? "Document unavailable" : document.OriginalFileName,
+                ContentType = document == null ? string.Empty : document.ContentType,
+                SizeBytes = document == null ? 0 : document.SizeBytes,
+                IsAvailable = document != null && !document.IsArchived
             })
             .ToListAsync(cancellationToken);
 
@@ -207,10 +209,11 @@ public sealed class PortalMessageService : IPortalMessageService
                 group => group.Key,
                 group => group
                     .Select(row => new MessageAttachmentView(
-                        row.Id,
-                        row.OriginalFileName,
+                        row.DocumentId,
+                        row.FileName,
                         row.ContentType,
-                        row.SizeBytes))
+                        row.SizeBytes,
+                        row.IsAvailable))
                     .ToArray());
 
         MessageDetailView[] projected = messages
