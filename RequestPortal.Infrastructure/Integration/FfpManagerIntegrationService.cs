@@ -265,7 +265,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             $"Information required: {request.PublicReference}",
             body,
             recipients,
-            cancellationToken);
+            cancellationToken,
+            stableMessageId: informationRequest.MessageId);
 
         FfpManagerInformationRequestedMessage message = new(
             Guid.NewGuid(),
@@ -351,7 +352,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             $"Information response: {request.PublicReference}",
             message,
             cancellationToken: cancellationToken,
-            attachmentDocumentIds: documentIds);
+            attachmentDocumentIds: documentIds,
+            stableMessageId: response.MessageId);
 
         if (request.Status == RequestStatus.MoreInformationRequired)
         {
