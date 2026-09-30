@@ -334,9 +334,9 @@ public sealed class PortalMessageService : IPortalMessageService
         MessageAudience audience = MessageAudience.Individual,
         IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
     {
-        if (recipientUserIds.Count == 0)
+        if (audience == MessageAudience.Individual && recipientUserIds.Count == 0)
         {
-            throw new ArgumentException("At least one message recipient is required.", nameof(recipientUserIds));
+            throw new ArgumentException("An individual recipient is required for an individual conversation.", nameof(recipientUserIds));
         }
 
         if (!senderIsStaff)
