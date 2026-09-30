@@ -235,6 +235,17 @@ public sealed class ConfigurationContractPublisher(
         bool graphEmailClientConfigured = HasValue(configuration, "Messaging:MicrosoftGraph:ClientId");
         bool graphEmailSecretConfigured = await HasSecretAsync(secrets, configuration["Messaging:MicrosoftGraph:ClientSecretName"] ?? "messaging/msgraph/client-secret", cancellationToken, logger);
         bool graphTeamsTokenConfigured = await HasSecretAsync(secrets, configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"] ?? "messaging/msgraph/teams/delegated-access-token", cancellationToken, logger);
+        string storageProvider = configuration["Storage:Provider"]?.Trim() ?? "LocalFolder";
+        bool storageLocal = storageProvider.Equals("LocalFolder", StringComparison.OrdinalIgnoreCase);
+        bool storageNetwork = storageProvider.Equals("NetworkFolder", StringComparison.OrdinalIgnoreCase);
+        bool storageSharePoint = storageProvider.Equals("SharePoint", StringComparison.OrdinalIgnoreCase);
+        bool storageProviderKnown = storageLocal || storageNetwork || storageSharePoint;
+        string storageSecretName = configuration["Storage:SharePoint:ClientSecretName"]?.Trim()
+            ?? "storage/sharepoint/client-secret";
+        bool storageSharePointSecretConfigured =
+            !storageSharePoint || await HasSecretAsync(secrets, storageSecretName, cancellationToken, logger);
+        bool storageLocalConfigured = storageLocal && HasDurablePath(configuration["Storage:Local:RootPath"]);
+        bool storageNetworkConfigured = storageNetwork && HasDurablePath(configuration["Storage:NetworkFolder:RootPath"]);
 
         if (contract["requirements"] is JsonArray requirements)
         {
@@ -246,7 +257,16 @@ public sealed class ConfigurationContractPublisher(
                 (bool configured, string state, string? verification) = id switch
                 {
                     "database-connection" => State(databaseConfigured, required, "RP-CONFIG-DB-001: PostgreSQL connection string must resolve through Common.Secrets."),
-                    "storage-root" => State(HasDurablePath(configuration["Storage:Local:RootPath"]), required, "RP-PROD-STORAGE-001: Production document storage must use a durable path outside App_Data."),
+                    "storage-provider" => State(storageProviderKnown, required, "RP-PROD-STORAGE-001: Storage:Provider must be LocalFolder, NetworkFolder, or SharePoint."),
+                    "storage-local-root" => OptionalDependencyState(storageLocal, storageLocalConfigured, "RP-PROD-STORAGE-LOCAL-001: LocalFolder production storage must use a durable path outside App_Data."),
+                    "storage-network-root" => OptionalDependencyState(storageNetwork, storageNetworkConfigured, "RP-PROD-STORAGE-NET-001: NetworkFolder production storage requires a durable UNC or mounted path."),
+                    "storage-sharepoint-tenant" => OptionalDependencyState(storageSharePoint, HasValue(configuration, "Storage:SharePoint:TenantId"), "RP-PROD-STORAGE-SP-001: SharePoint storage requires TenantId."),
+                    "storage-sharepoint-client" => OptionalDependencyState(storageSharePoint, HasValue(configuration, "Storage:SharePoint:ClientId"), "RP-PROD-STORAGE-SP-002: SharePoint storage requires ClientId."),
+                    "storage-sharepoint-host" => OptionalDependencyState(storageSharePoint, HasValue(configuration, "Storage:SharePoint:HostName"), "RP-PROD-STORAGE-SP-003: SharePoint storage requires HostName."),
+                    "storage-sharepoint-site" => OptionalFeatureState(storageSharePoint),
+                    "storage-sharepoint-drive" => OptionalDependencyState(storageSharePoint, HasValue(configuration, "Storage:SharePoint:DriveId") || HasValue(configuration, "Storage:SharePoint:DriveName"), "RP-PROD-STORAGE-SP-004: SharePoint storage requires DriveId or DriveName."),
+                    "storage-sharepoint-root" => OptionalDependencyState(storageSharePoint, HasValue(configuration, "Storage:SharePoint:RootFolder"), "RP-PROD-STORAGE-SP-005: SharePoint storage requires RootFolder."),
+                    "storage-sharepoint-client-secret" => OptionalDependencyState(storageSharePoint, storageSharePointSecretConfigured, "RP-PROD-STORAGE-SP-006: SharePoint storage client secret must resolve through Common.Secrets."),
                     "data-protection-keys" => State(HasDurablePath(configuration["Security:DataProtectionKeysPath"]), required, "RP-PROD-DP-001: Data Protection keys must be persisted outside the application deployment directory."),
                     "allowed-hosts" => State(allowedHostsConfigured, required, "RP-PROD-HOSTS-001: AllowedHosts must contain explicit production host names and may not be '*'."),
                     "staff-oidc-enabled" or "staff-oidc-authority" or "staff-oidc-client-id" or "staff-oidc-client-secret" => State(oidcConfigured, required, "RP-PROD-OIDC-001: Staff OIDC must be enabled with Authority, ClientId and a Common.Secrets-backed ClientSecret."),
