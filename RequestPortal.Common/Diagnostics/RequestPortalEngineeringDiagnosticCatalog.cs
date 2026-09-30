@@ -179,7 +179,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
         List<Common.Messaging.MessagingProviderHealth> providers = [];
         foreach (Common.Messaging.IExternalMessageChannelDiagnostic diagnostic in providerDiagnostics)
         {
-            providers.Add(await diagnostic.VerifyAsync(cancellationToken).ConfigureAwait(false));
+            providers.Add(await diagnostic.VerifyProviderAsync(cancellationToken).ConfigureAwait(false));
         }
 
         string providerEvidence = string.Join(
