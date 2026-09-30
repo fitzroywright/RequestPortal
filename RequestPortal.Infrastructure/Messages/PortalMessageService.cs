@@ -273,6 +273,7 @@ public sealed class PortalMessageService : IPortalMessageService
                 user.DisplayName,
                 user.Email,
                 user.IsInternalStaff,
+                membership.Role,
                 membership.Role
             })
             .ToListAsync(cancellationToken);
@@ -454,7 +455,20 @@ public sealed class PortalMessageService : IPortalMessageService
             .ToArrayAsync(cancellationToken);
 
         Guid[] recipients;
-        if (senderIsStaff)
+        if (thread.Audience == MessageAudience.FfpInternal)
+        {
+            if (!senderIsStaff)
+            {
+                throw new UnauthorizedAccessException("Only FFP staff can reply to internal conversations.");
+            }
+
+            recipients = await dbContext.Users
+                .AsNoTracking()
+                .Where(user => user.IsInternalStaff && user.Id != senderUserId)
+                .Select(user => user.Id)
+                .ToArrayAsync(cancellationToken);
+        }
+        else if (senderIsStaff)
         {
             recipients = await dbContext.Users
                 .AsNoTracking()
