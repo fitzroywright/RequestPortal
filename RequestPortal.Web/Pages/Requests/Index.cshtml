@@ -4,27 +4,57 @@
     ViewData["Title"] = "Requests";
 }
 
-<section class="section">
+<section class="operational-page">
     <div class="shell">
-        <div class="action-row" style="justify-content:space-between;align-items:end;margin-bottom:24px">
-            <div class="section-heading" style="margin-bottom:0">
-                <div class="eyebrow" style="color:#b45b09">Assistance requests</div>
-                <h1>Requests for my organizations</h1>
-                <p>Every request is permanently associated with the organization selected when it was created.</p>
+        <header class="operational-titlebar">
+            <div>
+                <div class="eyebrow request-eyebrow">Organization work</div>
+                <h1>Assistance requests</h1>
+                <p>Requests submitted by you for organizations you are authorized to represent.</p>
             </div>
-            <a class="button" asp-page="/Requests/Create">New request</a>
+            <div class="operational-toolbar">
+                <a class="button" asp-page="/Requests/Create">New request</a>
+                <a class="button button-secondary" asp-page="/Messages/Inbox">Messages</a>
+            </div>
+        </header>
+
+        <div class="operational-summary-strip">
+            <strong>@Model.Requests.Count</strong>
+            <span>request@(Model.Requests.Count == 1 ? "" : "s")</span>
+            <span>Use Open to work with the complete request record.</span>
         </div>
 
-        <section class="card">
+        <section class="operational-panel">
+            <div class="operational-panel-titlebar">
+                <div>
+                    <strong>Request queue</strong>
+                    <small>Organization, request summary, current status and submission date.</small>
+                </div>
+                <a asp-page="/Dashboard/Index">Workspace</a>
+            </div>
+
             @if (Model.Requests.Count == 0)
             {
-                <p class="muted">There are no requests available for your approved organization memberships.</p>
+                <div class="workspace-empty">
+                    <strong>No requests</strong>
+                    <p>There are no requests available for your approved organization memberships.</p>
+                    <a class="button button-small" asp-page="/Requests/Create">Create request</a>
+                </div>
             }
             else
             {
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Reference</th><th>Organization</th><th>Summary</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+                <div class="operational-table-wrap">
+                    <table class="operational-table">
+                        <thead>
+                            <tr>
+                                <th>Reference</th>
+                                <th>Organization</th>
+                                <th>Summary</th>
+                                <th>Status</th>
+                                <th>Submitted</th>
+                                <th></th>
+                            </tr>
+                        </thead>
                         <tbody>
                         @foreach (RequestSummary request in Model.Requests)
                         {
@@ -33,7 +63,7 @@
                                 <td>@request.OrganizationName</td>
                                 <td>@request.Summary</td>
                                 <td><span class="status status-@request.Status">@request.Status</span></td>
-                                <td>@(request.SubmittedUtc?.ToLocalTime().ToString("g") ?? "Not submitted")</td>
+                                <td>@(request.SubmittedUtc?.ToLocalTime().ToString("MMM dd yyyy, h:mm tt") ?? "Not submitted")</td>
                                 <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
                             </tr>
                         }
