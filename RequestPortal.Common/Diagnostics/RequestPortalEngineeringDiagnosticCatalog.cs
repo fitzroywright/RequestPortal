@@ -138,8 +138,8 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
     private async Task<EngineeringDiagnosticCheckResult> CheckCommonMessagingAsync(CancellationToken cancellationToken)
     {
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        Common.Messaging.IExternalDeliveryQueueHealth? queueHealth =
-            scope.ServiceProvider.GetService<Common.Messaging.IExternalDeliveryQueueHealth>();
+        global::Common.Messaging.IExternalDeliveryQueueHealth? queueHealth =
+            scope.ServiceProvider.GetService<global::Common.Messaging.IExternalDeliveryQueueHealth>();
         if (queueHealth is null)
         {
             return Failed(
@@ -149,7 +149,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 "IExternalDeliveryQueueHealth could not be resolved.");
         }
 
-        Common.Messaging.ExternalDeliveryQueueHealth health =
+        global::Common.Messaging.ExternalDeliveryQueueHealth health =
             await queueHealth.CheckHealthAsync(cancellationToken).ConfigureAwait(false);
         string queueEvidence =
             $"Queue={health.QueueName ?? "default"}; Pending={health.Pending}; Retrying={health.Retrying}; DeadLettered={health.DeadLettered}; ExpiredLeases={health.ExpiredLeases}; OldestPending={health.OldestPendingAge?.ToString() ?? "none"}";
@@ -163,9 +163,9 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 queueEvidence);
         }
 
-        Common.Messaging.IExternalMessageChannelDiagnostic[] providerDiagnostics =
-            scope.ServiceProvider.GetServices<Common.Messaging.IExternalMessageChannel>()
-                .OfType<Common.Messaging.IExternalMessageChannelDiagnostic>()
+        global::Common.Messaging.IExternalMessageChannelDiagnostic[] providerDiagnostics =
+            scope.ServiceProvider.GetServices<global::Common.Messaging.IExternalMessageChannel>()
+                .OfType<global::Common.Messaging.IExternalMessageChannelDiagnostic>()
                 .ToArray();
 
         if (providerDiagnostics.Length == 0)
@@ -176,8 +176,8 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 $"Common.Messaging queue is healthy, but no configured external channel exposes live provider verification. {queueEvidence}");
         }
 
-        List<Common.Messaging.MessagingProviderHealth> providers = [];
-        foreach (Common.Messaging.IExternalMessageChannelDiagnostic diagnostic in providerDiagnostics)
+        List<global::Common.Messaging.MessagingProviderHealth> providers = [];
+        foreach (global::Common.Messaging.IExternalMessageChannelDiagnostic diagnostic in providerDiagnostics)
         {
             providers.Add(await diagnostic.VerifyProviderAsync(cancellationToken).ConfigureAwait(false));
         }
@@ -187,7 +187,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
             providers.Select(result =>
                 $"{result.Provider}: Configured={result.Configured}, Reachable={result.Reachable}, State={result.State}, Reason={result.Reason ?? "none"}"));
 
-        Common.Messaging.MessagingProviderHealth[] failed =
+        global::Common.Messaging.MessagingProviderHealth[] failed =
             providers.Where(result => !result.Configured || !result.Reachable).ToArray();
 
         return failed.Length == 0
