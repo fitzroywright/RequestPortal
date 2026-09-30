@@ -12,7 +12,7 @@ public sealed class PortalMessagingTests
     private static readonly DateTimeOffset Now = new(2026, 9, 24, 23, 59, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task SharedStaffMailbox_PreservesAuditIdentity_ButHidesStaffEmailExternally()
+    public async Task SharedStaffMailbox_PreservesAuditIdentity_AndUsesNamesOnly()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
@@ -47,7 +47,6 @@ public sealed class PortalMessagingTests
             await service.GetInboxAsync(staff.Id, isStaff: true, cancellationToken: cancellationToken));
 
         Assert.Equal("Maria Johnson", staffInbox.SenderName);
-        Assert.Equal("maria@example.org", staffInbox.SenderEmail);
         Assert.Equal("Representative", staffInbox.SenderKind);
 
         await service.ReplyAsync(
@@ -68,8 +67,7 @@ public sealed class PortalMessagingTests
             representativeView.Messages,
             item => item.SenderKind == "FFP Staff");
 
-        Assert.Equal("David", staffReply.SenderName);
-        Assert.Null(staffReply.SenderEmail);
+        Assert.Equal("David Brown", staffReply.SenderName);
 
         MailboxMessageView sharedSent = Assert.Single(
             await service.GetSentAsync(
@@ -89,7 +87,7 @@ public sealed class PortalMessagingTests
     }
 
     [Fact]
-    public async Task RepresentativeToRepresentative_UsesFirstNameExternally_AndRequiresSameOrganization()
+    public async Task RepresentativeToRepresentative_UsesDisplayName_AndRequiresSameOrganization()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
@@ -124,8 +122,7 @@ public sealed class PortalMessagingTests
         MailboxMessageView andreInbox = Assert.Single(
             await service.GetInboxAsync(andre.Id, isStaff: false, cancellationToken: cancellationToken));
 
-        Assert.Equal("Maria", andreInbox.SenderName);
-        Assert.Null(andreInbox.SenderEmail);
+        Assert.Equal("Maria Johnson", andreInbox.SenderName);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => service.SendAsync(
