@@ -40,13 +40,23 @@
                             <div class="message-attachments"><span class="attachment-indicator" title="Documents linked to this message">📎</span>
                                 @foreach (MessageAttachmentView attachment in message.Attachments)
                                 {
-                                    <a class="message-attachment"
-                                       asp-page-handler="Attachment"
-                                       asp-route-id="@Model.Thread.ThreadId"
-                                       asp-route-documentId="@attachment.DocumentId">
-                                        @attachment.FileName
-                                        <small>@($"{Math.Max(1, attachment.SizeBytes / 1024)} KB")</small>
-                                    </a>
+                                    @if (attachment.IsAvailable)
+                                    {
+                                        <a class="message-attachment"
+                                           asp-page-handler="Attachment"
+                                           asp-route-id="@Model.Thread.ThreadId"
+                                           asp-route-documentId="@attachment.DocumentId">
+                                            @attachment.FileName
+                                            <small>@($"{Math.Max(1, attachment.SizeBytes / 1024)} KB")</small>
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="message-attachment message-attachment-unavailable">
+                                            @attachment.FileName
+                                            <small>Unavailable or access denied</small>
+                                        </span>
+                                    }
                                 }
                             </div>
                         }
