@@ -67,11 +67,11 @@ builder.Services.AddSingleton(new DiagnosticLevelStoreOptions
             "ffpmanager-bridge.db")
 });
 builder.Services.AddSingleton<IDiagnosticLevelRequestCredentialProvider, CommonSecretsDiagnosticLevelRequestCredentialProvider>();
-builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeConfigurationDiagnosticLevelTest>();
-builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeSqlAndOutboxDiagnosticLevelTest>();
-builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeReferenceDataDiagnosticLevelTest>();
-builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeCallbackDiagnosticLevelTest>();
-builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BridgeRecoveryDiagnosticLevelTest>();
+builder.Services.AddDiagnosticLevelTest<BridgeConfigurationDiagnosticLevelTest>();
+builder.Services.AddDiagnosticLevelTest<BridgeSqlAndOutboxDiagnosticLevelTest>();
+builder.Services.AddDiagnosticLevelTest<BridgeReferenceDataDiagnosticLevelTest>();
+builder.Services.AddDiagnosticLevelTest<BridgeCallbackDiagnosticLevelTest>();
+builder.Services.AddDiagnosticLevelTest<BridgeRecoveryDiagnosticLevelTest>();
 
 string gatewayMode = (builder.Configuration["Bridge:Gateway"] ?? "Fake").Trim();
 if (!gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase) &&
