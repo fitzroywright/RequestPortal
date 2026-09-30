@@ -11,6 +11,7 @@ using RequestPortal.Common.Time;
 using RequestPortal.Infrastructure.Documents;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Security;
+using RequestPortal.Web.Configuration;
 
 namespace RequestPortal.Web.Startup;
 
