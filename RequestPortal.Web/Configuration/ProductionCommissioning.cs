@@ -82,7 +82,8 @@ internal static class ProductionCommissioning
         AddIf(sharePointStorage &&
               (string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:TenantId"]) ||
                string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:ClientId"]) ||
-               string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:HostName"]) ||
+               (string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:SiteId"]) &&
+                string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:HostName"])) ||
                (string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:DriveId"]) &&
                 string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:DriveName"])) ||
                string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:RootFolder"]) ||
