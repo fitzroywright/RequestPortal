@@ -80,10 +80,7 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
                 "requestportal-l4-common-messaging",
                 "Common.Messaging",
                 EngineeringDiagnosticLevel.Level4Analysis,
-                _ => Task.FromResult(Passed(
-                    "requestportal-l4-common-messaging",
-                    "Common.Messaging",
-                    "RequestPortal uses Common.Messaging for queued external delivery; the RequestPortal outbox remains the application transaction boundary."))),
+                CheckCommonMessagingAsync),
 
             new EngineeringDiagnosticCheckDefinition(
                 "requestportal-l4-common-storage",
@@ -136,6 +133,73 @@ public sealed class RequestPortalEngineeringDiagnosticCatalog
             "RequestPortal database and directory components",
             "One or more startup component diagnostics failed.",
             evidence);
+    }
+
+    private async Task<EngineeringDiagnosticCheckResult> CheckCommonMessagingAsync(CancellationToken cancellationToken)
+    {
+        await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+        Common.Messaging.IExternalDeliveryQueueHealth? queueHealth =
+            scope.ServiceProvider.GetService<Common.Messaging.IExternalDeliveryQueueHealth>();
+        if (queueHealth is null)
+        {
+            return Failed(
+                "requestportal-l4-common-messaging",
+                "Common.Messaging",
+                "Common.Messaging queue health is not registered.",
+                "IExternalDeliveryQueueHealth could not be resolved.");
+        }
+
+        Common.Messaging.ExternalDeliveryQueueHealth health =
+            await queueHealth.CheckHealthAsync(cancellationToken).ConfigureAwait(false);
+        string queueEvidence =
+            $"Queue={health.QueueName ?? "default"}; Pending={health.Pending}; Retrying={health.Retrying}; DeadLettered={health.DeadLettered}; ExpiredLeases={health.ExpiredLeases}; OldestPending={health.OldestPendingAge?.ToString() ?? "none"}";
+
+        if (!health.IsAvailable)
+        {
+            return Failed(
+                "requestportal-l4-common-messaging",
+                "Common.Messaging",
+                "Common.Messaging durable delivery queue is unavailable.",
+                queueEvidence);
+        }
+
+        Common.Messaging.IExternalMessageChannelDiagnostic[] providerDiagnostics =
+            scope.ServiceProvider.GetServices<Common.Messaging.IExternalMessageChannel>()
+                .OfType<Common.Messaging.IExternalMessageChannelDiagnostic>()
+                .ToArray();
+
+        if (providerDiagnostics.Length == 0)
+        {
+            return Warning(
+                "requestportal-l4-common-messaging",
+                "Common.Messaging",
+                $"Common.Messaging queue is healthy, but no configured external channel exposes live provider verification. {queueEvidence}");
+        }
+
+        List<Common.Messaging.MessagingProviderHealth> providers = [];
+        foreach (Common.Messaging.IExternalMessageChannelDiagnostic diagnostic in providerDiagnostics)
+        {
+            providers.Add(await diagnostic.VerifyAsync(cancellationToken).ConfigureAwait(false));
+        }
+
+        string providerEvidence = string.Join(
+            "; ",
+            providers.Select(result =>
+                $"{result.Provider}: Configured={result.Configured}, Reachable={result.Reachable}, State={result.State}, Reason={result.Reason ?? "none"}"));
+
+        Common.Messaging.MessagingProviderHealth[] failed =
+            providers.Where(result => !result.Configured || !result.Reachable).ToArray();
+
+        return failed.Length == 0
+            ? Passed(
+                "requestportal-l4-common-messaging",
+                "Common.Messaging",
+                $"Common.Messaging queue is healthy and {providers.Count} live provider verification check(s) passed. {queueEvidence}")
+            : Failed(
+                "requestportal-l4-common-messaging",
+                "Common.Messaging",
+                $"{failed.Length} Common.Messaging provider verification check(s) failed.",
+                $"{queueEvidence}; {providerEvidence}");
     }
 
     private async Task<EngineeringDiagnosticCheckResult> CheckCommonStorageAsync(CancellationToken cancellationToken)
