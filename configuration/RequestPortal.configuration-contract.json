@@ -70,6 +70,15 @@
       "isConfigured": false
     },
     {
+      "id": "storage-sharepoint-site-id",
+      "displayName": "SharePoint site ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Uses the stable SharePoint site identifier directly, matching the FFP Manager Graph storage model.",
+      "configurationKey": "Storage:SharePoint:SiteId",
+      "isConfigured": false
+    },
+    {
       "id": "storage-sharepoint-host",
       "displayName": "SharePoint host",
       "kind": "Configuration",
