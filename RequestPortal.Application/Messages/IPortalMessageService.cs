@@ -35,7 +35,6 @@ public sealed record MessageAttachmentView(
 public sealed record MessageDetailView(
     Guid MessageId,
     string SenderName,
-    string? SenderEmail,
     string SenderKind,
     string Body,
     DateTimeOffset SentUtc,
