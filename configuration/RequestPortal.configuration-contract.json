@@ -24,13 +24,96 @@
       "sensitive": true
     },
     {
-      "id": "storage-root",
-      "displayName": "Document storage root",
+      "id": "storage-provider",
+      "displayName": "Document storage provider",
       "kind": "Configuration",
       "required": true,
-      "purpose": "Defines durable document storage used through Common.Storage.",
+      "purpose": "Selects the Common.Storage target used for Request Portal documents and storage-backed request features.",
+      "configurationKey": "Storage:Provider",
+      "isConfigured": false,
+      "example": "LocalFolder | NetworkFolder | SharePoint"
+    },
+    {
+      "id": "storage-local-root",
+      "displayName": "Local storage root",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines the local Common.Storage root when Storage:Provider is LocalFolder.",
       "configurationKey": "Storage:Local:RootPath",
       "isConfigured": false
+    },
+    {
+      "id": "storage-network-root",
+      "displayName": "Network folder storage root",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines the UNC or mounted SMB/NFS Common.Storage root when Storage:Provider is NetworkFolder.",
+      "configurationKey": "Storage:NetworkFolder:RootPath",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-sharepoint-tenant",
+      "displayName": "SharePoint tenant ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Identifies the Microsoft 365 tenant used by Common.Storage SharePoint storage.",
+      "configurationKey": "Storage:SharePoint:TenantId",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-sharepoint-client",
+      "displayName": "SharePoint application client ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Identifies the Entra application used by Common.Storage SharePoint storage.",
+      "configurationKey": "Storage:SharePoint:ClientId",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-sharepoint-host",
+      "displayName": "SharePoint host",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Identifies the SharePoint Online host containing Request Portal document storage.",
+      "configurationKey": "Storage:SharePoint:HostName",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-sharepoint-site",
+      "displayName": "SharePoint site path",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Selects the SharePoint site used by Common.Storage. Empty selects the host root site.",
+      "configurationKey": "Storage:SharePoint:SitePath",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-sharepoint-drive",
+      "displayName": "SharePoint document library",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Selects the SharePoint drive/document library by DriveId or DriveName.",
+      "configurationKey": "Storage:SharePoint:DriveName",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-sharepoint-root",
+      "displayName": "SharePoint storage root folder",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines the folder below the selected SharePoint document library reserved for Request Portal.",
+      "configurationKey": "Storage:SharePoint:RootFolder",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-sharepoint-client-secret",
+      "displayName": "SharePoint storage client secret",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Authenticates Common.Storage to Microsoft Graph when SharePoint is selected.",
+      "secretName": "storage/sharepoint/client-secret",
+      "isConfigured": false,
+      "sensitive": true
     },
     {
       "id": "data-protection-keys",
