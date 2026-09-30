@@ -1,3 +1,5 @@
+using RequestPortal.Domain.Messages;
+
 namespace RequestPortal.Application.Messages;
 
 public sealed record MailboxMessageView(
@@ -5,7 +7,6 @@ public sealed record MailboxMessageView(
     Guid ThreadId,
     string Subject,
     string SenderName,
-    string? SenderEmail,
     string SenderKind,
     string Preview,
     DateTimeOffset SentUtc,
@@ -22,6 +23,7 @@ public sealed record MessageThreadView(
     string? OrganizationName,
     Guid? RequestId,
     string? RequestReference,
+    MessageAudience Audience,
     IReadOnlyList<MessageDetailView> Messages);
 
 public sealed record MessageAttachmentView(
@@ -43,8 +45,8 @@ public sealed record MessageDetailView(
 public sealed record MessageRecipientOption(
     Guid UserId,
     string DisplayName,
-    string? Email,
-    bool IsStaff);
+    bool IsStaff,
+    bool IsOrganizationManager);
 
 public sealed record PortalMessageCreated(
     Guid MessageId,
@@ -96,6 +98,7 @@ public interface IPortalMessageService
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
         CancellationToken cancellationToken = default,
+        MessageAudience audience = MessageAudience.Individual,
         IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
 
     Task<IReadOnlyList<MessageRecipientOption>> GetOrganizationRecipientsAsync(
