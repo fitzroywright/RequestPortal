@@ -1214,6 +1214,11 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<DateTimeOffset?>("ClosedUtc")
                         .HasColumnType("timestamp with time zone");
 
