@@ -45,10 +45,6 @@
                                 {
                                     <div class="muted">FFP Staff</div>
                                 }
-                                @if (Model.IsStaff && !string.IsNullOrWhiteSpace(message.SenderEmail))
-                                {
-                                    <div class="muted">@message.SenderEmail</div>
-                                }
                             </td>
                             <td>
                                 <a asp-page="/Messages/Thread" asp-route-id="@message.ThreadId"><strong>@message.Subject</strong></a>

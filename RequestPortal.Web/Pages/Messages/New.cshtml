@@ -1,6 +1,7 @@
 @page
 @model RequestPortal.Web.Pages.Messages.NewModel
 @using RequestPortal.Application.Messages
+@using RequestPortal.Domain.Messages
 @{
     ViewData["Title"] = "New Message";
 }
@@ -35,7 +36,19 @@
                 <input type="hidden" asp-for="RequestId" />
                 <div asp-validation-summary="ModelOnly" class="validation"></div>
 
-                <label>To</label>
+                <label asp-for="Audience">Audience</label>
+                <select asp-for="Audience">
+                    <option value="@MessageAudience.Individual">Individual</option>
+                    <option value="@MessageAudience.Organization">Organization</option>
+                    <option value="@MessageAudience.OrganizationManager">Organization Manager</option>
+                    @if (Model.IsStaff)
+                    {
+                        <option value="@MessageAudience.FfpInternal">FFP Internal</option>
+                    }
+                </select>
+                <p class="muted compact-help">Audience controls visibility. Direct and internal conversations are never widened automatically.</p>
+
+                <label>Individual recipient</label>
                 @if (!Model.IsStaff)
                 {
                     <label class="check-row">
@@ -48,7 +61,7 @@
                     <option value="">@(Model.IsStaff ? "Choose representative" : "Or choose an organization representative")</option>
                     @foreach (MessageRecipientOption recipient in Model.Recipients)
                     {
-                        <option value="@recipient.UserId">@(Model.IsStaff && !string.IsNullOrWhiteSpace(recipient.Email) ? $"{recipient.DisplayName} · {recipient.Email}" : recipient.DisplayName)</option>
+                        <option value="@recipient.UserId">@recipient.DisplayName</option>
                     }
                 </select>
 
@@ -63,8 +76,8 @@
                 @if (Model.AvailableAttachments.Count > 0)
                 {
                     <fieldset class="field" style="border:1px solid #dde3e8;padding:14px">
-                        <legend style="font-weight:700">Attach request documents</legend>
-                        <p class="muted">These are existing Request Portal documents. The files remain in Common.Storage; the message stores only document references.</p>
+                        <legend style="font-weight:700">Link request documents</legend>
+                        <p class="muted">Documents remain in Common.Storage. Messages contain permission-aware references; no duplicate attachment is created.</p>
                         @foreach (var document in Model.AvailableAttachments.Where(item => !item.IsArchived))
                         {
                             <label class="check-row">

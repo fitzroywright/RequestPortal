@@ -189,15 +189,17 @@ public sealed class PortalMessageService : IPortalMessageService
         var attachmentRows = await (
             from attachment in dbContext.MessageAttachments.AsNoTracking()
             join document in dbContext.Documents.AsNoTracking()
-                on attachment.DocumentId equals document.Id
+                on attachment.DocumentId equals document.Id into documents
+            from document in documents.DefaultIfEmpty()
             where messageIds.Contains(attachment.MessageId)
             select new
             {
                 attachment.MessageId,
-                document.Id,
-                document.OriginalFileName,
-                document.ContentType,
-                document.SizeBytes
+                DocumentId = attachment.DocumentId,
+                FileName = document == null ? "Document unavailable" : document.OriginalFileName,
+                ContentType = document == null ? string.Empty : document.ContentType,
+                SizeBytes = document == null ? 0 : document.SizeBytes,
+                IsAvailable = document != null && !document.IsArchived
             })
             .ToListAsync(cancellationToken);
 
@@ -207,17 +209,18 @@ public sealed class PortalMessageService : IPortalMessageService
                 group => group.Key,
                 group => group
                     .Select(row => new MessageAttachmentView(
-                        row.Id,
-                        row.OriginalFileName,
+                        row.DocumentId,
+                        row.FileName,
                         row.ContentType,
-                        row.SizeBytes))
+                        row.SizeBytes,
+                        row.IsAvailable))
                     .ToArray());
 
         MessageDetailView[] projected = messages
             .Select(row =>
             {
-                (string senderName, string? senderEmail, string senderKind) =
-                    ProjectSender(row.Message, row.Sender, isStaff);
+                (string senderName, string senderKind) =
+                    ProjectSender(row.Message, row.Sender);
                 IReadOnlyList<MessageAttachmentView> attachments =
                     attachmentsByMessage.TryGetValue(row.Message.Id, out MessageAttachmentView[]? values)
                         ? values
@@ -226,7 +229,6 @@ public sealed class PortalMessageService : IPortalMessageService
                 return new MessageDetailView(
                     row.Message.Id,
                     senderName,
-                    senderEmail,
                     senderKind,
                     row.Message.Body,
                     row.Message.SentUtc,
@@ -242,6 +244,7 @@ public sealed class PortalMessageService : IPortalMessageService
             organizationName,
             thread.RequestId,
             requestReference,
+            thread.Audience,
             projected);
     }
 
@@ -269,16 +272,17 @@ public sealed class PortalMessageService : IPortalMessageService
                 user.Id,
                 user.DisplayName,
                 user.Email,
-                user.IsInternalStaff
+                user.IsInternalStaff,
+                membership.Role
             })
             .ToListAsync(cancellationToken);
 
         return rows
             .Select(row => new MessageRecipientOption(
                 row.Id,
-                isStaff ? row.DisplayName : FirstName(row.DisplayName, row.Email),
-                isStaff ? row.Email : null,
-                row.IsInternalStaff))
+                string.IsNullOrWhiteSpace(row.DisplayName) ? "Organization representative" : row.DisplayName,
+                row.IsInternalStaff,
+                row.Role == OrganizationRole.Administrator))
             .ToArray();
     }
 
@@ -290,7 +294,8 @@ public sealed class PortalMessageService : IPortalMessageService
         string subject,
         string body,
         CancellationToken cancellationToken = default,
-        IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null,
+        Guid? stableMessageId = null)
     {
         await EnsureApprovedMembershipAsync(senderUserId, organizationId, cancellationToken);
         await ValidateRequestScopeAsync(organizationId, requestId, cancellationToken);
@@ -317,7 +322,8 @@ public sealed class PortalMessageService : IPortalMessageService
             staffUserIds,
             staffVisible: true,
             cancellationToken,
-            attachmentDocumentIds);
+            attachmentDocumentIds,
+            stableMessageId: stableMessageId);
     }
 
     public async Task<Guid> SendAsync(
@@ -330,11 +336,12 @@ public sealed class PortalMessageService : IPortalMessageService
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
         CancellationToken cancellationToken = default,
+        MessageAudience audience = MessageAudience.Individual,
         IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
     {
-        if (recipientUserIds.Count == 0)
+        if (audience == MessageAudience.Individual && recipientUserIds.Count == 0)
         {
-            throw new ArgumentException("At least one message recipient is required.", nameof(recipientUserIds));
+            throw new ArgumentException("An individual recipient is required for an individual conversation.", nameof(recipientUserIds));
         }
 
         if (!senderIsStaff)
@@ -354,11 +361,53 @@ public sealed class PortalMessageService : IPortalMessageService
 
         await ValidateRequestScopeAsync(organizationId, requestId, cancellationToken);
 
-        bool staffVisible = senderIsStaff ||
-            await dbContext.Users.AsNoTracking()
+        if (audience == MessageAudience.FfpInternal && !senderIsStaff)
+        {
+            throw new UnauthorizedAccessException("Only FFP staff can create internal conversations.");
+        }
+
+        Guid[] effectiveRecipients = recipientUserIds.Distinct().ToArray();
+        if (organizationId.HasValue && audience == MessageAudience.Organization)
+        {
+            effectiveRecipients = await dbContext.OrganizationMemberships.AsNoTracking()
+                .Where(membership =>
+                    membership.OrganizationId == organizationId.Value &&
+                    membership.Status == MembershipStatus.Approved &&
+                    membership.UserId != senderUserId)
+                .Select(membership => membership.UserId)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
+        }
+        else if (organizationId.HasValue && audience == MessageAudience.OrganizationManager)
+        {
+            effectiveRecipients = await dbContext.OrganizationMemberships.AsNoTracking()
+                .Where(membership =>
+                    membership.OrganizationId == organizationId.Value &&
+                    membership.Status == MembershipStatus.Approved &&
+                    membership.Role == OrganizationRole.Administrator &&
+                    membership.UserId != senderUserId)
+                .Select(membership => membership.UserId)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
+        }
+        else if (audience == MessageAudience.FfpInternal)
+        {
+            effectiveRecipients = await dbContext.Users.AsNoTracking()
+                .Where(user => user.IsInternalStaff && user.Id != senderUserId)
+                .Select(user => user.Id)
+                .ToArrayAsync(cancellationToken);
+        }
+
+        if (effectiveRecipients.Length == 0)
+        {
+            throw new InvalidOperationException("No eligible recipients are available for the selected audience.");
+        }
+
+        bool staffVisible = audience == MessageAudience.FfpInternal ||
+            (!senderIsStaff && await dbContext.Users.AsNoTracking()
                 .AnyAsync(
-                    user => recipientUserIds.Contains(user.Id) && user.IsInternalStaff,
-                    cancellationToken);
+                    user => effectiveRecipients.Contains(user.Id) && user.IsInternalStaff,
+                    cancellationToken));
 
         return await SendInternalAsync(
             senderUserId,
@@ -368,10 +417,11 @@ public sealed class PortalMessageService : IPortalMessageService
             threadId,
             subject,
             body,
-            recipientUserIds,
+            effectiveRecipients,
             staffVisible,
             cancellationToken,
-            attachmentDocumentIds);
+            attachmentDocumentIds,
+            audience);
     }
 
     public async Task<Guid> ReplyAsync(
@@ -457,7 +507,8 @@ public sealed class PortalMessageService : IPortalMessageService
         string subject,
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? stableMessageId = null)
     {
         if (recipientUserIds.Count == 0)
         {
@@ -474,8 +525,14 @@ public sealed class PortalMessageService : IPortalMessageService
             staffVisible: true,
             cancellationToken);
 
+        Guid messageId = stableMessageId ?? Guid.NewGuid();
+        if (await dbContext.PortalMessages.AsNoTracking().AnyAsync(item => item.Id == messageId, cancellationToken))
+        {
+            return thread.Id;
+        }
+
         PortalMessage message = new(
-            Guid.NewGuid(),
+            messageId,
             thread.Id,
             null,
             PortalMessageSenderKind.System,
@@ -596,7 +653,9 @@ public sealed class PortalMessageService : IPortalMessageService
         IReadOnlyCollection<Guid> recipientUserIds,
         bool staffVisible,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null,
+        MessageAudience audience = MessageAudience.Individual,
+        Guid? stableMessageId = null)
     {
         ApplicationUserProjection sender = await dbContext.Users
             .AsNoTracking()
@@ -614,10 +673,17 @@ public sealed class PortalMessageService : IPortalMessageService
             requestId,
             subject,
             staffVisible,
-            cancellationToken);
+            cancellationToken,
+            audience);
+
+        Guid messageId = stableMessageId ?? Guid.NewGuid();
+        if (await dbContext.PortalMessages.AsNoTracking().AnyAsync(item => item.Id == messageId, cancellationToken))
+        {
+            return thread.Id;
+        }
 
         PortalMessage message = new(
-            Guid.NewGuid(),
+            messageId,
             thread.Id,
             senderUserId,
             senderKind,
@@ -674,7 +740,8 @@ public sealed class PortalMessageService : IPortalMessageService
         Guid? requestId,
         string subject,
         bool staffVisible,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        MessageAudience audience = MessageAudience.Individual)
     {
         if (threadId.HasValue)
         {
@@ -698,7 +765,8 @@ public sealed class PortalMessageService : IPortalMessageService
             requestId,
             subject,
             staffVisible,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            audience);
         dbContext.MessageThreads.Add(created);
         return created;
     }
@@ -900,8 +968,8 @@ public sealed class PortalMessageService : IPortalMessageService
         string? requestReference,
         bool viewerIsStaff)
     {
-        (string senderName, string? senderEmail, string senderKind) =
-            ProjectSender(message, sender, viewerIsStaff);
+        (string senderName, string senderKind) =
+            ProjectSender(message, sender);
         string preview = message.Body.Length <= 140
             ? message.Body
             : message.Body[..137] + "...";
@@ -911,7 +979,6 @@ public sealed class PortalMessageService : IPortalMessageService
             thread.Id,
             thread.Subject,
             senderName,
-            senderEmail,
             senderKind,
             preview,
             message.SentUtc,
@@ -922,30 +989,22 @@ public sealed class PortalMessageService : IPortalMessageService
             requestReference);
     }
 
-    private static (string Name, string? Email, string Kind) ProjectSender(
+    private static (string Name, string Kind) ProjectSender(
         PortalMessage message,
-        ApplicationUser? sender,
-        bool viewerIsStaff)
+        ApplicationUser? sender)
     {
         if (message.SenderKind == PortalMessageSenderKind.System)
         {
-            return ("FFP Request Processing", null, "FFP");
+            return ("FFP Request Processing", "FFP");
         }
 
         string displayName = sender?.DisplayName ?? message.SenderDisplayName;
-        string? email = sender?.Email;
-
-        if (viewerIsStaff)
-        {
-            return (
-                string.IsNullOrWhiteSpace(displayName) ? message.SenderDisplayName : displayName,
-                message.SenderKind == PortalMessageSenderKind.Representative ? email : null,
-                message.SenderKind == PortalMessageSenderKind.FfpStaff ? "FFP Staff" : "Representative");
-        }
+        string name = string.IsNullOrWhiteSpace(displayName)
+            ? (message.SenderKind == PortalMessageSenderKind.FfpStaff ? "FFP Staff" : "Organization representative")
+            : displayName.Trim();
 
         return (
-            FirstName(displayName, email),
-            null,
+            name,
             message.SenderKind == PortalMessageSenderKind.FfpStaff ? "FFP Staff" : "Representative");
     }
 

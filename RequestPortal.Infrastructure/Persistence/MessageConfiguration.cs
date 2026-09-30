@@ -11,6 +11,7 @@ internal sealed class MessageThreadConfiguration : IEntityTypeConfiguration<Mess
         builder.ToTable("message_threads");
         builder.HasKey(thread => thread.Id);
         builder.Property(thread => thread.Subject).HasMaxLength(300).IsRequired();
+        builder.Property(thread => thread.Audience).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(thread => thread.OrganizationId);
         builder.HasIndex(thread => thread.RequestId);
         builder.HasIndex(thread => new { thread.StaffVisible, thread.CreatedUtc });

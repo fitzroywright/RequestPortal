@@ -1,3 +1,5 @@
+using RequestPortal.Domain.Messages;
+
 namespace RequestPortal.Application.Messages;
 
 public sealed record MailboxMessageView(
@@ -5,7 +7,6 @@ public sealed record MailboxMessageView(
     Guid ThreadId,
     string Subject,
     string SenderName,
-    string? SenderEmail,
     string SenderKind,
     string Preview,
     DateTimeOffset SentUtc,
@@ -22,18 +23,19 @@ public sealed record MessageThreadView(
     string? OrganizationName,
     Guid? RequestId,
     string? RequestReference,
+    MessageAudience Audience,
     IReadOnlyList<MessageDetailView> Messages);
 
 public sealed record MessageAttachmentView(
     Guid DocumentId,
     string FileName,
     string ContentType,
-    long SizeBytes);
+    long SizeBytes,
+    bool IsAvailable);
 
 public sealed record MessageDetailView(
     Guid MessageId,
     string SenderName,
-    string? SenderEmail,
     string SenderKind,
     string Body,
     DateTimeOffset SentUtc,
@@ -43,8 +45,8 @@ public sealed record MessageDetailView(
 public sealed record MessageRecipientOption(
     Guid UserId,
     string DisplayName,
-    string? Email,
-    bool IsStaff);
+    bool IsStaff,
+    bool IsOrganizationManager);
 
 public sealed record PortalMessageCreated(
     Guid MessageId,
@@ -96,6 +98,7 @@ public interface IPortalMessageService
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
         CancellationToken cancellationToken = default,
+        MessageAudience audience = MessageAudience.Individual,
         IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
 
     Task<IReadOnlyList<MessageRecipientOption>> GetOrganizationRecipientsAsync(
@@ -112,7 +115,8 @@ public interface IPortalMessageService
         string subject,
         string body,
         CancellationToken cancellationToken = default,
-        IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null,
+        Guid? stableMessageId = null);
 
     Task<Guid> ReplyAsync(
         Guid senderUserId,
@@ -129,7 +133,8 @@ public interface IPortalMessageService
         string subject,
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? stableMessageId = null);
 
     Task<bool> CanAccessAttachmentAsync(
         Guid userId,

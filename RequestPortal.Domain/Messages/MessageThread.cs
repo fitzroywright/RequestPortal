@@ -1,5 +1,13 @@
 namespace RequestPortal.Domain.Messages;
 
+public enum MessageAudience
+{
+    Individual = 0,
+    Organization = 1,
+    OrganizationManager = 2,
+    FfpInternal = 3
+}
+
 public sealed class MessageThread
 {
     private MessageThread() { }
@@ -10,7 +18,8 @@ public sealed class MessageThread
         Guid? requestId,
         string subject,
         bool staffVisible,
-        DateTimeOffset createdUtc)
+        DateTimeOffset createdUtc,
+        MessageAudience audience = MessageAudience.Individual)
     {
         if (string.IsNullOrWhiteSpace(subject))
         {
@@ -22,6 +31,7 @@ public sealed class MessageThread
         RequestId = requestId;
         Subject = subject.Trim();
         StaffVisible = staffVisible;
+        Audience = audience;
         CreatedUtc = createdUtc;
     }
 
@@ -34,6 +44,8 @@ public sealed class MessageThread
     public string Subject { get; private set; } = string.Empty;
 
     public bool StaffVisible { get; private set; }
+
+    public MessageAudience Audience { get; private set; }
 
     public DateTimeOffset CreatedUtc { get; private set; }
 

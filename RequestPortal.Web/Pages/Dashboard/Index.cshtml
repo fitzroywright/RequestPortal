@@ -1,93 +1,79 @@
 @page
 @model RequestPortal.Web.Pages.Dashboard.IndexModel
+@using RequestPortal.Application.Portal
 @{
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = "My Requests";
 }
 
-<section class="section">
+<section class="section portal-workspace">
     <div class="shell">
-        <div class="section-heading">
-            <div class="eyebrow" style="color:#b45b09">Representative workspace</div>
-            <h1>Hello, @Model.DisplayName</h1>
-            <p>Choose the organization you are acting for, create requests, and follow FFP decisions from one dashboard.</p>
-        </div>
-
-        <div class="grid-3">
-            <article class="card">
-                <div class="muted">Approved organizations</div>
-                <div class="stat">@Model.ApprovedOrganizations</div>
-                <a class="button button-outline" asp-page="/Organizations/Index">Manage organizations</a>
-            </article>
-            <article class="card">
-                <div class="muted">Requests awaiting FFP</div>
-                <div class="stat">@Model.SubmittedCount</div>
-                <a class="button button-outline" asp-page="/Requests/Index">View requests</a>
-            </article>
-            <article class="card">
-                <div class="muted">Action required</div>
-                <div class="stat">@Model.ActionRequired.Count</div>
+        <header class="workspace-titlebar">
+            <div>
+                <div class="eyebrow request-eyebrow">Representative workspace</div>
+                <h1>Hello, @Model.DisplayName</h1>
+                <p>Requests, messages, documents and actions for your organizations.</p>
+            </div>
+            <div class="workspace-toolbar">
                 <a class="button" asp-page="/Requests/Create">New request</a>
-            </article>
-        </div>
+                <a class="button button-secondary" asp-page="/Messages/Inbox">Messages</a>
+            </div>
+        </header>
 
-        <div class="grid-3" style="margin-top:18px">
-            <article class="card"><div class="muted">Draft</div><div class="stat">@Model.DraftCount</div></article>
-            <article class="card"><div class="muted">More information required</div><div class="stat">@Model.MoreInformationCount</div></article>
-            <article class="card"><div class="muted">Approved / fulfilment</div><div class="stat">@Model.ApprovedCount</div></article>
-        </div>
-
-        @if (Model.ActionRequired.Count > 0)
-        {
-            <section class="card" style="margin-top:22px;border-left:4px solid #b45b09">
-                <div class="action-row" style="justify-content:space-between;align-items:center">
+        <div class="portal-workspace-grid">
+            <aside class="workspace-panel status-panel">
+                <div class="panel-titlebar">
                     <div>
-                        <h2>Action required</h2>
-                        <p class="muted">These requests need something from your organization.</p>
+                        <strong>Request Status</strong>
+                        <small>@Model.Requests.Count total requests</small>
                     </div>
                 </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Reference</th><th>Organization</th><th>Status</th><th></th></tr></thead>
-                        <tbody>
-                        @foreach (RequestSummary request in Model.ActionRequired.Take(8))
-                        {
-                            <tr>
-                                <td><strong>@request.PublicReference</strong></td>
-                                <td>@request.OrganizationName</td>
-                                <td><span class="status status-@request.Status">@request.Status</span></td>
-                                <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
-                            </tr>
-                        }
-                        </tbody>
-                    </table>
+                <div class="status-list" role="list">
+                    <button type="button" class="status-row is-active" data-status-filter="all"><span>All requests</span><strong>@Model.Requests.Count</strong></button>
+                    <button type="button" class="status-row" data-status-filter="Draft"><span>Draft</span><strong>@Model.DraftCount</strong></button>
+                    <button type="button" class="status-row" data-status-filter="Submitted"><span>Awaiting FFP</span><strong>@Model.SubmittedCount</strong></button>
+                    <button type="button" class="status-row" data-status-filter="MoreInformationRequired"><span>Information required</span><strong>@Model.MoreInformationCount</strong></button>
+                    <button type="button" class="status-row" data-status-filter="approved"><span>Approved / fulfilment</span><strong>@Model.ApprovedCount</strong></button>
                 </div>
-            </section>
-        }
 
-        <div class="dashboard-grid" style="margin-top:22px">
-            <section class="card">
-                <div class="action-row" style="justify-content:space-between;align-items:center">
-                    <h2>Recent requests</h2>
+                <div class="panel-titlebar panel-titlebar-secondary"><strong>Actions</strong></div>
+                <nav class="actions-list" aria-label="Workspace actions">
+                    <a asp-page="/Requests/Create">Create request <span>›</span></a>
+                    <a asp-page="/Messages/New">Send message <span>›</span></a>
+                    <a asp-page="/Organizations/Index">Organizations <span>›</span></a>
+                    <a asp-page="/Messages/Inbox">Conversation inbox <span>›</span></a>
+                </nav>
+            </aside>
+
+            <main class="workspace-panel request-panel">
+                <div class="panel-titlebar">
+                    <div>
+                        <strong id="request-panel-title">Recent Requests</strong>
+                        <small id="request-panel-subtitle">Select a status to filter this working list.</small>
+                    </div>
                     <a asp-page="/Requests/Index">View all</a>
                 </div>
+
                 @if (Model.Requests.Count == 0)
                 {
-                    <p class="muted">No requests yet. Create a request once you have an approved organization membership.</p>
+                    <div class="workspace-empty">
+                        <strong>No requests yet</strong>
+                        <p>Create a request once you have an approved organization membership.</p>
+                    </div>
                 }
                 else
                 {
-                    <div class="table-wrap">
-                        <table>
-                            <thead>
-                                <tr><th>Reference</th><th>Organization</th><th>Status</th><th></th></tr>
-                            </thead>
-                            <tbody>
-                            @foreach (RequestSummary request in Model.Requests.Take(8))
+                    <div class="table-wrap workspace-table-wrap">
+                        <table class="workspace-table">
+                            <thead><tr><th>Reference</th><th>Organization</th><th>Status</th><th>Created</th><th></th></tr></thead>
+                            <tbody id="request-status-results">
+                            @foreach (RequestSummary request in Model.Requests.OrderByDescending(item => item.CreatedUtc))
                             {
-                                <tr>
+                                string statusGroup = request.Status is "Approved" or "PendingFulfilment" or "Fulfilled" or "Closed" ? "approved" : request.Status;
+                                <tr data-request-status="@statusGroup">
                                     <td><strong>@request.PublicReference</strong></td>
                                     <td>@request.OrganizationName</td>
                                     <td><span class="status status-@request.Status">@request.Status</span></td>
+                                    <td>@request.CreatedUtc.ToLocalTime().ToString("MMM dd yyyy")</td>
                                     <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
                                 </tr>
                             }
@@ -95,27 +81,68 @@
                         </table>
                     </div>
                 }
-            </section>
+            </main>
 
-            <section class="card">
-                <h2>My organizations</h2>
-                @if (Model.Organizations.Count == 0)
-                {
-                    <p class="muted">You are not yet associated with an organization.</p>
-                    <a class="button" asp-page="/Organizations/Index">Register or join one</a>
-                }
-                else
-                {
-                    @foreach (OrganizationSummary organization in Model.Organizations)
+            <aside class="workspace-panel context-panel">
+                <div class="panel-titlebar">
+                    <div><strong>Organizations</strong><small>@Model.ApprovedOrganizations approved</small></div>
+                    <a asp-page="/Organizations/Index">Manage</a>
+                </div>
+                <div class="organization-list">
+                    @if (Model.Organizations.Count == 0)
                     {
-                        <div style="padding:14px 0;border-bottom:1px solid #e1e6ea">
-                            <strong>@organization.Name</strong><br />
-                            <span class="muted">@organization.Role · @organization.MembershipStatus</span><br />
-                            <a asp-page="/Organizations/Profile" asp-route-id="@organization.Id">Organization profile</a>
-                        </div>
+                        <div class="workspace-empty compact"><p>No organization membership yet.</p></div>
                     }
+                    else
+                    {
+                        @foreach (OrganizationSummary organization in Model.Organizations)
+                        {
+                            <a class="organization-row" asp-page="/Organizations/Profile" asp-route-id="@organization.Id">
+                                <strong>@organization.Name</strong>
+                                <span>@organization.Role · @organization.MembershipStatus</span>
+                            </a>
+                        }
+                    }
+                </div>
+
+                @if (Model.ActionRequired.Count > 0)
+                {
+                    <div class="panel-titlebar panel-titlebar-secondary">
+                        <div><strong>Needs Attention</strong><small>@Model.ActionRequired.Count requests</small></div>
+                    </div>
+                    <div class="attention-list">
+                        @foreach (RequestSummary request in Model.ActionRequired.Take(6))
+                        {
+                            <a asp-page="/Requests/Details" asp-route-id="@request.Id">
+                                <strong>@request.PublicReference</strong>
+                                <span>@request.Status</span>
+                            </a>
+                        }
+                    </div>
                 }
-            </section>
+            </aside>
         </div>
     </div>
 </section>
+
+@section Scripts {
+<script>
+(() => {
+    const buttons = document.querySelectorAll("[data-status-filter]");
+    const rows = document.querySelectorAll("[data-request-status]");
+    const title = document.getElementById("request-panel-title");
+    const subtitle = document.getElementById("request-panel-subtitle");
+
+    buttons.forEach(button => button.addEventListener("click", () => {
+        const filter = button.dataset.statusFilter;
+        buttons.forEach(item => item.classList.toggle("is-active", item === button));
+        rows.forEach(row => {
+            row.hidden = filter !== "all" && row.dataset.requestStatus !== filter;
+        });
+        title.textContent = button.querySelector("span")?.textContent || "Requests";
+        const visible = Array.from(rows).filter(row => !row.hidden).length;
+        subtitle.textContent = visible + (visible === 1 ? " request" : " requests") + " in this view.";
+    }));
+})();
+</script>
+}
