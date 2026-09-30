@@ -115,7 +115,8 @@ public interface IPortalMessageService
         string subject,
         string body,
         CancellationToken cancellationToken = default,
-        IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null,
+        Guid? stableMessageId = null);
 
     Task<Guid> ReplyAsync(
         Guid senderUserId,
@@ -132,7 +133,8 @@ public interface IPortalMessageService
         string subject,
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? stableMessageId = null);
 
     Task<bool> CanAccessAttachmentAsync(
         Guid userId,
