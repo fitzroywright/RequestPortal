@@ -293,6 +293,8 @@ public sealed class ConfigurationContractPublisher(
                     "public-url" => State(HasValue(configuration, "Aegis:PublicUrl"), required, "RP-PROD-PUBLIC-URL-001: Aegis:PublicUrl must identify the externally reachable Request Portal endpoint."),
                     _ => (false, "Unknown", "No runtime commissioning evaluator is defined for this requirement.")
                 };
+                if (id == "storage-sharepoint-client-secret")
+                    requirement["secretName"] = storageSecretName;
                 requirement["isConfigured"] = configured;
                 requirement["configurationState"] = state;
                 requirement["effectiveValueAvailable"] = configured;
