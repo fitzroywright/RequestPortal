@@ -30,7 +30,8 @@ public sealed record MessageAttachmentView(
     Guid DocumentId,
     string FileName,
     string ContentType,
-    long SizeBytes);
+    long SizeBytes,
+    bool IsAvailable);
 
 public sealed record MessageDetailView(
     Guid MessageId,
