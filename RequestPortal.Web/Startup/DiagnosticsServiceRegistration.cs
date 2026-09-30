@@ -55,64 +55,40 @@ internal static class DiagnosticsServiceRegistration
     private static void AddLevel5(
         WebApplicationBuilder builder)
     {
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , BasicRuntimeIdentityDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<BasicRuntimeIdentityDiagnosticLevelTest>();
 
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , BasicControlPlaneConfigurationDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<BasicControlPlaneConfigurationDiagnosticLevelTest>();
 
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , PostgreSqlConnectivityDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<PostgreSqlConnectivityDiagnosticLevelTest>();
 
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , MalwareScannerConnectivityDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<MalwareScannerConnectivityDiagnosticLevelTest>();
 
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , ExternalIdentityProvidersDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<ExternalIdentityProvidersDiagnosticLevelTest>();
     }
 
     private static void AddLevel4(
         WebApplicationBuilder builder)
     {
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , OrganizationAdministratorIntegrityDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<OrganizationAdministratorIntegrityDiagnosticLevelTest>();
 
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , MembershipStateIntegrityDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<MembershipStateIntegrityDiagnosticLevelTest>();
 
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , RequestRelationshipIntegrityDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<RequestRelationshipIntegrityDiagnosticLevelTest>();
 
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , DocumentStorageReferenceDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<DocumentStorageReferenceDiagnosticLevelTest>();
     }
 
     private static void AddLevel3(
         WebApplicationBuilder builder)
     {
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , ExpiredOrganizationRegistrationDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<ExpiredOrganizationRegistrationDiagnosticLevelTest>();
 
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , FulfilmentIntegrityDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<FulfilmentIntegrityDiagnosticLevelTest>();
     }
 
     private static void AddLevel2(
         WebApplicationBuilder builder)
     {
-        builder.Services.AddSingleton<
-            IDiagnosticLevelLocalTest
-            , FfpManagerBridgeReadinessDiagnosticLevelTest>();
+        builder.Services.AddDiagnosticLevelTest<FfpManagerBridgeReadinessDiagnosticLevelTest>();
     }
 }
