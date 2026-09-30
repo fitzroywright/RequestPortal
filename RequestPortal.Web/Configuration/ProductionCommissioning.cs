@@ -13,6 +13,10 @@ internal static class ProductionCommissioning
             configuration["FfpManagerIntegration:SharedSecretName"]?.Trim()
             ?? "FfpManagerIntegration:SharedSecret";
 
+        string storageSecretName =
+            configuration["Storage:SharePoint:ClientSecretName"]?.Trim()
+            ?? "storage/sharepoint/client-secret";
+
         return new RuntimeSecrets(
             await provider.GetAsync("ConnectionStrings:RequestPortal"),
             await provider.GetAsync("Authentication:Google:ClientSecret"),
@@ -21,7 +25,8 @@ internal static class ProductionCommissioning
             await provider.GetAsync("Authentication:Yahoo:ClientSecret"),
             await provider.GetAsync("Authentication:Apple:ClientSecret"),
             await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
-            await provider.GetAsync(integrationSharedSecretName));
+            await provider.GetAsync(integrationSharedSecretName),
+            await provider.GetAsync(storageSecretName));
     }
 
     public static IReadOnlyList<ProductionConfigurationFailure> Validate(
@@ -30,7 +35,11 @@ internal static class ProductionCommissioning
     {
         var failures = new List<ProductionConfigurationFailure>();
         string connectionString = secrets.ConnectionString ?? string.Empty;
-        string storageRoot = configuration["Storage:Local:RootPath"] ?? string.Empty;
+        string storageProvider = configuration["Storage:Provider"]?.Trim() ?? "LocalFolder";
+        string storageRoot = storageProvider.Equals("NetworkFolder", StringComparison.OrdinalIgnoreCase)
+            ? configuration["Storage:NetworkFolder:RootPath"] ?? string.Empty
+            : configuration["Storage:Local:RootPath"] ?? string.Empty;
+        bool sharePointStorage = storageProvider.Equals("SharePoint", StringComparison.OrdinalIgnoreCase);
         string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
         string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
         bool malwareScanningEnabled = configuration.GetValue("Uploads:MalwareScanning:Enabled", false);
@@ -61,9 +70,16 @@ internal static class ProductionCommissioning
         AddIf(string.IsNullOrWhiteSpace(connectionString),
             "RP-CONFIG-DB-001",
             "PostgreSQL connection string 'RequestPortal' is not configured through Common.Secrets.");
-        AddIf(string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase),
+        AddIf(!sharePointStorage && (string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase)),
             "RP-PROD-STORAGE-001",
-            "Production document storage must be a durable external filesystem path or network share.");
+            "Production document storage must use SharePoint or a durable external filesystem/network target.");
+        AddIf(sharePointStorage &&
+              (string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:TenantId"]) ||
+               string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:ClientId"]) ||
+               string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:HostName"]) ||
+               string.IsNullOrWhiteSpace(secrets.StorageSharePointClientSecret)),
+            "RP-PROD-STORAGE-SP-001",
+            "SharePoint storage requires TenantId, ClientId, HostName and a Common.Secrets-backed client secret.");
         AddIf(string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("App_Data", StringComparison.OrdinalIgnoreCase),
             "RP-PROD-DP-001",
             "Production Data Protection keys must be persisted outside the application deployment directory.");
@@ -136,7 +152,8 @@ internal sealed record RuntimeSecrets(
     string? YahooClientSecret,
     string? AppleClientSecret,
     string? StaffOidcClientSecret,
-    string? FfpManagerSharedSecret);
+    string? FfpManagerSharedSecret,
+    string? StorageSharePointClientSecret);
 
 internal sealed record ProductionConfigurationFailure(
     string Code,
