@@ -273,7 +273,6 @@ public sealed class PortalMessageService : IPortalMessageService
                 user.DisplayName,
                 user.Email,
                 user.IsInternalStaff,
-                membership.Role,
                 membership.Role
             })
             .ToListAsync(cancellationToken);
