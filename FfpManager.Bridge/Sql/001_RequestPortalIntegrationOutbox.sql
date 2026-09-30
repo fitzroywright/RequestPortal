@@ -147,6 +147,30 @@ BEGIN
         RETURN;
     END;
 
+    DECLARE @MessageCode nvarchar(25) = LEFT(REPLACE(CONVERT(nvarchar(36), @ResolvedEventId), N'-', N''), 25);
+
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM dbo.ApplicationNotes
+        WHERE ApplicationLetterID = @ApplicationLetterId
+          AND Code = @MessageCode
+          AND NoteType = N'Request Portal Information Request'
+    )
+    BEGIN
+        INSERT INTO dbo.ApplicationNotes
+        (
+            DateCreated, Code, Name, Description, UserName, DateUpdated,
+            ApplicationLetterID, NoteType, CreatedBy
+        )
+        VALUES
+        (
+            @ResolvedOccurredUtc, @MessageCode, N'Request information',
+            @Message, @CreatedBy, @ResolvedOccurredUtc,
+            @ApplicationLetterId, N'Request Portal Information Request', @CreatedBy
+        );
+    END;
+
     INSERT INTO dbo.RequestPortalIntegrationOutbox
     (
         EventId,
