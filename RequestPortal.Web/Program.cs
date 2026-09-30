@@ -68,7 +68,8 @@ AuthenticationServiceRegistration.Add(
 
 PlatformServiceRegistration.AddPlatform(
     builder
-    , secretsRuntime);
+    , secretsRuntime
+    , runtimeSecrets);
 
 MessagingServiceRegistration.Add(builder);
 ApplicationServiceRegistration.Add(builder);
