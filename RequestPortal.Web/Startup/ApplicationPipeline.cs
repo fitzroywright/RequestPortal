@@ -29,7 +29,7 @@ internal static class ApplicationPipeline
         context.Response.Headers["Referrer-Policy"] =
             "strict-origin-when-cross-origin";
         context.Response.Headers["Content-Security-Policy"] =
-            "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://login.microsoftonline.com";
+            "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://login.microsoftonline.com https://www.facebook.com";
         context.Response.Headers["Permissions-Policy"] =
             "camera=(), microphone=(), geolocation=(self)";
 
