@@ -39,7 +39,10 @@ internal static class ProductionCommissioning
         string storageRoot = storageProvider.Equals("NetworkFolder", StringComparison.OrdinalIgnoreCase)
             ? configuration["Storage:NetworkFolder:RootPath"] ?? string.Empty
             : configuration["Storage:Local:RootPath"] ?? string.Empty;
+        bool localStorage = storageProvider.Equals("LocalFolder", StringComparison.OrdinalIgnoreCase);
+        bool networkStorage = storageProvider.Equals("NetworkFolder", StringComparison.OrdinalIgnoreCase);
         bool sharePointStorage = storageProvider.Equals("SharePoint", StringComparison.OrdinalIgnoreCase);
+        bool knownStorageProvider = localStorage || networkStorage || sharePointStorage;
         string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
         string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
         bool malwareScanningEnabled = configuration.GetValue("Uploads:MalwareScanning:Enabled", false);
@@ -70,6 +73,9 @@ internal static class ProductionCommissioning
         AddIf(string.IsNullOrWhiteSpace(connectionString),
             "RP-CONFIG-DB-001",
             "PostgreSQL connection string 'RequestPortal' is not configured through Common.Secrets.");
+        AddIf(!knownStorageProvider,
+            "RP-PROD-STORAGE-PROVIDER-001",
+            "Storage:Provider must be LocalFolder, NetworkFolder, or SharePoint.");
         AddIf(!sharePointStorage && (string.IsNullOrWhiteSpace(storageRoot) || storageRoot.Contains("App_Data", StringComparison.OrdinalIgnoreCase)),
             "RP-PROD-STORAGE-001",
             "Production document storage must use SharePoint or a durable external filesystem/network target.");
@@ -77,6 +83,9 @@ internal static class ProductionCommissioning
               (string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:TenantId"]) ||
                string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:ClientId"]) ||
                string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:HostName"]) ||
+               (string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:DriveId"]) &&
+                string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:DriveName"])) ||
+               string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:RootFolder"]) ||
                string.IsNullOrWhiteSpace(secrets.StorageSharePointClientSecret)),
             "RP-PROD-STORAGE-SP-001",
             "SharePoint storage requires TenantId, ClientId, HostName and a Common.Secrets-backed client secret.");
