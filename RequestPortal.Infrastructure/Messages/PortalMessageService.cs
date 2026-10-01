@@ -176,7 +176,9 @@ public sealed class PortalMessageService : IPortalMessageService
                 on thread.RequestId equals request.Id into requests
             from request in requests.DefaultIfEmpty()
             where thread.ClosedUtc != null &&
-                  (message.SenderUserId == userId || recipients.Any(item => item.UserId == userId))
+                  (isStaff
+                      ? thread.StaffVisible
+                      : message.SenderUserId == userId || recipients.Any(item => item.UserId == userId))
             orderby message.SentUtc descending
             select new
             {
