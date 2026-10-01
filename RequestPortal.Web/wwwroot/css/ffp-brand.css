@@ -1537,3 +1537,57 @@ tr.staff-select-row:focus td:first-child{
         height:90px;
     }
 }
+
+
+/* Temporary Create Request diagnostic exception panel */
+.request-debug-error{
+    margin:0 0 16px;
+    border:2px solid #a52323;
+    border-radius:5px;
+    background:#fff7f7;
+    color:#4a1111;
+    overflow:hidden;
+}
+.request-debug-error-title{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:10px 12px;
+    background:#a52323;
+    color:#fff;
+}
+.request-debug-error-title span{
+    font-size:.78rem;
+    opacity:.9;
+}
+.request-debug-error dl{
+    display:grid;
+    grid-template-columns:1fr 2fr;
+    gap:0;
+    margin:0;
+    border-bottom:1px solid #e4bcbc;
+}
+.request-debug-error dl>div{
+    display:grid;
+    grid-template-columns:110px minmax(0,1fr);
+    gap:8px;
+    padding:7px 12px;
+}
+.request-debug-error dt{
+    font-weight:800;
+}
+.request-debug-error dd{
+    margin:0;
+    overflow-wrap:anywhere;
+}
+.request-debug-error pre{
+    margin:0;
+    padding:12px;
+    max-height:520px;
+    overflow:auto;
+    white-space:pre-wrap;
+    word-break:break-word;
+    background:#201515;
+    color:#ffeaea;
+    font:12px/1.45 Consolas, "Courier New", monospace;
+}
