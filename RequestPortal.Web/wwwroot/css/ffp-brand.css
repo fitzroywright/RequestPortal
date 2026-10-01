@@ -677,3 +677,57 @@ tr.staff-select-row:hover td:first-child,
 tr.staff-select-row:focus td:first-child{
     box-shadow:inset 3px 0 0 var(--ffp-orange);
 }
+
+
+/* Home page redesign */
+.home-hero .relief-carousel-stage{height:430px}
+.home-hero-copy{padding-top:54px}
+.home-hero-copy h1{max-width:660px;font-size:clamp(2.7rem,5vw,4.8rem)}
+.home-access{padding:34px 0 26px;background:#f6f8fb}
+.home-access-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:28px;align-items:start}
+.home-access-main{min-width:0}
+.home-access-heading{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr);gap:28px;align-items:end;margin-bottom:18px}
+.home-kicker{display:block;margin-bottom:4px;color:var(--ffp-navy);font-weight:900;letter-spacing:.03em}
+.home-access-heading h2{margin:0;color:var(--ffp-navy-deep);font-size:1.75rem}
+.home-access-heading p{margin:0;color:var(--muted);line-height:1.55}
+.home-feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.home-feature{display:flex;gap:12px;align-items:flex-start;min-height:128px;padding:18px;border:1px solid #d9e1e8;background:#fff;border-radius:6px;box-shadow:0 3px 10px rgba(16,38,58,.05);text-decoration:none}
+.home-feature:hover{border-color:#bccbd8;box-shadow:0 7px 18px rgba(16,38,58,.08)}
+.home-feature-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:50%;background:#e7f1ff;color:#1c5a97;font-weight:900}
+.home-feature:nth-child(2) .home-feature-icon{background:#e9f7e8;color:#22733b}
+.home-feature:nth-child(3) .home-feature-icon{background:#fff3c5;color:#755c00;font-size:.7rem}
+.home-feature strong{display:block;margin-bottom:5px;color:var(--ffp-navy-deep)}
+.home-feature span:last-child{display:block;color:var(--muted);font-size:.9rem;line-height:1.45}
+.home-how{margin-top:22px;padding-top:20px;border-top:1px solid #dbe2e8}
+.home-how h2{margin:0 0 12px;color:var(--ffp-navy-deep);font-size:1.35rem}
+.home-how-grid{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center}
+.home-how-step{display:flex;gap:10px;align-items:flex-start}
+.home-how-step>span{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:50%;background:#ddecff;color:#194f86;font-weight:900}
+.home-how-step:nth-of-type(3)>span{background:#e2f5e7;color:#247541}
+.home-how-step:nth-of-type(5)>span{background:#fff0b8;color:#725a00}
+.home-how-step strong{display:block;color:var(--ffp-navy-deep);font-size:.95rem}
+.home-how-step small{display:block;margin-top:3px;color:var(--muted);line-height:1.4}
+.home-how-arrow{color:#7890a3;font-size:1.4rem}
+.home-registration-note{position:relative;padding:24px 22px 20px;background:#fff3a8;border:1px solid #e1ca64;border-radius:2px;box-shadow:0 12px 24px rgba(75,63,19,.16);transform:rotate(-.65deg)}
+.home-registration-note::before{content:"";position:absolute;top:-8px;left:50%;width:76px;height:18px;transform:translateX(-50%) rotate(2deg);background:rgba(242,221,135,.95);border:1px solid rgba(182,157,67,.3)}
+.home-registration-note h3{margin:0 0 10px;color:var(--ffp-navy-deep);font-size:1.45rem}
+.home-registration-note p{margin:0;color:#514a2f;line-height:1.5}
+.home-registration-note small{display:block;margin-top:10px;color:#685f3b;line-height:1.4}
+.home-note-button{width:100%;margin-top:16px}
+.home-impact{padding:12px 0 30px;background:#fff}
+.home-impact-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.home-impact-card{position:relative;min-height:170px;overflow:hidden;border-radius:6px;background-image:linear-gradient(90deg,rgba(8,23,37,.82),rgba(8,23,37,.18)),var(--home-image);background-size:cover;background-position:center;box-shadow:0 3px 10px rgba(16,38,58,.08)}
+.home-impact-card>div{position:absolute;left:18px;right:18px;bottom:18px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.home-impact-card strong{display:block;font-size:1.35rem;margin-bottom:5px}
+.home-impact-card span{display:block;max-width:260px;line-height:1.4}
+@media(max-width:1000px){
+    .home-access-grid{grid-template-columns:1fr}
+    .home-registration-note{width:min(360px,100%);transform:none}
+    .home-access-heading{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+    .home-feature-grid,.home-impact-grid{grid-template-columns:1fr}
+    .home-how-grid{grid-template-columns:1fr}
+    .home-how-arrow{display:none}
+    .home-hero .relief-carousel-stage{height:450px}
+}
