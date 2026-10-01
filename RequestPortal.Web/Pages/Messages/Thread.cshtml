@@ -13,6 +13,46 @@
             <div class="section-heading">
                 <div class="eyebrow" style="color:#b45b09">Conversation</div>
                 <h1>@Model.Thread.Subject</h1>
+                @if (Model.IsStaff)
+                {
+                    <div class="action-row" style="margin:10px 0">
+                        @if (Model.Thread.ClosedUtc.HasValue)
+                        {
+                            <span class="status">Closed</span>
+                            <form method="post" asp-page-handler="Reopen" asp-route-id="@Model.Thread.ThreadId">
+                                <button class="button button-small" type="submit">Reopen</button>
+                            </form>
+                        }
+                        else
+                        {
+                            @if (Model.Thread.AssignedToStaffUserId.HasValue)
+                            {
+                                <span class="status">Assigned to @(Model.Thread.AssignedToStaffName ?? "FFP Staff")</span>
+                            }
+                            else
+                            {
+                                <span class="status">Unassigned</span>
+                            }
+
+                            @if (Model.IsAssignedToCurrentStaff)
+                            {
+                                <form method="post" asp-page-handler="Unassign" asp-route-id="@Model.Thread.ThreadId">
+                                    <button class="button button-small button-secondary" type="submit">Unassign</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form method="post" asp-page-handler="Assign" asp-route-id="@Model.Thread.ThreadId">
+                                    <button class="button button-small" type="submit">Assign to me</button>
+                                </form>
+                            }
+
+                            <form method="post" asp-page-handler="Close" asp-route-id="@Model.Thread.ThreadId">
+                                <button class="button button-small button-secondary" type="submit">Close</button>
+                            </form>
+                        }
+                    </div>
+                }
                 <p class="conversation-context">
                     <strong>@Model.Thread.Audience.ToString().Replace("OrganizationManager", "Organization Manager").Replace("FfpInternal", "FFP Internal")</strong> · @Model.Thread.OrganizationName
                     @if (!string.IsNullOrWhiteSpace(Model.Thread.RequestReference))
@@ -68,6 +108,8 @@
                 }
             </div>
 
+            @if (!Model.Thread.ClosedUtc.HasValue)
+            {
             <form method="post" class="card" style="margin-top:20px">
                 <label asp-for="Reply">Reply</label>
                 <textarea asp-for="Reply" rows="6" maxlength="10000" required></textarea>
@@ -89,6 +131,14 @@
 
                 <button class="button" type="submit">Send reply</button>
             </form>
+            }
+            else
+            {
+                <div class="card" style="margin-top:20px">
+                    <strong>This conversation is closed.</strong>
+                    <p class="muted">FFP staff can reopen it if further correspondence is required.</p>
+                </div>
+            }
         }
     </div>
 </section>
