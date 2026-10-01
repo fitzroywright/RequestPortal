@@ -160,6 +160,13 @@ public interface IPortalMessageService
         CancellationToken cancellationToken = default,
         IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
 
+    Task<Guid> SendStaffAlertAsync(
+        Guid? organizationId,
+        Guid? requestId,
+        string subject,
+        string body,
+        CancellationToken cancellationToken = default);
+
     Task<Guid> SendSystemMessageAsync(
         Guid? organizationId,
         Guid? requestId,
