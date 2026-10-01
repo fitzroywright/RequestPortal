@@ -11,6 +11,7 @@ public interface IRequestDraftService
         Guid userId,
         Guid requestId,
         Guid? beneficiaryId,
+        RequestKind kind,
         string? category,
         string? subcategory,
         string? programCategory,
