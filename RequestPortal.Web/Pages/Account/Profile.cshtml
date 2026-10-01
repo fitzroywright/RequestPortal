@@ -1,0 +1,183 @@
+@page
+@model RequestPortal.Web.Pages.Account.ProfileModel
+@using RequestPortal.Application.Notifications
+@using RequestPortal.Domain.Notifications
+@{
+    ViewData["Title"] = "My Profile";
+    NotificationPreferenceView? email = Model.FindPreference(NotificationChannel.Email);
+    NotificationPreferenceView? whatsapp = Model.FindPreference(NotificationChannel.WhatsApp);
+}
+
+<section class="profile-workspace">
+    <div class="shell profile-workspace-shell">
+        <header class="profile-titlebar">
+            <div>
+                <div class="eyebrow request-eyebrow">My account</div>
+                <h1>Profile</h1>
+                <p>Your personal details, organization memberships and notification preferences in one place.</p>
+            </div>
+            <a class="button button-small button-outline" asp-page="/Dashboard/Index">Back to workspace</a>
+        </header>
+
+        <div asp-validation-summary="ModelOnly" class="validation profile-validation"></div>
+
+        <div class="profile-dashboard">
+            <section class="profile-panel profile-personal">
+                <div class="profile-panel-title">
+                    <strong>Personal &amp; contact</strong>
+                    <small>Your Request Portal identity</small>
+                </div>
+                <form method="post" asp-page-handler="Profile" class="profile-compact-form">
+                    <div class="field">
+                        <label asp-for="ProfileInput.DisplayName">Name</label>
+                        <input asp-for="ProfileInput.DisplayName" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="ProfileInput.Email">Email</label>
+                        <input asp-for="ProfileInput.Email" type="email" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="ProfileInput.PhoneNumber">Phone number</label>
+                        <input asp-for="ProfileInput.PhoneNumber" type="tel" />
+                    </div>
+                    <div class="profile-readonly-row">
+                        <span>Registered identity</span>
+                        <strong>@Model.RegisteredIdentity</strong>
+                    </div>
+                    <button class="button button-small" type="submit">Save contact details</button>
+                </form>
+            </section>
+
+            <section class="profile-panel profile-membership">
+                <div class="profile-panel-title">
+                    <strong>Organization membership</strong>
+                    <small>@Model.Organizations.Count current membership(s)</small>
+                </div>
+
+                <div class="profile-membership-list">
+                    @if (Model.Organizations.Count == 0)
+                    {
+                        <p class="profile-empty">No organization memberships yet.</p>
+                    }
+                    else
+                    {
+                        @foreach (OrganizationSummary organization in Model.Organizations)
+                        {
+                            <div class="profile-membership-row">
+                                <div>
+                                    <strong>@organization.Name</strong>
+                                    <small>@organization.CountryCode · @organization.Role</small>
+                                </div>
+                                <span class="status status-@organization.MembershipStatus">@organization.MembershipStatus</span>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="profile-membership-actions">
+                    @if (Model.AvailableOrganizations.Count > 0)
+                    {
+                        <form method="post" asp-page-handler="RequestMembership" class="profile-inline-form">
+                            <select name="organizationId" aria-label="Organization to join">
+                                @foreach (OrganizationSummary organization in Model.AvailableOrganizations)
+                                {
+                                    <option value="@organization.Id">@organization.Name (@organization.CountryCode)</option>
+                                }
+                            </select>
+                            <button class="button button-small" type="submit">Request to join</button>
+                        </form>
+                    }
+
+                    @if (Model.RegistrationCountries.Count > 0)
+                    {
+                        <form method="post" asp-page-handler="RegisterOrganization" class="profile-register-form">
+                            <input asp-for="Registration.Name" placeholder="New organization name" />
+                            <select asp-for="Registration.CountryCode">
+                                @foreach (var country in Model.RegistrationCountries)
+                                {
+                                    <option value="@country.CountryCode">@country.DisplayName</option>
+                                }
+                            </select>
+                            <button class="button button-small button-outline" type="submit">Register organization</button>
+                        </form>
+                    }
+                </div>
+            </section>
+
+            <section class="profile-panel profile-notifications">
+                <div class="profile-panel-title">
+                    <strong>Notification preferences</strong>
+                    <small>Default email is your registered email address</small>
+                </div>
+
+                <form method="post" asp-page-handler="Preference" class="profile-notification-row">
+                    <input type="hidden" name="PreferenceInput.Channel" value="Email" />
+                    <div>
+                        <strong>Email</strong>
+                        <input name="PreferenceInput.Destination"
+                               value="@(email?.Destination ?? Model.ProfileInput.Email)"
+                               type="email"
+                               maxlength="500"
+                               aria-label="Notification email" />
+                    </div>
+                    <label class="profile-toggle">
+                        <input type="checkbox"
+                               name="PreferenceInput.Enabled"
+                               value="true"
+                               @(email?.Enabled != false ? "checked" : null)
+                               disabled="@(!Model.EmailAvailable)" />
+                        <span>Enabled</span>
+                    </label>
+                    <button class="button button-small button-outline"
+                            type="submit"
+                            disabled="@(!Model.EmailAvailable)">Save</button>
+                </form>
+
+                <form method="post" asp-page-handler="Preference" class="profile-notification-row">
+                    <input type="hidden" name="PreferenceInput.Channel" value="WhatsApp" />
+                    <div>
+                        <strong>WhatsApp</strong>
+                        <input name="PreferenceInput.Destination"
+                               value="@(whatsapp?.Destination ?? Model.ProfileInput.PhoneNumber)"
+                               type="tel"
+                               maxlength="500"
+                               aria-label="WhatsApp number" />
+                    </div>
+                    <label class="profile-toggle">
+                        <input type="checkbox"
+                               name="PreferenceInput.Enabled"
+                               value="true"
+                               @(whatsapp?.Enabled == true ? "checked" : null)
+                               disabled="@(!Model.WhatsAppAvailable)" />
+                        <span>@(Model.WhatsAppAvailable ? "Enabled" : "Unavailable")</span>
+                    </label>
+                    <button class="button button-small button-outline"
+                            type="submit"
+                            disabled="@(!Model.WhatsAppAvailable)">Save</button>
+                </form>
+
+                <div class="profile-org-notifications">
+                    <strong>Organization manager notifications</strong>
+                    @if (Model.OrganizationSubscriptions.Count == 0)
+                    {
+                        <small>No administrator notification settings are available.</small>
+                    }
+                    else
+                    {
+                        @foreach (OrganizationNotificationSubscriptionView subscription in Model.OrganizationSubscriptions)
+                        {
+                            <form method="post" asp-page-handler="OrganizationSubscription" class="profile-org-notification-row">
+                                <input type="hidden" name="OrganizationInput.MembershipId" value="@subscription.MembershipId" />
+                                <span title="@subscription.OrganizationName">@subscription.OrganizationName</span>
+                                <label title="Organization notices"><input type="checkbox" name="OrganizationInput.ReceiveOrganizationNotifications" value="true" @(subscription.ReceiveOrganizationNotifications ? "checked" : null) /> Org</label>
+                                <label title="Request updates"><input type="checkbox" name="OrganizationInput.ReceiveRequestNotifications" value="true" @(subscription.ReceiveRequestNotifications ? "checked" : null) /> Requests</label>
+                                <label title="Membership events"><input type="checkbox" name="OrganizationInput.ReceiveMembershipNotifications" value="true" @(subscription.ReceiveMembershipNotifications ? "checked" : null) /> Members</label>
+                                <button class="button button-small button-outline" type="submit">Save</button>
+                            </form>
+                        }
+                    }
+                </div>
+            </section>
+        </div>
+    </div>
+</section>
