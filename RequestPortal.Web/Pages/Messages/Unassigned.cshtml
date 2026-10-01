@@ -1,0 +1,68 @@
+@page
+@model RequestPortal.Web.Pages.Messages.UnassignedModel
+@using RequestPortal.Application.Messages
+@{
+    ViewData["Title"] = "Unassigned";
+}
+
+<section class="operational-page">
+    <div class="shell">
+        <header class="operational-titlebar">
+            <div>
+                <div class="eyebrow request-eyebrow">FFP Staff Messages</div>
+                <h1>Unassigned</h1>
+                <p>Shared Request Portal correspondence waiting for an FFP staff owner.</p>
+            </div>
+            <div class="operational-toolbar">
+                <a class="button" asp-page="/Messages/New">New message</a>
+            </div>
+        </header>
+
+        <div class="outlook-mailbox">
+            <aside class="outlook-folder-card">
+                <div class="outlook-folder-title">Shared mailbox</div>
+                <nav aria-label="Message folders">
+                    <a class="outlook-folder" asp-page="/Messages/Inbox"><span>▣ Inbox</span></a>
+                    <a class="outlook-folder" asp-page="/Messages/Assigned"><span>✓ Assigned to Me</span></a>
+                    <a class="outlook-folder is-active" asp-page="/Messages/Unassigned"><span>○ Unassigned</span></a>
+                    <a class="outlook-folder" asp-page="/Messages/Sent"><span>↗ Sent Items</span></a>
+                    <a class="outlook-folder" asp-page="/Messages/Archived"><span>▤ Closed</span></a>
+                </nav>
+            </aside>
+
+            <section class="outlook-message-workspace">
+                <div class="outlook-workspace-titlebar">
+                    <div><strong>Unassigned</strong><span>@Model.Messages.Count conversations</span></div>
+                    <span class="outlook-toolbar-note">Newest first</span>
+                </div>
+                @if (Model.Messages.Count == 0)
+                {
+                    <div class="workspace-empty"><strong>No unassigned conversations.</strong></div>
+                }
+                else
+                {
+                    @foreach (MailboxMessageView message in Model.Messages)
+                    {
+                        <a class="outlook-message-grid outlook-message-row" asp-page="/Messages/Thread" asp-route-id="@message.ThreadId">
+                            <span class="outlook-message-state">@(message.ReadUtc is null ? "●" : "○")</span>
+                            <span class="outlook-sender">
+                                <strong>@message.SenderName</strong>
+                                <small>@message.SenderKind</small>
+                                @if (!string.IsNullOrWhiteSpace(message.SenderEmail))
+                                {
+                                    <small>@message.SenderEmail</small>
+                                }
+                            </span>
+                            <span class="outlook-subject"><strong>@message.Subject</strong><small>@message.Preview</small></span>
+                            <span class="outlook-context">
+                                @if (!string.IsNullOrWhiteSpace(message.OrganizationName)) { <small>@message.OrganizationName</small> }
+                                @if (!string.IsNullOrWhiteSpace(message.RequestReference)) { <small>@message.RequestReference</small> }
+                            </span>
+                            <span class="outlook-date"><time>@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time></span>
+                        </a>
+                    }
+                }
+            </section>
+        </div>
+    </div>
+</section>
