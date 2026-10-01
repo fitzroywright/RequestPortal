@@ -126,6 +126,13 @@ public sealed class LoginModel : PageModel
                     HttpContext.RequestAborted);
             }
 
+            if (existingUser is null)
+            {
+                ErrorMessage = "The external sign-in account could not be found.";
+                await LoadProvidersAsync();
+                return Page();
+            }
+
             await signInManager.SignInWithClaimsAsync(
                 existingUser,
                 isPersistent: false,
