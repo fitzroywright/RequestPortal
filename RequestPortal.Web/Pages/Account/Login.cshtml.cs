@@ -178,7 +178,14 @@ public sealed class LoginModel : PageModel
             user.Id,
             user.Email,
             HttpContext.RequestAborted);
-        await signInManager.SignInAsync(user, isPersistent: false);
+        await signInManager.SignInWithClaimsAsync(
+            user,
+            isPersistent: false,
+            new[]
+            {
+                new Claim(ClaimTypes.Name, user.DisplayName ?? user.Email ?? "User"),
+                new Claim(ClaimTypes.GivenName, user.DisplayName ?? user.Email ?? "User")
+            });
         await EmitAsync("RP-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
 
         return LocalRedirect(ReturnUrl);
