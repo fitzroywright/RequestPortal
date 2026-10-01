@@ -164,15 +164,27 @@
 
                         <div class="rich-editor-shell">
                             <div class="rich-editor-toolbar" role="toolbar" aria-label="Project description formatting">
-                                <button type="button" data-command="undo" title="Undo">↶</button>
-                                <button type="button" data-command="redo" title="Redo">↷</button>
-                                <button type="button" data-command="bold"><strong>B</strong></button>
-                                <button type="button" data-command="italic"><em>I</em></button>
-                                <button type="button" data-block="p">Paragraph</button>
-                                <button type="button" data-block="h2">Heading</button>
-                                <button type="button" data-command="insertUnorderedList">Bullets</button>
-                                <button type="button" data-command="insertOrderedList">Numbers</button>
-                                <button type="button" id="insert-table">Table</button>
+                                <button type="button" data-command="undo" title="Undo" aria-label="Undo">↶</button>
+                                <button type="button" data-command="redo" title="Redo" aria-label="Redo">↷</button>
+                                <span class="rich-editor-toolbar-separator" aria-hidden="true"></span>
+                                <button type="button" data-command="bold" title="Bold" aria-label="Bold"><strong>B</strong></button>
+                                <button type="button" data-command="italic" title="Italic" aria-label="Italic"><em>I</em></button>
+                                <span class="rich-editor-toolbar-separator" aria-hidden="true"></span>
+                                <button type="button" class="editor-icon-button" data-block="p" title="Paragraph" aria-label="Paragraph">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h9a4 4 0 0 1 0 8h-2v8h-2V6h-2v14H9v-8H8a4 4 0 1 1 0-8Zm0 2a2 2 0 1 0 0 4h1V6H8Zm7 0v4h2a2 2 0 1 0 0-4h-2Z"/></svg>
+                                </button>
+                                <button type="button" class="editor-icon-button" data-block="h2" title="Heading" aria-label="Heading">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2v6h8V5h2v14h-2v-6H6v6H4V5Zm14 8h5v2h-3v1h2a1 1 0 0 1 1 1v3h-5v-2h3v-1h-2a1 1 0 0 1-1-1v-3Z"/></svg>
+                                </button>
+                                <button type="button" class="editor-icon-button" data-command="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm2-1h15v2H7V5ZM5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm2-1h15v2H7v-2Zm-2 7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm2-1h15v2H7v-2Z"/></svg>
+                                </button>
+                                <button type="button" class="editor-icon-button" data-command="insertOrderedList" title="Numbered list" aria-label="Numbered list">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2v4H3V6H2V5h1V4Zm-1 7h3v1l-2 2h2v1H2v-1l2-2H2v-1Zm0 6h3v1l-1 1 1 1v1H2v-1h2l-1-1 1-1H2v-1Zm6-12h14v2H8V5Zm0 6h14v2H8v-2Zm0 6h14v2H8v-2Z"/></svg>
+                                </button>
+                                <button type="button" class="editor-icon-button" id="insert-table" title="Insert table" aria-label="Insert table">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3V4Zm2 2v3h4V6H5Zm6 0v3h4V6h-4Zm6 0v3h2V6h-2ZM5 11v3h4v-3H5Zm6 0v3h4v-3h-4Zm6 0v3h2v-3h-2ZM5 16v2h4v-2H5Zm6 0v2h4v-2h-4Zm6 0v2h2v-2h-2Z"/></svg>
+                                </button>
                             </div>
                             <div id="project-editor"
                                  class="rich-project-editor"
