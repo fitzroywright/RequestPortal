@@ -27,3 +27,6 @@ secrets.json
 publish-test/
 requestportal-clean.tgz
 requestportal-test.tgz
+
+# Local IDE/generated personalization state
+.cr/
