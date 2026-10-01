@@ -566,11 +566,15 @@ public sealed class PortalMessageService : IPortalMessageService
             throw new InvalidOperationException("No eligible recipients are available for the selected audience.");
         }
 
-        bool staffVisible = audience == MessageAudience.FfpInternal ||
-            (!senderIsStaff && await dbContext.Users.AsNoTracking()
+        bool staffVisible =
+            senderIsStaff ||
+            audience == MessageAudience.FfpInternal ||
+            await dbContext.Users.AsNoTracking()
                 .AnyAsync(
-                    user => effectiveRecipients.Contains(user.Id) && user.IsInternalStaff,
-                    cancellationToken));
+                    user =>
+                        effectiveRecipients.Contains(user.Id) &&
+                        user.IsInternalStaff,
+                    cancellationToken);
 
         return await SendInternalAsync(
             senderUserId,
@@ -1160,7 +1164,10 @@ public sealed class PortalMessageService : IPortalMessageService
             join thread in dbContext.MessageThreads.AsNoTracking()
                 on message.ThreadId equals thread.Id
             where thread.StaffVisible &&
-                  thread.ClosedUtc == null
+                  thread.ClosedUtc == null &&
+                  message.SenderUserId != staffUserId &&
+                  (message.SenderKind != PortalMessageSenderKind.FfpStaff ||
+                   thread.Audience == MessageAudience.FfpInternal)
             select message.Id)
             .ToArrayAsync(cancellationToken);
 
@@ -1197,10 +1204,15 @@ public sealed class PortalMessageService : IPortalMessageService
     {
         await EnsureInternalStaffAsync(staffUserId, cancellationToken);
 
-        Guid[] messageIds = await dbContext.PortalMessages
-            .AsNoTracking()
-            .Where(message => message.ThreadId == threadId)
-            .Select(message => message.Id)
+        Guid[] messageIds = await (
+            from message in dbContext.PortalMessages.AsNoTracking()
+            join thread in dbContext.MessageThreads.AsNoTracking()
+                on message.ThreadId equals thread.Id
+            where message.ThreadId == threadId &&
+                  message.SenderUserId != staffUserId &&
+                  (message.SenderKind != PortalMessageSenderKind.FfpStaff ||
+                   thread.Audience == MessageAudience.FfpInternal)
+            select message.Id)
             .ToArrayAsync(cancellationToken);
 
         Guid[] existing = await dbContext.MessageRecipients
