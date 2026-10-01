@@ -6,94 +6,184 @@
     ViewData["Title"] = "New Message";
 }
 
-<section class="section">
-    <div class="shell">
+<section class="section message-compose-page">
+    <div class="shell message-compose-shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">Messages</div>
             <h1>New message</h1>
-            <p>@(Model.IsStaff ? "Send a message from the shared FFP Staff mailbox. The representative will see your first name and FFP Staff, not your email address." : "Message FFP Staff or another approved representative in one of your organizations.")</p>
+            @if (Model.IsStaff)
+            {
+                <p>Send a message from the shared FFP Staff mailbox.</p>
+            }
+            else
+            {
+                <p>Write your message and send it. FFP Staff is the default recipient.</p>
+            }
         </div>
 
-        <form method="get" class="card" style="margin-bottom:20px">
-            <label for="organizationId">Organization</label>
-            <select id="organizationId" name="OrganizationId" onchange="this.form.submit()">
-                <option value="">Choose organization</option>
-                @foreach (var organization in Model.Organizations)
-                {
-                    <option value="@organization.Id" selected="@(Model.OrganizationId == organization.Id ? "selected" : null)">@organization.Name</option>
-                }
-            </select>
-            @if (Model.RequestId.HasValue)
-            {
-                <input type="hidden" name="RequestId" value="@Model.RequestId" />
-            }
-        </form>
-
-        @if (Model.OrganizationId.HasValue)
+        @if (!Model.IsStaff)
         {
-            <form method="post" class="card">
-                <input type="hidden" asp-for="OrganizationId" />
-                <input type="hidden" asp-for="RequestId" />
-                <div asp-validation-summary="ModelOnly" class="validation"></div>
-
-                <label asp-for="Audience">Audience</label>
-                <select asp-for="Audience">
-                    <option value="@MessageAudience.Individual">Individual</option>
-                    @if (Model.CanBroadcastToOrganization)
-                    {
-                        <option value="@MessageAudience.Organization">Organization</option>
-                        <option value="@MessageAudience.OrganizationManager">Organization Manager</option>
-                    }
-                    @if (Model.IsStaff)
-                    {
-                        <option value="@MessageAudience.FfpInternal">FFP Internal</option>
-                    }
-                </select>
-                <p class="muted compact-help">Audience controls visibility. Direct and internal conversations are never widened automatically.</p>
-
-                <label>Individual recipient</label>
-                @if (!Model.IsStaff)
-                {
-                    <label class="check-row">
-                        <input asp-for="ToFfpStaff" />
-                        <span><strong>FFP Staff</strong> · shared staff inbox</span>
-                    </label>
-                }
-
-                <select asp-for="RecipientUserId">
-                    <option value="">@(Model.IsStaff ? "Choose representative" : "Or choose an organization representative")</option>
-                    @foreach (MessageRecipientOption recipient in Model.Recipients)
-                    {
-                        <option value="@recipient.UserId">@recipient.DisplayName@if (Model.IsStaff && !string.IsNullOrWhiteSpace(recipient.Email)) { <text> · @recipient.Email</text> }</option>
-                    }
-                </select>
-
-                <label asp-for="Subject">Subject</label>
-                <input asp-for="Subject" maxlength="300" />
-                <span asp-validation-for="Subject" class="validation"></span>
-
-                <label asp-for="Body">Message</label>
-                <textarea asp-for="Body" rows="9" maxlength="10000"></textarea>
-                <span asp-validation-for="Body" class="validation"></span>
-
-                @if (Model.AvailableAttachments.Count > 0)
-                {
-                    <fieldset class="field" style="border:1px solid #dde3e8;padding:14px">
-                        <legend style="font-weight:700">Link request documents</legend>
-                        <p class="muted">Documents remain in Common.Storage. Messages contain permission-aware references; no duplicate attachment is created.</p>
-                        @foreach (var document in Model.AvailableAttachments.Where(item => !item.IsArchived))
+            @if (Model.Organizations.Count > 1 && !Model.RequestId.HasValue)
+            {
+                <form method="get" class="message-compose-context">
+                    <label for="organizationId">Organization</label>
+                    <select id="organizationId" name="OrganizationId" onchange="this.form.submit()">
+                        <option value="">Choose organization</option>
+                        @foreach (var organization in Model.Organizations)
                         {
-                            <label class="check-row">
-                                <input type="checkbox" name="AttachmentDocumentIds" value="@document.Id" />
-                                <span>@document.OriginalFileName <small class="muted">(@document.DocumentType)</small></span>
+                            <option value="@organization.Id"
+                                    selected="@(Model.OrganizationId == organization.Id ? "selected" : null)">
+                                @organization.Name
+                            </option>
+                        }
+                    </select>
+                </form>
+            }
+
+            @if (Model.OrganizationId.HasValue)
+            {
+                <form method="post" class="message-compose-card">
+                    <input type="hidden" asp-for="OrganizationId" />
+                    <input type="hidden" asp-for="RequestId" />
+                    <input type="hidden" asp-for="Subject" />
+                    <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+                    <div class="message-destination-bar" role="radiogroup" aria-label="Send message to">
+                        <label class="message-destination-option">
+                            <input asp-for="Destination" type="radio" value="ffp" />
+                            <span>FFP Staff</span>
+                        </label>
+                        <label class="message-destination-option">
+                            <input asp-for="Destination" type="radio" value="manager" />
+                            <span>Organization Manager</span>
+                        </label>
+                        @if (Model.RequestId.HasValue)
+                        {
+                            <label class="message-destination-option message-destination-note">
+                                <input asp-for="Destination" type="radio" value="note" />
+                                <span>Private application note</span>
                             </label>
                         }
-                    </fieldset>
-                }
+                    </div>
+                    <span asp-validation-for="Destination" class="validation"></span>
 
-                <button class="button" type="submit">Send message</button>
-                <a class="button button-secondary" asp-page="/Messages/Inbox">Cancel</a>
+                    @if (!string.IsNullOrWhiteSpace(Model.RequestReference))
+                    {
+                        <div class="message-request-context">
+                            Application <strong>@Model.RequestReference</strong>
+                        </div>
+                    }
+
+                    <div class="message-composer-box">
+                        <textarea asp-for="Body"
+                                  rows="8"
+                                  maxlength="10000"
+                                  placeholder="Write a message..."
+                                  aria-label="Message"></textarea>
+                        <span asp-validation-for="Body" class="validation"></span>
+
+                        <div class="message-composer-footer">
+                            <details class="message-attachment-menu">
+                                <summary title="Link a request document" aria-label="Link a request document">📎</summary>
+                                @if (Model.AvailableAttachments.Count > 0)
+                                {
+                                    <div class="message-attachment-picker">
+                                        <strong>Link request documents</strong>
+                                        @foreach (var document in Model.AvailableAttachments.Where(item => !item.IsArchived))
+                                        {
+                                            <label class="check-row">
+                                                <input type="checkbox" name="AttachmentDocumentIds" value="@document.Id" />
+                                                <span>@document.OriginalFileName</span>
+                                            </label>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="message-attachment-picker">
+                                        <span class="muted">No request documents are available to link.</span>
+                                    </div>
+                                }
+                            </details>
+
+                            <button class="button" type="submit">Send</button>
+                        </div>
+                    </div>
+
+                    <p class="muted compact-help message-destination-help">
+                        <strong>FFP Staff</strong> sends to the shared staff inbox.
+                        <strong>Organization Manager</strong> sends only to approved managers of this organization.
+                        @if (Model.RequestId.HasValue)
+                        {
+                            <text><strong>Private application note</strong> is visible only to you and stays attached to this application.</text>
+                        }
+                    </p>
+                </form>
+            }
+            else
+            {
+                <div class="card">
+                    <strong>Choose an organization first.</strong>
+                    <p class="muted">Messages are always associated with the organization you are representing.</p>
+                </div>
+            }
+        }
+        else
+        {
+            <form method="get" class="card" style="margin-bottom:20px">
+                <label for="organizationId">Organization</label>
+                <select id="organizationId" name="OrganizationId" onchange="this.form.submit()">
+                    <option value="">Choose organization</option>
+                    @foreach (var organization in Model.Organizations)
+                    {
+                        <option value="@organization.Id"
+                                selected="@(Model.OrganizationId == organization.Id ? "selected" : null)">
+                            @organization.Name
+                        </option>
+                    }
+                </select>
+                @if (Model.RequestId.HasValue)
+                {
+                    <input type="hidden" name="RequestId" value="@Model.RequestId" />
+                }
             </form>
+
+            @if (Model.OrganizationId.HasValue)
+            {
+                <form method="post" class="card">
+                    <input type="hidden" asp-for="OrganizationId" />
+                    <input type="hidden" asp-for="RequestId" />
+                    <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+                    <label asp-for="Audience">Audience</label>
+                    <select asp-for="Audience">
+                        <option value="@MessageAudience.Individual">Individual</option>
+                        <option value="@MessageAudience.Organization">Organization</option>
+                        <option value="@MessageAudience.OrganizationManager">Organization Manager</option>
+                        <option value="@MessageAudience.FfpInternal">FFP Internal</option>
+                    </select>
+
+                    <label asp-for="RecipientUserId">Recipient</label>
+                    <select asp-for="RecipientUserId">
+                        <option value="">Choose representative</option>
+                        @foreach (MessageRecipientOption recipient in Model.Recipients)
+                        {
+                            <option value="@recipient.UserId">
+                                @recipient.DisplayName@if (!string.IsNullOrWhiteSpace(recipient.Email)) { <text> · @recipient.Email</text> }
+                            </option>
+                        }
+                    </select>
+
+                    <label asp-for="Subject">Subject</label>
+                    <input asp-for="Subject" maxlength="300" />
+
+                    <label asp-for="Body">Message</label>
+                    <textarea asp-for="Body" rows="8" maxlength="10000"></textarea>
+                    <span asp-validation-for="Body" class="validation"></span>
+
+                    <button class="button" type="submit">Send</button>
+                </form>
+            }
         }
     </div>
 </section>
