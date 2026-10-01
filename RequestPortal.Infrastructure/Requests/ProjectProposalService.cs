@@ -292,6 +292,16 @@ public sealed class ProjectProposalService : IProjectProposalService
         }
         catch (Exception exception)
         {
+            foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry in
+                     dbContext.ChangeTracker.Entries()
+                         .Where(entry =>
+                             entry.Entity is RequestPortal.Domain.Auditing.AuditEntry &&
+                             entry.State == EntityState.Added)
+                         .ToArray())
+            {
+                entry.State = EntityState.Detached;
+            }
+
             logger.LogWarning(
                 exception,
                 "Project proposal audit could not be written for request {RequestId}. Request processing will continue.",
