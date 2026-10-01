@@ -69,6 +69,10 @@
                             <span class="outlook-sender">
                                 <strong>@message.SenderName</strong>
                                 <small>@message.SenderKind</small>
+                                @if (Model.IsStaff && !string.IsNullOrWhiteSpace(message.SenderEmail))
+                                {
+                                    <small>@message.SenderEmail</small>
+                                }
                             </span>
                             <span class="outlook-subject">
                                 <strong>@message.Subject</strong>
