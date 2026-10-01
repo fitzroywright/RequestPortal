@@ -728,6 +728,63 @@ public sealed class PortalMessageService : IPortalMessageService
             thread.Audience);
     }
 
+    public async Task<Guid> SendStaffAlertAsync(
+        Guid? organizationId,
+        Guid? requestId,
+        string subject,
+        string body,
+        CancellationToken cancellationToken = default)
+    {
+        await ValidateRequestScopeAsync(
+            organizationId,
+            requestId,
+            cancellationToken);
+
+        MessageThread thread = await ResolveThreadAsync(
+            threadId: null,
+            organizationId,
+            requestId,
+            subject,
+            staffVisible: true,
+            cancellationToken,
+            MessageAudience.FfpInternal);
+
+        Guid[] staffUserIds = await dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.IsInternalStaff)
+            .Select(user => user.Id)
+            .ToArrayAsync(cancellationToken);
+
+        if (staffUserIds.Length == 0)
+        {
+            throw new InvalidOperationException("No FFP staff mailbox identities are available.");
+        }
+
+        PortalMessage message = new(
+            Guid.NewGuid(),
+            thread.Id,
+            senderUserId: null,
+            PortalMessageSenderKind.System,
+            "Request Portal",
+            body,
+            DateTimeOffset.UtcNow);
+
+        dbContext.PortalMessages.Add(message);
+        AddRecipients(
+            message.Id,
+            staffUserIds,
+            senderUserId: null);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await NotifyAsync(
+            message,
+            thread,
+            staffUserIds,
+            cancellationToken);
+
+        return thread.Id;
+    }
+
     public async Task<Guid> SendSystemMessageAsync(
         Guid? organizationId,
         Guid? requestId,
