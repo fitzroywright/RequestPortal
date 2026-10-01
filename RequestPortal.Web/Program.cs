@@ -1,5 +1,6 @@
 using Common.Diagnostics;
 using Common.Secrets;
+using Common.Storage;
 using RequestPortal.Common.Configuration;
 using RequestPortal.Web.Configuration;
 using RequestPortal.Web.Startup;
@@ -57,6 +58,28 @@ string connectionString =
     runtimeSecrets.ConnectionString
     ?? throw new InvalidOperationException(
         "ConnectionStrings:RequestPortal is required through Common.Secrets.");
+
+string storageProvider = builder.Configuration["Storage:Provider"]?.Trim() ?? "LocalFolder";
+if (string.Equals(storageProvider, "SharePoint", StringComparison.OrdinalIgnoreCase))
+{
+    StorageTargetOptions storageTarget = StorageTargetOptions.FromConfiguration(
+        builder.Configuration,
+        runtimeSecrets.StorageSharePointClientSecret);
+    builder.Services.AddCommonStorage(storageTarget);
+}
+else
+{
+    StorageTargetOptions storageTarget = StorageTargetOptions.FromConfiguration(builder.Configuration);
+    if (storageTarget.Kind is StorageTargetKind.LocalFolder or StorageTargetKind.NetworkFolder &&
+        !Path.IsPathRooted(storageTarget.RootPath))
+    {
+        storageTarget = storageTarget with
+        {
+            RootPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, storageTarget.RootPath!))
+        };
+    }
+    builder.Services.AddCommonStorage(storageTarget);
+}
 
 PlatformServiceRegistration.AddPersistence(
     builder
