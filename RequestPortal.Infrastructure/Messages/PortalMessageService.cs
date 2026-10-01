@@ -85,8 +85,66 @@ public sealed class PortalMessageService : IPortalMessageService
                 row.Sender,
                 row.OrganizationName,
                 row.RequestReference,
-                isStaff))
+                isStaff,
+                dbContext.MessageAttachments.Any(attachment => attachment.MessageId == row.Message.Id)))
             .ToArray();
+    }
+
+    public async Task<IReadOnlyList<MailboxMessageView>> GetArchivedAsync(
+        Guid userId,
+        bool isStaff,
+        int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        int boundedTake = Math.Clamp(take, 1, 250);
+
+        var rows = await (
+            from message in dbContext.PortalMessages.AsNoTracking()
+            join thread in dbContext.MessageThreads.AsNoTracking()
+                on message.ThreadId equals thread.Id
+            join recipient in dbContext.MessageRecipients.AsNoTracking()
+                on message.Id equals recipient.MessageId into recipients
+            join sender in dbContext.Users.AsNoTracking()
+                on message.SenderUserId equals (Guid?)sender.Id into senders
+            from sender in senders.DefaultIfEmpty()
+            join organization in dbContext.Organizations.AsNoTracking()
+                on thread.OrganizationId equals organization.Id into organizations
+            from organization in organizations.DefaultIfEmpty()
+            join request in dbContext.AssistanceRequests.AsNoTracking()
+                on thread.RequestId equals request.Id into requests
+            from request in requests.DefaultIfEmpty()
+            where thread.ClosedUtc != null &&
+                  (message.SenderUserId == userId || recipients.Any(item => item.UserId == userId))
+            orderby message.SentUtc descending
+            select new
+            {
+                Message = message,
+                Thread = thread,
+                Sender = sender,
+                OrganizationName = organization == null ? null : organization.Name,
+                RequestReference = request == null ? null : request.PublicReference
+            })
+            .Take(boundedTake)
+            .ToListAsync(cancellationToken);
+
+        var messageIds = rows.Select(row => row.Message.Id).ToArray();
+        var attachmentMessageIds = await dbContext.MessageAttachments.AsNoTracking()
+            .Where(item => messageIds.Contains(item.MessageId))
+            .Select(item => item.MessageId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var attachmentSet = attachmentMessageIds.ToHashSet();
+
+        return rows.Select(row => ToMailboxView(
+            row.Message,
+            row.Thread,
+            null,
+            row.Sender,
+            row.OrganizationName,
+            row.RequestReference,
+            isStaff,
+            attachmentSet.Contains(row.Message.Id))).ToArray();
     }
 
     public async Task<IReadOnlyList<MailboxMessageView>> GetSentAsync(
@@ -133,7 +191,8 @@ public sealed class PortalMessageService : IPortalMessageService
                 row.Sender,
                 row.OrganizationName,
                 row.RequestReference,
-                isStaff))
+                isStaff,
+                dbContext.MessageAttachments.Any(attachment => attachment.MessageId == row.Message.Id)))
             .ToArray();
     }
 
@@ -979,7 +1038,8 @@ public sealed class PortalMessageService : IPortalMessageService
         ApplicationUser? sender,
         string? organizationName,
         string? requestReference,
-        bool viewerIsStaff)
+        bool viewerIsStaff,
+        bool hasAttachments = false)
     {
         (string senderName, string senderKind) =
             ProjectSender(message, sender);
@@ -999,7 +1059,8 @@ public sealed class PortalMessageService : IPortalMessageService
             thread.OrganizationId,
             organizationName,
             thread.RequestId,
-            requestReference);
+            requestReference,
+            hasAttachments);
     }
 
     private static (string Name, string Kind) ProjectSender(
