@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authentication;
+
 namespace RequestPortal.Web.Startup;
 
 internal static class ApplicationPipeline
