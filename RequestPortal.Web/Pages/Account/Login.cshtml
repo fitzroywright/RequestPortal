@@ -16,9 +16,28 @@
             Use the social or personal account you registered with the portal.
         </p>
     </section>
-    <section class="login-panel">
-        <h2>Choose a sign-in method</h2>
-        <p class="muted">Applicants and organization representatives can use any configured provider below.</p>
+    <section class="login-panel login-panel-illustrated">
+        <div class="login-art login-art-builders" aria-hidden="true">
+            <img src="/img/legacy/builder2.webp" alt="" />
+        </div>
+        <div class="login-art login-art-worker" aria-hidden="true">
+            <img src="/img/worker03.webp" alt="" />
+        </div>
+        <div class="login-art login-art-help" aria-hidden="true">
+            <img src="/img/callus2.jpg" alt="" />
+        </div>
+
+        <div class="login-panel-content">
+            <div class="login-panel-heading">
+                <div>
+                    <h2>Choose a sign-in method</h2>
+                    <p class="muted">Applicants and organization representatives can use any configured provider below.</p>
+                </div>
+                <div class="login-help-cue">
+                    <strong>Need help?</strong>
+                    <span>FFP is here to assist.</span>
+                </div>
+            </div>
 
         @foreach (RequestPortal.Web.Pages.Account.LoginModel.ExternalProviderOption provider in Model.ExternalProviders)
         {
@@ -106,5 +125,6 @@
         {
             <div class="flash error">@Model.ErrorMessage</div>
         }
+        </div>
     </section>
 </div>
