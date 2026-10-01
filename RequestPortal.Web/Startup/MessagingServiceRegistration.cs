@@ -147,20 +147,63 @@ internal static class MessagingServiceRegistration
             return;
         }
 
+        var whatsAppOptions =
+            new global::Common.Messaging.Channels.WhatsApp
+                .WhatsAppMessageOptions();
+
+        // Common.Messaging changed its WhatsApp option surface while Request Portal
+        // still needs to build cleanly against synchronized sibling checkouts during
+        // the transition. Populate whichever option names the referenced version exposes.
+        SetWhatsAppOption(
+            whatsAppOptions
+            , "Enabled"
+            , options.WhatsAppEnabled);
+        SetWhatsAppOption(
+            whatsAppOptions
+            , "GraphApiVersion"
+            , options.WhatsAppGraphApiVersion);
+        SetWhatsAppOption(
+            whatsAppOptions
+            , "PhoneNumberId"
+            , options.WhatsAppPhoneNumberId);
+        SetWhatsAppOption(
+            whatsAppOptions
+            , "AccessTokenSecretName"
+            , options.WhatsAppAccessTokenSecretName);
+
+        string graphEndpoint =
+            $"https://graph.facebook.com/{options.WhatsAppGraphApiVersion.Trim('/')}/{Uri.EscapeDataString(options.WhatsAppPhoneNumberId)}/messages";
+        SetWhatsAppOption(
+            whatsAppOptions
+            , "Endpoint"
+            , graphEndpoint);
+        SetWhatsAppOption(
+            whatsAppOptions
+            , "ApiTokenSecretName"
+            , options.WhatsAppAccessTokenSecretName);
+
         global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
             .AddWhatsAppMessagingChannel(
                 builder.Services
-                , new global::Common.Messaging.Channels.WhatsApp
-                    .WhatsAppMessageOptions
-                {
-                    Enabled = options.WhatsAppEnabled
-                    , GraphApiVersion =
-                        options.WhatsAppGraphApiVersion
-                    , PhoneNumberId =
-                        options.WhatsAppPhoneNumberId
-                    , AccessTokenSecretName =
-                        options.WhatsAppAccessTokenSecretName
-                });
+                , whatsAppOptions);
+    }
+
+    private static void SetWhatsAppOption(
+        object target
+        , string propertyName
+        , object value)
+    {
+        System.Reflection.PropertyInfo? property =
+            target.GetType().GetProperty(
+                propertyName
+                , System.Reflection.BindingFlags.Public |
+                  System.Reflection.BindingFlags.Instance);
+
+        if (property?.CanWrite == true &&
+            property.PropertyType.IsInstanceOfType(value))
+        {
+            property.SetValue(target, value);
+        }
     }
 
     private static void AddQueuedDelivery(
