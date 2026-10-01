@@ -1,4 +1,8 @@
+@inject IConfiguration Configuration
 @using System.Security.Claims
+@{
+    bool trainingEnabled = Configuration.GetValue("Training:Enabled", false);
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,7 +11,10 @@
     <title>@ViewData["Title"] - Request Portal</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/ffp-brand.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/contextual-training.css" asp-append-version="true" />
+    @if (trainingEnabled)
+    {
+        <link rel="stylesheet" href="~/css/contextual-training.css" asp-append-version="true" />
+    }
     <link rel="stylesheet" href="~/css/operational-workspace.css" asp-append-version="true" />
 </head>
 <body>
@@ -214,7 +221,10 @@
         });
     })();
     </script>
-    <script src="~/js/contextual-training.js" asp-append-version="true"></script>
+    @if (trainingEnabled)
+    {
+        <script src="~/js/contextual-training.js" asp-append-version="true"></script>
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
