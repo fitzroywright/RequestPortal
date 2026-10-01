@@ -139,26 +139,29 @@
         @RenderBody()
     </main>
 
-    <footer class="site-footer">
-        <div class="shell footer-grid ffp-footer-grid">
-            <div class="ffp-footer-identity">
-                <img class="footer-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor" />
-                <div>
-                    <strong>Food For The Poor Jamaica</strong>
-                    <p class="ffp-scripture">“As often as you did it for one of the least of my brothers and sisters, you did it for me.” <span>Matthew 25:40</span></p>
+    @if (ViewData["HideFooter"] as bool? != true)
+    {
+        <footer class="site-footer">
+            <div class="shell footer-grid ffp-footer-grid">
+                <div class="ffp-footer-identity">
+                    <img class="footer-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor" />
+                    <div>
+                        <strong>Food For The Poor Jamaica</strong>
+                        <p class="ffp-scripture">“As often as you did it for one of the least of my brothers and sisters, you did it for me.” <span>Matthew 25:40</span></p>
+                    </div>
                 </div>
+                <address class="footer-meta ffp-contact">
+                    P.O. Box 557, Ellerslie Pen<br />
+                    Spanish Town, St. Catherine, Jamaica, W.I.<br />
+                    <a href="tel:+18769845005">+1-876-984-5005</a> &nbsp;|&nbsp;
+                    <a href="tel:+18766180141">+1-876-618-0141</a> &nbsp;|&nbsp;
+                    <a href="tel:+18769073656">+1-876-907-3656</a><br />
+                    <a href="mailto:ffpinfo@foodforthepoorja.org">ffpinfo@foodforthepoorja.org</a><br />
+                    <a href="mailto:customerservice@foodforthepoorja.org">customerservice@foodforthepoorja.org</a>
+                </address>
             </div>
-            <address class="footer-meta ffp-contact">
-                P.O. Box 557, Ellerslie Pen<br />
-                Spanish Town, St. Catherine, Jamaica, W.I.<br />
-                <a href="tel:+18769845005">+1-876-984-5005</a> &nbsp;|&nbsp;
-                <a href="tel:+18766180141">+1-876-618-0141</a> &nbsp;|&nbsp;
-                <a href="tel:+18769073656">+1-876-907-3656</a><br />
-                <a href="mailto:ffpinfo@foodforthepoorja.org">ffpinfo@foodforthepoorja.org</a><br />
-                <a href="mailto:customerservice@foodforthepoorja.org">customerservice@foodforthepoorja.org</a>
-            </address>
-        </div>
-    </footer>
+        </footer>
+    }
 
     @if (User.Identity?.IsAuthenticated == true)
     {
