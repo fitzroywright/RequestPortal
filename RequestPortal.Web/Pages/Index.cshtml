@@ -163,7 +163,7 @@
 
 <section class="relief-access-section">
     <div class="shell">
-        <div class="relief-section-heading">
+        <div class="relief-section-heading relief-section-heading-compact">
             <span>User Assistance &amp; Access</span>
             <h2>Get help or access your account</h2>
         </div>
@@ -187,28 +187,29 @@
                     </div>
                 </article>
             </section>
-            <aside class="relief-login-card">
+            <aside class="relief-registration-note">
                 @if (User.Identity?.IsAuthenticated == true)
                 {
+                    <span class="registration-note-label">Your account</span>
                     <h3>Welcome back</h3>
-                    <p>You are signed in. Continue to your dashboard or organization workspace.</p>
+                    <p>Continue to your dashboard or organization workspace.</p>
                     <a class="button relief-wide-button" asp-page="/Dashboard/Index">Open dashboard</a>
-                    <a class="button button-outline relief-wide-button" asp-page="/Organizations/Index">My organizations</a>
+                    <a class="registration-note-link" asp-page="/Organizations/Index">My organizations →</a>
                 }
                 else
                 {
-                    <h3>Registered User Login</h3>
-                    <p>New here? Your first successful external sign-in creates your portal identity.</p>
+                    <span class="registration-note-label">Registration</span>
+                    <h3>New to the portal?</h3>
+                    <p>Your first successful sign-in creates your Request Portal identity.</p>
                     <a class="button relief-wide-button" asp-page="/Account/Login">Register or sign in</a>
-                    <a class="button button-outline relief-wide-button" asp-page="/Account/StaffLogin">FFP staff sign in</a>
-                    <small>Google, Microsoft, Facebook or other configured identity providers are shown on the sign-in page.</small>
+                    <small>Choose your personal, social, or FFP sign-in method on the sign-in page.</small>
                 }
             </aside>
         </div>
     </div>
 </section>
 
-<section class="section relief-process-section">
+<section class="section relief-process-section relief-process-section-compact">
     <div class="shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">One portal, clear ownership</div>
