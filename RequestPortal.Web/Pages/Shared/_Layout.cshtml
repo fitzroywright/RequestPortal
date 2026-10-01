@@ -56,9 +56,51 @@
                         <a asp-page="/Account/Notifications">Notifications</a>
                         <a asp-page="/Messages/Inbox" class="messages-nav-link">Messages <span id="messageUnreadBadge" class="message-badge" hidden>0</span></a>
                     }
-                    <form method="post" asp-page="/Account/Logout" class="nav-form">
-                        <button type="submit" class="nav-link-button">Sign out</button>
-                    </form>
+                    <div class="profile-menu">
+                        <button type="button"
+                                class="profile-menu-trigger"
+                                aria-expanded="false"
+                                aria-controls="profileMenuPanel"
+                                data-profile-menu-trigger>
+                            <span class="profile-avatar" aria-hidden="true">
+                                @{
+                                    string profileName = User.Identity?.Name ?? "User";
+                                    string[] profileParts = profileName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                                    string profileInitials = profileParts.Length switch
+                                    {
+                                        0 => "U",
+                                        1 => profileParts[0][..Math.Min(2, profileParts[0].Length)].ToUpperInvariant(),
+                                        _ => $"{profileParts[0][0]}{profileParts[^1][0]}".ToUpperInvariant()
+                                    };
+                                }
+                                @profileInitials
+                            </span>
+                            <span class="profile-menu-name">@profileName</span>
+                            <span class="profile-menu-chevron" aria-hidden="true">⌄</span>
+                        </button>
+                        <div id="profileMenuPanel" class="profile-menu-panel" hidden data-profile-menu-panel>
+                            <div class="profile-menu-header">
+                                <span class="profile-avatar profile-avatar-large" aria-hidden="true">@profileInitials</span>
+                                <div>
+                                    <strong>@profileName</strong>
+                                    <small>@(isFfpStaff ? "FFP Staff" : "Applicant / Representative")</small>
+                                </div>
+                            </div>
+                            <div class="profile-menu-section">
+                                <a asp-page="/Organizations/Index">Organizations</a>
+                                <a asp-page="/Account/Notifications">Notification preferences</a>
+                            </div>
+                            <div class="profile-menu-section profile-menu-profile">
+                                <span class="profile-menu-label">Profile</span>
+                                <strong>@profileName</strong>
+                            </div>
+                            <div class="profile-menu-section">
+                                <form method="post" asp-page="/Account/Logout" class="profile-menu-signout">
+                                    <button type="submit">Sign out</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 }
                 else
                 {
@@ -118,6 +160,33 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
         <script src="~/js/messages.js" asp-append-version="true"></script>
     }
+    <script>
+    (() => {
+        const trigger = document.querySelector("[data-profile-menu-trigger]");
+        const panel = document.querySelector("[data-profile-menu-panel]");
+        if (!trigger || !panel) return;
+
+        const close = () => {
+            panel.hidden = true;
+            trigger.setAttribute("aria-expanded", "false");
+        };
+
+        trigger.addEventListener("click", event => {
+            event.stopPropagation();
+            const open = panel.hidden;
+            panel.hidden = !open;
+            trigger.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+
+        document.addEventListener("click", event => {
+            if (!panel.contains(event.target) && !trigger.contains(event.target)) close();
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") close();
+        });
+    })();
+    </script>
     <script src="~/js/contextual-training.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
