@@ -145,82 +145,143 @@
     }
 </style>
 
-<section class="relief-carousel" data-relief-carousel>
+@{
+    bool homeIsFfpStaff =
+        User.Identity?.IsAuthenticated == true &&
+        User.HasClaim(
+            RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim,
+            RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
+}
+
+<section class="relief-carousel home-hero" data-relief-carousel>
     <div class="relief-carousel-stage">
         <div class="relief-carousel-image" data-carousel-image aria-hidden="true"></div>
         <div class="relief-carousel-shade"></div>
         <button class="relief-carousel-arrow relief-carousel-prev" type="button" data-carousel-prev aria-label="Previous slide">‹</button>
         <button class="relief-carousel-arrow relief-carousel-next" type="button" data-carousel-next aria-label="Next slide">›</button>
-        <div class="shell relief-carousel-copy">
-            <div class="eyebrow" data-carousel-kicker>Disaster Relief</div>
-            <h1 data-carousel-title>Standing with Jamaica</h1>
-            <p data-carousel-text>Responding today. Rebuilding tomorrow. Together we bring hope.</p>
-            <a class="button" asp-page="/Account/Login">Start here →</a>
+        <div class="shell relief-carousel-copy home-hero-copy">
+            <div class="eyebrow" data-carousel-kicker>Community Support</div>
+            <h1 data-carousel-title>Building brighter futures together</h1>
+            <p data-carousel-text>Partnering with communities across Jamaica for lasting, positive change.</p>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                if (homeIsFfpStaff)
+                {
+                    <a class="button" asp-page="/Staff/Index">Open staff workspace →</a>
+                }
+                else
+                {
+                    <a class="button" asp-page="/Dashboard/Index">Open my workspace →</a>
+                }
+            }
+            else
+            {
+                <a class="button" asp-page="/Account/Login">Start here →</a>
+            }
         </div>
         <div class="shell relief-carousel-thumbs" data-carousel-thumbs aria-label="Relief programme slides"></div>
     </div>
 </section>
 
-<section class="relief-access-section">
-    <div class="shell">
-        <div class="relief-section-heading relief-section-heading-compact">
-            <span>User Assistance &amp; Access</span>
-            <h2>Get help or access your account</h2>
+<section class="home-access">
+    <div class="shell home-access-grid">
+        <div class="home-access-main">
+            <div class="home-access-heading">
+                <div>
+                    <span class="home-kicker">User Assistance &amp; Access</span>
+                    <h2>One place to request help and follow the work.</h2>
+                </div>
+                <p>Organization representatives can submit assistance requests, follow progress, and keep conversations and documents together.</p>
+            </div>
+
+            <div class="home-feature-grid">
+                <a class="home-feature" asp-page="/Account/Login">
+                    <span class="home-feature-icon">▤</span>
+                    <div>
+                        <strong>Submit requests</strong>
+                        <span>Apply for assistance for your community, programme, or project.</span>
+                    </div>
+                </a>
+                <a class="home-feature" asp-page="/Account/Login">
+                    <span class="home-feature-icon">⌕</span>
+                    <div>
+                        <strong>Track progress</strong>
+                        <span>See the current stage, messages, documents, and follow-up requests.</span>
+                    </div>
+                </a>
+                <a class="home-feature" asp-page="/Account/Login">
+                    <span class="home-feature-icon">●●</span>
+                    <div>
+                        <strong>Stay connected</strong>
+                        <span>Keep communication with Food For The Poor Jamaica in one place.</span>
+                    </div>
+                </a>
+            </div>
+
+            <div class="home-how">
+                <h2>How it works</h2>
+                <div class="home-how-grid">
+                    <div class="home-how-step">
+                        <span>1</span>
+                        <div><strong>Sign in</strong><small>Use your personal identity provider and register or join an organization.</small></div>
+                    </div>
+                    <div class="home-how-arrow">→</div>
+                    <div class="home-how-step">
+                        <span>2</span>
+                        <div><strong>Submit a request</strong><small>Provide the request details, supporting information, and documents.</small></div>
+                    </div>
+                    <div class="home-how-arrow">→</div>
+                    <div class="home-how-step">
+                        <span>3</span>
+                        <div><strong>Review &amp; follow up</strong><small>Track review, respond to questions, and follow fulfilment.</small></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="relief-access-grid">
-            <section class="relief-info-card">
-                <article class="relief-info-row">
-                    <img src="~/img/leaningwoman.webp" alt="" aria-hidden="true" />
-                    <div>
-                        <h3>Request for Assistance</h3>
-                        <p>Assistance requests are made through approved organizations. Sign in to register an organization, request membership in an existing organization, or continue an assistance request.</p>
-                        <a class="relief-text-link" asp-page="/Account/Login">Start here →</a>
-                    </div>
-                </article>
-                <div class="relief-divider"></div>
-                <article class="relief-info-row">
-                    <img src="~/img/worker03.webp" alt="" aria-hidden="true" />
-                    <div>
-                        <h3>Organization Representatives</h3>
-                        <p>Representatives sign in as themselves and may act only for organizations that have approved their membership. Your account keeps those relationships and requests in one secure place.</p>
-                        <a class="relief-text-link" asp-page="/Account/Login">Representative access →</a>
-                    </div>
-                </article>
-            </section>
-            <aside class="relief-registration-note">
-                @if (User.Identity?.IsAuthenticated == true)
+
+        <aside class="home-registration-note">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                if (homeIsFfpStaff)
                 {
-                    <span class="registration-note-label">Your account</span>
-                    <h3>Welcome back</h3>
-                    <p>Continue to your dashboard or organization workspace.</p>
-                    <a class="button relief-wide-button" asp-page="/Dashboard/Index">Open dashboard</a>
-                    <a class="registration-note-link" asp-page="/Organizations/Index">My organizations →</a>
+                    <span class="registration-note-label">FFP staff</span>
+                    <h3>You are signed in</h3>
+                    <p>Continue to the internal staff workspace. Staff accounts do not use the organization representative workspace.</p>
+                    <a class="button home-note-button" asp-page="/Staff/Index">Open staff workspace</a>
+                    <a class="registration-note-link" asp-page="/Staff/Operations">View action queues →</a>
                 }
                 else
                 {
-                    <span class="registration-note-label">Registration</span>
-                    <h3>New to the portal?</h3>
-                    <p>Your first successful sign-in creates your Request Portal identity.</p>
-                    <a class="button relief-wide-button" asp-page="/Account/Login">Register or sign in</a>
-                    <small>Choose your personal, social, or FFP sign-in method on the sign-in page.</small>
+                    <span class="registration-note-label">Your account</span>
+                    <h3>Welcome back</h3>
+                    <p>Continue to your request workspace or manage the organizations you represent.</p>
+                    <a class="button home-note-button" asp-page="/Dashboard/Index">Open workspace</a>
+                    <a class="registration-note-link" asp-page="/Organizations/Index">My organizations →</a>
                 }
-            </aside>
-        </div>
+            }
+            else
+            {
+                <span class="registration-note-label">Registration</span>
+                <h3>New to the portal?</h3>
+                <p>Your first successful sign-in creates your Request Portal identity. You can then register or join an organization.</p>
+                <a class="button home-note-button" asp-page="/Account/Login">Register or sign in →</a>
+                <small>Choose your personal, social, or Food For The Poor sign-in method on the sign-in page.</small>
+            }
+        </aside>
     </div>
 </section>
 
-<section class="section relief-process-section relief-process-section-compact">
-    <div class="shell">
-        <div class="section-heading">
-            <div class="eyebrow" style="color:#b45b09">One portal, clear ownership</div>
-            <h2>Assistance requests belong to organizations.</h2>
-            <p>Representatives authenticate as people, while each request remains tied to the organization they are authorized to represent. New organizations and new representative memberships follow an approval process before requests can be submitted.</p>
-        </div>
-        <div class="grid-3">
-            <article class="card"><h3>1. Register or join</h3><p>Register a new organization or request membership in an approved organization.</p></article>
-            <article class="card"><h3>2. Submit assistance</h3><p>Provide the request details and supporting documents on behalf of your organization.</p></article>
-            <article class="card"><h3>3. Follow the request</h3><p>Track review, requests for additional information, decisions and fulfilment from your dashboard.</p></article>
-        </div>
+<section class="home-impact">
+    <div class="shell home-impact-grid">
+        <article class="home-impact-card" style="--home-image:url('/img/carousel/Splash01.jpg')">
+            <div><strong>Stronger communities</strong><span>Supporting people, families and communities in need.</span></div>
+        </article>
+        <article class="home-impact-card" style="--home-image:url('/img/carousel/Splash03.jpg')">
+            <div><strong>Lasting change</strong><span>Working together for a brighter tomorrow.</span></div>
+        </article>
+        <article class="home-impact-card" style="--home-image:url('/img/carousel/Splash06.jpg')">
+            <div><strong>People first</strong><span>Hope, opportunity and a better future for Jamaica.</span></div>
+        </article>
     </div>
 </section>
 
