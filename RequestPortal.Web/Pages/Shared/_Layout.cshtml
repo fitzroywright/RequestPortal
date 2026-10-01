@@ -1,3 +1,4 @@
+@using System.Security.Claims
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -62,9 +63,15 @@
                                 aria-expanded="false"
                                 aria-controls="profileMenuPanel"
                                 data-profile-menu-trigger>
-                            <span class="profile-avatar" aria-hidden="true">
+                            <span class="profile-avatar profile-avatar-studio" aria-hidden="true">
                                 @{
-                                    string profileName = User.Identity?.Name ?? "User";
+                                    string? profileNameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
+                                    string? profileGivenName = User.FindFirst(ClaimTypes.GivenName)?.Value;
+                                    string profileName = !string.IsNullOrWhiteSpace(profileNameClaim) && !profileNameClaim.Contains('@')
+                                        ? profileNameClaim
+                                        : !string.IsNullOrWhiteSpace(profileGivenName) && !profileGivenName.Contains('@')
+                                            ? profileGivenName
+                                            : "User";
                                     string[] profileParts = profileName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                                     string profileInitials = profileParts.Length switch
                                     {
@@ -80,7 +87,7 @@
                         </button>
                         <div id="profileMenuPanel" class="profile-menu-panel" hidden data-profile-menu-panel>
                             <div class="profile-menu-header">
-                                <span class="profile-avatar profile-avatar-large" aria-hidden="true">@profileInitials</span>
+                                <span class="profile-avatar profile-avatar-large profile-avatar-studio" aria-hidden="true">@profileInitials</span>
                                 <div>
                                     <strong>@profileName</strong>
                                     <small>@(isFfpStaff ? "FFP Staff" : "Applicant / Representative")</small>
