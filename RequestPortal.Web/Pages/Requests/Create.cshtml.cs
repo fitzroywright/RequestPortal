@@ -92,18 +92,39 @@ public sealed class CreateModel : PageModel
             Input.Kind = kind.Value;
         }
 
-        ApplicationUser user = await GetUserAsync();
-        await LoadPageDataAsync(user);
-        if (Input.OrganizationId == Guid.Empty && Organizations.Count == 1)
+        try
         {
-            Input.OrganizationId = Organizations[0].Id;
+            ApplicationUser user = await GetUserAsync();
+            await LoadPageDataAsync(user);
+            if (Input.OrganizationId == Guid.Empty && Organizations.Count == 1)
+            {
+                Input.OrganizationId = Organizations[0].Id;
+            }
+        }
+        catch (Exception exception)
+        {
+            CaptureFailure(
+                exception,
+                "loading the New Request page");
         }
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        ApplicationUser user = await GetUserAsync();
-        await LoadPageDataAsync(user);
+        ApplicationUser user;
+        try
+        {
+            user = await GetUserAsync();
+            await LoadPageDataAsync(user);
+        }
+        catch (Exception exception)
+        {
+            CaptureFailure(
+                exception,
+                "loading request data before submission");
+
+            return Page();
+        }
 
         OrganizationRequesterOption? selectedOrganization = Organizations.FirstOrDefault(item => item.Id == Input.OrganizationId);
         if (selectedOrganization is null)
@@ -156,6 +177,14 @@ public sealed class CreateModel : PageModel
         catch (InvalidOperationException exception)
         {
             ModelState.AddModelError(nameof(Input.OrganizationId), exception.Message);
+            return Page();
+        }
+        catch (Exception exception)
+        {
+            CaptureFailure(
+                exception,
+                "checking production submission policy");
+
             return Page();
         }
 
@@ -294,6 +323,29 @@ public sealed class CreateModel : PageModel
 
         TempData["Success"] = "Request submitted to FFP for review.";
         return RedirectToPage("/Requests/Details", new { id = requestId });
+    }
+
+    private void CaptureFailure(
+        Exception exception,
+        string stage)
+    {
+        string correlation =
+            System.Diagnostics.Activity.Current?.Id
+            ?? HttpContext.TraceIdentifier;
+
+        FailureStage = stage;
+        FailureCorrelation = correlation;
+        FailureDetails = exception.ToString();
+
+        logger.LogError(
+            exception,
+            "Create Request failed while {Stage}; Correlation={Correlation}",
+            stage,
+            correlation);
+
+        ModelState.AddModelError(
+            string.Empty,
+            $"The request could not be completed while {stage}. The full server exception is displayed below. Reference: {correlation}");
     }
 
     private void ValidateItems()
