@@ -12,7 +12,7 @@ using RequestPortal.Infrastructure.Identity;
 
 namespace RequestPortal.Web.Pages.Account;
 
-[Authorize(AuthenticationSchemes = IdentityConstants.ApplicationScheme)]
+[Authorize(Policy = "PortalRepresentative")]
 public sealed class ProfileModel : PageModel
 {
     private readonly UserManager<ApplicationUser> userManager;
@@ -48,7 +48,7 @@ public sealed class ProfileModel : PageModel
     public PersonalProfileInput ProfileInput { get; set; } = new();
 
     [BindProperty]
-    public PreferenceInput PreferenceInput { get; set; } = new();
+    public PreferenceInput Preference { get; set; } = new();
 
     [BindProperty]
     public OrganizationSubscriptionInput OrganizationInput { get; set; } = new();
@@ -97,8 +97,8 @@ public sealed class ProfileModel : PageModel
         ApplicationUser user = await GetUserAsync();
         LoadAvailability();
 
-        if (PreferenceInput.Enabled && !IsAvailable(PreferenceInput.Channel))
-            ModelState.AddModelError(string.Empty, $"{PreferenceInput.Channel} notifications are not available.");
+        if (Preference.Enabled && !IsAvailable(Preference.Channel))
+            ModelState.AddModelError(string.Empty, $"{Preference.Channel} notifications are not available.");
 
         if (!ModelState.IsValid)
         {
@@ -108,12 +108,12 @@ public sealed class ProfileModel : PageModel
 
         await notificationPreferenceService.SavePreferenceAsync(
             user.Id,
-            PreferenceInput.Channel,
-            PreferenceInput.Destination,
-            PreferenceInput.Enabled,
+            Preference.Channel,
+            Preference.Destination,
+            Preference.Enabled,
             HttpContext.RequestAborted);
 
-        TempData["Success"] = $"{PreferenceInput.Channel} notification preference saved.";
+        TempData["Success"] = $"{Preference.Channel} notification preference saved.";
         return RedirectToPage();
     }
 
