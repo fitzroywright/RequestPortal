@@ -443,3 +443,13 @@
 .message-attachment{border-radius:4px;padding:6px 8px}
 @media(max-width:1100px){.portal-workspace-grid{grid-template-columns:230px 1fr}.context-panel{grid-column:1/-1}.organization-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.workspace-titlebar{align-items:flex-start;flex-direction:column}.portal-workspace-grid{grid-template-columns:1fr}.workspace-toolbar{width:100%;flex-wrap:wrap}.organization-list{grid-template-columns:1fr}.message-bubble{max-width:96%}}
+
+
+/* FFP staff workspace extensions */
+.staff-organization-row{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.staff-organization-row>a{display:grid;gap:2px;min-width:0;flex:1;color:var(--ink);text-decoration:none}
+.staff-organization-row>a:hover strong{color:var(--ffp-orange-dark)}
+.staff-organization-row form{margin:0;flex:0 0 auto}
+.workspace-panel-footer{padding:10px 12px;border-top:1px solid var(--border);background:#f7f7f4}
+.staff-workspace .status-row{text-decoration:none}
+.staff-workspace .status-row:hover{color:var(--ink)}
