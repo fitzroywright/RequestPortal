@@ -18,6 +18,8 @@ public sealed class ThreadModel(
 
     public bool IsStaff { get; private set; }
 
+    public bool IsAssignedToCurrentStaff { get; private set; }
+
     [BindProperty]
     [Required]
     [StringLength(10000)]
@@ -56,6 +58,74 @@ public sealed class ThreadModel(
             : File(download.Content, download.ContentType, download.FileName);
     }
 
+    public async Task<IActionResult> OnPostAssignAsync(Guid id)
+    {
+        Guid userId = CurrentUserId();
+        if (!IsFfpStaff())
+        {
+            return Forbid();
+        }
+
+        await messageService.AssignThreadAsync(
+            userId,
+            id,
+            HttpContext.RequestAborted);
+
+        TempData["Success"] = "Conversation assigned to you.";
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostUnassignAsync(Guid id)
+    {
+        Guid userId = CurrentUserId();
+        if (!IsFfpStaff())
+        {
+            return Forbid();
+        }
+
+        await messageService.UnassignThreadAsync(
+            userId,
+            id,
+            HttpContext.RequestAborted);
+
+        TempData["Success"] = "Conversation returned to the unassigned queue.";
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostCloseAsync(Guid id)
+    {
+        Guid userId = CurrentUserId();
+        if (!IsFfpStaff())
+        {
+            return Forbid();
+        }
+
+        await messageService.CloseThreadAsync(
+            userId,
+            id,
+            HttpContext.RequestAborted);
+
+        TempData["Success"] = "Conversation closed.";
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostReopenAsync(Guid id)
+    {
+        Guid userId = CurrentUserId();
+        if (!IsFfpStaff())
+        {
+            return Forbid();
+        }
+
+        await messageService.ReopenThreadAsync(
+            userId,
+            id,
+            HttpContext.RequestAborted);
+
+        TempData["Success"] = "Conversation reopened.";
+        return RedirectToPage(new { id });
+    }
+
     public async Task<IActionResult> OnPostAsync(Guid id)
     {
         Guid userId = CurrentUserId();
@@ -92,6 +162,10 @@ public sealed class ThreadModel(
         {
             return NotFound();
         }
+
+        IsAssignedToCurrentStaff =
+            IsStaff &&
+            Thread.AssignedToStaffUserId == userId;
 
         if (Thread.RequestId.HasValue)
         {
