@@ -178,7 +178,7 @@ public sealed class ProjectProposalService : IProjectProposalService
 
         await SaveInternalAsync(userId, requestId, revision.Title, revision.RichContentHtml, automatic: false, cancellationToken);
         ProjectProposal proposal = await dbContext.ProjectProposals.AsNoTracking().SingleAsync(item => item.RequestId == requestId, cancellationToken);
-        await auditWriter.WriteAsync(
+        await TryAuditAsync(
             userId,
             "ProjectProposalRevisionRestored",
             nameof(ProjectProposal),
@@ -256,7 +256,7 @@ public sealed class ProjectProposalService : IProjectProposalService
             automatic,
             cancellationToken);
 
-        await auditWriter.WriteAsync(
+        await TryAuditAsync(
             userId,
             automatic ? "ProjectProposalAutosaved" : "ProjectProposalSaved",
             nameof(ProjectProposal),
@@ -264,6 +264,39 @@ public sealed class ProjectProposalService : IProjectProposalService
             request.OrganizationId,
             $"Version {proposal.Version}; {(automatic ? "automatic draft save" : "explicit save")}.",
             cancellationToken);
+    }
+
+    private async Task TryAuditAsync(
+        Guid actorUserId,
+        string action,
+        string entityType,
+        Guid entityId,
+        Guid? organizationId,
+        string? detail,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await auditWriter.WriteAsync(
+                actorUserId,
+                action,
+                entityType,
+                entityId,
+                organizationId,
+                detail,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Project proposal audit could not be written for request {RequestId}. Request processing will continue.",
+                entityId);
+        }
     }
 
     private async Task TryStoreRevisionAsync(
