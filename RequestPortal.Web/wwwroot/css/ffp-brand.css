@@ -453,3 +453,31 @@
 .workspace-panel-footer{padding:10px 12px;border-top:1px solid var(--border);background:#f7f7f4}
 .staff-workspace .status-row{text-decoration:none}
 .staff-workspace .status-row:hover{color:var(--ink)}
+
+
+/* Unified logged-in profile flyout */
+.profile-menu{position:relative;margin-left:4px}
+.profile-menu-trigger{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:4px 8px 4px 5px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--ffp-navy);font:inherit;font-weight:700;cursor:pointer}
+.profile-menu-trigger:hover,.profile-menu-trigger[aria-expanded="true"]{background:#f4f5f3;border-color:#c8d0d0}
+.profile-avatar{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--ffp-navy);color:#fff;font-size:.72rem;font-weight:800;letter-spacing:.03em}
+.profile-avatar-large{width:42px;height:42px;font-size:.82rem}
+.profile-menu-name{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-menu-chevron{font-size:1rem;line-height:1;color:var(--muted)}
+.profile-menu-panel{position:absolute;top:calc(100% + 7px);right:0;z-index:1500;width:290px;border:1px solid var(--border);border-radius:6px;background:#fff;box-shadow:0 10px 28px rgba(16,38,58,.16);overflow:hidden}
+.profile-menu-panel[hidden]{display:none}
+.profile-menu-header{display:flex;align-items:center;gap:11px;padding:14px;background:#f2f4f3;border-bottom:1px solid var(--border)}
+.profile-menu-header>div{display:grid;gap:2px;min-width:0}
+.profile-menu-header strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ffp-navy-deep)}
+.profile-menu-header small{color:var(--muted)}
+.profile-menu-section{display:grid;border-bottom:1px solid #e8ebe8}
+.profile-menu-section:last-child{border-bottom:0}
+.profile-menu-section>a,.profile-menu-signout button{display:block;width:100%;padding:11px 14px;border:0;background:#fff;color:var(--ink);text-align:left;text-decoration:none;font:inherit;cursor:pointer}
+.profile-menu-section>a:hover,.profile-menu-signout button:hover{background:#f7f7f4;color:var(--ffp-orange-dark)}
+.profile-menu-profile{padding:11px 14px;gap:2px}
+.profile-menu-profile strong{color:var(--ink)}
+.profile-menu-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:var(--muted)}
+.profile-menu-signout{margin:0}
+@media(max-width:900px){
+    .profile-menu-name{max-width:120px}
+    .profile-menu-panel{position:fixed;top:82px;right:14px;width:min(290px,calc(100vw - 28px))}
+}
