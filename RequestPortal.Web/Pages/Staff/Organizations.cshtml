@@ -32,7 +32,7 @@
                     <tbody>
                     @foreach (StaffOrganizationSummary organization in Model.Organizations)
                     {
-                        <tr>
+                        <tr class="staff-select-row" data-row-href="/Staff/Organization/@organization.Id" role="link" tabindex="0">
                             <td><strong>@organization.Name</strong></td>
                             <td>@organization.CountryCode</td>
                             <td><span class="status status-@organization.Status">@organization.Status</span></td>
