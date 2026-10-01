@@ -303,8 +303,50 @@
                     }
                 </div>
 
-                <aside class="card">
-                    <h2>Status history</h2>
+                <aside class="request-detail-side">
+                    <section class="operational-panel request-messages-card">
+                        <div class="panel-titlebar">
+                            <div>
+                                <strong>Messages</strong>
+                                <small>@Model.MessageThreads.Sum(thread => thread.Messages.Count) messages · @Model.MessageThreads.Count conversations</small>
+                            </div>
+                            <a asp-page="/Messages/New" asp-route-OrganizationId="@Model.Request.OrganizationId" asp-route-RequestId="@Model.Request.Id">New</a>
+                        </div>
+                        @if (Model.MessageThreads.Count == 0)
+                        {
+                            <div class="workspace-empty compact">
+                                <strong>No messages</strong>
+                                <p>Messages about this application will appear here.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="request-message-list">
+                                @foreach (var thread in Model.MessageThreads)
+                                {
+                                    <a class="request-message-thread" asp-page="/Messages/Thread" asp-route-id="@thread.ThreadId">
+                                        <div class="request-message-thread-head">
+                                            <strong>@thread.Subject</strong>
+                                            <span>@thread.Audience.ToString().Replace("OrganizationManager", "Organization Manager").Replace("FfpInternal", "FFP Internal")</span>
+                                        </div>
+                                        @foreach (var message in thread.Messages.TakeLast(3))
+                                        {
+                                            <div class="request-message-item">
+                                                <strong>@message.SenderName</strong>
+                                                <span>@message.Body</span>
+                                                <small>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt") @if (message.Attachments.Count > 0) { <text> · 📎</text> }</small>
+                                            </div>
+                                        }
+                                    </a>
+                                }
+                            </div>
+                        }
+                    </section>
+
+                    <section class="operational-panel request-status-card">
+                        <div class="panel-titlebar">
+                            <strong>Status history</strong>
+                        </div>
                     <div class="timeline">
                         @foreach (RequestHistoryDetail history in Model.Request.History)
                         {
@@ -318,6 +360,7 @@
                             </div>
                         }
                     </div>
+                    </section>
                 </aside>
             </div>
         }
