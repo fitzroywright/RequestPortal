@@ -145,6 +145,11 @@ public sealed class ProjectProposalService : IProjectProposalService
         AssistanceRequest request = await dbContext.AssistanceRequests.AsNoTracking().SingleAsync(item => item.Id == requestId, cancellationToken);
         if (!isStaff) await EnsureAccessAsync(userId, request.OrganizationId, cancellationToken);
 
+        if (revisionStorage is null)
+        {
+            return [];
+        }
+
         IReadOnlyList<StoredFile> versions = await revisionStorage.GetVersionsAsync(RevisionStorageKey(requestId), cancellationToken);
         List<ProjectProposalRevisionDetail> results = [];
         foreach (StoredFile version in versions.Take(100))
@@ -163,6 +168,12 @@ public sealed class ProjectProposalService : IProjectProposalService
     {
         AssistanceRequest request = await dbContext.AssistanceRequests.SingleAsync(item => item.Id == requestId, cancellationToken);
         await EnsureEditableAsync(userId, request, cancellationToken);
+
+        if (revisionStorage is null)
+        {
+            throw new InvalidOperationException(
+                "Proposal revision history is not available with the configured storage provider.");
+        }
 
         IReadOnlyList<StoredFile> versions = await revisionStorage.GetVersionsAsync(RevisionStorageKey(requestId), cancellationToken);
         StoredFile? stored = versions.FirstOrDefault(item =>
@@ -350,6 +361,11 @@ public sealed class ProjectProposalService : IProjectProposalService
         bool automatic,
         CancellationToken cancellationToken)
     {
+        if (revisionStorage is null)
+        {
+            return;
+        }
+
         Guid revisionId = Guid.NewGuid();
         DateTimeOffset savedUtc = clock.UtcNow;
         StoredProposalRevision revision = new(
