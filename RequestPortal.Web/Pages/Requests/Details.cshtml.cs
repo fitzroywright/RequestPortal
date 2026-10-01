@@ -1,4 +1,5 @@
 using System;
+using System.Security.Claims;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -11,12 +12,14 @@ using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Delivery;
 using RequestPortal.Application.Integration;
+using RequestPortal.Application.Messages;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
+using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Pages.Requests;
 
@@ -32,6 +35,7 @@ public sealed class DetailsModel : PageModel
     private readonly IExternalApplicationIntegrationService ffpManagerIntegrationService;
     private readonly IDeliveryService deliveryService;
     private readonly RequestPortalDbContext dbContext;
+    private readonly IPortalMessageService messageService;
 
     public DetailsModel(
         UserManager<ApplicationUser> userManager,
@@ -43,7 +47,8 @@ public sealed class DetailsModel : PageModel
         IRequestReferenceDataService referenceDataService,
         IExternalApplicationIntegrationService ffpManagerIntegrationService,
         IDeliveryService deliveryService,
-        RequestPortalDbContext dbContext)
+        RequestPortalDbContext dbContext,
+        IPortalMessageService messageService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -55,6 +60,7 @@ public sealed class DetailsModel : PageModel
         this.ffpManagerIntegrationService = ffpManagerIntegrationService;
         this.deliveryService = deliveryService;
         this.dbContext = dbContext;
+        this.messageService = messageService;
     }
 
     public new RequestDetail? Request { get; private set; }
@@ -63,6 +69,7 @@ public sealed class DetailsModel : PageModel
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
     public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
+    public IReadOnlyList<MessageThreadView> MessageThreads { get; private set; } = Array.Empty<MessageThreadView>();
 
     [BindProperty]
     public ItemInput Item { get; set; } = new();
@@ -264,6 +271,32 @@ public sealed class DetailsModel : PageModel
                 HttpContext.RequestAborted);
         }
 
+        Guid userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new InvalidOperationException("Authenticated user ID is unavailable."));
+        bool isStaff = User.HasClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
+        Guid[] threadIds = await dbContext.MessageThreads
+            .AsNoTracking()
+            .Where(thread => thread.RequestId == id)
+            .OrderByDescending(thread => thread.CreatedUtc)
+            .Select(thread => thread.Id)
+            .Take(20)
+            .ToArrayAsync(HttpContext.RequestAborted);
+
+        List<MessageThreadView> visibleThreads = [];
+        foreach (Guid threadId in threadIds)
+        {
+            MessageThreadView? thread = await messageService.GetThreadAsync(
+                userId,
+                isStaff,
+                threadId,
+                HttpContext.RequestAborted);
+            if (thread is not null)
+            {
+                visibleThreads.Add(thread);
+            }
+        }
+
+        MessageThreads = visibleThreads;
         Documents = await documentService.GetRequestDocumentsAsync(
             user.Id,
             id,
