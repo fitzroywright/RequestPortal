@@ -39,8 +39,11 @@
                 <label asp-for="Audience">Audience</label>
                 <select asp-for="Audience">
                     <option value="@MessageAudience.Individual">Individual</option>
-                    <option value="@MessageAudience.Organization">Organization</option>
-                    <option value="@MessageAudience.OrganizationManager">Organization Manager</option>
+                    @if (Model.CanBroadcastToOrganization)
+                    {
+                        <option value="@MessageAudience.Organization">Organization</option>
+                        <option value="@MessageAudience.OrganizationManager">Organization Manager</option>
+                    }
                     @if (Model.IsStaff)
                     {
                         <option value="@MessageAudience.FfpInternal">FFP Internal</option>
