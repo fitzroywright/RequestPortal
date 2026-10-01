@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using Common.Diagnostics;
+using Common.Messaging;
 using Common.Secrets;
 using Common.Storage;
 using Microsoft.AspNetCore.Authentication;
@@ -165,6 +166,156 @@ public sealed class MalwareScannerConnectivityDiagnosticLevelTest(
                 "Malware scanner TCP endpoint is unreachable.",
                 $"Host={host}; Port={port}; FailureType={exception.GetType().Name}");
         }
+    }
+}
+
+public sealed class RequiredSecretsDiagnosticLevelTest(
+    IConfiguration configuration,
+    ISecretProvider secrets) : IDiagnosticLevelLocalTest
+{
+    public string TestId => "REQUESTPORTAL.WEB.L5.SECRETS.REQUIRED";
+    public string Name => "Required secret availability";
+    public string Owner => "RequestPortal.Web";
+    public EngineeringDiagnosticLevel Level => EngineeringDiagnosticLevel.Level5Scan;
+    public bool IsDestructive => false;
+
+    public async Task<EngineeringDiagnosticCheckResult> RunAsync(CancellationToken cancellationToken)
+    {
+        var required = new List<(string Label, string SecretName)>
+        {
+            ("Request Portal database", "ConnectionStrings:RequestPortal")
+        };
+
+        string? diagnosticCredentialName =
+            configuration["Aegis:Diagnostics:RequestCredentialSecretName"]?.Trim();
+        if (!string.IsNullOrWhiteSpace(diagnosticCredentialName))
+        {
+            required.Add(("Diagnostics request credential", diagnosticCredentialName));
+        }
+
+        if (configuration.GetValue("Authentication:StaffOidc:Enabled", false))
+        {
+            required.Add(("Staff OIDC client secret", "Authentication:StaffOidc:ClientSecret"));
+        }
+
+        if (configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false))
+        {
+            required.Add((
+                "Common.Messaging Microsoft Graph client secret",
+                configuration["Messaging:MicrosoftGraph:ClientSecretName"]?.Trim()
+                    ?? "messaging/msgraph/client-secret"));
+        }
+
+        if (configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false))
+        {
+            required.Add((
+                "Common.Messaging Teams delegated token",
+                configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"]?.Trim()
+                    ?? "messaging/msgraph/teams/delegated-access-token"));
+        }
+
+        if (string.Equals(
+            configuration["Storage:Provider"]?.Trim(),
+            "SharePoint",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            required.Add((
+                "SharePoint storage client secret",
+                configuration["Storage:SharePoint:ClientSecretName"]?.Trim()
+                    ?? "storage/sharepoint/client-secret"));
+        }
+
+        if (configuration.GetValue("FfpManagerIntegration:Enabled", false))
+        {
+            required.Add((
+                "FFP Manager integration shared secret",
+                configuration["FfpManagerIntegration:SharedSecretName"]?.Trim()
+                    ?? "FfpManagerIntegration:SharedSecret"));
+        }
+
+        var missing = new List<string>();
+        foreach ((string label, string secretName) in required)
+        {
+            try
+            {
+                string? value = await secrets.GetAsync(secretName, cancellationToken);
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    missing.Add(label);
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                missing.Add($"{label}:resolve-{exception.GetType().Name}");
+            }
+        }
+
+        return missing.Count == 0
+            ? EngineeringDiagnosticPolicy.Passed(
+                TestId,
+                Name,
+                "All currently required Request Portal secrets resolve through Common.Secrets.",
+                $"Checked={required.Count}; SecretValuesExposed=false")
+            : EngineeringDiagnosticPolicy.Failed(
+                TestId,
+                Name,
+                "One or more currently required Request Portal secrets cannot be resolved through Common.Secrets.",
+                $"MissingOrUnreadable={string.Join(",", missing)}; Checked={required.Count}; SecretValuesExposed=false");
+    }
+}
+
+public sealed class MicrosoftGraphMessagingDiagnosticLevelTest(
+    IConfiguration configuration,
+    IEnumerable<IExternalMessageChannel> channels) : IDiagnosticLevelLocalTest
+{
+    public string TestId => "REQUESTPORTAL.WEB.L3.MESSAGING.MICROSOFT_GRAPH";
+    public string Name => "Common.Messaging Microsoft Graph provider verification";
+    public string Owner => "RequestPortal.Web";
+    public EngineeringDiagnosticLevel Level => EngineeringDiagnosticLevel.Level3Verification;
+    public bool IsDestructive => false;
+
+    public async Task<EngineeringDiagnosticCheckResult> RunAsync(CancellationToken cancellationToken)
+    {
+        bool enabled =
+            configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
+
+        if (!enabled)
+        {
+            return EngineeringDiagnosticPolicy.Warning(
+                TestId,
+                Name,
+                "Microsoft Graph email is not enabled for Request Portal.");
+        }
+
+        IExternalMessageChannelDiagnostic? diagnostic = channels
+            .OfType<IExternalMessageChannelDiagnostic>()
+            .FirstOrDefault(channel => channel.Channel == MessageChannel.MsEmail);
+
+        if (diagnostic is null)
+        {
+            return EngineeringDiagnosticPolicy.Failed(
+                TestId,
+                Name,
+                "Microsoft Graph email is enabled, but the Common.Messaging channel does not expose live provider verification.");
+        }
+
+        MessagingProviderHealth result =
+            await diagnostic.VerifyProviderAsync(cancellationToken).ConfigureAwait(false);
+
+        string evidence =
+            $"Provider={result.Provider}; Configured={result.Configured}; Reachable={result.Reachable}; State={result.State}; LatencyMs={result.Latency?.TotalMilliseconds:F0}; Reason={result.Reason ?? "none"}; SecretValuesExposed=false";
+
+        return result.Configured && result.Reachable
+            ? EngineeringDiagnosticPolicy.Passed(
+                TestId,
+                Name,
+                "Common.Messaging authenticated to Microsoft Graph and verified the configured sender mailbox.",
+                evidence)
+            : EngineeringDiagnosticPolicy.Failed(
+                TestId,
+                Name,
+                "Common.Messaging Microsoft Graph provider verification failed.",
+                evidence);
     }
 }
 
