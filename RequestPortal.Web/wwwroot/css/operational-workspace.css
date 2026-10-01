@@ -401,3 +401,115 @@
 @media(max-width:650px){.outlook-mailbox{grid-template-columns:1fr}.outlook-folder-card{border-right:0;border-bottom:1px solid #aeb8c2}.outlook-folder-card nav{display:flex;overflow-x:auto}.outlook-folder{min-width:max-content}.outlook-message-grid{grid-template-columns:24px minmax(120px,1fr) 110px}.outlook-message-grid-header{display:none}.outlook-subject small{white-space:normal}.outlook-sender small{display:none}}
 
 .request-detail-side{display:grid;gap:10px;align-content:start}.request-messages-card{min-width:0}.request-message-list{max-height:520px;overflow:auto}.request-message-thread{display:block;padding:10px 12px;border-bottom:1px solid var(--workspace-line-soft);color:var(--workspace-title);text-decoration:none}.request-message-thread:hover{background:#f3f7fa}.request-message-thread-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.request-message-thread-head strong{font-size:.88rem}.request-message-thread-head span{font-size:.7rem;color:var(--workspace-muted);white-space:nowrap}.request-message-item{display:grid;grid-template-columns:auto 1fr;gap:2px 6px;margin-top:8px;padding-left:6px;border-left:2px solid #d5dde4}.request-message-item strong{font-size:.78rem}.request-message-item span{grid-column:1/-1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--workspace-muted);font-size:.78rem}.request-message-item small{grid-column:1/-1;color:#7a8792;font-size:.7rem}.request-status-card .timeline{max-height:360px;overflow:auto;padding:8px 12px}@media(max-width:900px){.request-detail-side{grid-template-columns:1fr}.request-message-list{max-height:360px}}
+
+/* Studio-style Request Portal cards and contained work areas */
+body:has(.operational-page) {
+    overflow: hidden;
+}
+body:has(.operational-page) main {
+    height: calc(100vh - 88px);
+    overflow: hidden;
+}
+body:has(.operational-page) .site-footer {
+    display: none;
+}
+.operational-page {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+.operational-page > .shell {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+.operational-page .operational-titlebar,
+.operational-page .workspace-titlebar {
+    flex: 0 0 auto;
+}
+.operational-page .portal-workspace-grid,
+.operational-page .outlook-mailbox,
+.operational-page > .shell > .dashboard-grid,
+.operational-page > .shell > .grid-2 {
+    min-height: 0;
+}
+.operational-page .operational-panel,
+.operational-page .workspace-panel,
+.operational-page .card {
+    border: 1px solid #d5dbe1;
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(23,32,51,.06);
+    overflow: hidden;
+}
+.operational-page .operational-panel > h2,
+.operational-page .operational-panel > h3,
+.operational-page .card > h2,
+.operational-page .card > h3 {
+    margin: 0;
+    padding: 11px 14px;
+    border-bottom: 1px solid #d5dbe1;
+    background: #f5f7f9;
+    color: #172033;
+    font-size: .96rem;
+}
+.operational-page .operational-panel > .action-row:first-child,
+.operational-page .card > .action-row:first-child {
+    min-height: 46px;
+    margin: 0;
+    padding: 7px 12px;
+    border-bottom: 1px solid #d5dbe1;
+    background: #f5f7f9;
+}
+.operational-page .operational-panel > .action-row:first-child h2,
+.operational-page .card > .action-row:first-child h2,
+.operational-page .operational-panel > .action-row:first-child h3,
+.operational-page .card > .action-row:first-child h3 {
+    margin: 0;
+    font-size: .96rem;
+}
+.operational-page .operational-panel > table,
+.operational-page .operational-panel > .table-wrap,
+.operational-page .card > .table-wrap {
+    margin: 0;
+}
+.operational-page .operational-panel > .table-wrap,
+.operational-page .card > .table-wrap {
+    max-height: 100%;
+    overflow: auto;
+}
+.operational-page .portal-workspace-grid > *,
+.operational-page .dashboard-grid > *,
+.operational-page .grid-2 > * {
+    min-height: 0;
+}
+.operational-page .dashboard-grid,
+.operational-page .grid-2 {
+    overflow: auto;
+}
+.operational-page .portal-workspace-grid {
+    overflow: hidden;
+}
+.operational-page .portal-workspace-grid > .request-panel,
+.operational-page .portal-workspace-grid > .workspace-panel {
+    overflow: hidden;
+}
+.operational-page .request-panel .workspace-table-wrap,
+.operational-page .workspace-panel .status-list,
+.operational-page .workspace-panel .organization-list,
+.operational-page .workspace-panel .attention-list,
+.operational-page .request-message-list {
+    overflow: auto;
+}
+@media(max-width:760px) {
+    body:has(.operational-page) main {
+        height: calc(100vh - 70px);
+    }
+    .operational-page {
+        overflow: auto;
+    }
+    .operational-page > .shell {
+        height: auto;
+    }
+}
