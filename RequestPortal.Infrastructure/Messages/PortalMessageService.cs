@@ -278,8 +278,8 @@ public sealed class PortalMessageService : IPortalMessageService
         MessageDetailView[] projected = messages
             .Select(row =>
             {
-                (string senderName, string senderKind) =
-                    ProjectSender(row.Message, row.Sender);
+                (string senderName, string senderKind, string? senderEmail) =
+                    ProjectSender(row.Message, row.Sender, isStaff);
                 IReadOnlyList<MessageAttachmentView> attachments =
                     attachmentsByMessage.TryGetValue(row.Message.Id, out MessageAttachmentView[]? values)
                         ? values
@@ -289,6 +289,7 @@ public sealed class PortalMessageService : IPortalMessageService
                     row.Message.Id,
                     senderName,
                     senderKind,
+                    senderEmail,
                     row.Message.Body,
                     row.Message.SentUtc,
                     row.Message.SenderUserId == userId,
@@ -1041,8 +1042,8 @@ public sealed class PortalMessageService : IPortalMessageService
         bool viewerIsStaff,
         bool hasAttachments = false)
     {
-        (string senderName, string senderKind) =
-            ProjectSender(message, sender);
+        (string senderName, string senderKind, string? senderEmail) =
+            ProjectSender(message, sender, viewerIsStaff);
         string preview = message.Body.Length <= 140
             ? message.Body
             : message.Body[..137] + "...";
@@ -1053,6 +1054,7 @@ public sealed class PortalMessageService : IPortalMessageService
             thread.Subject,
             senderName,
             senderKind,
+            senderEmail,
             preview,
             message.SentUtc,
             readUtc,
@@ -1063,23 +1065,29 @@ public sealed class PortalMessageService : IPortalMessageService
             hasAttachments);
     }
 
-    private static (string Name, string Kind) ProjectSender(
+    private static (string Name, string Kind, string? Email) ProjectSender(
         PortalMessage message,
-        ApplicationUser? sender)
+        ApplicationUser? sender,
+        bool viewerIsStaff)
     {
         if (message.SenderKind == PortalMessageSenderKind.System)
         {
-            return ("FFP Request Processing", "FFP");
+            return ("FFP Request Processing", "FFP", null);
         }
 
-        string displayName = sender?.DisplayName ?? message.SenderDisplayName;
-        string name = string.IsNullOrWhiteSpace(displayName)
-            ? (message.SenderKind == PortalMessageSenderKind.FfpStaff ? "FFP Staff" : "Organization representative")
-            : displayName.Trim();
+        string name = FirstName(
+            sender?.DisplayName ?? message.SenderDisplayName,
+            sender?.Email);
+
+        if (message.SenderKind == PortalMessageSenderKind.FfpStaff)
+        {
+            return (name, "FFP Staff", null);
+        }
 
         return (
             name,
-            message.SenderKind == PortalMessageSenderKind.FfpStaff ? "FFP Staff" : "Representative");
+            "Representative",
+            viewerIsStaff ? sender?.Email : null);
     }
 
     private static string FirstName(string? displayName, string? email)
