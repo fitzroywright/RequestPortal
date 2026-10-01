@@ -29,11 +29,20 @@
                     <a class="outlook-folder outlook-new-message" asp-page="/Messages/New">
                         <span><span class="outlook-folder-icon">✉</span> New Message</span>
                     </a>
+                    @if (Model.IsStaff)
+                    {
+                        <a class="outlook-folder" asp-page="/Messages/Assigned">
+                            <span><span class="outlook-folder-icon">✓</span> Assigned to Me</span>
+                        </a>
+                        <a class="outlook-folder" asp-page="/Messages/Unassigned">
+                            <span><span class="outlook-folder-icon">○</span> Unassigned</span>
+                        </a>
+                    }
                     <a class="outlook-folder" asp-page="/Messages/Sent">
                         <span><span class="outlook-folder-icon">↗</span> Sent Items</span>
                     </a>
                     <a class="outlook-folder outlook-archive-link" asp-page="/Messages/Archived">
-                        <span><span class="outlook-folder-icon">▤</span> Archived Messages</span>
+                        <span><span class="outlook-folder-icon">▤</span> @(Model.IsStaff ? "Closed" : "Archived Messages")</span>
                     </a>
                 </nav>
             </aside>
