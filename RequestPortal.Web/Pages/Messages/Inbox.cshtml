@@ -2,72 +2,87 @@
 @model RequestPortal.Web.Pages.Messages.InboxModel
 @using RequestPortal.Application.Messages
 @{
-    ViewData["Title"] = Model.IsStaff ? "FFP Staff Inbox" : "Inbox";
+    ViewData["Title"] = Model.IsStaff ? "FFP Staff Messages" : "Messages";
 }
 
 <section class="operational-page">
     <div class="shell">
         <header class="operational-titlebar">
             <div>
-                <div class="eyebrow request-eyebrow">Correspondence</div>
-                <h1>@(Model.IsStaff ? "FFP Staff Inbox" : "Messages")</h1>
-                <p>@(Model.IsStaff ? "Shared correspondence from representatives and Request Portal processing." : "Messages from FFP and representatives in your organizations.")</p>
+                <div class="eyebrow request-eyebrow">Messages</div>
+                <h1>@(Model.IsStaff ? "FFP Staff Messages" : "Messages")</h1>
+                <p>Correspondence, requests and document-linked conversations.</p>
             </div>
             <div class="operational-toolbar">
                 <a class="button" asp-page="/Messages/New">New message</a>
-                <a class="button button-secondary" asp-page="/Messages/Sent">Sent items</a>
             </div>
         </header>
 
-        <div class="mailbox-shell">
-            <nav class="mailbox-folders" aria-label="Mailbox folders">
-                <a class="is-active" asp-page="/Messages/Inbox">Inbox <span>@Model.UnreadCount</span></a>
-                <a asp-page="/Messages/Sent">Sent</a>
-                <a asp-page="/Messages/New">New message</a>
-            </nav>
+        <div class="outlook-mailbox">
+            <aside class="outlook-folder-card">
+                <div class="outlook-folder-title">Mailbox</div>
+                <nav aria-label="Message folders">
+                    <a class="outlook-folder is-active" asp-page="/Messages/Inbox">
+                        <span><span class="outlook-folder-icon">▣</span> Inbox</span>
+                        @if (Model.UnreadCount > 0) { <strong>@Model.UnreadCount</strong> }
+                    </a>
+                    <a class="outlook-folder outlook-new-message" asp-page="/Messages/New">
+                        <span><span class="outlook-folder-icon">✉</span> New Message</span>
+                    </a>
+                    <a class="outlook-folder" asp-page="/Messages/Sent">
+                        <span><span class="outlook-folder-icon">↗</span> Sent Items</span>
+                    </a>
+                    <a class="outlook-folder outlook-archive-link" asp-page="/Messages/Archived">
+                        <span><span class="outlook-folder-icon">▤</span> Archived Messages</span>
+                    </a>
+                </nav>
+            </aside>
 
-            <section class="mailbox-list" aria-label="Messages">
+            <section class="outlook-message-workspace" aria-label="Inbox messages">
+                <div class="outlook-workspace-titlebar">
+                    <div>
+                        <strong>Inbox</strong>
+                        <span>@Model.Messages.Count messages</span>
+                    </div>
+                    <span class="outlook-toolbar-note">Newest first</span>
+                </div>
+
                 @if (Model.Messages.Count == 0)
                 {
                     <div class="workspace-empty">
-                        <strong>Your inbox is empty</strong>
+                        <strong>Your inbox is empty.</strong>
                         <p>New correspondence will appear here.</p>
                     </div>
                 }
                 else
                 {
-                    <div class="mailbox-row mailbox-header" aria-hidden="true">
-                        <span>From</span>
-                        <span>Subject</span>
-                        <span>Context</span>
-                        <span>Received</span>
+                    <div class="outlook-message-grid outlook-message-grid-header" aria-hidden="true">
+                        <span></span><span>Sender</span><span>Subject / Preview</span><span>Context</span><span>Date</span>
                     </div>
                     @foreach (MailboxMessageView message in Model.Messages)
                     {
-                        <article class="mailbox-row @(message.ReadUtc is null ? "message-unread" : null)">
-                            <div>
+                        <a class="outlook-message-grid outlook-message-row @(message.ReadUtc is null ? "outlook-unread" : null)"
+                           asp-page="/Messages/Thread" asp-route-id="@message.ThreadId">
+                            <span class="outlook-message-state" aria-hidden="true">
+                                @(message.ReadUtc is null ? "●" : "○")
+                            </span>
+                            <span class="outlook-sender">
                                 <strong>@message.SenderName</strong>
-                                @if (message.SenderKind == "FFP Staff")
-                                {
-                                    <div class="mailbox-meta">FFP Staff</div>
-                                }
-                            </div>
-                            <div class="mailbox-subject">
-                                <a asp-page="/Messages/Thread" asp-route-id="@message.ThreadId"><strong>@message.Subject</strong></a>
-                                <div class="mailbox-preview">@message.Preview</div>
-                            </div>
-                            <div class="mailbox-context">
-                                @if (!string.IsNullOrWhiteSpace(message.OrganizationName))
-                                {
-                                    <div>@message.OrganizationName</div>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(message.RequestReference))
-                                {
-                                    <div>@message.RequestReference</div>
-                                }
-                            </div>
-                            <time class="mailbox-meta" datetime="@message.SentUtc.ToUniversalTime().ToString("O")">@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt")</time>
-                        </article>
+                                <small>@message.SenderKind</small>
+                            </span>
+                            <span class="outlook-subject">
+                                <strong>@message.Subject</strong>
+                                <small>@message.Preview</small>
+                            </span>
+                            <span class="outlook-context">
+                                @if (!string.IsNullOrWhiteSpace(message.OrganizationName)) { <small>@message.OrganizationName</small> }
+                                @if (!string.IsNullOrWhiteSpace(message.RequestReference)) { <small>@message.RequestReference</small> }
+                            </span>
+                            <span class="outlook-date">
+                                @if (message.HasAttachments) { <span class="outlook-attachment" title="Documents attached to this message" aria-label="Has documents">📎</span> }
+                                <time datetime="@message.SentUtc.ToUniversalTime().ToString("O")">@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time>
+                            </span>
+                        </a>
                     }
                 }
             </section>
