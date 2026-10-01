@@ -294,15 +294,14 @@
 }
 
 .provider-icon-microsoft {
-    grid-template-columns: repeat(2, 10px);
-    grid-template-rows: repeat(2, 10px);
-    gap: 2px;
+    background: transparent;
+    border-radius: 0;
 }
-
-.provider-icon-microsoft span:nth-child(1) { background: #f25022; }
-.provider-icon-microsoft span:nth-child(2) { background: #7fba00; }
-.provider-icon-microsoft span:nth-child(3) { background: #00a4ef; }
-.provider-icon-microsoft span:nth-child(4) { background: #ffb900; }
+.provider-icon-microsoft svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+}
 
 .provider-button-disabled .provider-icon {
     opacity: .82;
