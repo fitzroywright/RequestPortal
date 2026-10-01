@@ -653,3 +653,27 @@
         transform:none;
     }
 }
+
+
+/* Staff workspace/list full-row selection */
+.staff-select-row{
+    cursor:pointer;
+}
+tr.staff-select-row:hover td,
+tr.staff-select-row:focus td,
+.staff-select-row.organization-row:hover,
+.staff-select-row.organization-row:focus{
+    background:#f6f1e9;
+}
+tr.staff-select-row:focus,
+.staff-select-row.organization-row:focus{
+    outline:2px solid var(--ffp-orange);
+    outline-offset:-2px;
+}
+tr.staff-select-row td:first-child{
+    box-shadow:inset 3px 0 0 transparent;
+}
+tr.staff-select-row:hover td:first-child,
+tr.staff-select-row:focus td:first-child{
+    box-shadow:inset 3px 0 0 var(--ffp-orange);
+}
