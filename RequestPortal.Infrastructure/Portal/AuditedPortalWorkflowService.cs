@@ -93,7 +93,14 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     public async Task<Guid> CreateRequestAsync(Guid userId, Guid organizationId, string summary, CancellationToken cancellationToken = default)
     {
         Guid requestId = await inner.CreateRequestAsync(userId, organizationId, summary, cancellationToken);
-        await auditWriter.WriteAsync(userId, "RequestCreated", "AssistanceRequest", requestId, organizationId, summary, cancellationToken);
+        await TryAuditAsync(
+            userId,
+            "RequestCreated",
+            "AssistanceRequest",
+            requestId,
+            organizationId,
+            summary,
+            cancellationToken);
         operationsFlowPublisher.TryEnqueue(requestId, "Applicant", clock.UtcNow, "Request draft created.");
         return requestId;
     }
@@ -113,7 +120,7 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     {
         await inner.AddRequestItemAsync(userId, requestId, itemName, description, quantity, unitOfMeasureId, notes, cancellationToken);
         RequestDetail? request = await inner.GetRequestAsync(userId, requestId, false, cancellationToken);
-        await auditWriter.WriteAsync(
+        await TryAuditAsync(
             userId,
             "RequestItemAdded",
             "AssistanceRequest",
@@ -128,7 +135,14 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
         RequestDetail? request = await inner.GetRequestAsync(userId, requestId, false, cancellationToken);
         await EnsureOrganizationEligibleForSubmissionAsync(request?.OrganizationId, cancellationToken);
         await inner.SubmitRequestAsync(userId, requestId, cancellationToken);
-        await auditWriter.WriteAsync(userId, "RequestSubmitted", "AssistanceRequest", requestId, request?.OrganizationId, cancellationToken: cancellationToken);
+        await TryAuditAsync(
+            userId,
+            "RequestSubmitted",
+            "AssistanceRequest",
+            requestId,
+            request?.OrganizationId,
+            detail: null,
+            cancellationToken);
         operationsFlowPublisher.TryEnqueue(requestId, "Submission", clock.UtcNow, "Request submitted for review.");
     }
 
@@ -187,6 +201,44 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
             .SingleAsync(item => item.Id == organizationId.Value, cancellationToken);
 
         organization.EnsureEligibleForSubmission(DateOnly.FromDateTime(clock.UtcNow.UtcDateTime));
+    }
+
+    private async Task TryAuditAsync(
+        Guid actorUserId,
+        string action,
+        string entityType,
+        Guid entityId,
+        Guid? organizationId,
+        string? detail,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await auditWriter.WriteAsync(
+                actorUserId,
+                action,
+                entityType,
+                entityId,
+                organizationId,
+                detail,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry in
+                     dbContext.ChangeTracker.Entries()
+                         .Where(entry =>
+                             entry.Entity is RequestPortal.Domain.Auditing.AuditEntry &&
+                             entry.State == EntityState.Added)
+                         .ToArray())
+            {
+                entry.State = EntityState.Detached;
+            }
+        }
     }
 
     private void AddOutboxMessage<TMessage>(TMessage message)
