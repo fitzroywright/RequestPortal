@@ -44,10 +44,9 @@ public sealed class NotificationsModel : PageModel
     [BindProperty]
     public OrganizationSubscriptionInput OrganizationInput { get; set; } = new();
 
-    public async Task OnGetAsync()
+    public IActionResult OnGet()
     {
-        ApplicationUser user = await GetUserAsync();
-        await LoadAsync(user);
+        return RedirectToPage("/Account/Profile");
     }
 
     public async Task<IActionResult> OnPostSaveAsync()
