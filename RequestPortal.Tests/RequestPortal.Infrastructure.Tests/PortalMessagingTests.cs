@@ -184,6 +184,162 @@ public sealed class PortalMessagingTests
     }
 
     [Fact]
+    public async Task OrganizationBroadcast_RequiresAdministratorMembership()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+
+        ApplicationUser administrator = CreateUser("Maria Johnson", "maria@example.org", false);
+        ApplicationUser member = CreateUser("Andre Williams", "andre@example.org", false);
+        ApplicationUser otherMember = CreateUser("Peter Brown", "peter@example.org", false);
+        database.Db.Users.AddRange(administrator, member, otherMember);
+
+        Organization organization = CreateApprovedOrganization(administrator.Id, "Community Group");
+
+        OrganizationMembership memberMembership =
+            organization.RequestMembership(Guid.NewGuid(), member.Id, Now.AddMinutes(2));
+        memberMembership.Approve(administrator.Id, Now.AddMinutes(3));
+
+        OrganizationMembership otherMembership =
+            organization.RequestMembership(Guid.NewGuid(), otherMember.Id, Now.AddMinutes(4));
+        otherMembership.Approve(administrator.Id, Now.AddMinutes(5));
+
+        database.Db.Organizations.Add(organization);
+        await database.Db.SaveChangesAsync(cancellationToken);
+
+        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => service.SendAsync(
+                member.Id,
+                senderIsStaff: false,
+                organization.Id,
+                requestId: null,
+                threadId: null,
+                subject: "Organization notice",
+                body: "Ordinary representatives cannot broadcast.",
+                recipientUserIds: Array.Empty<Guid>(),
+                cancellationToken,
+                audience: MessageAudience.Organization));
+
+        Guid threadId = await service.SendAsync(
+            administrator.Id,
+            senderIsStaff: false,
+            organization.Id,
+            requestId: null,
+            threadId: null,
+            subject: "Organization notice",
+            body: "Administrator broadcast.",
+            recipientUserIds: Array.Empty<Guid>(),
+            cancellationToken,
+            audience: MessageAudience.Organization);
+
+        Assert.Contains(
+            await service.GetInboxAsync(member.Id, false, cancellationToken: cancellationToken),
+            item => item.ThreadId == threadId);
+        Assert.Contains(
+            await service.GetInboxAsync(otherMember.Id, false, cancellationToken: cancellationToken),
+            item => item.ThreadId == threadId);
+    }
+
+    [Fact]
+    public async Task SharedStaffMailbox_SupportsAssignmentCloseAndReopen()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+
+        ApplicationUser representative = CreateUser("Maria Johnson", "maria@example.org", false);
+        ApplicationUser staff = CreateUser("David Brown", "david.brown@foodforthepoorja.org", true);
+        database.Db.Users.AddRange(representative, staff);
+
+        Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
+        database.Db.Organizations.Add(organization);
+        await database.Db.SaveChangesAsync(cancellationToken);
+
+        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+
+        Guid threadId = await service.SendToSharedStaffAsync(
+            representative.Id,
+            organization.Id,
+            requestId: null,
+            threadId: null,
+            subject: "Please help",
+            body: "I need assistance.",
+            cancellationToken);
+
+        Assert.Contains(
+            await service.GetUnassignedAsync(staff.Id, cancellationToken: cancellationToken),
+            item => item.ThreadId == threadId);
+
+        await service.AssignThreadAsync(staff.Id, threadId, cancellationToken);
+
+        Assert.DoesNotContain(
+            await service.GetUnassignedAsync(staff.Id, cancellationToken: cancellationToken),
+            item => item.ThreadId == threadId);
+        Assert.Contains(
+            await service.GetAssignedToMeAsync(staff.Id, cancellationToken: cancellationToken),
+            item => item.ThreadId == threadId);
+
+        MessageThreadView assigned = Assert.IsType<MessageThreadView>(
+            await service.GetThreadAsync(staff.Id, true, threadId, cancellationToken));
+        Assert.Equal(staff.Id, assigned.AssignedToStaffUserId);
+        Assert.Equal("David", assigned.AssignedToStaffName);
+
+        await service.CloseThreadAsync(staff.Id, threadId, cancellationToken);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.ReplyAsync(
+                staff.Id,
+                true,
+                threadId,
+                "This cannot be sent while closed.",
+                cancellationToken));
+
+        Assert.Contains(
+            await service.GetArchivedAsync(staff.Id, true, cancellationToken: cancellationToken),
+            item => item.ThreadId == threadId);
+
+        await service.ReopenThreadAsync(staff.Id, threadId, cancellationToken);
+
+        MessageThreadView reopened = Assert.IsType<MessageThreadView>(
+            await service.GetThreadAsync(staff.Id, true, threadId, cancellationToken));
+        Assert.Null(reopened.ClosedUtc);
+        Assert.Equal(staff.Id, reopened.AssignedToStaffUserId);
+    }
+
+    [Fact]
+    public async Task SystemMessage_CreatesExternalNotificationRequest()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+
+        ApplicationUser representative = CreateUser("Maria Johnson", "maria@example.org", false);
+        ApplicationUser staff = CreateUser("David Brown", "david.brown@foodforthepoorja.org", true);
+        database.Db.Users.AddRange(representative, staff);
+
+        Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
+        database.Db.Organizations.Add(organization);
+        await database.Db.SaveChangesAsync(cancellationToken);
+
+        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+
+        await service.SendSystemMessageAsync(
+            organization.Id,
+            requestId: null,
+            threadId: null,
+            subject: "Information required",
+            body: "Please upload the signed letter.",
+            [representative.Id],
+            cancellationToken);
+
+        Assert.Contains(
+            database.Db.OutboxMessages,
+            message => message.MessageType.EndsWith(
+                nameof(RequestPortal.Common.Messaging.PortalMessageNotificationRequestedMessage),
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task MessageAttachment_StaysWithinThreadAndOrganizationScope()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
