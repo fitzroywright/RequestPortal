@@ -26,6 +26,10 @@ public sealed record MessageThreadView(
     Guid? RequestId,
     string? RequestReference,
     MessageAudience Audience,
+    Guid? AssignedToStaffUserId,
+    string? AssignedToStaffName,
+    DateTimeOffset? AssignedUtc,
+    DateTimeOffset? ClosedUtc,
     IReadOnlyList<MessageDetailView> Messages);
 
 public sealed record MessageAttachmentView(
@@ -83,6 +87,16 @@ public interface IPortalMessageService
     Task<IReadOnlyList<MailboxMessageView>> GetSentAsync(
         Guid userId,
         bool isStaff,
+        int take = 100,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MailboxMessageView>> GetAssignedToMeAsync(
+        Guid staffUserId,
+        int take = 100,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MailboxMessageView>> GetUnassignedAsync(
+        Guid staffUserId,
         int take = 100,
         CancellationToken cancellationToken = default);
 
@@ -155,6 +169,26 @@ public interface IPortalMessageService
 
     Task MarkThreadReadAsync(
         Guid userId,
+        Guid threadId,
+        CancellationToken cancellationToken = default);
+
+    Task AssignThreadAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken = default);
+
+    Task UnassignThreadAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken = default);
+
+    Task CloseThreadAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken = default);
+
+    Task ReopenThreadAsync(
+        Guid staffUserId,
         Guid threadId,
         CancellationToken cancellationToken = default);
 }
