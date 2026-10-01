@@ -17,6 +17,10 @@ internal static class ProductionCommissioning
             configuration["Storage:SharePoint:ClientSecretName"]?.Trim()
             ?? "storage/sharepoint/client-secret";
 
+        string whatsAppSecretName =
+            configuration["Notifications:WhatsAppAccessTokenSecretName"]?.Trim()
+            ?? "messaging/whatsapp/access-token";
+
         return new RuntimeSecrets(
             await provider.GetAsync("ConnectionStrings:RequestPortal"),
             await provider.GetAsync("Authentication:Google:ClientSecret"),
@@ -26,7 +30,8 @@ internal static class ProductionCommissioning
             await provider.GetAsync("Authentication:Apple:ClientSecret"),
             await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
             await provider.GetAsync(integrationSharedSecretName),
-            await provider.GetAsync(storageSecretName));
+            await provider.GetAsync(storageSecretName),
+            await provider.GetAsync(whatsAppSecretName));
     }
 
     public static IReadOnlyList<ProductionConfigurationFailure> Validate(
@@ -114,7 +119,7 @@ internal static class ProductionCommissioning
         AddIf(!hasExternalProvider,
             "RP-PROD-OAUTH-001",
             "At least one external representative identity provider must be commissioned.");
-        AddIf(whatsAppEnabled && (string.IsNullOrWhiteSpace(whatsAppPhoneNumberId) || string.IsNullOrWhiteSpace(whatsAppGraphApiVersion) || string.IsNullOrWhiteSpace(secrets.StorageSharePointClientSecret) && false),
+        AddIf(whatsAppEnabled && (string.IsNullOrWhiteSpace(whatsAppPhoneNumberId) || string.IsNullOrWhiteSpace(whatsAppGraphApiVersion) || string.IsNullOrWhiteSpace(secrets.WhatsAppAccessToken)),
             "RP-PROD-WHATSAPP-001",
             "WhatsApp requires GraphApiVersion, PhoneNumberId and a Common.Secrets-backed access token.");
         AddIf(!notificationsEnabled ||
@@ -169,7 +174,8 @@ internal sealed record RuntimeSecrets(
     string? AppleClientSecret,
     string? StaffOidcClientSecret,
     string? FfpManagerSharedSecret,
-    string? StorageSharePointClientSecret);
+    string? StorageSharePointClientSecret,
+    string? WhatsAppAccessToken);
 
 internal sealed record ProductionConfigurationFailure(
     string Code,
