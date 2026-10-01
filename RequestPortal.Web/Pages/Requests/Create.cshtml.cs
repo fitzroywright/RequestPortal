@@ -127,6 +127,8 @@ public sealed class CreateModel : PageModel
             ModelState.AddModelError(nameof(Input.ProgramCategory), "Select a valid program classification.");
         }
 
+        Input.Location = BuildLocationText();
+
         if (Input.Kind == RequestKind.GoodsAndServices)
         {
             ValidateItems();
@@ -399,6 +401,24 @@ public sealed class CreateModel : PageModel
         Organizations = options;
     }
 
+    private string? BuildLocationText()
+    {
+        string[] parts =
+        [
+            Input.Address?.Trim() ?? string.Empty,
+            Input.Town?.Trim() ?? string.Empty,
+            Input.Parish?.Trim() ?? string.Empty
+        ];
+
+        string[] populated = parts
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .ToArray();
+
+        return populated.Length == 0
+            ? null
+            : string.Join(", ", populated);
+    }
+
     private static string[] MissingProfileFields(OrganizationProfile profile)
     {
         List<string> missing = [];
@@ -447,6 +467,15 @@ public sealed class CreateModel : PageModel
         public string? ProgramCategory { get; set; }
 
         public RequestPriority Priority { get; set; } = RequestPriority.Normal;
+
+        [StringLength(300)]
+        public string? Address { get; set; }
+
+        [StringLength(120)]
+        public string? Town { get; set; }
+
+        [StringLength(80)]
+        public string? Parish { get; set; }
 
         [StringLength(500)]
         public string? Location { get; set; }
