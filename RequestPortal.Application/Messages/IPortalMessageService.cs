@@ -131,6 +131,16 @@ public interface IPortalMessageService
         Guid organizationId,
         CancellationToken cancellationToken = default);
 
+    Task<Guid> SavePersonalNoteAsync(
+        Guid senderUserId,
+        Guid organizationId,
+        Guid requestId,
+        Guid? threadId,
+        string subject,
+        string body,
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null);
+
     Task<Guid> SendToSharedStaffAsync(
         Guid senderUserId,
         Guid organizationId,
