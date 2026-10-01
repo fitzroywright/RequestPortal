@@ -68,19 +68,22 @@ public sealed class ProjectProposalService : IProjectProposalService
     private readonly IClock clock;
     private readonly IBusinessAuditWriter auditWriter;
     private readonly IVersionedFileStorage revisionStorage;
+    private readonly ILogger<ProjectProposalService> logger;
 
     public ProjectProposalService(
         RequestPortalDbContext dbContext,
         IOrganizationAccessService organizationAccessService,
         IClock clock,
         IBusinessAuditWriter auditWriter,
-        IVersionedFileStorage revisionStorage)
+        IVersionedFileStorage revisionStorage,
+        ILogger<ProjectProposalService> logger)
     {
         this.dbContext = dbContext;
         this.organizationAccessService = organizationAccessService;
         this.clock = clock;
         this.auditWriter = auditWriter;
         this.revisionStorage = revisionStorage;
+        this.logger = logger;
     }
 
     public async Task InitializeProjectAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default)
@@ -96,10 +99,21 @@ public sealed class ProjectProposalService : IProjectProposalService
             dbContext.ProjectProposals.Add(proposal);
             LongFormTemplate initial = templates[0];
             proposal.Update(initial.Title, Sanitize(initial.RichContentHtml), userId, clock.UtcNow);
-            await StoreRevisionAsync(proposal, userId, automatic: false, cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (!exists)
+        {
+            ProjectProposal proposal = await dbContext.ProjectProposals
+                .SingleAsync(item => item.RequestId == requestId, cancellationToken);
+
+            await TryStoreRevisionAsync(
+                proposal,
+                userId,
+                automatic: false,
+                cancellationToken);
+        }
     }
 
     public async Task<ProjectProposalDetail?> GetAsync(Guid userId, Guid requestId, bool isStaff, CancellationToken cancellationToken = default)
@@ -234,8 +248,12 @@ public sealed class ProjectProposalService : IProjectProposalService
         if (proposal.Title == cleanTitle && proposal.RichContentHtml == sanitizedHtml) return;
 
         proposal.Update(cleanTitle, sanitizedHtml, userId, clock.UtcNow);
-        await StoreRevisionAsync(proposal, userId, automatic, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await TryStoreRevisionAsync(
+            proposal,
+            userId,
+            automatic,
+            cancellationToken);
 
         await auditWriter.WriteAsync(
             userId,
@@ -245,6 +263,33 @@ public sealed class ProjectProposalService : IProjectProposalService
             request.OrganizationId,
             $"Version {proposal.Version}; {(automatic ? "automatic draft save" : "explicit save")}.",
             cancellationToken);
+    }
+
+    private async Task TryStoreRevisionAsync(
+        ProjectProposal proposal,
+        Guid editedByUserId,
+        bool automatic,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await StoreRevisionAsync(
+                proposal,
+                editedByUserId,
+                automatic,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Project proposal revision history could not be written for request {RequestId}. The database proposal remains saved.",
+                proposal.RequestId);
+        }
     }
 
     private async Task StoreRevisionAsync(
