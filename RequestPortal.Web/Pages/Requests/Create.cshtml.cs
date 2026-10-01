@@ -69,6 +69,9 @@ public sealed class CreateModel : PageModel
     public IReadOnlyList<ProgramClassificationOption> Programs { get; private set; } = Array.Empty<ProgramClassificationOption>();
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
     public string SubmittedByName { get; private set; } = string.Empty;
+    public string? FailureDetails { get; private set; }
+    public string? FailureStage { get; private set; }
+    public string? FailureCorrelation { get; private set; }
 
     [BindProperty]
     public RequestInput Input { get; set; } = new();
@@ -276,9 +279,13 @@ public sealed class CreateModel : PageModel
                     correlation);
             }
 
+            FailureStage = stage;
+            FailureCorrelation = correlation;
+            FailureDetails = exception.ToString();
+
             ModelState.AddModelError(
                 string.Empty,
-                $"The request could not be completed while {stage}. Reference: {correlation}");
+                $"The request could not be completed while {stage}. The full server exception is displayed below. Reference: {correlation}");
 
             return Page();
         }
