@@ -25,6 +25,8 @@ public sealed class NewModel(
 
     public bool IsStaff { get; private set; }
 
+    public bool CanBroadcastToOrganization { get; private set; }
+
     [BindProperty(SupportsGet = true)]
     public Guid? OrganizationId { get; set; }
 
@@ -132,12 +134,27 @@ public sealed class NewModel(
         {
             IReadOnlyList<OrganizationSummary> organizations =
                 await workflowService.GetOrganizationsForUserAsync(userId, HttpContext.RequestAborted);
-            Organizations = organizations
+            OrganizationSummary[] approvedOrganizations = organizations
                 .Where(item =>
                     item.OrganizationStatus == "Approved" &&
                     item.MembershipStatus == "Approved")
+                .ToArray();
+
+            Organizations = approvedOrganizations
                 .Select(item => new OrganizationOption(item.Id, item.Name))
                 .ToArray();
+
+            if (OrganizationId.HasValue)
+            {
+                CanBroadcastToOrganization = approvedOrganizations.Any(item =>
+                    item.Id == OrganizationId.Value &&
+                    string.Equals(item.Role, "Administrator", StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        if (IsStaff)
+        {
+            CanBroadcastToOrganization = true;
         }
 
         if (OrganizationId.HasValue)
