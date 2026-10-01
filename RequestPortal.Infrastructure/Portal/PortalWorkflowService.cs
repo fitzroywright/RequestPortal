@@ -588,7 +588,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
             cancellationToken);
     }
 
-    private Task WriteDiagnosticAsync(
+    private async Task WriteDiagnosticAsync(
         string code,
         DiagnosticSeverity severity,
         string component,
@@ -611,6 +611,19 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
             message,
             Properties: properties);
 
-        return diagnosticRouter.RouteAsync(diagnosticEvent, cancellationToken);
+        try
+        {
+            await diagnosticRouter.RouteAsync(
+                diagnosticEvent,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            // Diagnostics must never block or roll back a successful business operation.
+        }
     }
 }
