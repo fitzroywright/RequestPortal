@@ -447,6 +447,40 @@ public sealed class PortalMessageService : IPortalMessageService
             .ToArray();
     }
 
+    public async Task<Guid> SavePersonalNoteAsync(
+        Guid senderUserId,
+        Guid organizationId,
+        Guid requestId,
+        Guid? threadId,
+        string subject,
+        string body,
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
+    {
+        await EnsureApprovedMembershipAsync(
+            senderUserId,
+            organizationId,
+            cancellationToken);
+        await ValidateRequestScopeAsync(
+            organizationId,
+            requestId,
+            cancellationToken);
+
+        return await SendInternalAsync(
+            senderUserId,
+            PortalMessageSenderKind.Representative,
+            organizationId,
+            requestId,
+            threadId,
+            subject,
+            body,
+            Array.Empty<Guid>(),
+            staffVisible: false,
+            cancellationToken,
+            attachmentDocumentIds,
+            MessageAudience.PersonalNote);
+    }
+
     public async Task<Guid> SendToSharedStaffAsync(
         Guid senderUserId,
         Guid organizationId,
@@ -514,7 +548,7 @@ public sealed class PortalMessageService : IPortalMessageService
 
             await EnsureApprovedMembershipAsync(senderUserId, organizationId.Value, cancellationToken);
 
-            if (audience is MessageAudience.Organization or MessageAudience.OrganizationManager)
+            if (audience == MessageAudience.Organization)
             {
                 await EnsureOrganizationAdministratorAsync(
                     senderUserId,
@@ -673,7 +707,8 @@ public sealed class PortalMessageService : IPortalMessageService
                 .ToArray();
         }
 
-        if (recipients.Length == 0)
+        if (thread.Audience != MessageAudience.PersonalNote &&
+            recipients.Length == 0)
         {
             throw new InvalidOperationException("No eligible recipients are available for this conversation.");
         }
@@ -689,7 +724,8 @@ public sealed class PortalMessageService : IPortalMessageService
             recipients,
             thread.StaffVisible,
             cancellationToken,
-            attachmentDocumentIds);
+            attachmentDocumentIds,
+            thread.Audience);
     }
 
     public async Task<Guid> SendSystemMessageAsync(
@@ -1015,7 +1051,14 @@ public sealed class PortalMessageService : IPortalMessageService
             }
         }
 
-        AddExternalNotificationOutbox(message, thread, recipients);
+        if (audience != MessageAudience.PersonalNote)
+        {
+            AddExternalNotificationOutbox(
+                message,
+                thread,
+                recipients);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         if (auditWriter is not null)
         {
@@ -1029,7 +1072,15 @@ public sealed class PortalMessageService : IPortalMessageService
             cancellationToken);
         }
 
-        await NotifyAsync(message, thread, recipients, cancellationToken);
+        if (audience != MessageAudience.PersonalNote)
+        {
+            await NotifyAsync(
+                message,
+                thread,
+                recipients,
+                cancellationToken);
+        }
+
         return thread.Id;
     }
 
