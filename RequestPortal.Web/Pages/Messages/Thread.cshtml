@@ -32,6 +32,10 @@
                             {
                                 <span class="status">FFP Staff</span>
                             }
+                            @if (Model.IsStaff && !string.IsNullOrWhiteSpace(message.SenderEmail))
+                            {
+                                <span class="muted">@message.SenderEmail</span>
+                            }
                             <span class="muted">@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</span>
                         </div>
                         <div class="message-body">@message.Body</div>
