@@ -191,6 +191,29 @@
         });
     })();
     </script>
+    <script>
+    (() => {
+        const interactiveSelector = "a,button,input,select,textarea,label,form,[role='button']";
+        const navigate = row => {
+            const href = row.getAttribute("data-row-href");
+            if (href) window.location.assign(href);
+        };
+
+        document.addEventListener("click", event => {
+            const row = event.target.closest("[data-row-href]");
+            if (!row || event.target.closest(interactiveSelector)) return;
+            navigate(row);
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            const row = event.target.closest("[data-row-href]");
+            if (!row || event.target.closest(interactiveSelector)) return;
+            event.preventDefault();
+            navigate(row);
+        });
+    })();
+    </script>
     <script src="~/js/contextual-training.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
