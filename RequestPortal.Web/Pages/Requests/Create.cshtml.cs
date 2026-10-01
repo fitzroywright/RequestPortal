@@ -248,6 +248,30 @@ public sealed class CreateModel : PageModel
                 requestId,
                 correlation);
 
+            try
+            {
+                Guid? failedRequestId = requestId == Guid.Empty
+                    ? null
+                    : requestId;
+
+                await messageService.SendStaffAlertAsync(
+                    Input.OrganizationId,
+                    failedRequestId,
+                    "Request creation failed",
+                    $"A representative encountered an error while {stage}. " +
+                    $"Correlation: {correlation}. " +
+                    $"Request: {(failedRequestId.HasValue ? failedRequestId.Value.ToString("D") : "not yet created")}. " +
+                    $"Error: {exception.GetType().Name}: {exception.Message}",
+                    HttpContext.RequestAborted);
+            }
+            catch (Exception alertException)
+            {
+                logger.LogWarning(
+                    alertException,
+                    "The Create Request failure could not also be posted to the FFP Staff inbox. Correlation={Correlation}",
+                    correlation);
+            }
+
             ModelState.AddModelError(
                 string.Empty,
                 $"The request could not be completed while {stage}. Reference: {correlation}");
