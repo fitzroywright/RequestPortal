@@ -152,6 +152,7 @@ public sealed class CreateModel : PageModel
             user.Id,
             requestId,
             null,
+            Input.Kind,
             Input.Category,
             Input.Subcategory,
             Input.ProgramCategory,
