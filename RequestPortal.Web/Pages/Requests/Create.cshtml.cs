@@ -150,13 +150,19 @@ public sealed class CreateModel : PageModel
             return Page();
         }
 
-        Guid requestId = await workflowService.CreateRequestAsync(
-            user.Id,
-            Input.OrganizationId,
-            Input.Summary,
-            HttpContext.RequestAborted);
+        Guid requestId = Guid.Empty;
+        string stage = "creating the request";
 
-        await requestDraftService.SetDetailsAsync(
+        try
+        {
+            requestId = await workflowService.CreateRequestAsync(
+                user.Id,
+                Input.OrganizationId,
+                Input.Summary,
+                HttpContext.RequestAborted);
+
+            stage = "saving request details";
+            await requestDraftService.SetDetailsAsync(
             user.Id,
             requestId,
             null,
@@ -169,41 +175,46 @@ public sealed class CreateModel : PageModel
             Input.Circumstances,
             HttpContext.RequestAborted);
 
-        try
-        {
-            await requestLocationService.ResolveAndSaveAsync(
+            stage = "saving request location";
+            try
+            {
+                await requestLocationService.ResolveAndSaveAsync(
                 requestId,
                 Input.Location,
                 Input.Latitude,
                 Input.Longitude,
                 HttpContext.RequestAborted);
         }
-        catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(
-                exception,
-                "Request location enrichment could not be stored for request {RequestId}. Request creation will continue.",
-                requestId);
-        }
+            catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Request location enrichment could not be stored for request {RequestId}. Request creation will continue.",
+                    requestId);
+            }
 
-        if (Input.Kind == RequestKind.Project)
-        {
-            await projectProposalService.InitializeProjectAsync(user.Id, requestId, HttpContext.RequestAborted);
-            await projectProposalService.SaveAsync(
+            if (Input.Kind == RequestKind.Project)
+            {
+                stage = "initializing the project proposal";
+                await projectProposalService.InitializeProjectAsync(user.Id, requestId, HttpContext.RequestAborted);
+                stage = "saving the project proposal";
+                await projectProposalService.SaveAsync(
                 user.Id,
                 requestId,
                 string.IsNullOrWhiteSpace(Project.Title) ? "Project Proposal" : Project.Title,
                 Project.RichContentHtml ?? string.Empty,
                 HttpContext.RequestAborted);
-            await UploadProjectDocumentsAsync(user.Id, requestId);
-        }
-        else
-        {
-            foreach (RequestItemInput item in Items.Where(item => !item.IsBlank))
+                stage = "uploading project documents";
+                await UploadProjectDocumentsAsync(user.Id, requestId);
+            }
+            else
+            {
+                stage = "saving requested items";
+                foreach (RequestItemInput item in Items.Where(item => !item.IsBlank))
             {
                 await workflowService.AddRequestItemAsync(
                     user.Id,
@@ -214,10 +225,35 @@ public sealed class CreateModel : PageModel
                     item.UnitOfMeasureId,
                     item.Notes,
                     HttpContext.RequestAborted);
+                }
             }
-        }
 
-        await workflowService.SubmitRequestAsync(user.Id, requestId, HttpContext.RequestAborted);
+            stage = "submitting the request";
+            await workflowService.SubmitRequestAsync(user.Id, requestId, HttpContext.RequestAborted);
+        }
+        catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            string correlation =
+                System.Diagnostics.Activity.Current?.Id
+                ?? HttpContext.TraceIdentifier;
+
+            logger.LogError(
+                exception,
+                "Create Request failed while {Stage}. RequestId={RequestId}; Correlation={Correlation}",
+                stage,
+                requestId,
+                correlation);
+
+            ModelState.AddModelError(
+                string.Empty,
+                $"The request could not be completed while {stage}. Reference: {correlation}");
+
+            return Page();
+        }
 
         TempData["Success"] = "Request submitted to FFP for review.";
         return RedirectToPage("/Requests/Details", new { id = requestId });
