@@ -200,15 +200,22 @@ public sealed class PortalMessageService : IPortalMessageService
 
         var attachmentSet = attachmentMessageIds.ToHashSet();
 
-        return rows.Select(row => ToMailboxView(
-            row.Message,
-            row.Thread,
-            null,
-            row.Sender,
-            row.OrganizationName,
-            row.RequestReference,
-            isStaff,
-            attachmentSet.Contains(row.Message.Id))).ToArray();
+        return rows
+            .GroupBy(row => row.Thread.Id)
+            .Select(group => group
+                .OrderByDescending(row => row.Message.SentUtc)
+                .First())
+            .Select(row => ToMailboxView(
+                row.Message,
+                row.Thread,
+                null,
+                row.Sender,
+                row.OrganizationName,
+                row.RequestReference,
+                isStaff,
+                attachmentSet.Contains(row.Message.Id)))
+            .OrderByDescending(message => message.SentUtc)
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<MailboxMessageView>> GetSentAsync(
