@@ -49,7 +49,37 @@ public sealed class MessageThread
 
     public DateTimeOffset CreatedUtc { get; private set; }
 
+    public Guid? AssignedToStaffUserId { get; private set; }
+
+    public DateTimeOffset? AssignedUtc { get; private set; }
+
     public DateTimeOffset? ClosedUtc { get; private set; }
 
+    public void Assign(Guid staffUserId, DateTimeOffset assignedUtc)
+    {
+        if (!StaffVisible)
+        {
+            throw new InvalidOperationException("Only staff-visible conversations can be assigned.");
+        }
+        if (ClosedUtc.HasValue)
+        {
+            throw new InvalidOperationException("Closed conversations cannot be assigned.");
+        }
+
+        AssignedToStaffUserId = staffUserId;
+        AssignedUtc = assignedUtc;
+    }
+
+    public void Unassign()
+    {
+        AssignedToStaffUserId = null;
+        AssignedUtc = null;
+    }
+
     public void Close(DateTimeOffset closedUtc) => ClosedUtc = closedUtc;
+
+    public void Reopen()
+    {
+        ClosedUtc = null;
+    }
 }
