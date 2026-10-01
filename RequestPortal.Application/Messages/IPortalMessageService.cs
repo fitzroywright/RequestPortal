@@ -8,6 +8,7 @@ public sealed record MailboxMessageView(
     string Subject,
     string SenderName,
     string SenderKind,
+    string? SenderEmail,
     string Preview,
     DateTimeOffset SentUtc,
     DateTimeOffset? ReadUtc,
@@ -38,6 +39,7 @@ public sealed record MessageDetailView(
     Guid MessageId,
     string SenderName,
     string SenderKind,
+    string? SenderEmail,
     string Body,
     DateTimeOffset SentUtc,
     bool IsMine,
@@ -46,6 +48,7 @@ public sealed record MessageDetailView(
 public sealed record MessageRecipientOption(
     Guid UserId,
     string DisplayName,
+    string? Email,
     bool IsStaff,
     bool IsOrganizationManager);
 
