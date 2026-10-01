@@ -90,6 +90,52 @@ public sealed class PortalMessageService : IPortalMessageService
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<MailboxMessageView>> GetAssignedToMeAsync(
+        Guid staffUserId,
+        int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInternalStaffAsync(staffUserId, cancellationToken);
+
+        Guid[] threadIds = await dbContext.MessageThreads
+            .AsNoTracking()
+            .Where(thread =>
+                thread.StaffVisible &&
+                thread.AssignedToStaffUserId == staffUserId &&
+                thread.ClosedUtc == null)
+            .Select(thread => thread.Id)
+            .ToArrayAsync(cancellationToken);
+
+        return await GetStaffQueueAsync(
+            staffUserId,
+            threadIds,
+            take,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MailboxMessageView>> GetUnassignedAsync(
+        Guid staffUserId,
+        int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInternalStaffAsync(staffUserId, cancellationToken);
+
+        Guid[] threadIds = await dbContext.MessageThreads
+            .AsNoTracking()
+            .Where(thread =>
+                thread.StaffVisible &&
+                thread.AssignedToStaffUserId == null &&
+                thread.ClosedUtc == null)
+            .Select(thread => thread.Id)
+            .ToArrayAsync(cancellationToken);
+
+        return await GetStaffQueueAsync(
+            staffUserId,
+            threadIds,
+            take,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<MailboxMessageView>> GetArchivedAsync(
         Guid userId,
         bool isStaff,
@@ -297,6 +343,23 @@ public sealed class PortalMessageService : IPortalMessageService
             })
             .ToArray();
 
+        string? assignedToStaffName = null;
+        if (thread.AssignedToStaffUserId.HasValue)
+        {
+            var assignedUser = await dbContext.Users
+                .AsNoTracking()
+                .Where(user => user.Id == thread.AssignedToStaffUserId.Value)
+                .Select(user => new { user.DisplayName, user.Email })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (assignedUser is not null)
+            {
+                assignedToStaffName = FirstName(
+                    assignedUser.DisplayName,
+                    assignedUser.Email);
+            }
+        }
+
         return new MessageThreadView(
             thread.Id,
             thread.Subject,
@@ -305,6 +368,10 @@ public sealed class PortalMessageService : IPortalMessageService
             thread.RequestId,
             requestReference,
             thread.Audience,
+            thread.AssignedToStaffUserId,
+            assignedToStaffName,
+            thread.AssignedUtc,
+            thread.ClosedUtc,
             projected);
     }
 
@@ -725,6 +792,112 @@ public sealed class PortalMessageService : IPortalMessageService
         }
     }
 
+    public async Task AssignThreadAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken = default)
+    {
+        MessageThread thread = await LoadStaffThreadForMutationAsync(
+            staffUserId,
+            threadId,
+            cancellationToken);
+
+        thread.Assign(staffUserId, DateTimeOffset.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (auditWriter is not null)
+        {
+            await auditWriter.WriteAsync(
+                staffUserId,
+                "MessageThreadAssigned",
+                "MessageThread",
+                threadId,
+                thread.OrganizationId,
+                $"assignedTo={staffUserId:D}",
+                cancellationToken);
+        }
+    }
+
+    public async Task UnassignThreadAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken = default)
+    {
+        MessageThread thread = await LoadStaffThreadForMutationAsync(
+            staffUserId,
+            threadId,
+            cancellationToken);
+
+        thread.Unassign();
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (auditWriter is not null)
+        {
+            await auditWriter.WriteAsync(
+                staffUserId,
+                "MessageThreadUnassigned",
+                "MessageThread",
+                threadId,
+                thread.OrganizationId,
+                null,
+                cancellationToken);
+        }
+    }
+
+    public async Task CloseThreadAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken = default)
+    {
+        MessageThread thread = await LoadStaffThreadForMutationAsync(
+            staffUserId,
+            threadId,
+            cancellationToken);
+
+        thread.Close(DateTimeOffset.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (auditWriter is not null)
+        {
+            await auditWriter.WriteAsync(
+                staffUserId,
+                "MessageThreadClosed",
+                "MessageThread",
+                threadId,
+                thread.OrganizationId,
+                null,
+                cancellationToken);
+        }
+    }
+
+    public async Task ReopenThreadAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInternalStaffAsync(staffUserId, cancellationToken);
+
+        MessageThread thread = await dbContext.MessageThreads
+            .SingleAsync(
+                item => item.Id == threadId && item.StaffVisible,
+                cancellationToken);
+
+        thread.Reopen();
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (auditWriter is not null)
+        {
+            await auditWriter.WriteAsync(
+                staffUserId,
+                "MessageThreadReopened",
+                "MessageThread",
+                threadId,
+                thread.OrganizationId,
+                null,
+                cancellationToken);
+        }
+    }
+
     private async Task<Guid> SendInternalAsync(
         Guid senderUserId,
         PortalMessageSenderKind senderKind,
@@ -942,6 +1115,69 @@ public sealed class PortalMessageService : IPortalMessageService
             where message.ThreadId == thread.Id && recipient.UserId == userId
             select recipient)
             .AnyAsync(cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<MailboxMessageView>> GetStaffQueueAsync(
+        Guid staffUserId,
+        IReadOnlyCollection<Guid> threadIds,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (threadIds.Count == 0)
+        {
+            return Array.Empty<MailboxMessageView>();
+        }
+
+        IReadOnlyList<MailboxMessageView> inbox = await GetInboxAsync(
+            staffUserId,
+            isStaff: true,
+            Math.Clamp(take * 5, take, 250),
+            cancellationToken);
+
+        HashSet<Guid> allowed = threadIds.ToHashSet();
+
+        return inbox
+            .Where(message => allowed.Contains(message.ThreadId))
+            .GroupBy(message => message.ThreadId)
+            .Select(group => group.OrderByDescending(message => message.SentUtc).First())
+            .OrderByDescending(message => message.SentUtc)
+            .Take(Math.Clamp(take, 1, 250))
+            .ToArray();
+    }
+
+    private async Task<MessageThread> LoadStaffThreadForMutationAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken)
+    {
+        await EnsureInternalStaffAsync(staffUserId, cancellationToken);
+
+        return await dbContext.MessageThreads
+            .SingleAsync(
+                item =>
+                    item.Id == threadId &&
+                    item.StaffVisible &&
+                    item.ClosedUtc == null,
+                cancellationToken);
+    }
+
+    private async Task EnsureInternalStaffAsync(
+        Guid staffUserId,
+        CancellationToken cancellationToken)
+    {
+        bool isStaff = await dbContext.Users
+            .AsNoTracking()
+            .AnyAsync(
+                user =>
+                    user.Id == staffUserId &&
+                    user.IsInternalStaff,
+                cancellationToken);
+
+        if (!isStaff)
+        {
+            throw new UnauthorizedAccessException(
+                "FFP staff access is required for shared mailbox operations.");
+        }
     }
 
     private async Task EnsureApprovedMembershipAsync(
