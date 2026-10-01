@@ -14,6 +14,15 @@ internal static class AuthorizationServiceRegistration
         builder.Services.AddAuthorization(options =>
         {
             options.AddPolicy(
+                "PortalRepresentative"
+                , policy =>
+                {
+                    policy.AuthenticationSchemes.Add(
+                        IdentityConstants.ApplicationScheme);
+                    policy.RequireAuthenticatedUser();
+                });
+
+            options.AddPolicy(
                 PortalPolicies.FfpStaff
                 , policy =>
                 {
@@ -70,7 +79,9 @@ internal static class AuthorizationServiceRegistration
 
         builder.Services.AddRazorPages(options =>
         {
-            options.Conventions.AuthorizeFolder("/Dashboard");
+            options.Conventions.AuthorizeFolder(
+                "/Dashboard"
+                , "PortalRepresentative");
             options.Conventions.AuthorizeFolder(
                 "/Staff"
                 , PortalPolicies.FfpStaff);
@@ -80,8 +91,12 @@ internal static class AuthorizationServiceRegistration
             options.Conventions.AuthorizeFolder(
                 "/Management"
                 , PortalPolicies.ManagementDashboard);
-            options.Conventions.AuthorizeFolder("/Organizations");
-            options.Conventions.AuthorizeFolder("/Requests");
+            options.Conventions.AuthorizeFolder(
+                "/Organizations"
+                , "PortalRepresentative");
+            options.Conventions.AuthorizeFolder(
+                "/Requests"
+                , "PortalRepresentative");
             options.Conventions.AuthorizeFolder(
                 "/Messages"
                 , "PortalMessages");
