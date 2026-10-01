@@ -1219,6 +1219,12 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<Guid?>("AssignedToStaffUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AssignedUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("ClosedUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1240,6 +1246,8 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AssignedToStaffUserId");
 
                     b.HasIndex("OrganizationId");
 
