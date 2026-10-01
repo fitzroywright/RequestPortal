@@ -153,135 +153,65 @@
             RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
 }
 
-<section class="relief-carousel home-hero" data-relief-carousel>
-    <div class="relief-carousel-stage">
-        <div class="relief-carousel-image" data-carousel-image aria-hidden="true"></div>
-        <div class="relief-carousel-shade"></div>
-        <button class="relief-carousel-arrow relief-carousel-prev" type="button" data-carousel-prev aria-label="Previous slide">‹</button>
-        <button class="relief-carousel-arrow relief-carousel-next" type="button" data-carousel-next aria-label="Next slide">›</button>
-        <div class="shell relief-carousel-copy home-hero-copy">
-            <div class="eyebrow" data-carousel-kicker>Community Support</div>
-            <h1 data-carousel-title>Building brighter futures together</h1>
-            <p data-carousel-text>Partnering with communities across Jamaica for lasting, positive change.</p>
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                if (homeIsFfpStaff)
-                {
-                    <a class="button" asp-page="/Staff/Index">Open staff workspace →</a>
-                }
-                else
-                {
-                    <a class="button" asp-page="/Dashboard/Index">Open my workspace →</a>
-                }
-            }
-            else
-            {
-                <a class="button" asp-page="/Account/Login">Start here →</a>
-            }
-        </div>
-        <div class="shell relief-carousel-thumbs" data-carousel-thumbs aria-label="Relief programme slides"></div>
-    </div>
-</section>
-
-<section class="home-access">
-    <div class="shell home-access-grid">
-        <div class="home-access-main">
-            <div class="home-access-heading">
-                <div>
-                    <span class="home-kicker">User Assistance &amp; Access</span>
-                    <h2>One place to request help and follow the work.</h2>
-                </div>
-                <p>Organization representatives can submit assistance requests, follow progress, and keep conversations and documents together.</p>
+<section class="home-dashboard">
+    <div class="shell home-dashboard-grid">
+        <aside class="home-featured-project">
+            <div class="home-featured-titlebar">Featured Project</div>
+            <div class="home-featured-image">
+                <img src="~/img/leaningwoman.webp" alt="" />
             </div>
-
-            <div class="home-feature-grid">
-                <a class="home-feature" asp-page="/Account/Login">
-                    <span class="home-feature-icon">▤</span>
-                    <div>
-                        <strong>Submit requests</strong>
-                        <span>Apply for assistance for your community, programme, or project.</span>
-                    </div>
-                </a>
-                <a class="home-feature" asp-page="/Account/Login">
-                    <span class="home-feature-icon">⌕</span>
-                    <div>
-                        <strong>Track progress</strong>
-                        <span>See the current stage, messages, documents, and follow-up requests.</span>
-                    </div>
-                </a>
-                <a class="home-feature" asp-page="/Account/Login">
-                    <span class="home-feature-icon">●●</span>
-                    <div>
-                        <strong>Stay connected</strong>
-                        <span>Keep communication with Food For The Poor Jamaica in one place.</span>
-                    </div>
-                </a>
+            <div class="home-featured-copy">
+                <strong>Safer Homes, Stronger Communities</strong>
+                <p>Support for home construction and repairs helps families live in safer, healthier environments across Jamaica.</p>
+                <a asp-page="/Requests/Index">View Project →</a>
             </div>
-
-            <div class="home-how">
-                <h2>How it works</h2>
-                <div class="home-how-grid">
-                    <div class="home-how-step">
-                        <span>1</span>
-                        <div><strong>Sign in</strong><small>Use your personal identity provider and register or join an organization.</small></div>
-                    </div>
-                    <div class="home-how-arrow">→</div>
-                    <div class="home-how-step">
-                        <span>2</span>
-                        <div><strong>Submit a request</strong><small>Provide the request details, supporting information, and documents.</small></div>
-                    </div>
-                    <div class="home-how-arrow">→</div>
-                    <div class="home-how-step">
-                        <span>3</span>
-                        <div><strong>Review &amp; follow up</strong><small>Track review, respond to questions, and follow fulfilment.</small></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <aside class="home-registration-note">
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                if (homeIsFfpStaff)
-                {
-                    <span class="registration-note-label">FFP staff</span>
-                    <h3>You are signed in</h3>
-                    <p>Continue to the internal staff workspace. Staff accounts do not use the organization representative workspace.</p>
-                    <a class="button home-note-button" asp-page="/Staff/Index">Open staff workspace</a>
-                    <a class="registration-note-link" asp-page="/Staff/Operations">View action queues →</a>
-                }
-                else
-                {
-                    <span class="registration-note-label">Your account</span>
-                    <h3>Welcome back</h3>
-                    <p>Continue to your request workspace or manage the organizations you represent.</p>
-                    <a class="button home-note-button" asp-page="/Dashboard/Index">Open workspace</a>
-                    <a class="registration-note-link" asp-page="/Organizations/Index">My organizations →</a>
-                }
-            }
-            else
-            {
-                <span class="registration-note-label">Registration</span>
-                <h3>New to the portal?</h3>
-                <p>Your first successful sign-in creates your Request Portal identity. You can then register or join an organization.</p>
-                <a class="button home-note-button" asp-page="/Account/Login">Register or sign in →</a>
-                <small>Choose your personal, social, or Food For The Poor sign-in method on the sign-in page.</small>
-            }
         </aside>
-    </div>
-</section>
 
-<section class="home-impact">
-    <div class="shell home-impact-grid">
-        <article class="home-impact-card" style="--home-image:url('/img/carousel/Splash01.jpg')">
-            <div><strong>Stronger communities</strong><span>Supporting people, families and communities in need.</span></div>
-        </article>
-        <article class="home-impact-card" style="--home-image:url('/img/carousel/Splash03.jpg')">
-            <div><strong>Lasting change</strong><span>Working together for a brighter tomorrow.</span></div>
-        </article>
-        <article class="home-impact-card" style="--home-image:url('/img/carousel/Splash06.jpg')">
-            <div><strong>People first</strong><span>Hope, opportunity and a better future for Jamaica.</span></div>
-        </article>
+        <section class="relief-carousel home-hero" data-relief-carousel>
+            <div class="relief-carousel-stage">
+                <div class="relief-carousel-image" data-carousel-image aria-hidden="true"></div>
+                <div class="relief-carousel-shade"></div>
+                <button class="relief-carousel-arrow relief-carousel-prev" type="button" data-carousel-prev aria-label="Previous slide">‹</button>
+                <button class="relief-carousel-arrow relief-carousel-next" type="button" data-carousel-next aria-label="Next slide">›</button>
+                <div class="relief-carousel-copy home-hero-copy">
+                    <div class="eyebrow" data-carousel-kicker>Community Support</div>
+                    <h1 data-carousel-title>Building brighter futures together</h1>
+                    <p data-carousel-text>Partnering with communities across Jamaica for lasting, positive change.</p>
+                </div>
+                <div class="relief-carousel-thumbs" data-carousel-thumbs aria-label="Relief programme slides"></div>
+            </div>
+        </section>
+
+        <aside class="home-welcome">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <h1>Welcome Back, @Model.FirstName!</h1>
+            }
+            else
+            {
+                <h1>Welcome</h1>
+            }
+            <p>What would you like to do today?</p>
+
+            <div class="home-quick-grid">
+                @if (User.Identity?.IsAuthenticated == true && !homeIsFfpStaff)
+                {
+                    <a class="home-quick-card" asp-page="/Requests/Create" asp-route-kind="Project"><strong>New Project Request</strong><small>Submit a project request.</small><b>→</b></a>
+                    <a class="home-quick-card" asp-page="/Requests/Create" asp-route-kind="GoodsAndServices"><strong>Goods &amp; Services Request</strong><small>Request products, equipment, or services.</small><b>→</b></a>
+                    <a class="home-quick-card" asp-page="/Requests/Index"><strong>My Requests</strong><small>View the status of your submitted requests.</small><b>→</b></a>
+                    <a class="home-quick-card" asp-page="/Messages/Index"><strong>Messages</strong><small>Check for updates and respond to messages.</small><b>→</b></a>
+                }
+                else if (homeIsFfpStaff)
+                {
+                    <a class="home-quick-card" asp-page="/Staff/Index"><strong>Staff Workspace</strong><small>Open the internal workspace.</small><b>→</b></a>
+                    <a class="home-quick-card" asp-page="/Staff/Operations"><strong>Action Queues</strong><small>Review work requiring attention.</small><b>→</b></a>
+                }
+                else
+                {
+                    <a class="home-quick-card" asp-page="/Account/Login"><strong>Sign In</strong><small>Sign in to submit and track requests.</small><b>→</b></a>
+                }
+            </div>
+        </aside>
     </div>
 </section>
 
