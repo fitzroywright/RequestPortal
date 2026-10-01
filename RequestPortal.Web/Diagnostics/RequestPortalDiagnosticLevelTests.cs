@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using Common.Diagnostics;
+using Common.Secrets;
 using Common.Storage;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
@@ -164,6 +165,115 @@ public sealed class MalwareScannerConnectivityDiagnosticLevelTest(
                 "Malware scanner TCP endpoint is unreachable.",
                 $"Host={host}; Port={port}; FailureType={exception.GetType().Name}");
         }
+    }
+}
+
+public sealed class ExternalIdentityProviderSecretsDiagnosticLevelTest(
+    IConfiguration configuration,
+    ISecretProvider secrets) : IDiagnosticLevelLocalTest
+{
+    private static readonly (string Name, string ClientKey, string SecretKey, string? MetadataUrl)[] providers =
+    [
+        ("Google", "Authentication:Google:ClientId", "Authentication:Google:ClientSecret", "https://accounts.google.com/.well-known/openid-configuration"),
+        ("Microsoft", "Authentication:Microsoft:ClientId", "Authentication:Microsoft:ClientSecret", "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration"),
+        ("Facebook", "Authentication:Facebook:AppId", "Authentication:Facebook:AppSecret", null),
+        ("Yahoo", "Authentication:Yahoo:ClientId", "Authentication:Yahoo:ClientSecret", "https://api.login.yahoo.com/.well-known/openid-configuration"),
+        ("Apple", "Authentication:Apple:ClientId", "Authentication:Apple:ClientSecret", "https://appleid.apple.com/.well-known/openid-configuration")
+    ];
+
+    public string TestId => "REQUESTPORTAL.WEB.L5.AUTH.EXTERNAL_PROVIDER_SECRETS";
+    public string Name => "Representative identity provider credentials";
+    public string Owner => "RequestPortal.Web";
+    public EngineeringDiagnosticLevel Level => EngineeringDiagnosticLevel.Level5Scan;
+    public bool IsDestructive => false;
+
+    public async Task<EngineeringDiagnosticCheckResult> RunAsync(CancellationToken cancellationToken)
+    {
+        var configured = new List<string>();
+        var missingSecrets = new List<string>();
+        var unreachable = new List<string>();
+
+        using var client = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(8)
+        };
+
+        foreach ((string provider, string clientKey, string secretKey, string? metadataUrl) in providers)
+        {
+            if (string.IsNullOrWhiteSpace(configuration[clientKey]))
+            {
+                continue;
+            }
+
+            configured.Add(provider);
+
+            string? secret;
+            try
+            {
+                secret = await secrets.GetAsync(secretKey, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                missingSecrets.Add($"{provider}:resolve-{exception.GetType().Name}");
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(secret))
+            {
+                missingSecrets.Add(provider);
+                continue;
+            }
+
+            if (metadataUrl is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                using HttpResponseMessage response = await client.GetAsync(metadataUrl, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    unreachable.Add($"{provider}:HTTP{(int)response.StatusCode}");
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                unreachable.Add($"{provider}:{exception.GetType().Name}");
+            }
+        }
+
+        if (configured.Count == 0)
+        {
+            return EngineeringDiagnosticPolicy.Failed(
+                TestId,
+                Name,
+                "No representative identity provider has a configured client identifier.");
+        }
+
+        if (missingSecrets.Count > 0)
+        {
+            return EngineeringDiagnosticPolicy.Failed(
+                TestId,
+                Name,
+                "One or more configured identity providers cannot resolve their credential from Common.Secrets.",
+                $"MissingOrUnreadable={string.Join(",", missingSecrets)}; Configured={string.Join(",", configured)}");
+        }
+
+        if (unreachable.Count > 0)
+        {
+            return EngineeringDiagnosticPolicy.Warning(
+                TestId,
+                Name,
+                "Identity provider credentials are available, but one or more OIDC discovery endpoints could not be reached.",
+                $"Unreachable={string.Join(",", unreachable)}; Configured={string.Join(",", configured)}");
+        }
+
+        return EngineeringDiagnosticPolicy.Passed(
+            TestId,
+            Name,
+            "Configured identity provider credentials resolve through Common.Secrets and available OIDC discovery endpoints are reachable.",
+            $"Configured={string.Join(",", configured)}; SecretsResolved={configured.Count}; SecretValuesExposed=false");
     }
 }
 
