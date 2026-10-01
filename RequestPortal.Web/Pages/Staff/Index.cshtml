@@ -110,7 +110,7 @@
                             @foreach (RequestSummary request in Model.SubmittedRequests.OrderByDescending(item => item.CreatedUtc).Take(12))
                             {
                                 var ageDays = Math.Max(0, (DateTimeOffset.UtcNow - request.CreatedUtc).Days);
-                                <tr>
+                                <tr class="staff-select-row" data-row-href="/Staff/Review/@request.Id" role="link" tabindex="0">
                                     <td>
                                         <a asp-page="/Staff/Review" asp-route-id="@request.Id">
                                             <strong>@request.PublicReference</strong>
@@ -157,7 +157,7 @@
                     {
                         @foreach (OrganizationSummary organization in Model.PendingOrganizations.Take(8))
                         {
-                            <div class="organization-row staff-organization-row">
+                            <div class="organization-row staff-organization-row staff-select-row" data-row-href="/Staff/Organization/@organization.Id" role="link" tabindex="0">
                                 <a asp-page="/Staff/Organization" asp-route-id="@organization.Id">
                                     <strong>@organization.Name</strong>
                                     <span>@organization.CountryCode</span>
