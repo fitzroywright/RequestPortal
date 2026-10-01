@@ -533,3 +533,123 @@
         padding:18px 32px 20px;
     }
 }
+
+
+/* Home page compaction and registration note */
+.relief-access-section{
+    padding:34px 0 30px;
+}
+.relief-section-heading-compact{
+    max-width:none;
+    margin:0 0 18px;
+    text-align:left;
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+}
+.relief-section-heading-compact h2{
+    margin:0;
+    font-size:1.65rem;
+}
+.relief-section-heading-compact span{
+    flex:0 0 auto;
+}
+.relief-access-grid{
+    grid-template-columns:minmax(0,1fr) 285px;
+    gap:22px;
+    align-items:start;
+}
+.relief-info-card{
+    padding:24px 26px;
+}
+.relief-info-row{
+    grid-template-columns:68px 1fr;
+    gap:16px;
+}
+.relief-info-row img{
+    width:62px;
+    max-height:88px;
+}
+.relief-divider{
+    margin:18px 0;
+}
+.relief-registration-note{
+    position:relative;
+    align-self:start;
+    padding:22px 20px 18px;
+    background:#fff5b8;
+    border:1px solid #e3d27a;
+    border-radius:2px;
+    box-shadow:0 8px 16px rgba(75,63,19,.13);
+    transform:rotate(.5deg);
+}
+.relief-registration-note::before{
+    content:"";
+    position:absolute;
+    top:-7px;
+    left:50%;
+    width:72px;
+    height:16px;
+    transform:translateX(-50%) rotate(-2deg);
+    background:rgba(244,226,153,.9);
+    border:1px solid rgba(194,171,88,.35);
+}
+.registration-note-label{
+    display:block;
+    margin-bottom:6px;
+    color:#7b6200;
+    font-size:.72rem;
+    font-weight:900;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+}
+.relief-registration-note h3{
+    margin:0 0 8px;
+    color:var(--ffp-navy-deep);
+    font-size:1.2rem;
+}
+.relief-registration-note p{
+    margin:0 0 12px;
+    color:#554d2f;
+    line-height:1.45;
+    font-size:.9rem;
+}
+.relief-registration-note small{
+    display:block;
+    margin-top:10px;
+    color:#6b6040;
+    line-height:1.4;
+}
+.registration-note-link{
+    display:inline-block;
+    margin-top:10px;
+    color:var(--ffp-navy);
+    font-weight:800;
+}
+.relief-process-section-compact{
+    padding:38px 0 44px;
+}
+.relief-process-section-compact .section-heading{
+    margin-bottom:18px;
+}
+.relief-process-section-compact .grid-3{
+    gap:14px;
+}
+.relief-process-section-compact .card{
+    padding:18px 20px;
+}
+@media(max-width:900px){
+    .relief-section-heading-compact{
+        display:block;
+    }
+    .relief-section-heading-compact h2{
+        margin-top:8px;
+    }
+    .relief-access-grid{
+        grid-template-columns:1fr;
+    }
+    .relief-registration-note{
+        width:min(340px,100%);
+        transform:none;
+    }
+}
