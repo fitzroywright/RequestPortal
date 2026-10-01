@@ -62,7 +62,6 @@
                         <a asp-page="/Dashboard/Index">Workspace</a>
                         <a asp-page="/Organizations/Index">Organizations</a>
                         <a asp-page="/Requests/Index">Requests</a>
-                        <a asp-page="/Account/Notifications">Notifications</a>
                         <a asp-page="/Messages/Inbox" class="messages-nav-link">Messages <span id="messageUnreadBadge" class="message-badge" hidden>0</span></a>
                     }
                     <div class="profile-menu">
@@ -98,14 +97,16 @@
                                     <small>@(isFfpStaff ? "FFP Staff" : "Applicant / Representative")</small>
                                 </div>
                             </div>
-                            <div class="profile-menu-section">
-                                <a asp-page="/Organizations/Index">Organizations</a>
-                                <a asp-page="/Account/Notifications">Notification preferences</a>
-                            </div>
-                            <div class="profile-menu-section profile-menu-profile">
-                                <span class="profile-menu-label">Profile</span>
-                                <strong>@profileName</strong>
-                            </div>
+                            @if (!isFfpStaff && !isExternalReviewer)
+                            {
+                                <div class="profile-menu-section">
+                                    <a asp-page="/Account/Profile">My profile</a>
+                                </div>
+                                <div class="profile-menu-section profile-menu-profile">
+                                    <span class="profile-menu-label">Profile</span>
+                                    <strong>@profileName</strong>
+                                </div>
+                            }
                             <div class="profile-menu-section">
                                 <form method="post" asp-page="/Account/Logout" class="profile-menu-signout">
                                     <button type="submit">Sign out</button>
