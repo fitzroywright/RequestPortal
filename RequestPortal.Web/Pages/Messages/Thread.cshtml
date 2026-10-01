@@ -54,7 +54,7 @@
                     </div>
                 }
                 <p class="conversation-context">
-                    <strong>@Model.Thread.Audience.ToString().Replace("OrganizationManager", "Organization Manager").Replace("FfpInternal", "FFP Internal")</strong> · @Model.Thread.OrganizationName
+                    <strong>@Model.Thread.Audience.ToString().Replace("OrganizationManager", "Organization Manager").Replace("FfpInternal", "FFP Internal").Replace("PersonalNote", "Private application note")</strong> · @Model.Thread.OrganizationName
                     @if (!string.IsNullOrWhiteSpace(Model.Thread.RequestReference))
                     {
                         <span> · @Model.Thread.RequestReference</span>
@@ -111,7 +111,7 @@
             @if (!Model.Thread.ClosedUtc.HasValue)
             {
             <form method="post" class="card" style="margin-top:20px">
-                <label asp-for="Reply">Reply</label>
+                <label asp-for="Reply">@(Model.Thread.Audience == MessageAudience.PersonalNote ? "Add note" : "Reply")</label>
                 <textarea asp-for="Reply" rows="6" maxlength="10000" required></textarea>
                 <span asp-validation-for="Reply" class="validation"></span>
 
@@ -129,7 +129,7 @@
                     </fieldset>
                 }
 
-                <button class="button" type="submit">Send reply</button>
+                <button class="button" type="submit">@(Model.Thread.Audience == MessageAudience.PersonalNote ? "Save note" : "Send reply")</button>
             </form>
             }
             else
