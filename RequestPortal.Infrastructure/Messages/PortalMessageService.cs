@@ -572,6 +572,11 @@ public sealed class PortalMessageService : IPortalMessageService
         MessageThread thread = await dbContext.MessageThreads
             .SingleAsync(item => item.Id == threadId, cancellationToken);
 
+        if (thread.ClosedUtc.HasValue)
+        {
+            throw new InvalidOperationException("This conversation is closed. Reopen it before replying.");
+        }
+
         if (!await CanViewThreadAsync(senderUserId, senderIsStaff, thread, cancellationToken))
         {
             throw new UnauthorizedAccessException("The current user cannot reply to this conversation.");
