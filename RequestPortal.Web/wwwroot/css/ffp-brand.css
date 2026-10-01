@@ -483,3 +483,53 @@
     .profile-menu-name{max-width:120px}
     .profile-menu-panel{position:fixed;top:82px;right:14px;width:min(290px,calc(100vw - 28px))}
 }
+
+
+/* Sign-in separation: external identity providers above, FFP staff access in a distinct footer. */
+.login-intro-note{
+    margin-top:22px;
+    padding-top:18px;
+    border-top:1px solid rgba(255,255,255,.22);
+    color:#dbe4eb;
+    font-size:.92rem;
+}
+.ffp-staff-signin-footer{
+    margin:28px -48px -48px;
+    padding:20px 48px 22px;
+    border-top:1px solid var(--border);
+    background:#f7f8f6;
+}
+.ffp-staff-signin-identity{
+    display:flex;
+    align-items:flex-start;
+    gap:14px;
+}
+.ffp-staff-signin-identity img{
+    flex:0 0 auto;
+    width:82px;
+    height:50px;
+    object-fit:contain;
+    object-position:left center;
+}
+.ffp-staff-signin-identity strong{
+    display:block;
+    color:var(--ffp-navy-deep);
+    margin-bottom:4px;
+}
+.ffp-staff-signin-identity p{
+    margin:0;
+    color:var(--muted);
+    font-size:.88rem;
+    line-height:1.5;
+}
+.ffp-staff-signin-button{
+    width:100%;
+    margin-top:14px;
+    background:#fff;
+}
+@media(max-width:900px){
+    .ffp-staff-signin-footer{
+        margin:26px -32px -32px;
+        padding:18px 32px 20px;
+    }
+}
