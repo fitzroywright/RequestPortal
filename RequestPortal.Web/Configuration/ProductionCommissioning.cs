@@ -47,6 +47,9 @@ internal static class ProductionCommissioning
         string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
         bool malwareScanningEnabled = configuration.GetValue("Uploads:MalwareScanning:Enabled", false);
         bool notificationsEnabled = configuration.GetValue("Notifications:Enabled", false);
+        bool whatsAppEnabled = configuration.GetValue("Notifications:WhatsAppEnabled", false);
+        string whatsAppPhoneNumberId = configuration["Notifications:WhatsAppPhoneNumberId"] ?? string.Empty;
+        string whatsAppGraphApiVersion = configuration["Notifications:WhatsAppGraphApiVersion"] ?? string.Empty;
         bool integrationEnabled = configuration.GetValue("FfpManagerIntegration:Enabled", false);
         string[] reviewerGroups = configuration.GetSection("Authentication:ActiveDirectory:ReviewerGroups").Get<string[]>() ?? Array.Empty<string>();
         string[] administratorGroups = configuration.GetSection("Authentication:ActiveDirectory:AdministratorGroups").Get<string[]>() ?? Array.Empty<string>();
@@ -111,6 +114,9 @@ internal static class ProductionCommissioning
         AddIf(!hasExternalProvider,
             "RP-PROD-OAUTH-001",
             "At least one external representative identity provider must be commissioned.");
+        AddIf(whatsAppEnabled && (string.IsNullOrWhiteSpace(whatsAppPhoneNumberId) || string.IsNullOrWhiteSpace(whatsAppGraphApiVersion) || string.IsNullOrWhiteSpace(secrets.StorageSharePointClientSecret) && false),
+            "RP-PROD-WHATSAPP-001",
+            "WhatsApp requires GraphApiVersion, PhoneNumberId and a Common.Secrets-backed access token.");
         AddIf(!notificationsEnabled ||
               string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) ||
               string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]),
