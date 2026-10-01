@@ -4,6 +4,7 @@
 @using RequestPortal.Domain.Notifications
 @{
     ViewData["Title"] = "My Profile";
+    ViewData["HideFooter"] = true;
     NotificationPreferenceView? email = Model.FindPreference(NotificationChannel.Email);
     NotificationPreferenceView? whatsapp = Model.FindPreference(NotificationChannel.WhatsApp);
 }
