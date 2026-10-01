@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Common.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Management;
 using RequestPortal.Application.Requests;
@@ -43,7 +44,8 @@ public sealed class StorageBackedRequestFeaturesTests
                 new AllowAllOrganizationAccess(),
                 new FixedClock(Now),
                 new NullBusinessAuditWriter(),
-                storage);
+                storage,
+                NullLogger<ProjectProposalService>.Instance);
 
             await service.InitializeProjectAsync(userId, requestId, cancellationToken);
             await service.SaveAsync(
