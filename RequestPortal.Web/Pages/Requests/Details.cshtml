@@ -8,15 +8,15 @@
     ViewData["Title"] = "Request Details";
 }
 
-<section class="section">
+<section class="operational-page">
     <div class="shell">
         @if (Model.Request is null)
         {
-            <section class="card"><h1>Request not found</h1></section>
+            <section class="operational-panel"><h1>Request not found</h1></section>
         }
         else
         {
-            <div class="action-row" style="justify-content:space-between;align-items:end;margin-bottom:24px">
+            <header class="workspace-titlebar">
                 <div class="section-heading" style="margin-bottom:0">
                     <div class="eyebrow" style="color:#b45b09">@Model.Request.OrganizationName</div>
                     <h1>@Model.Request.PublicReference</h1>
@@ -29,13 +29,13 @@
                        asp-route-RequestId="@Model.Request.Id">Message FFP</a>
                     <span class="status status-@Model.Request.Status">@Model.Request.Status</span>
                 </div>
-            </div>
+            </header>
 
-            <div class="dashboard-grid">
+            <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
                 <div>
                     @if (Model.ProjectProposal is not null)
                     {
-                        <section class="card">
+                        <section class="operational-panel">
                             <div class="action-row" style="justify-content:space-between;align-items:center">
                                 <div>
                                     <div class="eyebrow" style="color:#b45b09">Project proposal</div>
@@ -52,7 +52,7 @@
 
                         @if (Model.ProjectPlanning is not null)
                         {
-                            <section class="card" style="margin-top:1.5rem">
+                            <section class="operational-panel" style="margin-top:10px">
                                 <h2>Project budget</h2>
                                 <div class="table-wrap">
                                     <table>
@@ -84,7 +84,7 @@
                                 </div>
                             </section>
 
-                            <section class="card" style="margin-top:1.5rem">
+                            <section class="operational-panel" style="margin-top:10px">
                                 <h2>Implementation milestones</h2>
                                 <div class="table-wrap">
                                     <table>
@@ -107,7 +107,7 @@
                     }
                     else
                     {
-                        <section class="card">
+                        <section class="operational-panel">
                             <h2>Requested items</h2>
                             @if (Model.Request.Items.Count == 0)
                             {
@@ -184,7 +184,7 @@
 
                     @if (Model.Request.Status == "MoreInformationRequired")
                     {
-                        <section class="card" style="margin-top:1.5rem">
+                        <section class="operational-panel" style="margin-top:10px">
                             <div class="flash error">
                                 FFP requested additional information. The latest request from FFP appears in the status history. Add any supporting documents below, then send your response here.
                             </div>
@@ -220,7 +220,7 @@
 
                     @if (Model.Deliveries.Count > 0)
                     {
-                        <section class="card" style="margin-top:1.5rem">
+                        <section class="operational-panel" style="margin-top:10px">
                             <h2>Delivery / Proof of Delivery</h2>
                             <div class="table-wrap"><table>
                                 <thead><tr><th>Reference</th><th>Recipient</th><th>Status</th><th>Acknowledged</th><th>Evidence</th><th>Notes</th></tr></thead>
@@ -241,7 +241,7 @@
                         </section>
                     }
 
-                    <section class="card" style="margin-top:1.5rem">
+                    <section class="operational-panel" style="margin-top:10px">
                         <h2>Supporting documents</h2>
                         @if (Model.Documents.Count == 0)
                         {
@@ -287,7 +287,7 @@
 
                     @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
                     {
-                        <section class="card" style="margin-top:1.5rem">
+                        <section class="operational-panel" style="margin-top:10px">
                             <h2>Cancel request</h2>
                             <p class="muted">Cancellation is permanent and is recorded in the request history.</p>
                             <form method="post" asp-page-handler="Cancel" class="form-grid">

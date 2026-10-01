@@ -5,7 +5,7 @@
     ViewData["Title"] = "Organizations";
 }
 
-<section class="section">
+<section class="operational-page">
     <div class="shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">Organization access</div>
@@ -17,7 +17,7 @@
         </div>
 
         <div class="dashboard-grid">
-            <section class="card">
+            <section class="operational-panel">
                 <h2>Current memberships</h2>
                 @if (Model.Organizations.Count == 0)
                 {
@@ -50,7 +50,7 @@
                 }
             </section>
 
-            <section class="card">
+            <section class="operational-panel">
                 <h2>Register a new organization</h2>
                 @if (Model.RegistrationCountries.Count == 0)
                 {
@@ -80,7 +80,7 @@
             </section>
         </div>
 
-        <section class="card" style="margin-top:22px">
+        <section class="operational-panel" style="margin-top:10px">
             <h2>Join an existing organization</h2>
             @if (Model.AvailableOrganizations.Count == 0)
             {
