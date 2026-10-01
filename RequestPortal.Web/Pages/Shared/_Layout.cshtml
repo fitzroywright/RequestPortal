@@ -63,27 +63,24 @@
                                 aria-expanded="false"
                                 aria-controls="profileMenuPanel"
                                 data-profile-menu-trigger>
-                            <span class="profile-avatar profile-avatar-studio" aria-hidden="true">
-                                @{
-                                    string? profileNameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
-                                    string? profileGivenName = User.FindFirst(ClaimTypes.GivenName)?.Value;
-                                    string profileName = !string.IsNullOrWhiteSpace(profileNameClaim) && !profileNameClaim.Contains('@')
-                                        ? profileNameClaim
-                                        : !string.IsNullOrWhiteSpace(profileGivenName) && !profileGivenName.Contains('@')
-                                            ? profileGivenName
-                                            : "User";
-                                    string[] profileParts = profileName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                    string profileInitials = profileParts.Length switch
-                                    {
-                                        0 => "U",
-                                        1 => profileParts[0][..Math.Min(2, profileParts[0].Length)].ToUpperInvariant(),
-                                        _ => $"{profileParts[0][0]}{profileParts[^1][0]}".ToUpperInvariant()
-                                    };
-                                }
-                                @profileInitials
-                            </span>
+                            @{
+                                string? profileNameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
+                                string? profileGivenName = User.FindFirst(ClaimTypes.GivenName)?.Value;
+                                string profileName = !string.IsNullOrWhiteSpace(profileNameClaim) && !profileNameClaim.Contains('@')
+                                    ? profileNameClaim
+                                    : !string.IsNullOrWhiteSpace(profileGivenName) && !profileGivenName.Contains('@')
+                                        ? profileGivenName
+                                        : "User";
+                                string[] profileParts = profileName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                                string profileInitials = profileParts.Length switch
+                                {
+                                    0 => "U",
+                                    1 => profileParts[0][..Math.Min(2, profileParts[0].Length)].ToUpperInvariant(),
+                                    _ => $"{profileParts[0][0]}{profileParts[^1][0]}".ToUpperInvariant()
+                                };
+                            }
                             <span class="profile-menu-name">@profileName</span>
-                            <span class="profile-menu-chevron" aria-hidden="true">⌄</span>
+                            <span class="profile-avatar profile-avatar-studio" aria-hidden="true">@profileInitials</span>
                         </button>
                         <div id="profileMenuPanel" class="profile-menu-panel" hidden data-profile-menu-panel>
                             <div class="profile-menu-header">
