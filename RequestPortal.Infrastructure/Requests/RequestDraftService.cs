@@ -26,6 +26,7 @@ public sealed class RequestDraftService : IRequestDraftService
         Guid userId,
         Guid requestId,
         Guid? beneficiaryId,
+        RequestKind kind,
         string? category,
         string? subcategory,
         string? programCategory,
@@ -57,6 +58,7 @@ public sealed class RequestDraftService : IRequestDraftService
             }
         }
 
+        request.SetKind(kind);
         request.SetDetails(
             beneficiaryId,
             category,
