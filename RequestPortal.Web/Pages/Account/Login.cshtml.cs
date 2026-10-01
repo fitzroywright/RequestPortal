@@ -126,6 +126,14 @@ public sealed class LoginModel : PageModel
                     HttpContext.RequestAborted);
             }
 
+            await signInManager.SignInWithClaimsAsync(
+                existingUser,
+                isPersistent: false,
+                new[]
+                {
+                    new Claim(ClaimTypes.Name, existingUser.DisplayName ?? existingUser.Email ?? "User"),
+                    new Claim(ClaimTypes.GivenName, existingUser.DisplayName ?? existingUser.Email ?? "User")
+                });
             await EmitAsync("RP-AUTH-EXTERNAL-OK", "External representative authentication succeeded.", loginInfo.LoginProvider);
             return LocalRedirect(ReturnUrl);
         }
@@ -220,7 +228,14 @@ public sealed class LoginModel : PageModel
             user.Id,
             user.Email,
             HttpContext.RequestAborted);
-        await signInManager.SignInAsync(user, isPersistent: false);
+        await signInManager.SignInWithClaimsAsync(
+            user,
+            isPersistent: false,
+            new[]
+            {
+                new Claim(ClaimTypes.Name, user.DisplayName ?? "User"),
+                new Claim(ClaimTypes.GivenName, user.DisplayName ?? "User")
+            });
         await EmitAsync("RP-AUTH-DEMO-REP", "Demo representative signed in.", demoEmail);
 
         return LocalRedirect(LocalReturnUrl(returnUrl));
