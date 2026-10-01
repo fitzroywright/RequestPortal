@@ -121,12 +121,43 @@
                         <label asp-for="Input.Priority">Priority</label>
                         <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
                     </div>
+                    <div class="field request-address-field">
+                        <label asp-for="Input.Address">Address</label>
+                        <input asp-for="Input.Address" placeholder="Street, district or community" />
+                    </div>
                     <div class="field">
-                        <label asp-for="Input.Location">Location</label>
-                        <div class="inline-location">
-                            <input asp-for="Input.Location" placeholder="Community, parish or address" />
-                            <button class="button button-outline button-small" type="button" id="use-location">Use location</button>
-                        </div>
+                        <label asp-for="Input.Town">Town</label>
+                        <input asp-for="Input.Town"
+                               id="request-town"
+                               list="request-town-options"
+                               autocomplete="off"
+                               placeholder="Start typing a town" />
+                        <datalist id="request-town-options"></datalist>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Input.Parish">Parish</label>
+                        <select asp-for="Input.Parish" id="request-parish">
+                            <option value="">Select parish</option>
+                            <option>Kingston</option>
+                            <option>St. Andrew</option>
+                            <option>St. Thomas</option>
+                            <option>Portland</option>
+                            <option>St. Mary</option>
+                            <option>St. Ann</option>
+                            <option>Trelawny</option>
+                            <option>St. James</option>
+                            <option>Hanover</option>
+                            <option>Westmoreland</option>
+                            <option>St. Elizabeth</option>
+                            <option>Manchester</option>
+                            <option>Clarendon</option>
+                            <option>St. Catherine</option>
+                        </select>
+                    </div>
+                    <div class="field request-location-action">
+                        <label>Location tools</label>
+                        <button class="button button-outline button-small" type="button" id="use-location">Use device location</button>
+                        <input asp-for="Input.Location" type="hidden" />
                         <input asp-for="Input.Latitude" type="hidden" />
                         <input asp-for="Input.Longitude" type="hidden" />
                         <small id="location-status" class="muted"></small>
@@ -531,6 +562,47 @@
     const locationStatus = document.getElementById('location-status');
     const latitude = document.getElementById('Input_Latitude');
     const longitude = document.getElementById('Input_Longitude');
+    const parishSelect = document.getElementById('request-parish');
+    const townInput = document.getElementById('request-town');
+    const townOptions = document.getElementById('request-town-options');
+
+    const jamaicaTowns = {
+        'Kingston': ['Kingston', 'Downtown Kingston', 'New Kingston', 'Cross Roads', 'Half Way Tree'],
+        'St. Andrew': ['Half Way Tree', 'Constant Spring', 'Papine', 'Liguanea', 'Mona', 'Red Hills', 'Stony Hill', 'Gordon Town', 'Bull Bay'],
+        'St. Thomas': ['Morant Bay', 'Yallahs', 'Seaforth', 'Bath', 'Port Morant'],
+        'Portland': ['Port Antonio', 'Buff Bay', 'Hope Bay', 'Manchioneal', 'Boston'],
+        'St. Mary': ['Port Maria', 'Annotto Bay', 'Highgate', 'Oracabessa', 'Gayle'],
+        'St. Ann': ['St. Ann\'s Bay', 'Ocho Rios', 'Brown\'s Town', 'Runaway Bay', 'Claremont', 'Discovery Bay'],
+        'Trelawny': ['Falmouth', 'Duncans', 'Wakefield', 'Albert Town', 'Clark\'s Town'],
+        'St. James': ['Montego Bay', 'Cambridge', 'Anchovy', 'Maroon Town'],
+        'Hanover': ['Lucea', 'Green Island', 'Sandy Bay', 'Hopewell'],
+        'Westmoreland': ['Savanna-la-Mar', 'Negril', 'Bluefields', 'Darliston', 'Grange Hill'],
+        'St. Elizabeth': ['Black River', 'Santa Cruz', 'Junction', 'Balaclava', 'Malvern'],
+        'Manchester': ['Mandeville', 'Christiana', 'Porus', 'Mile Gully', 'May Day'],
+        'Clarendon': ['May Pen', 'Chapelton', 'Lionel Town', 'Frankfield', 'Hayes'],
+        'St. Catherine': ['Spanish Town', 'Portmore', 'Old Harbour', 'Linstead', 'Ewarton', 'Bog Walk', 'Point Hill']
+    };
+
+    function updateTownSuggestions() {
+        if (!townOptions) return;
+        const selectedParish = parishSelect?.value || '';
+        const towns = selectedParish
+            ? (jamaicaTowns[selectedParish] || [])
+            : Object.values(jamaicaTowns).flat();
+
+        townOptions.replaceChildren(
+            ...[...new Set(towns)]
+                .sort((left, right) => left.localeCompare(right))
+                .map(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    return option;
+                })
+        );
+    }
+
+    parishSelect?.addEventListener('change', updateTownSuggestions);
+    updateTownSuggestions();
     locationButton?.addEventListener('click', () => {
         if (!navigator.geolocation) {
             locationStatus.textContent = 'Location services are not available. The typed location will be used.';
