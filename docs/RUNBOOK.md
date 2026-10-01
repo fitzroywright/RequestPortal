@@ -41,3 +41,8 @@ Escalate repeated staff-authentication failures, document-integrity failures, de
 
 ## Log Locations
 Application/service logs plus Operations/Diagnostics correlation IDs. Never log OIDC codes/tokens, passwords, session tokens, registration credentials or document contents.
+
+
+## Document storage
+
+Production Request Portal uses `Common.Storage` with `Storage:Provider=SharePoint`. Documents are stored under the configured SharePoint document library/root folder. The Graph client secret is resolved through Common.Secrets using `Storage:SharePoint:ClientSecretName`. Application code must use `IFileStorage`; it must not construct provider-specific storage implementations directly.
