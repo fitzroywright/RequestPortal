@@ -66,6 +66,8 @@ internal static class DiagnosticsServiceRegistration
         builder.Services.AddDiagnosticLevelTest<ExternalIdentityProvidersDiagnosticLevelTest>();
 
         builder.Services.AddDiagnosticLevelTest<ExternalIdentityProviderSecretsDiagnosticLevelTest>();
+
+        builder.Services.AddDiagnosticLevelTest<RequiredSecretsDiagnosticLevelTest>();
     }
 
     private static void AddLevel4(
@@ -86,6 +88,8 @@ internal static class DiagnosticsServiceRegistration
         builder.Services.AddDiagnosticLevelTest<ExpiredOrganizationRegistrationDiagnosticLevelTest>();
 
         builder.Services.AddDiagnosticLevelTest<FulfilmentIntegrityDiagnosticLevelTest>();
+
+        builder.Services.AddDiagnosticLevelTest<MicrosoftGraphMessagingDiagnosticLevelTest>();
     }
 
     private static void AddLevel2(
