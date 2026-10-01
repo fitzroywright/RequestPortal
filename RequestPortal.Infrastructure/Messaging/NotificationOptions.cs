@@ -22,9 +22,9 @@ public sealed class NotificationOptions
 
     public string PasswordSecretName { get; set; } = "Notifications:SmtpPassword";
 
-    public string WhatsAppEndpoint { get; set; } = string.Empty;
+    public string WhatsAppGraphApiVersion { get; set; } = "v23.0";
 
-    public string WhatsAppEndpointSecretName { get; set; } = "messaging/whatsapp/endpoint";
+    public string WhatsAppPhoneNumberId { get; set; } = string.Empty;
 
-    public string WhatsAppApiTokenSecretName { get; set; } = "messaging/whatsapp/api-token";
+    public string WhatsAppAccessTokenSecretName { get; set; } = "messaging/whatsapp/access-token";
 }
