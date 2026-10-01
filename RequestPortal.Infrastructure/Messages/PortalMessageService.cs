@@ -731,6 +731,7 @@ public sealed class PortalMessageService : IPortalMessageService
 
         dbContext.PortalMessages.Add(message);
         AddRecipients(message.Id, allRecipients, senderUserId: null);
+        AddExternalNotificationOutbox(message, thread, allRecipients);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (auditWriter is not null)
