@@ -112,10 +112,10 @@
                 </div>
 
                 <form method="post" asp-page-handler="Preference" class="profile-notification-row">
-                    <input type="hidden" name="PreferenceInput.Channel" value="Email" />
+                    <input type="hidden" name="Preference.Channel" value="Email" />
                     <div>
                         <strong>Email</strong>
-                        <input name="PreferenceInput.Destination"
+                        <input name="Preference.Destination"
                                value="@(email?.Destination ?? Model.ProfileInput.Email)"
                                type="email"
                                maxlength="500"
@@ -123,7 +123,7 @@
                     </div>
                     <label class="profile-toggle">
                         <input type="checkbox"
-                               name="PreferenceInput.Enabled"
+                               name="Preference.Enabled"
                                value="true"
                                @(email?.Enabled != false ? "checked" : null)
                                disabled="@(!Model.EmailAvailable)" />
@@ -135,10 +135,10 @@
                 </form>
 
                 <form method="post" asp-page-handler="Preference" class="profile-notification-row">
-                    <input type="hidden" name="PreferenceInput.Channel" value="WhatsApp" />
+                    <input type="hidden" name="Preference.Channel" value="WhatsApp" />
                     <div>
                         <strong>WhatsApp</strong>
-                        <input name="PreferenceInput.Destination"
+                        <input name="Preference.Destination"
                                value="@(whatsapp?.Destination ?? Model.ProfileInput.PhoneNumber)"
                                type="tel"
                                maxlength="500"
@@ -146,7 +146,7 @@
                     </div>
                     <label class="profile-toggle">
                         <input type="checkbox"
-                               name="PreferenceInput.Enabled"
+                               name="Preference.Enabled"
                                value="true"
                                @(whatsapp?.Enabled == true ? "checked" : null)
                                disabled="@(!Model.WhatsAppAvailable)" />
