@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Countries;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Management;
+using RequestPortal.Application.Messages;
 using RequestPortal.Application.Organizations;
 using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
@@ -34,6 +35,7 @@ public sealed class CreateModel : PageModel
     private readonly IRequestLocationService requestLocationService;
     private readonly IOrganizationProfileService organizationProfileService;
     private readonly IDocumentService documentService;
+    private readonly IPortalMessageService messageService;
     private readonly ILogger<CreateModel> logger;
 
     public CreateModel(
@@ -46,6 +48,7 @@ public sealed class CreateModel : PageModel
         IRequestLocationService requestLocationService,
         IOrganizationProfileService organizationProfileService,
         IDocumentService documentService,
+        IPortalMessageService messageService,
         ILogger<CreateModel> logger)
     {
         this.userManager = userManager;
@@ -57,6 +60,7 @@ public sealed class CreateModel : PageModel
         this.requestLocationService = requestLocationService;
         this.organizationProfileService = organizationProfileService;
         this.documentService = documentService;
+        this.messageService = messageService;
         this.logger = logger;
     }
 
