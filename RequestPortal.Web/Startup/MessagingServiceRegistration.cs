@@ -153,11 +153,13 @@ internal static class MessagingServiceRegistration
                 , new global::Common.Messaging.Channels.WhatsApp
                     .WhatsAppMessageOptions
                 {
-                    Endpoint = options.WhatsAppEndpoint
-                    , EndpointSecretName =
-                        options.WhatsAppEndpointSecretName
-                    , ApiTokenSecretName =
-                        options.WhatsAppApiTokenSecretName
+                    Enabled = options.WhatsAppEnabled
+                    , GraphApiVersion =
+                        options.WhatsAppGraphApiVersion
+                    , PhoneNumberId =
+                        options.WhatsAppPhoneNumberId
+                    , AccessTokenSecretName =
+                        options.WhatsAppAccessTokenSecretName
                 });
     }
 
