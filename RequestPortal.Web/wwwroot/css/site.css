@@ -51,3 +51,34 @@
 .new-request-page .field textarea{padding:6px 8px;border-radius:4px}
 .circumstances-field textarea{min-height:112px;font-size:.84rem}
 .request-validation{margin-bottom:6px;font-size:.8rem}
+
+
+/* Structured request location fields */
+.request-address-field{
+    grid-column:span 2;
+}
+.request-location-action{
+    align-content:end;
+}
+.request-location-action .button{
+    width:100%;
+    white-space:nowrap;
+}
+.request-location-action #location-status{
+    min-height:1em;
+    font-size:.68rem;
+    line-height:1.15;
+}
+#request-town{
+    min-width:0;
+}
+@media(max-width:1050px){
+    .request-address-field{
+        grid-column:span 2;
+    }
+}
+@media(max-width:720px){
+    .request-address-field{
+        grid-column:auto;
+    }
+}
