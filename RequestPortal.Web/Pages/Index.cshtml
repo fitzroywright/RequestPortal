@@ -155,15 +155,16 @@
 
 <section class="home-dashboard">
     <div class="shell home-dashboard-grid">
-        <aside class="home-featured-project">
-            <div class="home-featured-titlebar">Featured Project</div>
-            <div class="home-featured-image">
-                <img src="~/img/leaningwoman.webp" alt="" />
-            </div>
-            <div class="home-featured-copy">
-                <strong>Safer Homes, Stronger Communities</strong>
-                <p>Support for home construction and repairs helps families live in safer, healthier environments across Jamaica.</p>
-                <a asp-page="/Requests/Index">View Project →</a>
+        <aside class="home-featured-wrap">
+            <img class="home-featured-holder" src="~/img/leaningwoman.webp" alt="" aria-hidden="true" />
+            <div class="home-featured-project">
+                <div class="home-featured-titlebar">Featured Project</div>
+                <div class="home-featured-image" style="background-image:url('/img/carousel/Splash01.jpg')" aria-hidden="true"></div>
+                <div class="home-featured-copy">
+                    <strong>Safer Homes, Stronger Communities</strong>
+                    <p>Support for home construction and repairs helps families live in safer, healthier environments across Jamaica.</p>
+                    <a asp-page="/Requests/Index">View Project →</a>
+                </div>
             </div>
         </aside>
 
@@ -196,10 +197,22 @@
             <div class="home-quick-grid">
                 @if (User.Identity?.IsAuthenticated == true && !homeIsFfpStaff)
                 {
-                    <a class="home-quick-card" asp-page="/Requests/Create" asp-route-kind="Project"><strong>New Project Request</strong><small>Submit a project request.</small><b>→</b></a>
+                    <a class="home-quick-card home-quick-project" asp-page="/Requests/Create" asp-route-kind="Project">
+                        <img class="home-card-worker" data-project-worker src="~/img/legacy/worker01.webp" alt="" aria-hidden="true" />
+                        <strong>New Project Request</strong>
+                        <small>Submit a project request.</small>
+                        <b>→</b>
+                    </a>
                     <a class="home-quick-card" asp-page="/Requests/Create" asp-route-kind="GoodsAndServices"><strong>Goods &amp; Services Request</strong><small>Request products, equipment, or services.</small><b>→</b></a>
                     <a class="home-quick-card" asp-page="/Requests/Index"><strong>My Requests</strong><small>View the status of your submitted requests.</small><b>→</b></a>
-                    <a class="home-quick-card" asp-page="/Messages/Index"><strong>Messages</strong><small>Check for updates and respond to messages.</small><b>→</b></a>
+                    <a class="home-quick-card home-quick-messages" asp-page="/Messages/Inbox">
+                        <div class="home-message-title">
+                            <strong>Messages</strong>
+                            <img class="home-card-baby" src="~/img/legacy/leave-comment.webp" alt="" aria-hidden="true" />
+                        </div>
+                        <small>Check for updates and respond to messages.</small>
+                        <b>→</b>
+                    </a>
                 }
                 else if (homeIsFfpStaff)
                 {
@@ -270,6 +283,17 @@
         } else {
             splash.classList.add('is-removed');
         }
+    }
+
+    const projectWorker = document.querySelector('[data-project-worker]');
+    if (projectWorker) {
+        const projectWorkerChoices = [
+            '/img/legacy/worker01.webp',
+            '/img/legacy/builder2.webp'
+        ];
+        projectWorker.src = projectWorkerChoices[
+            Math.floor(Math.random() * projectWorkerChoices.length)
+        ];
     }
 
     const root = document.querySelector('[data-relief-carousel]');
