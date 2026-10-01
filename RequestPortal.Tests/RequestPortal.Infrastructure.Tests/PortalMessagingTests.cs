@@ -46,8 +46,9 @@ public sealed class PortalMessagingTests
         MailboxMessageView staffInbox = Assert.Single(
             await service.GetInboxAsync(staff.Id, isStaff: true, cancellationToken: cancellationToken));
 
-        Assert.Equal("Maria Johnson", staffInbox.SenderName);
+        Assert.Equal("Maria", staffInbox.SenderName);
         Assert.Equal("Representative", staffInbox.SenderKind);
+        Assert.Equal("maria@example.org", staffInbox.SenderEmail);
 
         await service.ReplyAsync(
             staff.Id,
@@ -67,7 +68,8 @@ public sealed class PortalMessagingTests
             representativeView.Messages,
             item => item.SenderKind == "FFP Staff");
 
-        Assert.Equal("David Brown", staffReply.SenderName);
+        Assert.Equal("David", staffReply.SenderName);
+        Assert.Null(staffReply.SenderEmail);
 
         MailboxMessageView sharedSent = Assert.Single(
             await service.GetSentAsync(
@@ -76,7 +78,8 @@ public sealed class PortalMessagingTests
                 cancellationToken: cancellationToken),
             item => item.ThreadId == threadId);
 
-        Assert.Equal("David Brown", sharedSent.SenderName);
+        Assert.Equal("David", sharedSent.SenderName);
+        Assert.Null(sharedSent.SenderEmail);
 
         PortalMessage persistedStaffMessage = Assert.Single(
             database.Db.PortalMessages,
@@ -122,7 +125,8 @@ public sealed class PortalMessagingTests
         MailboxMessageView andreInbox = Assert.Single(
             await service.GetInboxAsync(andre.Id, isStaff: false, cancellationToken: cancellationToken));
 
-        Assert.Equal("Maria Johnson", andreInbox.SenderName);
+        Assert.Equal("Maria", andreInbox.SenderName);
+        Assert.Null(andreInbox.SenderEmail);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => service.SendAsync(
