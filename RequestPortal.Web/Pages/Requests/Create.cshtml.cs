@@ -34,6 +34,7 @@ public sealed class CreateModel : PageModel
     private readonly IRequestLocationService requestLocationService;
     private readonly IOrganizationProfileService organizationProfileService;
     private readonly IDocumentService documentService;
+    private readonly ILogger<CreateModel> logger;
 
     public CreateModel(
         UserManager<ApplicationUser> userManager,
@@ -44,7 +45,8 @@ public sealed class CreateModel : PageModel
         IRequestReferenceDataService referenceDataService,
         IRequestLocationService requestLocationService,
         IOrganizationProfileService organizationProfileService,
-        IDocumentService documentService)
+        IDocumentService documentService,
+        ILogger<CreateModel> logger)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -55,6 +57,7 @@ public sealed class CreateModel : PageModel
         this.requestLocationService = requestLocationService;
         this.organizationProfileService = organizationProfileService;
         this.documentService = documentService;
+        this.logger = logger;
     }
 
     public IReadOnlyList<OrganizationRequesterOption> Organizations { get; private set; } = Array.Empty<OrganizationRequesterOption>();
@@ -75,8 +78,13 @@ public sealed class CreateModel : PageModel
     [BindProperty]
     public SupportingDocumentsInput SupportingDocuments { get; set; } = new();
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(RequestKind? kind = null)
     {
+        if (kind.HasValue)
+        {
+            Input.Kind = kind.Value;
+        }
+
         ApplicationUser user = await GetUserAsync();
         await LoadPageDataAsync(user);
         if (Input.OrganizationId == Guid.Empty && Organizations.Count == 1)
@@ -161,12 +169,26 @@ public sealed class CreateModel : PageModel
             Input.Circumstances,
             HttpContext.RequestAborted);
 
-        await requestLocationService.ResolveAndSaveAsync(
-            requestId,
-            Input.Location,
-            Input.Latitude,
-            Input.Longitude,
-            HttpContext.RequestAborted);
+        try
+        {
+            await requestLocationService.ResolveAndSaveAsync(
+                requestId,
+                Input.Location,
+                Input.Latitude,
+                Input.Longitude,
+                HttpContext.RequestAborted);
+        }
+        catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Request location enrichment could not be stored for request {RequestId}. Request creation will continue.",
+                requestId);
+        }
 
         if (Input.Kind == RequestKind.Project)
         {
