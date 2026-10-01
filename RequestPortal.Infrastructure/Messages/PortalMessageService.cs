@@ -413,6 +413,15 @@ public sealed class PortalMessageService : IPortalMessageService
             }
 
             await EnsureApprovedMembershipAsync(senderUserId, organizationId.Value, cancellationToken);
+
+            if (audience is MessageAudience.Organization or MessageAudience.OrganizationManager)
+            {
+                await EnsureOrganizationAdministratorAsync(
+                    senderUserId,
+                    organizationId.Value,
+                    cancellationToken);
+            }
+
             await EnsureRepresentativeRecipientsAsync(
                 senderUserId,
                 organizationId.Value,
@@ -952,6 +961,28 @@ public sealed class PortalMessageService : IPortalMessageService
         if (!approved)
         {
             throw new UnauthorizedAccessException("Approved organization membership is required for this conversation.");
+        }
+    }
+
+    private async Task EnsureOrganizationAdministratorAsync(
+        Guid userId,
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        bool administrator = await dbContext.OrganizationMemberships
+            .AsNoTracking()
+            .AnyAsync(
+                membership =>
+                    membership.UserId == userId &&
+                    membership.OrganizationId == organizationId &&
+                    membership.Status == MembershipStatus.Approved &&
+                    membership.Role == OrganizationRole.Administrator,
+                cancellationToken);
+
+        if (!administrator)
+        {
+            throw new UnauthorizedAccessException(
+                "Organization administrator access is required for organization-wide messages.");
         }
     }
 
