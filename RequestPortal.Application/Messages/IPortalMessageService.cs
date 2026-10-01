@@ -14,7 +14,8 @@ public sealed record MailboxMessageView(
     Guid? OrganizationId,
     string? OrganizationName,
     Guid? RequestId,
-    string? RequestReference);
+    string? RequestReference,
+    bool HasAttachments);
 
 public sealed record MessageThreadView(
     Guid ThreadId,
@@ -77,6 +78,12 @@ public interface IPortalMessageService
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<MailboxMessageView>> GetSentAsync(
+        Guid userId,
+        bool isStaff,
+        int take = 100,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MailboxMessageView>> GetArchivedAsync(
         Guid userId,
         bool isStaff,
         int take = 100,
