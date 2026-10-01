@@ -340,7 +340,8 @@ public sealed class PortalMessageService : IPortalMessageService
         return rows
             .Select(row => new MessageRecipientOption(
                 row.Id,
-                string.IsNullOrWhiteSpace(row.DisplayName) ? "Organization representative" : row.DisplayName,
+                FirstName(row.DisplayName, row.Email),
+                isStaff && !row.IsInternalStaff ? row.Email : null,
                 row.IsInternalStaff,
                 row.Role == OrganizationRole.Administrator))
             .ToArray();
