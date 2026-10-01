@@ -30,6 +30,13 @@ public sealed class PortalMessageService : IPortalMessageService
         bool isStaff,
         CancellationToken cancellationToken = default)
     {
+        if (isStaff)
+        {
+            await EnsureSharedStaffMailboxRecipientsAsync(
+                userId,
+                cancellationToken);
+        }
+
         return await dbContext.MessageRecipients
             .AsNoTracking()
             .CountAsync(
@@ -46,6 +53,13 @@ public sealed class PortalMessageService : IPortalMessageService
         int take = 100,
         CancellationToken cancellationToken = default)
     {
+        if (isStaff)
+        {
+            await EnsureSharedStaffMailboxRecipientsAsync(
+                userId,
+                cancellationToken);
+        }
+
         int boundedTake = Math.Clamp(take, 1, 250);
 
         var rows = await (
@@ -63,7 +77,9 @@ public sealed class PortalMessageService : IPortalMessageService
             join request in dbContext.AssistanceRequests.AsNoTracking()
                 on thread.RequestId equals request.Id into requests
             from request in requests.DefaultIfEmpty()
-            where recipient.UserId == userId && recipient.ArchivedUtc == null
+            where recipient.UserId == userId &&
+                  recipient.ArchivedUtc == null &&
+                  thread.ClosedUtc == null
             orderby message.SentUtc descending
             select new
             {
@@ -255,6 +271,14 @@ public sealed class PortalMessageService : IPortalMessageService
         if (thread is null || !await CanViewThreadAsync(userId, isStaff, thread, cancellationToken))
         {
             return null;
+        }
+
+        if (isStaff && thread.StaffVisible)
+        {
+            await EnsureSharedStaffThreadRecipientsAsync(
+                userId,
+                threadId,
+                cancellationToken);
         }
 
         await MarkThreadReadAsync(userId, threadId, cancellationToken);
@@ -1120,6 +1144,81 @@ public sealed class PortalMessageService : IPortalMessageService
             where message.ThreadId == thread.Id && recipient.UserId == userId
             select recipient)
             .AnyAsync(cancellationToken);
+    }
+
+    private async Task EnsureSharedStaffMailboxRecipientsAsync(
+        Guid staffUserId,
+        CancellationToken cancellationToken)
+    {
+        await EnsureInternalStaffAsync(staffUserId, cancellationToken);
+
+        Guid[] messageIds = await (
+            from message in dbContext.PortalMessages.AsNoTracking()
+            join thread in dbContext.MessageThreads.AsNoTracking()
+                on message.ThreadId equals thread.Id
+            where thread.StaffVisible &&
+                  thread.ClosedUtc == null
+            select message.Id)
+            .ToArrayAsync(cancellationToken);
+
+        if (messageIds.Length == 0)
+        {
+            return;
+        }
+
+        Guid[] existing = await dbContext.MessageRecipients
+            .AsNoTracking()
+            .Where(recipient =>
+                recipient.UserId == staffUserId &&
+                messageIds.Contains(recipient.MessageId))
+            .Select(recipient => recipient.MessageId)
+            .ToArrayAsync(cancellationToken);
+
+        HashSet<Guid> existingSet = existing.ToHashSet();
+        foreach (Guid messageId in messageIds.Where(id => !existingSet.Contains(id)))
+        {
+            dbContext.MessageRecipients.Add(
+                new MessageRecipient(messageId, staffUserId));
+        }
+
+        if (dbContext.ChangeTracker.HasChanges())
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private async Task EnsureSharedStaffThreadRecipientsAsync(
+        Guid staffUserId,
+        Guid threadId,
+        CancellationToken cancellationToken)
+    {
+        await EnsureInternalStaffAsync(staffUserId, cancellationToken);
+
+        Guid[] messageIds = await dbContext.PortalMessages
+            .AsNoTracking()
+            .Where(message => message.ThreadId == threadId)
+            .Select(message => message.Id)
+            .ToArrayAsync(cancellationToken);
+
+        Guid[] existing = await dbContext.MessageRecipients
+            .AsNoTracking()
+            .Where(recipient =>
+                recipient.UserId == staffUserId &&
+                messageIds.Contains(recipient.MessageId))
+            .Select(recipient => recipient.MessageId)
+            .ToArrayAsync(cancellationToken);
+
+        HashSet<Guid> existingSet = existing.ToHashSet();
+        foreach (Guid messageId in messageIds.Where(id => !existingSet.Contains(id)))
+        {
+            dbContext.MessageRecipients.Add(
+                new MessageRecipient(messageId, staffUserId));
+        }
+
+        if (dbContext.ChangeTracker.HasChanges())
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private async Task<IReadOnlyList<MailboxMessageView>> GetStaffQueueAsync(
