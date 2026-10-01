@@ -7,19 +7,18 @@
 <div class="login-shell">
     <section class="login-intro">
         <div class="eyebrow">Organization representatives</div>
-        <h1>Welcome back.</h1>
+        <h1>Sign in to the Request Portal</h1>
         <p>
-            Sign in as yourself. Your organization memberships determine which organizations you may represent
-            and which requests you may view or submit.
+            Organization representatives sign in as themselves using one of the external identity providers shown here.
+            Your approved organization memberships determine which organizations you may represent and which requests you may view or submit.
         </p>
-        <p>
-            FFP internal staff should use the separate staff sign-in with their FFP Active Directory credentials.
+        <p class="login-intro-note">
+            Use the social or personal account you registered with the portal.
         </p>
-        <a class="button button-secondary" asp-page="/Account/StaffLogin">FFP staff sign in</a>
     </section>
     <section class="login-panel">
-        <h2>Representative sign in</h2>
-        <p class="muted">Use one of the available external identity providers.</p>
+        <h2>Choose a sign-in method</h2>
+        <p class="muted">Applicants and organization representatives can use any configured provider below.</p>
 
         @foreach (RequestPortal.Web.Pages.Account.LoginModel.ExternalProviderOption provider in Model.ExternalProviders)
         {
@@ -65,6 +64,23 @@
                 </button>
             </form>
         }
+
+
+        <div class="ffp-staff-signin-footer">
+            <div class="ffp-staff-signin-identity">
+                <img src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png"
+                     alt="Food For The Poor" />
+                <div>
+                    <strong>Food For The Poor User Sign In</strong>
+                    <p>
+                        This option is only for Food For The Poor staff and other authorized FFP users with an internal organization account.
+                    </p>
+                </div>
+            </div>
+            <a class="button button-outline ffp-staff-signin-button" asp-page="/Account/StaffLogin">
+                FFP User Sign In
+            </a>
+        </div>
 
         @if (Model.DemoEnabled)
         {
