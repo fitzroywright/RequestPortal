@@ -17,7 +17,37 @@ internal static class ApplicationPipeline
         app.UseRouting();
         app.UseRateLimiter();
         app.UseAuthentication();
+        app.Use(ApplyAlternateAuthenticatedPrincipalAsync);
         app.UseAuthorization();
+    }
+
+    private static async Task ApplyAlternateAuthenticatedPrincipalAsync(
+        HttpContext context
+        , Func<Task> next)
+    {
+        if (context.User.Identity?.IsAuthenticated != true)
+        {
+            Microsoft.AspNetCore.Authentication.AuthenticateResult staff =
+                await context.AuthenticateAsync(
+                    RequestPortal.Web.Security.StaffOidcOptions.StaffCookieScheme);
+
+            if (staff.Succeeded && staff.Principal is not null)
+            {
+                context.User = staff.Principal;
+            }
+            else
+            {
+                Microsoft.AspNetCore.Authentication.AuthenticateResult reviewer =
+                    await context.AuthenticateAsync("ExternalReviewer");
+
+                if (reviewer.Succeeded && reviewer.Principal is not null)
+                {
+                    context.User = reviewer.Principal;
+                }
+            }
+        }
+
+        await next();
     }
 
     private static async Task AddSecurityHeadersAsync(
