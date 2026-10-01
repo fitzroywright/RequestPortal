@@ -44,8 +44,8 @@ public sealed class StorageBackedRequestFeaturesTests
                 new AllowAllOrganizationAccess(),
                 new FixedClock(Now),
                 new NullBusinessAuditWriter(),
-                storage,
-                NullLogger<ProjectProposalService>.Instance);
+                NullLogger<ProjectProposalService>.Instance,
+                storage);
 
             await service.InitializeProjectAsync(userId, requestId, cancellationToken);
             await service.SaveAsync(
