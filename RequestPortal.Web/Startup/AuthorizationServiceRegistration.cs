@@ -101,6 +101,12 @@ internal static class AuthorizationServiceRegistration
                 "/Messages"
                 , "PortalMessages");
             options.Conventions.AuthorizePage(
+                "/Messages/Assigned"
+                , PortalPolicies.FfpStaff);
+            options.Conventions.AuthorizePage(
+                "/Messages/Unassigned"
+                , PortalPolicies.FfpStaff);
+            options.Conventions.AuthorizePage(
                 "/ExternalReview/Index"
                 , "ExternalReview");
         });
