@@ -68,7 +68,7 @@ public sealed class ProjectProposalService : IProjectProposalService
     private readonly IOrganizationAccessService organizationAccessService;
     private readonly IClock clock;
     private readonly IBusinessAuditWriter auditWriter;
-    private readonly IVersionedFileStorage revisionStorage;
+    private readonly IVersionedFileStorage? revisionStorage;
     private readonly ILogger<ProjectProposalService> logger;
 
     public ProjectProposalService(
@@ -76,15 +76,15 @@ public sealed class ProjectProposalService : IProjectProposalService
         IOrganizationAccessService organizationAccessService,
         IClock clock,
         IBusinessAuditWriter auditWriter,
-        IVersionedFileStorage revisionStorage,
-        ILogger<ProjectProposalService> logger)
+        ILogger<ProjectProposalService> logger,
+        IVersionedFileStorage? revisionStorage = null)
     {
         this.dbContext = dbContext;
         this.organizationAccessService = organizationAccessService;
         this.clock = clock;
         this.auditWriter = auditWriter;
-        this.revisionStorage = revisionStorage;
         this.logger = logger;
+        this.revisionStorage = revisionStorage;
     }
 
     public async Task InitializeProjectAsync(Guid userId, Guid requestId, CancellationToken cancellationToken = default)
@@ -315,6 +315,14 @@ public sealed class ProjectProposalService : IProjectProposalService
         bool automatic,
         CancellationToken cancellationToken)
     {
+        if (revisionStorage is null)
+        {
+            logger.LogWarning(
+                "Project proposal revision history is unavailable because the configured Common.Storage provider does not support versioned storage. Request {RequestId} will continue without revision-history storage.",
+                proposal.RequestId);
+            return;
+        }
+
         try
         {
             await StoreRevisionAsync(
