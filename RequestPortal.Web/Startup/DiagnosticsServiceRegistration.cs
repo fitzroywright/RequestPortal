@@ -64,6 +64,8 @@ internal static class DiagnosticsServiceRegistration
         builder.Services.AddDiagnosticLevelTest<MalwareScannerConnectivityDiagnosticLevelTest>();
 
         builder.Services.AddDiagnosticLevelTest<ExternalIdentityProvidersDiagnosticLevelTest>();
+
+        builder.Services.AddDiagnosticLevelTest<ExternalIdentityProviderSecretsDiagnosticLevelTest>();
     }
 
     private static void AddLevel4(
