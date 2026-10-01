@@ -40,15 +40,19 @@ public sealed class NewModel(
     public bool ToFfpStaff { get; set; }
 
     [BindProperty]
+    public string Destination { get; set; } = "ffp";
+
+    [BindProperty]
     public MessageAudience Audience { get; set; } = MessageAudience.Individual;
 
     [BindProperty]
     public List<Guid> AttachmentDocumentIds { get; set; } = [];
 
     [BindProperty]
-    [Required]
     [StringLength(300)]
     public string Subject { get; set; } = string.Empty;
+
+    public string? RequestReference { get; private set; }
 
     [BindProperty]
     [Required]
@@ -74,9 +78,12 @@ public sealed class NewModel(
         {
             ModelState.AddModelError(nameof(RecipientUserId), "Choose an individual recipient.");
         }
-        else if (!IsStaff && !ToFfpStaff && Audience == MessageAudience.Individual && !RecipientUserId.HasValue)
+
+        if (!IsStaff &&
+            string.Equals(Destination, "note", StringComparison.OrdinalIgnoreCase) &&
+            !RequestId.HasValue)
         {
-            ModelState.AddModelError(nameof(RecipientUserId), "Choose FFP Staff or an organization representative.");
+            ModelState.AddModelError(nameof(Destination), "Private notes must be attached to an application.");
         }
 
         if (!ModelState.IsValid)
@@ -85,28 +92,62 @@ public sealed class NewModel(
             return Page();
         }
 
+        string subject = string.IsNullOrWhiteSpace(Subject)
+            ? BuildSubject()
+            : Subject.Trim();
+
         Guid threadId;
-        if (!IsStaff && ToFfpStaff)
+        if (!IsStaff)
         {
-            threadId = await messageService.SendToSharedStaffAsync(
-                userId,
-                OrganizationId!.Value,
-                RequestId,
-                null,
-                Subject,
-                Body,
-                cancellationToken: HttpContext.RequestAborted,
-                attachmentDocumentIds: AttachmentDocumentIds);
+            if (string.Equals(Destination, "manager", StringComparison.OrdinalIgnoreCase))
+            {
+                threadId = await messageService.SendAsync(
+                    userId,
+                    senderIsStaff: false,
+                    OrganizationId,
+                    RequestId,
+                    threadId: null,
+                    subject,
+                    Body,
+                    Array.Empty<Guid>(),
+                    cancellationToken: HttpContext.RequestAborted,
+                    audience: MessageAudience.OrganizationManager,
+                    attachmentDocumentIds: AttachmentDocumentIds);
+            }
+            else if (string.Equals(Destination, "note", StringComparison.OrdinalIgnoreCase))
+            {
+                threadId = await messageService.SavePersonalNoteAsync(
+                    userId,
+                    OrganizationId!.Value,
+                    RequestId!.Value,
+                    threadId: null,
+                    subject,
+                    Body,
+                    cancellationToken: HttpContext.RequestAborted,
+                    attachmentDocumentIds: AttachmentDocumentIds);
+            }
+            else
+            {
+                threadId = await messageService.SendToSharedStaffAsync(
+                    userId,
+                    OrganizationId!.Value,
+                    RequestId,
+                    threadId: null,
+                    subject,
+                    Body,
+                    cancellationToken: HttpContext.RequestAborted,
+                    attachmentDocumentIds: AttachmentDocumentIds);
+            }
         }
         else
         {
             threadId = await messageService.SendAsync(
                 userId,
-                IsStaff,
+                senderIsStaff: true,
                 OrganizationId,
                 RequestId,
-                null,
-                Subject,
+                threadId: null,
+                subject,
                 Body,
                 RecipientUserId.HasValue ? [RecipientUserId.Value] : Array.Empty<Guid>(),
                 cancellationToken: HttpContext.RequestAborted,
@@ -144,6 +185,25 @@ public sealed class NewModel(
                 .Select(item => new OrganizationOption(item.Id, item.Name))
                 .ToArray();
 
+            if (RequestId.HasValue)
+            {
+                IReadOnlyList<RequestSummary> requests =
+                    await workflowService.GetRequestsForUserAsync(
+                        userId,
+                        HttpContext.RequestAborted);
+                RequestSummary? request = requests.FirstOrDefault(item => item.Id == RequestId.Value);
+                if (request is not null)
+                {
+                    OrganizationId ??= request.OrganizationId;
+                    RequestReference = request.PublicReference;
+                }
+            }
+
+            if (!OrganizationId.HasValue && Organizations.Count == 1)
+            {
+                OrganizationId = Organizations[0].Id;
+            }
+
             if (OrganizationId.HasValue)
             {
                 CanBroadcastToOrganization = approvedOrganizations.Any(item =>
@@ -174,6 +234,20 @@ public sealed class NewModel(
                 IsStaff,
                 HttpContext.RequestAborted);
         }
+    }
+
+    private string BuildSubject()
+    {
+        if (string.Equals(Destination, "note", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(RequestReference)
+                ? "Application note"
+                : $"Note · {RequestReference}";
+        }
+
+        return string.IsNullOrWhiteSpace(RequestReference)
+            ? "Request Portal message"
+            : $"Application · {RequestReference}";
     }
 
     private Guid CurrentUserId() =>
