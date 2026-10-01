@@ -265,9 +265,35 @@ public sealed class DocumentService : IDocumentService
         await fileStorage.DeleteAsync(storageKey, cancellationToken);
     }
 
-    private Task AuditAsync(Guid actorUserId, string action, Guid documentId, Guid organizationId, string? detail, CancellationToken cancellationToken)
+    private async Task AuditAsync(Guid actorUserId, string action, Guid documentId, Guid organizationId, string? detail, CancellationToken cancellationToken)
     {
-        return auditWriter.WriteAsync(actorUserId, action, "Document", documentId, organizationId, detail, cancellationToken);
+        try
+        {
+            await auditWriter.WriteAsync(
+                actorUserId,
+                action,
+                "Document",
+                documentId,
+                organizationId,
+                detail,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry in
+                     dbContext.ChangeTracker.Entries()
+                         .Where(entry =>
+                             entry.Entity is RequestPortal.Domain.Auditing.AuditEntry &&
+                             entry.State == EntityState.Added)
+                         .ToArray())
+            {
+                entry.State = EntityState.Detached;
+            }
+        }
     }
 
     private async Task EnsureApprovedMemberAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken)
