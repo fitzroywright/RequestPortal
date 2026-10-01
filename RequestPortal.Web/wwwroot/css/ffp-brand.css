@@ -456,6 +456,9 @@
 
 /* Unified logged-in profile flyout */
 .profile-menu{position:relative;margin-left:4px}
+.profile-menu-trigger.profile-menu-studio{background:transparent;border:0;border-radius:0;padding:0;min-height:34px;color:inherit;box-shadow:none}
+.profile-menu-trigger.profile-menu-studio:hover,.profile-menu-trigger.profile-menu-studio[aria-expanded="true"]{background:transparent;border-color:transparent}
+.profile-avatar-studio{width:32px;height:32px;border-radius:50%;background:var(--ffp-navy);color:#fff;font-size:.72rem;font-weight:800}
 .profile-menu-trigger{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:4px 8px 4px 5px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--ffp-navy);font:inherit;font-weight:700;cursor:pointer}
 .profile-menu-trigger:hover,.profile-menu-trigger[aria-expanded="true"]{background:#f4f5f3;border-color:#c8d0d0}
 .profile-avatar{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--ffp-navy);color:#fff;font-size:.72rem;font-weight:800;letter-spacing:.03em}
