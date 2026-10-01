@@ -22,13 +22,14 @@
             </a>
             <nav class="main-nav">
                 @{
-                    bool isFfpStaff = User.Identity?.IsAuthenticated == true &&
+                    bool isAuthenticated = User.Identity?.IsAuthenticated == true;
+                    bool isFfpStaff = isAuthenticated &&
                         User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim, RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
                     bool canViewManagement = User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard);
                     bool isExternalReviewer = User.HasClaim("requestportal.external-review", "true");
                 }
                 <a asp-page="/Index">Home</a>
-                @if (User.Identity?.IsAuthenticated == true)
+                @if (isAuthenticated)
                 {
                     if (isExternalReviewer)
                     {
