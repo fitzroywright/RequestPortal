@@ -71,6 +71,11 @@
                                 <td>@(request.SubmittedUtc?.ToLocalTime().ToString("MMM dd yyyy, h:mm tt") ?? "Not submitted")</td>
                                 <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
                             </tr>
+                            <tr class="request-conversation-row">
+                                <td colspan="6">
+                                    @await Component.InvokeAsync("RequestConversation", new { requestId = request.Id, returnUrl = Url.Page("/Requests/Index", new { query = Model.Query }) ?? "/Requests", compact = true })
+                                </td>
+                            </tr>
                         }
                         </tbody>
                     </table>
