@@ -111,13 +111,6 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         Guid organizationId,
         CancellationToken cancellationToken = default)
     {
-        bool activeElsewhere = await dbContext.OrganizationMemberships.AsNoTracking()
-            .AnyAsync(item => item.UserId == userId
-                && item.Status == MembershipStatus.Approved
-                && item.OrganizationId != organizationId, cancellationToken);
-        if (activeElsewhere)
-            throw new InvalidOperationException("This account is already tied to an organization and cannot join another organization.");
-
         Organization organization = await dbContext.Organizations
             .Include(item => item.Memberships)
             .SingleAsync(item => item.Id == organizationId, cancellationToken);
