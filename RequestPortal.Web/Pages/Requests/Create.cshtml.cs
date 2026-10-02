@@ -471,7 +471,12 @@ public sealed class CreateModel : PageModel
 
     private async Task LoadPageDataAsync(ApplicationUser user)
     {
-        SubmittedByName = string.IsNullOrWhiteSpace(user.DisplayName) ? user.UserName ?? user.Email ?? "Applicant" : user.DisplayName;
+        string submittedByName = string.IsNullOrWhiteSpace(user.DisplayName)
+            ? user.UserName ?? user.Email ?? "Applicant"
+            : user.DisplayName;
+        SubmittedByName = submittedByName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault() ?? "Applicant";
         Categories = await referenceDataService.GetCategoriesAsync(HttpContext.RequestAborted);
         Programs = await referenceDataService.GetProgramsAsync(HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
