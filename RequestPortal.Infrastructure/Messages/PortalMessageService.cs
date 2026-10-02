@@ -441,7 +441,7 @@ public sealed class PortalMessageService : IPortalMessageService
             .Select(row => new MessageRecipientOption(
                 row.Id,
                 FirstName(row.DisplayName, row.Email),
-                isStaff && !row.IsInternalStaff ? row.Email : null,
+                null,
                 row.IsInternalStaff,
                 row.Role == OrganizationRole.Administrator))
             .ToArray();
@@ -1675,7 +1675,7 @@ public sealed class PortalMessageService : IPortalMessageService
         return (
             name,
             "Representative",
-            viewerIsStaff ? sender?.Email : null);
+            null);
     }
 
     private static string FirstName(string? displayName, string? email)
