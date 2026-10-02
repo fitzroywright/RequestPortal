@@ -112,6 +112,12 @@ public interface IPortalMessageService
         Guid threadId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<MessageThreadView>> GetRequestThreadsAsync(
+        Guid userId,
+        bool isStaff,
+        Guid requestId,
+        CancellationToken cancellationToken = default);
+
     Task<Guid> SendAsync(
         Guid senderUserId,
         bool senderIsStaff,
