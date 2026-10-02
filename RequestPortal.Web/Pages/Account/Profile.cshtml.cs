@@ -43,6 +43,7 @@ public sealed class ProfileModel : PageModel
     public bool EmailAvailable { get; private set; }
     public bool WhatsAppAvailable { get; private set; }
     public string RegisteredIdentity { get; private set; } = string.Empty;
+    public bool IndividualProfileUpdateRequired { get; private set; }
 
     [BindProperty]
     public PersonalProfileInput ProfileInput { get; set; } = new();
@@ -78,6 +79,8 @@ public sealed class ProfileModel : PageModel
         user.PhoneNumber = string.IsNullOrWhiteSpace(ProfileInput.PhoneNumber)
             ? null
             : ProfileInput.PhoneNumber.Trim();
+        user.IndividualProfileUpdateRequired = false;
+        user.IndividualProfileUpdateRequiredUtc = null;
 
         IdentityResult result = await userManager.UpdateAsync(user);
         if (!result.Succeeded)
@@ -98,6 +101,7 @@ public sealed class ProfileModel : PageModel
         ApplicationUser user = await GetUserAsync();
         KeepValidationFor(nameof(Preference));
         LoadAvailability();
+        IndividualProfileUpdateRequired = user.IndividualProfileUpdateRequired;
 
         if (Preference.Enabled && !IsAvailable(Preference.Channel))
             ModelState.AddModelError(string.Empty, $"{Preference.Channel} notifications are not available.");

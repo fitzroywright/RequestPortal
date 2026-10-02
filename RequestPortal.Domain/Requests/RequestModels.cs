@@ -13,7 +13,8 @@ public enum RequestStatus
     PendingFulfilment = 6,
     Fulfilled = 7,
     Closed = 8,
-    Duplicate = 9
+    Duplicate = 9,
+    RepresentativeReviewRequired = 10
 }
 
 public enum RequestPriority

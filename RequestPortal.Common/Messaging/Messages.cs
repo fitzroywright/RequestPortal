@@ -77,6 +77,16 @@ public sealed record MembershipChangedMessage(
     string Change,
     string? Detail = null) : IMessage;
 
+public sealed record OrganizationMembershipEndedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid OrganizationId,
+    Guid MembershipId,
+    Guid UserId,
+    Guid EndedByUserId,
+    string Reason,
+    IReadOnlyCollection<Guid> AffectedRequestIds) : IMessage;
+
 public sealed record OrganizationStatusChangedMessage(
     Guid MessageId,
     DateTimeOffset OccurredUtc,
