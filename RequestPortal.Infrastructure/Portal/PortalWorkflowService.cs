@@ -82,33 +82,12 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         return contexts;
     }
 
-    public async Task<IReadOnlyList<OrganizationSummary>> GetAvailableOrganizationsAsync(
+    public Task<IReadOnlyList<OrganizationSummary>> GetAvailableOrganizationsAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        List<Guid> existingOrganizationIds = await dbContext.OrganizationMemberships
-            .AsNoTracking()
-            .Where(membership => membership.UserId == userId && membership.Status != MembershipStatus.Revoked)
-            .Select(membership => membership.OrganizationId)
-            .ToListAsync(cancellationToken);
-
-        List<OrganizationSummary> organizations = await dbContext.Organizations
-            .AsNoTracking()
-            .Where(organization =>
-                organization.Status == OrganizationStatus.Approved &&
-                organization.OrganizationType != "IndividualContext" &&
-                !existingOrganizationIds.Contains(organization.Id))
-            .OrderBy(organization => organization.Name)
-            .Select(organization => new OrganizationSummary(
-                organization.Id,
-                organization.Name,
-                organization.CountryCode,
-                organization.Status.ToString(),
-                string.Empty,
-                string.Empty))
-            .ToListAsync(cancellationToken);
-
-        return organizations;
+        IReadOnlyList<OrganizationSummary> none = Array.Empty<OrganizationSummary>();
+        return Task.FromResult(none);
     }
 
     private async Task EnsureIndividualContextAsync(
@@ -190,43 +169,13 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         return organization.Id;
     }
 
-    public async Task RequestMembershipAsync(
+    public Task RequestMembershipAsync(
         Guid userId,
         Guid organizationId,
         CancellationToken cancellationToken = default)
     {
-        Organization organization = await dbContext.Organizations
-            .Include(item => item.Memberships)
-            .SingleAsync(item => item.Id == organizationId, cancellationToken);
-
-        if (organization.Status != OrganizationStatus.Approved)
-        {
-            throw new InvalidOperationException("Membership can only be requested for an approved organization.");
-        }
-
-        OrganizationMembership membership =
-            organization.RequestMembership(Guid.NewGuid(), userId, clock.UtcNow);
-
-        // This is a new child on an existing aggregate. Mark it explicitly as Added
-        // so EF never infers an update for the new membership from graph state.
-        dbContext.OrganizationMemberships.Add(membership);
-
-        AddOutboxMessage(new MembershipRequestedMessage(
-            Guid.NewGuid(),
-            clock.UtcNow,
-            organizationId,
-            membership.Id,
-            userId));
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        await WriteDiagnosticAsync(
-            "RP-MEMBERSHIP-REQUESTED",
-            DiagnosticSeverity.Information,
-            "OrganizationMembership",
-            "Organization membership requested.",
-            organizationId.ToString(),
-            cancellationToken);
+        throw new InvalidOperationException(
+            "Organization membership is invitation-only. Ask an organization administrator to send an invitation to your account email address.");
     }
 
     public async Task<IReadOnlyList<OrganizationSummary>> GetPendingOrganizationsAsync(
