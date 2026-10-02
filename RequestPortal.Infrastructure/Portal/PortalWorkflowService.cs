@@ -116,13 +116,13 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         CancellationToken cancellationToken)
     {
         bool exists = await (
-            from membership in dbContext.OrganizationMemberships.AsNoTracking()
-            join organization in dbContext.Organizations.AsNoTracking()
-                on membership.OrganizationId equals organization.Id
-            where membership.UserId == userId
-                && organization.OrganizationType == "IndividualContext"
-                && membership.Status == MembershipStatus.Approved
-            select membership.Id)
+            from existingMembership in dbContext.OrganizationMemberships.AsNoTracking()
+            join existingOrganization in dbContext.Organizations.AsNoTracking()
+                on existingMembership.OrganizationId equals existingOrganization.Id
+            where existingMembership.UserId == userId
+                && existingOrganization.OrganizationType == "IndividualContext"
+                && existingMembership.Status == MembershipStatus.Approved
+            select existingMembership.Id)
             .AnyAsync(cancellationToken);
 
         if (exists)
