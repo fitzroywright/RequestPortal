@@ -12,11 +12,16 @@ public sealed class AssistanceRequest
     {
     }
 
-    public AssistanceRequest(Guid id, string publicReference, Guid organizationId, Guid createdByUserId, DateTimeOffset createdUtc)
+    public AssistanceRequest(Guid id, string publicReference, Guid? organizationId, Guid createdByUserId, DateTimeOffset createdUtc)
     {
+        if (createdByUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Creating user is required.", nameof(createdByUserId));
+        }
+
         if (organizationId == Guid.Empty)
         {
-            throw new ArgumentException("Organization is required.", nameof(organizationId));
+            throw new ArgumentException("Organization id cannot be empty when supplied.", nameof(organizationId));
         }
 
         Id = id;
@@ -34,7 +39,9 @@ public sealed class AssistanceRequest
 
     public string PublicReference { get; private set; } = string.Empty;
 
-    public Guid OrganizationId { get; private set; }
+    public Guid? OrganizationId { get; private set; }
+
+    public bool IsIndividualRequest => !OrganizationId.HasValue;
 
     public Guid CreatedByUserId { get; private set; }
 
