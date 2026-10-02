@@ -37,6 +37,7 @@ public sealed class IndividualProfileCompletenessTests
             NationalIdTrn = "123456789",
             MaritalStatus = "Single",
             HomeAddress = "1 Test Road",
+            Town = "Spanish Town",
             Parish = "St. Catherine",
             DistrictArea = "Spanish Town",
             EmploymentStatus = "Employed",
