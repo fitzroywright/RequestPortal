@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Portal;
+using RequestPortal.Application.Requests;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
