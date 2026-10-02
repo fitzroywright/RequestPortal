@@ -87,7 +87,13 @@
                     }
                 </div>
 
-                @if (Model.CanStartRequestConversation || replyThread is not null)
+                @if (Model.RequestConversationReadOnly)
+                {
+                    <div class="request-conversation-readonly">
+                        @Model.RequestConversationReadOnlyReason
+                    </div>
+                }
+                else
                 {
                     bool startingNewMessage = requestMessages.Length == 0 || replyThread is null;
 
@@ -450,6 +456,7 @@
     .request-detail-reply { border-top:0; background:#fafbfc; }
     .request-detail-reply > label { display:block; margin-bottom:6px; }
     .request-attachment-hint { margin-top:5px; color:#6b7780; font-size:.78rem; }
+    .request-conversation-readonly { padding:10px 12px; border-top:1px solid #e3e7ea; background:#f7f8f9; color:#5e6870; font-size:.86rem; }
     .proposal-document {
         margin-top: 18px;
         background: #fff;
