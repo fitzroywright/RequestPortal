@@ -44,106 +44,6 @@
 
             <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
                 <div class="request-detail-main">
-                    <section id="conversation" class="operational-panel request-messages-card request-messages-always-visible">
-                <div class="panel-titlebar">
-                    <div>
-                        <strong><span class="panel-icon panel-icon-message">✉</span> Messages about this request</strong>
-                        <small class="muted">All messages connected to @Model.Request.PublicReference are kept with this request.</small>
-                    </div>
-                    <a asp-page="/Messages/Inbox">All messages</a>
-                </div>
-
-                <div asp-validation-summary="ModelOnly" class="validation"></div>
-
-                @{
-                    var requestMessages = Model.MessageThreads
-                        .SelectMany(thread => thread.Messages.Select(message => new { Thread = thread, Message = message }))
-                        .OrderBy(item => item.Message.SentUtc)
-                        .ToArray();
-
-                    var replyThread = Model.MessageThreads
-                        .Where(thread => !thread.ClosedUtc.HasValue)
-                        .OrderByDescending(thread => thread.Messages.LastOrDefault()?.SentUtc ?? DateTimeOffset.MinValue)
-                        .FirstOrDefault();
-                }
-
-                <div class="request-conversation-history request-message-list">
-                    @if (requestMessages.Length == 0)
-                    {
-                        <div class="workspace-empty compact">
-                            <p>No messages have been received for this request yet.</p>
-                        </div>
-                    }
-                    else
-                    {
-                        @foreach (var item in requestMessages)
-                        {
-                            <article class="request-message-item @(item.Message.IsMine ? "is-mine" : "is-received")">
-                                <div class="request-message-avatar" aria-hidden="true">@(item.Message.SenderName.Length > 0 ? item.Message.SenderName.Substring(0,1).ToUpperInvariant() : "M")</div>
-                                <div class="request-message-content">
-                                    <div class="request-message-meta">
-                                        <strong>@item.Message.SenderName</strong>
-                                        <time>@item.Message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time>
-                                    </div>
-                                    <p>@item.Message.Body</p>
-                                </div>
-                                @foreach (var attachment in item.Message.Attachments)
-                                {
-                                    <a asp-page="/Messages/Thread"
-                                       asp-page-handler="Attachment"
-                                       asp-route-id="@item.Thread.ThreadId"
-                                       asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
-                                }
-                            </article>
-                        }
-                    }
-                </div>
-
-                @if (Model.RequestConversationReadOnly)
-                {
-                    <div class="request-conversation-readonly">
-                        @Model.RequestConversationReadOnlyReason
-                    </div>
-                }
-                else
-                {
-                    bool startingNewMessage = requestMessages.Length == 0 || replyThread is null;
-
-                    <form method="post"
-                          enctype="multipart/form-data"
-                          asp-page-handler="Reply"
-                          class="request-reply-form request-detail-reply">
-                        <input type="hidden" name="id" value="@Model.Request.Id" />
-                        @if (replyThread is not null)
-                        {
-                            <input type="hidden" name="ReplyThreadId" value="@replyThread.ThreadId" />
-                        }
-
-                        <label for="request-reply-box">
-                            <strong>@(startingNewMessage ? "New Message" : "Reply")</strong>
-                        </label>
-                        <div class="request-reply-box">
-                            <textarea id="request-reply-box"
-                                      name="Reply"
-                                      rows="4"
-                                      maxlength="10000"
-                                      required
-                                      placeholder="@(startingNewMessage ? "Type a new message about this request..." : "Type your reply here...")"
-                                      aria-label="@(startingNewMessage ? "New message about this request" : "Reply to messages about this request")">@Model.Reply</textarea>
-                            <label class="reply-paperclip" title="Attach a file">
-                                📎
-                                <input name="ReplyAttachment" type="file" aria-label="Attach a file" />
-                            </label>
-                        </div>
-                        <div class="request-attachment-hint">You can attach a supporting file to this message.</div>
-                        <span asp-validation-for="Reply" class="validation"></span>
-                        <div class="action-row">
-                            <button class="button button-small" type="submit">@(startingNewMessage ? "New Message" : "Send reply")</button>
-                        </div>
-                    </form>
-                }
-            </section>
-                    
                     @if (Model.ProjectProposal is not null)
                     {
                         <section id="items" class="operational-panel">
@@ -351,6 +251,106 @@
                             </table></div>
                         </section>
                     }
+
+                    <section id="conversation" class="operational-panel request-messages-card request-messages-always-visible">
+                <div class="panel-titlebar">
+                    <div>
+                        <strong><span class="panel-icon panel-icon-message">✉</span> Messages about this request</strong>
+                        <small class="muted">All messages connected to @Model.Request.PublicReference are kept with this request.</small>
+                    </div>
+                    <a asp-page="/Messages/Inbox">All messages</a>
+                </div>
+
+                <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+                @{
+                    var requestMessages = Model.MessageThreads
+                        .SelectMany(thread => thread.Messages.Select(message => new { Thread = thread, Message = message }))
+                        .OrderBy(item => item.Message.SentUtc)
+                        .ToArray();
+
+                    var replyThread = Model.MessageThreads
+                        .Where(thread => !thread.ClosedUtc.HasValue)
+                        .OrderByDescending(thread => thread.Messages.LastOrDefault()?.SentUtc ?? DateTimeOffset.MinValue)
+                        .FirstOrDefault();
+                }
+
+                <div class="request-conversation-history request-message-list">
+                    @if (requestMessages.Length == 0)
+                    {
+                        <div class="workspace-empty compact">
+                            <p>No messages have been received for this request yet.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var item in requestMessages)
+                        {
+                            <article class="request-message-item @(item.Message.IsMine ? "is-mine" : "is-received")">
+                                <div class="request-message-avatar" aria-hidden="true">@(item.Message.SenderName.Length > 0 ? item.Message.SenderName.Substring(0,1).ToUpperInvariant() : "M")</div>
+                                <div class="request-message-content">
+                                    <div class="request-message-meta">
+                                        <strong>@item.Message.SenderName</strong>
+                                        <time>@item.Message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time>
+                                    </div>
+                                    <p>@item.Message.Body</p>
+                                </div>
+                                @foreach (var attachment in item.Message.Attachments)
+                                {
+                                    <a asp-page="/Messages/Thread"
+                                       asp-page-handler="Attachment"
+                                       asp-route-id="@item.Thread.ThreadId"
+                                       asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
+                                }
+                            </article>
+                        }
+                    }
+                </div>
+
+                @if (Model.RequestConversationReadOnly)
+                {
+                    <div class="request-conversation-readonly">
+                        @Model.RequestConversationReadOnlyReason
+                    </div>
+                }
+                else
+                {
+                    bool startingNewMessage = requestMessages.Length == 0 || replyThread is null;
+
+                    <form method="post"
+                          enctype="multipart/form-data"
+                          asp-page-handler="Reply"
+                          class="request-reply-form request-detail-reply">
+                        <input type="hidden" name="id" value="@Model.Request.Id" />
+                        @if (replyThread is not null)
+                        {
+                            <input type="hidden" name="ReplyThreadId" value="@replyThread.ThreadId" />
+                        }
+
+                        <label for="request-reply-box">
+                            <strong>@(startingNewMessage ? "New Message" : "Reply")</strong>
+                        </label>
+                        <div class="request-reply-box">
+                            <textarea id="request-reply-box"
+                                      name="Reply"
+                                      rows="4"
+                                      maxlength="10000"
+                                      required
+                                      placeholder="@(startingNewMessage ? "Type a new message about this request..." : "Type your reply here...")"
+                                      aria-label="@(startingNewMessage ? "New message about this request" : "Reply to messages about this request")">@Model.Reply</textarea>
+                            <label class="reply-paperclip" title="Attach a file">
+                                📎
+                                <input name="ReplyAttachment" type="file" aria-label="Attach a file" />
+                            </label>
+                        </div>
+                        <div class="request-attachment-hint">You can attach a supporting file to this message.</div>
+                        <span asp-validation-for="Reply" class="validation"></span>
+                        <div class="action-row">
+                            <button class="button button-small" type="submit">@(startingNewMessage ? "New Message" : "Send reply")</button>
+                        </div>
+                    </form>
+                }
+            </section>
 
                     <section id="documents" class="operational-panel" style="margin-top:10px">
                         <h2><span class="panel-icon panel-icon-files">▧</span> Supporting documents <span class="panel-count">@Model.Documents.Count</span></h2>
