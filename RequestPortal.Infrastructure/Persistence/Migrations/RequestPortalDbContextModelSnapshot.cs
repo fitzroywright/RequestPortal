@@ -949,6 +949,56 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.ToTable("units_of_measure", (string)null);
                 });
 
+            modelBuilder.Entity("RequestPortal.Domain.Organizations.OrganizationInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AcceptedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AcceptedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTimeOffset>("ExpiresUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InvitedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("ExpiresUtc");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("OrganizationId", "Email", "Status");
+
+                    b.ToTable("organization_invitations", (string)null);
+                });
+
             modelBuilder.Entity("RequestPortal.Domain.Reviewers.ExternalReviewerInvitation", b =>
                 {
                     b.Property<Guid>("Id")
