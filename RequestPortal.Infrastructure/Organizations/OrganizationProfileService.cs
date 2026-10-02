@@ -48,24 +48,43 @@ public sealed class OrganizationProfileService : IOrganizationProfileService
             organization.CountryCode,
             organization.Status.ToString(),
             organization.RegistrationNumber,
+            organization.TaxRegistrationNumber,
             organization.OrganizationType,
+            organization.TradingName,
+            organization.DateEstablished,
+            organization.CountryOfRegistration,
             organization.Address,
+            organization.Parish,
+            organization.DistrictArea,
+            organization.MailingAddress,
             organization.Phone,
+            organization.AlternativePhone,
             organization.Email,
+            organization.Website,
             organization.PrimaryContactName,
+            organization.PrimaryContactTitle,
+            organization.AuthorizedSignatoryName,
+            organization.AuthorizedSignatoryTitle,
+            organization.SecondaryContactName,
+            organization.SecondaryContactEmail,
+            organization.SecondaryContactPhone,
+            organization.EmployeeCount,
+            organization.VolunteerCount,
+            organization.ApproximateBeneficiariesServed,
+            organization.GeographicServiceArea,
+            organization.MainActivities,
+            organization.PopulationGroupsServed,
+            organization.PreviouslyReceivedFfpAssistance,
+            organization.AnnualOperatingBudget,
+            organization.PrimaryFundingSources,
+            organization.PremisesSituation,
             organization.RegistrationExpiryDate);
     }
 
     public async Task UpdateAsync(
         Guid userId,
         Guid organizationId,
-        string? registrationNumber,
-        string? organizationType,
-        string? address,
-        string? phone,
-        string? email,
-        string? primaryContactName,
-        DateOnly? registrationExpiryDate,
+        OrganizationProfileUpdate update,
         CancellationToken cancellationToken = default)
     {
         Organization organization = await dbContext.Organizations
@@ -78,14 +97,38 @@ public sealed class OrganizationProfileService : IOrganizationProfileService
         }
 
         organization.UpdateProfile(
-            registrationNumber,
-            organizationType,
-            address,
-            phone,
-            email,
-            primaryContactName,
-            registrationExpiryDate);
+            update.RegistrationNumber,
+            update.TaxRegistrationNumber,
+            update.OrganizationType,
+            update.TradingName,
+            update.DateEstablished,
+            update.CountryOfRegistration,
+            update.Address,
+            update.Parish,
+            update.DistrictArea,
+            update.MailingAddress,
+            update.Phone,
+            update.AlternativePhone,
+            update.Email,
+            update.Website,
+            update.PrimaryContactName,
+            update.PrimaryContactTitle,
+            update.AuthorizedSignatoryName,
+            update.AuthorizedSignatoryTitle,
+            update.SecondaryContactName,
+            update.SecondaryContactEmail,
+            update.SecondaryContactPhone,
+            update.EmployeeCount,
+            update.VolunteerCount,
+            update.ApproximateBeneficiariesServed,
+            update.GeographicServiceArea,
+            update.MainActivities,
+            update.PopulationGroupsServed,
+            update.PreviouslyReceivedFfpAssistance,
+            update.AnnualOperatingBudget,
+            update.PrimaryFundingSources,
+            update.PremisesSituation,
+            update.RegistrationExpiryDate);
 
         await dbContext.SaveChangesAsync(cancellationToken);
-    }
-}
+    }}
