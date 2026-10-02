@@ -76,6 +76,9 @@ public sealed class DetailsModel : PageModel
     public bool DocumentsUnavailable { get; private set; }
     public bool RequestConversationReadOnly { get; private set; }
     public string? RequestConversationReadOnlyReason { get; private set; }
+    public RequestDetailPageMeta DetailMeta { get; private set; } = new();
+    public RequesterDetailCard RequesterCard { get; private set; } = new();
+    public RelatedDetailCard RelatedCard { get; private set; } = new();
 
     [BindProperty] public string Reply { get; set; } = string.Empty;
     [BindProperty] public Guid? ReplyThreadId { get; set; }
@@ -428,6 +431,107 @@ public sealed class DetailsModel : PageModel
             }
         }
 
+        var detailData = await (
+            from request in dbContext.AssistanceRequests.AsNoTracking()
+            join organization in dbContext.Organizations.AsNoTracking()
+                on request.OrganizationId equals organization.Id
+            join creator in dbContext.Users.AsNoTracking()
+                on request.CreatedByUserId equals creator.Id
+            where request.Id == id
+            select new
+            {
+                request.Kind,
+                request.Priority,
+                request.Category,
+                request.Subcategory,
+                request.ProgramCategory,
+                request.Location,
+                request.Circumstances,
+                request.CreatedUtc,
+                request.SubmittedUtc,
+                request.SubmittedByUserId,
+                OrganizationName = organization.Name,
+                organization.OrganizationType,
+                organization.CountryOfRegistration,
+                organization.Parish,
+                CreatorId = creator.Id,
+                CreatorName = creator.DisplayName,
+                creator.DateOfBirth,
+                creator.NationalIdTrn,
+                creator.PhoneNumber,
+                creator.AlternativePhoneNumber,
+                creator.Email,
+                creator.HomeAddress,
+                CreatorParish = creator.Parish,
+                creator.DistrictArea,
+                creator.HouseholdSize,
+                creator.EmploymentStatus,
+                creator.MonthlyHouseholdIncome,
+                creator.HousingSituation
+            })
+            .SingleAsync(HttpContext.RequestAborted);
+
+        string submittedByName = detailData.CreatorName;
+        if (detailData.SubmittedByUserId.HasValue &&
+            detailData.SubmittedByUserId.Value != detailData.CreatorId)
+        {
+            submittedByName = await dbContext.Users.AsNoTracking()
+                .Where(item => item.Id == detailData.SubmittedByUserId.Value)
+                .Select(item => item.DisplayName)
+                .SingleOrDefaultAsync(HttpContext.RequestAborted)
+                ?? detailData.CreatorName;
+        }
+
+        DateTimeOffset lastUpdated = Request.History
+            .Select(item => item.ChangedUtc)
+            .DefaultIfEmpty(detailData.CreatedUtc)
+            .Max();
+
+        string? ffpReference = await dbContext.IntegrationLinks.AsNoTracking()
+            .Where(item => item.RequestId == id && item.SystemName == "FFPManager")
+            .Select(item => item.ExternalReference)
+            .SingleOrDefaultAsync(HttpContext.RequestAborted);
+
+        bool individualRequest = string.Equals(
+            detailData.OrganizationType,
+            "IndividualContext",
+            StringComparison.Ordinal);
+
+        DetailMeta = new RequestDetailPageMeta(
+            detailData.Kind.ToString(),
+            detailData.Priority.ToString(),
+            detailData.Category,
+            detailData.Subcategory,
+            detailData.ProgramCategory,
+            detailData.Location,
+            detailData.Circumstances,
+            detailData.CreatedUtc,
+            detailData.SubmittedUtc,
+            lastUpdated,
+            submittedByName,
+            individualRequest);
+
+        RequesterCard = new RequesterDetailCard(
+            detailData.CreatorName,
+            detailData.DateOfBirth,
+            detailData.NationalIdTrn,
+            detailData.PhoneNumber,
+            detailData.AlternativePhoneNumber,
+            detailData.Email,
+            detailData.HomeAddress,
+            detailData.CreatorParish,
+            detailData.DistrictArea,
+            detailData.HouseholdSize,
+            detailData.EmploymentStatus,
+            detailData.MonthlyHouseholdIncome,
+            detailData.HousingSituation);
+
+        RelatedCard = new RelatedDetailCard(
+            individualRequest ? "N/A (Individual)" : detailData.OrganizationName,
+            ffpReference,
+            detailData.CountryOfRegistration,
+            detailData.Parish);
+
         MessageThreads = visibleThreads;
 
         RequestConversationReadOnlyReason = GetMessagingRestriction(Request, visibleThreads);
@@ -483,6 +587,60 @@ public sealed class DetailsModel : PageModel
     {
         return await userManager.GetUserAsync(User)
             ?? throw new InvalidOperationException("Authenticated portal user could not be resolved.");
+    }
+
+    public sealed record RequestDetailPageMeta(
+        string RequestType,
+        string Priority,
+        string? Category,
+        string? Subcategory,
+        string? ProgramCategory,
+        string? Location,
+        string? Circumstances,
+        DateTimeOffset CreatedUtc,
+        DateTimeOffset? SubmittedUtc,
+        DateTimeOffset LastUpdatedUtc,
+        string SubmittedByName,
+        bool IsIndividualRequest)
+    {
+        public RequestDetailPageMeta() : this(
+            string.Empty, string.Empty, null, null, null, null, null,
+            default, null, default, string.Empty, false)
+        {
+        }
+    }
+
+    public sealed record RequesterDetailCard(
+        string Name,
+        DateOnly? DateOfBirth,
+        string? NationalIdTrn,
+        string? Phone,
+        string? AlternativePhone,
+        string? Email,
+        string? Address,
+        string? Parish,
+        string? DistrictArea,
+        int? HouseholdSize,
+        string? EmploymentStatus,
+        decimal? MonthlyHouseholdIncome,
+        string? HousingSituation)
+    {
+        public RequesterDetailCard() : this(
+            string.Empty, null, null, null, null, null, null, null, null,
+            null, null, null, null)
+        {
+        }
+    }
+
+    public sealed record RelatedDetailCard(
+        string Organization,
+        string? FfpReference,
+        string? Country,
+        string? Parish)
+    {
+        public RelatedDetailCard() : this(string.Empty, null, null, null)
+        {
+        }
     }
 
     public sealed class ItemInput
