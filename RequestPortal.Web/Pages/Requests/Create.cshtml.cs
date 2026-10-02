@@ -280,6 +280,17 @@ public sealed class CreateModel : PageModel
         {
             throw;
         }
+        catch (RequestSubmissionBlockedException exception)
+        {
+            logger.LogInformation(
+                "Request submission blocked by policy. Code={Code}; UserId={UserId}; RequestId={RequestId}",
+                exception.Code,
+                user.Id,
+                requestId);
+
+            ModelState.AddModelError(string.Empty, exception.Message);
+            return Page();
+        }
         catch (Exception exception)
         {
             string correlation = HttpContext.TraceIdentifier;
