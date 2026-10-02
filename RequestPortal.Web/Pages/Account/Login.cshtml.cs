@@ -66,7 +66,9 @@ public sealed class LoginModel : PageModel
     {
         if (!supportedProviders.Contains(provider, StringComparer.OrdinalIgnoreCase))
         {
-            return BadRequest("Unsupported external identity provider.");
+            TempData["Error"] = "We couldn’t start that sign-in. Please choose one of the available sign-in methods and try again.";
+            await EmitAsync("RP-AUTH-EXTERNAL-UNSUPPORTED", "Unsupported external identity provider was requested.", provider ?? string.Empty);
+            return RedirectToPage("/Index");
         }
 
         IEnumerable<AuthenticationScheme> schemes = await schemeProvider.GetAllSchemesAsync();
@@ -75,35 +77,48 @@ public sealed class LoginModel : PageModel
 
         if (!configured)
         {
-            TempData["Error"] = $"{provider} sign-in is not configured yet.";
+            TempData["Error"] = $"We couldn’t sign you in with {FriendlyProvider(provider)}. Please try another sign-in method.";
+            await EmitAsync("RP-AUTH-EXTERNAL-NOTCONFIGURED", "External identity provider is not configured.", provider);
             return RedirectToPage("/Index");
         }
 
         string redirectUrl = Url.Page(
             "/Account/Login",
             "ExternalCallback",
-            new { returnUrl = LocalReturnUrl(returnUrl) }) ?? "/Dashboard";
+            new
+            {
+                returnUrl = LocalReturnUrl(returnUrl),
+                provider
+            }) ?? "/Dashboard";
 
         AuthenticationProperties properties = signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
         return Challenge(properties, provider);
     }
 
-    public async Task<IActionResult> OnGetExternalCallbackAsync(string? returnUrl = null, string? remoteError = null)
+    public async Task<IActionResult> OnGetExternalCallbackAsync(
+        string? returnUrl = null,
+        string? remoteError = null,
+        string? provider = null)
     {
         ReturnUrl = LocalReturnUrl(returnUrl);
+        string providerName = FriendlyProvider(provider);
 
         if (!string.IsNullOrWhiteSpace(remoteError))
         {
-            TempData["Error"] = "The external sign-in provider could not complete authentication.";
+            TempData["Error"] = $"We couldn’t sign you in with {providerName}. Please try again, or choose another sign-in method.";
+            await EmitAsync("RP-AUTH-EXTERNAL-REMOTE-FAIL", "External identity provider returned an authentication error.", remoteError);
             return RedirectToPage("/Index");
         }
 
         ExternalLoginInfo? loginInfo = await signInManager.GetExternalLoginInfoAsync();
         if (loginInfo is null)
         {
-            TempData["Error"] = "External sign-in information was not available.";
+            TempData["Error"] = $"We couldn’t sign you in with {providerName}. Please try again, or choose another sign-in method.";
+            await EmitAsync("RP-AUTH-EXTERNAL-INFO-MISSING", "External sign-in information was unavailable.", provider ?? string.Empty);
             return RedirectToPage("/Index");
         }
+
+        providerName = FriendlyProvider(loginInfo.LoginProvider);
 
         Microsoft.AspNetCore.Identity.SignInResult existingResult = await signInManager.ExternalLoginSignInAsync(
             loginInfo.LoginProvider,
@@ -126,7 +141,8 @@ public sealed class LoginModel : PageModel
 
             if (existingUser is null)
             {
-                TempData["Error"] = "The external sign-in account could not be found.";
+                TempData["Error"] = $"We couldn’t sign you in with {providerName}. Please try again, or choose another sign-in method.";
+                await EmitAsync("RP-AUTH-EXTERNAL-ACCOUNT-MISSING", "External sign-in succeeded but the linked Request Portal account was not found.", loginInfo.LoginProvider);
                 return RedirectToPage("/Index");
             }
 
@@ -145,7 +161,8 @@ public sealed class LoginModel : PageModel
         string? email = loginInfo.Principal.FindFirstValue(ClaimTypes.Email);
         if (string.IsNullOrWhiteSpace(email))
         {
-            TempData["Error"] = "The identity provider did not supply the required account identity.";
+            TempData["Error"] = $"We couldn’t sign you in with {providerName}. Please try again, or choose another sign-in method.";
+            await EmitAsync("RP-AUTH-EXTERNAL-EMAIL-MISSING", "External identity provider did not supply an email address.", loginInfo.LoginProvider);
             return RedirectToPage("/Index");
         }
 
@@ -170,7 +187,7 @@ public sealed class LoginModel : PageModel
             IdentityResult createResult = await userManager.CreateAsync(user);
             if (!createResult.Succeeded)
             {
-                TempData["Error"] = "The Request Portal account could not be created.";
+                TempData["Error"] = $"We couldn’t finish signing you in with {providerName}. Please try again later.";
                 await EmitAsync("RP-AUTH-EXTERNAL-LOCALUSER-FAIL", "External user local account creation failed.", string.Join("; ", createResult.Errors.Select(error => error.Code)));
                 return RedirectToPage("/Index");
             }
@@ -179,7 +196,8 @@ public sealed class LoginModel : PageModel
         IdentityResult loginResult = await userManager.AddLoginAsync(user, loginInfo);
         if (!loginResult.Succeeded && !loginResult.Errors.Any(error => error.Code == "LoginAlreadyAssociated"))
         {
-            TempData["Error"] = "The external sign-in could not be linked to the Request Portal account.";
+            TempData["Error"] = $"We couldn’t finish signing you in with {providerName}. Please try again later.";
+            await EmitAsync("RP-AUTH-EXTERNAL-LINK-FAIL", "External sign-in could not be linked to the Request Portal account.", string.Join("; ", loginResult.Errors.Select(error => error.Code)));
             return RedirectToPage("/Index");
         }
 
@@ -267,6 +285,14 @@ public sealed class LoginModel : PageModel
         }
 
         return "/Dashboard";
+    }
+
+    private static string FriendlyProvider(string? provider)
+    {
+        string? supported = supportedProviders.FirstOrDefault(item =>
+            string.Equals(item, provider, StringComparison.OrdinalIgnoreCase));
+
+        return supported ?? "that sign-in method";
     }
 
     public sealed record ExternalProviderOption(string Name, bool IsConfigured);
