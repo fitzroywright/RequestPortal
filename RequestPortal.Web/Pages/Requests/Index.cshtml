@@ -1,81 +1,140 @@
 @page
 @model RequestPortal.Web.Pages.Requests.IndexModel
+@using RequestPortal.Application.Portal
+@using RequestPortal.Domain.Requests
 @{
-    ViewData["Title"] = "Requests";
+    ViewData["Title"] = "My Requests";
 }
 
-<section class="operational-page">
-    <div class="shell">
-        <header class="operational-titlebar">
+<section class="operational-page requests-workspace-page">
+    <div class="shell requests-workspace-shell">
+        <header class="operational-titlebar requests-workspace-titlebar">
             <div>
                 <div class="eyebrow request-eyebrow">Request workspace</div>
-                <h1>Assistance requests</h1>
+                <h1>My Requests</h1>
                 <p>Personal requests and requests submitted for organizations you are authorized to represent.</p>
             </div>
             <div class="operational-toolbar">
                 <a class="button" asp-page="/Requests/Create">New request</a>
-                <a class="button button-secondary" asp-page="/Messages/Inbox">Messages</a>
             </div>
         </header>
 
-        <div class="operational-summary-strip">
-            <form method="get" class="operational-toolbar">
-                <label for="request-code-search">Request code</label>
-                <input id="request-code-search" name="query" value="@Model.Query" placeholder="RP-26-18427" maxlength="40" />
-                <button class="button button-small" type="submit">Find request</button>
-            </form>
-            <strong>@Model.Requests.Count</strong>
-            <span>request@(Model.Requests.Count == 1 ? "" : "s")</span>
-            <span>Use Open to work with the complete request record.</span>
-        </div>
+        <section class="requests-filterbar">
+            <form method="get" class="requests-filter-form">
+                <div class="requests-filter-field requests-filter-search">
+                    <label for="request-code-search">Request code</label>
+                    <input id="request-code-search"
+                           name="query"
+                           value="@Model.Query"
+                           placeholder="RP-26-18427"
+                           maxlength="40" />
+                </div>
 
-        <section class="operational-panel">
-            <div class="operational-panel-titlebar">
+                <div class="requests-filter-field">
+                    <label for="organization-filter">Organization</label>
+                    <select id="organization-filter" name="organization">
+                        <option value="">All organizations</option>
+                        @foreach (string organization in Model.OrganizationOptions)
+                        {
+                            <option value="@organization" selected="@(string.Equals(Model.Organization, organization, StringComparison.OrdinalIgnoreCase))">
+                                @organization
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="requests-filter-field">
+                    <label for="status-filter">Status</label>
+                    <select id="status-filter" name="status">
+                        <option value="">All statuses</option>
+                        @foreach (string status in Model.StatusOptions)
+                        {
+                            <option value="@status" selected="@(string.Equals(Model.Status, status, StringComparison.OrdinalIgnoreCase))">
+                                @RequestStatusPresentation.Label(status)
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="requests-filter-actions">
+                    <button class="button button-small" type="submit">Apply filters</button>
+                    @if (!string.IsNullOrWhiteSpace(Model.Query) ||
+                         !string.IsNullOrWhiteSpace(Model.Organization) ||
+                         !string.IsNullOrWhiteSpace(Model.Status))
+                    {
+                        <a class="button button-small button-secondary" asp-page="/Requests/Index">Clear</a>
+                    }
+                </div>
+            </form>
+
+            <div class="requests-filter-summary">
+                <strong>@Model.Requests.Count</strong>
+                <span>request@(Model.Requests.Count == 1 ? "" : "s")</span>
+            </div>
+        </section>
+
+        <section class="operational-panel requests-queue-panel">
+            <div class="operational-panel-titlebar requests-queue-titlebar">
                 <div>
                     <strong>Request queue</strong>
                     <small>Organization, request summary, current status and submission date.</small>
                 </div>
-                <a asp-page="/Dashboard/Index">Request overview</a>
+                <a asp-page="/Dashboard/Index">Request Workspace</a>
             </div>
 
-            @if (Model.Requests.Count == 0)
-            {
-                <div class="workspace-empty">
-                    <strong>No requests</strong>
-                    <p>You have not created any personal or organization requests yet.</p>
-                    <a class="button button-small" asp-page="/Requests/Create">Create request</a>
-                </div>
-            }
-            else
-            {
-                <div class="operational-table-wrap">
-                    <table class="operational-table">
-                        <thead>
-                            <tr>
-                                <th>Reference</th>
-                                <th>Organization</th>
-                                <th>Summary</th>
-                                <th>Status</th>
-                                <th>Submitted</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        @foreach (RequestSummary request in Model.Requests)
+            <div class="requests-queue-body">
+                @if (Model.Requests.Count == 0)
+                {
+                    <div class="workspace-empty requests-queue-empty">
+                        <strong>No matching requests</strong>
+                        <p>No requests match the current filters.</p>
+                        @if (!string.IsNullOrWhiteSpace(Model.Query) ||
+                             !string.IsNullOrWhiteSpace(Model.Organization) ||
+                             !string.IsNullOrWhiteSpace(Model.Status))
                         {
-                            <tr>
-                                <td><strong>@request.PublicReference</strong></td>
-                                <td>@request.OrganizationName</td>
-                                <td>@request.Summary</td>
-                                <td><span class="status status-@request.Status">@request.Status</span></td>
-                                <td>@(request.SubmittedUtc?.ToLocalTime().ToString("MMM dd yyyy, h:mm tt") ?? "Not submitted")</td>
-                                <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
-                            </tr>
+                            <a class="button button-small button-secondary" asp-page="/Requests/Index">Clear filters</a>
                         }
-                        </tbody>
-                    </table>
-                </div>
-            }
+                        else
+                        {
+                            <a class="button button-small" asp-page="/Requests/Create">Create request</a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="operational-table-wrap requests-queue-scroll">
+                        <table class="operational-table requests-queue-table">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Organization</th>
+                                    <th>Summary</th>
+                                    <th>Status</th>
+                                    <th>Submitted</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (RequestSummary request in Model.Requests)
+                            {
+                                <tr>
+                                    <td><strong>@request.PublicReference</strong></td>
+                                    <td>@request.OrganizationName</td>
+                                    <td>@request.Summary</td>
+                                    <td>
+                                        <span class="status status-@request.Status">
+                                            @RequestStatusPresentation.Label(request.Status)
+                                        </span>
+                                    </td>
+                                    <td>@(request.SubmittedUtc?.ToLocalTime().ToString("MMM dd yyyy, h:mm tt") ?? "Not submitted")</td>
+                                    <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
         </section>
     </div>
 </section>
