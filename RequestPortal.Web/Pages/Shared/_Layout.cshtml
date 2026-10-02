@@ -29,15 +29,20 @@
 <body class="@(useApplicationShell ? "authenticated-app" : "public-site")">
     <header class="site-header @(useApplicationShell ? "app-header" : null)">
         <div class="shell nav-shell @(useApplicationShell ? "app-nav-shell" : null)">
-            <a class="brand" asp-page="/Index">
-                <img class="brand-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor" />
-                <span class="brand-copy">
-                    <strong>Request Portal</strong>
-                    @if (!useApplicationShell)
-                    {
+            <a class="brand @(useApplicationShell ? "app-brand" : null)" asp-page="/Index">
+                @if (useApplicationShell)
+                {
+                    <span class="app-brand-mark" aria-hidden="true">RP</span>
+                    <span class="brand-copy"><strong>RequestPortal</strong></span>
+                }
+                else
+                {
+                    <img class="brand-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor" />
+                    <span class="brand-copy">
+                        <strong>Request Portal</strong>
                         <small>Food For The Poor Jamaica</small>
-                    }
-                </span>
+                    </span>
+                }
             </a>
             <nav class="main-nav @(useApplicationShell ? "app-main-nav" : null)">
 
@@ -53,24 +58,32 @@
                     }
                     else if (isFfpStaff)
                     {
-                        if (canViewManagement)
+                        <a asp-page="/Staff/Index">Home</a>
+                        <a asp-page="/Staff/Operations">Requests</a>
+                        <a asp-page="/Staff/Organizations">Organizations</a>
+                        <a asp-page="/Staff/Reports">Reports</a>
+                        @if (canViewManagement)
                         {
                             <a asp-page="/Management/Index">Management</a>
                         }
-                        <a asp-page="/Staff/Index">FFP Staff</a>
-                        <a asp-page="/Staff/Operations">Operations</a>
-                        <a asp-page="/Staff/Reports">Reports</a>
-                        <a asp-page="/Staff/Reviewers">External Reviewers</a>
-                        <a asp-page="/Messages/Inbox" class="messages-nav-link">Messages <span id="messageUnreadBadge" class="message-badge" hidden>0</span></a>
+                        <a asp-page="/Staff/Reviewers">Reviewers</a>
                     }
                     else
                     {
-                        <a asp-page="/Dashboard/Index">Overview</a>
+                        <a asp-page="/Dashboard/Index">Home</a>
                         <a asp-page="/Requests/Index">My Requests</a>
                         <a asp-page="/Requests/Create">New Request</a>
-                        <a asp-page="/Messages/Inbox" class="messages-nav-link">Messages <span id="messageUnreadBadge" class="message-badge" hidden>0</span></a>
+                        <a asp-page="/Account/Profile">My Profile</a>
                         <a asp-page="/Organizations/Index">Organizations</a>
                     }
+
+                    <a asp-page="/Messages/Inbox"
+                       class="app-message-link messages-nav-link"
+                       aria-label="Messages"
+                       title="Messages">
+                        <span class="app-message-icon" aria-hidden="true">✉</span>
+                        <span id="messageUnreadBadge" class="message-badge" hidden>0</span>
+                    </a>
                     <div class="profile-menu">
                         <button type="button"
                                 class="profile-menu-trigger profile-menu-studio"
@@ -121,7 +134,7 @@
                 else
                 {
                 }
-                @if (!isFfpStaff && !isExternalReviewer)
+                @if (!useApplicationShell && !isFfpStaff && !isExternalReviewer)
                 {
                     <a class="button button-small donate-button" href="https://www.foodforthepoorja.org/hurricane-melissa-relief/" target="_blank" rel="noopener noreferrer">Donate</a>
                 }
