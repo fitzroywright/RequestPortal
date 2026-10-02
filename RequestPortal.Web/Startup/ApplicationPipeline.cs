@@ -14,6 +14,21 @@ internal static class ApplicationPipeline
         }
 
         app.UseForwardedHeaders();
+        app.UseStatusCodePages(async statusCodeContext =>
+        {
+            HttpContext context = statusCodeContext.HttpContext;
+            bool isPageNavigation =
+                HttpMethods.IsGet(context.Request.Method) &&
+                !context.Request.Path.StartsWithSegments("/api") &&
+                !context.Request.Path.StartsWithSegments("/hubs");
+
+            if (isPageNavigation && context.Response.StatusCode == StatusCodes.Status404NotFound)
+            {
+                context.Response.Redirect("/?navigationError=not-found");
+            }
+
+            await Task.CompletedTask;
+        });
         app.Use(RecordRequestFailureAsync);
         app.UseHttpsRedirection();
         app.Use(AddSecurityHeadersAsync);
