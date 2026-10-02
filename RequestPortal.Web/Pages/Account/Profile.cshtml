@@ -43,9 +43,13 @@
                                 <input asp-for="ProfileInput.DisplayName" />
                                 <span asp-validation-for="ProfileInput.DisplayName" class="validation"></span>
                             </div>
-                            <div class="field">
+                            <div class="field profile-dob-field">
                                 <label asp-for="ProfileInput.DateOfBirth">Date of birth</label>
-                                <input asp-for="ProfileInput.DateOfBirth" type="date" />
+                                <div class="profile-dob-row">
+                                    <input asp-for="ProfileInput.DateOfBirth" type="date" id="profile-date-of-birth" />
+                                    <span id="profile-age" class="profile-age-chip">Age —</span>
+                                </div>
+                                <small id="profile-age-warning" class="profile-age-warning" hidden></small>
                                 <span asp-validation-for="ProfileInput.DateOfBirth" class="validation"></span>
                             </div>
                             <div class="field">
