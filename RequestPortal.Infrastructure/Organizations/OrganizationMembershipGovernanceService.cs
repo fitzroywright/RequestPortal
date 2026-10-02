@@ -151,12 +151,9 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
                 && item.Id != membership.Id
                 && item.Status == MembershipStatus.Approved, cancellationToken);
 
-        if (!hasAnotherApprovedMembership)
-        {
-            var user = await dbContext.Users.SingleAsync(item => item.Id == membership.UserId, cancellationToken);
-            user.IndividualProfileUpdateRequired = true;
-            user.IndividualProfileUpdateRequiredUtc = now;
-        }
+        var user = await dbContext.Users.SingleAsync(item => item.Id == membership.UserId, cancellationToken);
+        user.IndividualProfileUpdateRequired = !hasAnotherApprovedMembership;
+        user.IndividualProfileUpdateRequiredUtc = hasAnotherApprovedMembership ? null : now;
 
         AddMembershipChangedOutbox(organizationId, membership, "Revoked", reason);
         OrganizationMembershipEndedMessage ended = new(
