@@ -51,7 +51,7 @@
                     <div class="message-destination-bar" role="radiogroup" aria-label="Send message to">
                         <label class="message-destination-option">
                             <input asp-for="Destination" type="radio" value="ffp" />
-                            <span>FFP Staff</span>
+                            <span>Food For The Poor</span>
                         </label>
                         <label class="message-destination-option">
                             <input asp-for="Destination" type="radio" value="manager" />
@@ -111,7 +111,7 @@
                     </div>
 
                     <p class="muted compact-help message-destination-help">
-                        <strong>FFP Staff</strong> sends to the shared staff inbox.
+                        <strong>Food For The Poor</strong> sends to the shared FFP staff inbox. When the message is attached to a request that has been synchronized to FFP Manager, it is also written to that Application Letter as a note.
                         <strong>Organization Manager</strong> sends only to approved managers of this organization.
                         @if (Model.RequestId.HasValue)
                         {
