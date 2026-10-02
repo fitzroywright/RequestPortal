@@ -13,16 +13,21 @@ public sealed class MembersModel : PageModel
 {
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IOrganizationMembershipGovernanceService governanceService;
+    private readonly IOrganizationInvitationService invitationService;
 
     public MembersModel(
         UserManager<ApplicationUser> userManager,
-        IOrganizationMembershipGovernanceService governanceService)
+        IOrganizationMembershipGovernanceService governanceService,
+        IOrganizationInvitationService invitationService)
     {
         this.userManager = userManager;
         this.governanceService = governanceService;
+        this.invitationService = invitationService;
     }
 
     public IReadOnlyList<OrganizationMembershipView> Memberships { get; private set; } = Array.Empty<OrganizationMembershipView>();
+
+    public IReadOnlyList<OrganizationInvitationView> Invitations { get; private set; } = Array.Empty<OrganizationInvitationView>();
 
     public Guid OrganizationId { get; private set; }
 
@@ -34,6 +39,54 @@ public sealed class MembersModel : PageModel
             user.Id,
             organizationId,
             HttpContext.RequestAborted);
+        Invitations = await invitationService.GetForAdministratorAsync(
+            user.Id,
+            organizationId,
+            HttpContext.RequestAborted);
+    }
+
+    public async Task<IActionResult> OnPostInviteAsync(Guid organizationId, string email)
+    {
+        try
+        {
+            string publicBaseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+            await invitationService.InviteAsync(
+                GetUserId(),
+                organizationId,
+                email,
+                publicBaseUrl,
+                HttpContext.RequestAborted);
+            TempData["Success"] = "Invitation sent.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            TempData["Error"] = exception.Message;
+        }
+        catch (ArgumentException exception)
+        {
+            TempData["Error"] = exception.Message;
+        }
+
+        return RedirectToPage(new { organizationId });
+    }
+
+    public async Task<IActionResult> OnPostRevokeInvitationAsync(Guid organizationId, Guid invitationId)
+    {
+        try
+        {
+            await invitationService.RevokeAsync(
+                GetUserId(),
+                organizationId,
+                invitationId,
+                HttpContext.RequestAborted);
+            TempData["Success"] = "Invitation revoked.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            TempData["Error"] = exception.Message;
+        }
+
+        return RedirectToPage(new { organizationId });
     }
 
     public Task<IActionResult> OnPostApproveAsync(Guid organizationId, Guid membershipId)
