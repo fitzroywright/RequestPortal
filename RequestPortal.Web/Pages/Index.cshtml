@@ -233,17 +233,56 @@
                         <form method="post"
                               asp-page="/Account/Login"
                               asp-page-handler="External"
-                              class="home-signin-form">
+                              class="home-signin-form"
+                              data-provider-form>
                             <input type="hidden" name="returnUrl" value="/Dashboard" />
-                            <label for="home-signin-provider">Sign in with</label>
+                            <input type="hidden" name="provider" value="Google" data-provider-input />
+                            <label>Sign in with</label>
                             <div class="home-signin-provider-row">
-                                <select id="home-signin-provider" name="provider" aria-label="Choose sign-in provider">
-                                    <option value="Google" selected>Google</option>
-                                    <option value="Facebook">Facebook</option>
-                                    <option value="Yahoo">Yahoo</option>
-                                    <option value="Microsoft">Microsoft</option>
-                                    <option value="Apple">Apple</option>
-                                </select>
+                                <div class="provider-dropdown" data-provider-dropdown>
+                                    <button class="provider-dropdown-trigger"
+                                            type="button"
+                                            aria-haspopup="listbox"
+                                            aria-expanded="false"
+                                            data-provider-trigger>
+                                        <span class="provider-dropdown-current">
+                                            <span class="provider-logo provider-logo-google" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.35 12.27c0-.71-.06-1.39-.18-2.05H12v3.88h5.24a4.48 4.48 0 0 1-1.94 2.94v2.44h3.14c1.84-1.69 2.91-4.18 2.91-7.21Z"/><path fill="#34A853" d="M12 21.84c2.63 0 4.84-.87 6.45-2.36l-3.14-2.44c-.87.58-1.98.93-3.31.93-2.54 0-4.7-1.72-5.47-4.03H3.28v2.52A9.74 9.74 0 0 0 12 21.84Z"/><path fill="#FBBC05" d="M6.53 13.94A5.86 5.86 0 0 1 6.22 12c0-.67.12-1.33.31-1.94V7.54H3.28A9.82 9.82 0 0 0 2.25 12c0 1.61.39 3.13 1.03 4.46l3.25-2.52Z"/><path fill="#EA4335" d="M12 6.03c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.04 14.63 2.16 12 2.16a9.74 9.74 0 0 0-8.72 5.38l3.25 2.52C7.3 7.75 9.46 6.03 12 6.03Z"/></svg>
+                                            </span>
+                                            <span data-provider-name>Google</span>
+                                        </span>
+                                        <span class="provider-dropdown-chevron" aria-hidden="true">▾</span>
+                                    </button>
+                                    <div class="provider-dropdown-menu" role="listbox" hidden data-provider-menu>
+                                        <button type="button" role="option" aria-selected="true" data-provider-option data-provider="Google">
+                                            <span class="provider-logo provider-logo-google" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.35 12.27c0-.71-.06-1.39-.18-2.05H12v3.88h5.24a4.48 4.48 0 0 1-1.94 2.94v2.44h3.14c1.84-1.69 2.91-4.18 2.91-7.21Z"/><path fill="#34A853" d="M12 21.84c2.63 0 4.84-.87 6.45-2.36l-3.14-2.44c-.87.58-1.98.93-3.31.93-2.54 0-4.7-1.72-5.47-4.03H3.28v2.52A9.74 9.74 0 0 0 12 21.84Z"/><path fill="#FBBC05" d="M6.53 13.94A5.86 5.86 0 0 1 6.22 12c0-.67.12-1.33.31-1.94V7.54H3.28A9.82 9.82 0 0 0 2.25 12c0 1.61.39 3.13 1.03 4.46l3.25-2.52Z"/><path fill="#EA4335" d="M12 6.03c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.04 14.63 2.16 12 2.16a9.74 9.74 0 0 0-8.72 5.38l3.25 2.52C7.3 7.75 9.46 6.03 12 6.03Z"/></svg>
+                                            </span>
+                                            <span>Google</span>
+                                            <span class="provider-check" aria-hidden="true">✓</span>
+                                        </button>
+                                        <button type="button" role="option" aria-selected="false" data-provider-option data-provider="Facebook">
+                                            <span class="provider-logo provider-logo-facebook" aria-hidden="true">f</span>
+                                            <span>Facebook</span>
+                                            <span class="provider-check" aria-hidden="true">✓</span>
+                                        </button>
+                                        <button type="button" role="option" aria-selected="false" data-provider-option data-provider="Yahoo">
+                                            <span class="provider-logo provider-logo-yahoo" aria-hidden="true">Y!</span>
+                                            <span>Yahoo</span>
+                                            <span class="provider-check" aria-hidden="true">✓</span>
+                                        </button>
+                                        <button type="button" role="option" aria-selected="false" data-provider-option data-provider="Microsoft">
+                                            <span class="provider-logo provider-logo-microsoft" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                                            <span>Microsoft</span>
+                                            <span class="provider-check" aria-hidden="true">✓</span>
+                                        </button>
+                                        <button type="button" role="option" aria-selected="false" data-provider-option data-provider="Apple">
+                                            <span class="provider-logo provider-logo-apple" aria-hidden="true">●</span>
+                                            <span>Apple</span>
+                                            <span class="provider-check" aria-hidden="true">✓</span>
+                                        </button>
+                                    </div>
+                                </div>
                                 <button class="button home-signin-submit" type="submit">Continue</button>
                             </div>
                         </form>
@@ -322,14 +361,122 @@
         grid-template-columns: minmax(0,1fr) auto;
         gap: 9px;
     }
-    .home-signin-provider-row select {
+    .provider-dropdown {
+        position: relative;
         min-width: 0;
-        border: 1px solid #bec8cf;
-        border-radius: 9px;
-        background: #fff;
-        padding: 10px 38px 10px 12px;
-        font: inherit;
+    }
+    .provider-dropdown-trigger {
+        width: 100%;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        border: 1px solid #b7c0c7;
+        border-radius: 4px;
+        background: linear-gradient(#ffffff, #f3f4f5);
+        padding: 0 10px 0 12px;
         color: #172735;
+        font: inherit;
+        cursor: pointer;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.85);
+    }
+    .provider-dropdown-trigger:hover,
+    .provider-dropdown-trigger[aria-expanded="true"] {
+        border-color: #7f8c96;
+        background: #fff;
+    }
+    .provider-dropdown-current,
+    .provider-dropdown-menu button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .provider-dropdown-chevron {
+        border-left: 1px solid #d1d6da;
+        padding-left: 10px;
+        color: #56636d;
+        font-size: .78rem;
+    }
+    .provider-dropdown-menu {
+        position: absolute;
+        z-index: 30;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        padding: 4px;
+        border: 1px solid #aeb8c0;
+        border-radius: 4px;
+        background: #fff;
+        box-shadow: 0 10px 26px rgba(25,39,52,.18);
+    }
+    .provider-dropdown-menu button {
+        width: 100%;
+        min-height: 38px;
+        border: 0;
+        border-radius: 2px;
+        background: transparent;
+        padding: 7px 9px;
+        color: #172735;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    .provider-dropdown-menu button:hover,
+    .provider-dropdown-menu button:focus {
+        outline: none;
+        background: #e9f2fb;
+    }
+    .provider-dropdown-menu button[aria-selected="true"] {
+        background: #eef4fa;
+    }
+    .provider-check {
+        margin-left: auto;
+        color: #185abd;
+        visibility: hidden;
+    }
+    .provider-dropdown-menu button[aria-selected="true"] .provider-check {
+        visibility: visible;
+    }
+    .provider-logo {
+        width: 21px;
+        height: 21px;
+        flex: 0 0 21px;
+        display: inline-grid;
+        place-items: center;
+        font-size: .82rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+    .provider-logo svg {
+        width: 19px;
+        height: 19px;
+        display: block;
+    }
+    .provider-logo-facebook {
+        border-radius: 50%;
+        background: #1877f2;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        font-size: 1rem;
+    }
+    .provider-logo-yahoo {
+        color: #6001d2;
+        font-family: Arial, sans-serif;
+        font-size: .72rem;
+    }
+    .provider-logo-microsoft {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 1px;
+    }
+    .provider-logo-microsoft span:nth-child(1) { background: #f25022; }
+    .provider-logo-microsoft span:nth-child(2) { background: #7fba00; }
+    .provider-logo-microsoft span:nth-child(3) { background: #00a4ef; }
+    .provider-logo-microsoft span:nth-child(4) { background: #ffb900; }
+    .provider-logo-apple {
+        color: #111;
+        font-size: .78rem;
     }
     .home-signin-submit {
         min-width: 104px;
@@ -395,6 +542,55 @@
 <script src="~/js/carousel-extra/mair-2.js"></script>
 <script src="~/js/carousel-extra/mair-3.js"></script>
 <script src="~/js/carousel-extra/massias-1.js"></script>
+
+<script>
+(() => {
+    const dropdown = document.querySelector('[data-provider-dropdown]');
+    if (!dropdown) return;
+
+    const trigger = dropdown.querySelector('[data-provider-trigger]');
+    const menu = dropdown.querySelector('[data-provider-menu]');
+    const form = dropdown.closest('[data-provider-form]');
+    const input = form?.querySelector('[data-provider-input]');
+    const currentName = trigger?.querySelector('[data-provider-name]');
+    const options = [...dropdown.querySelectorAll('[data-provider-option]')];
+
+    const iconMarkup = option => option.querySelector('.provider-logo')?.outerHTML || '';
+
+    const close = () => {
+        menu.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+    };
+
+    trigger.addEventListener('click', event => {
+        event.stopPropagation();
+        const opening = menu.hidden;
+        menu.hidden = !opening;
+        trigger.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    });
+
+    options.forEach(option => {
+        option.addEventListener('click', () => {
+            const provider = option.dataset.provider;
+            input.value = provider;
+            currentName.textContent = provider;
+            const current = trigger.querySelector('.provider-dropdown-current');
+            current.innerHTML = iconMarkup(option) + '<span data-provider-name>' + provider + '</span>';
+            options.forEach(item => item.setAttribute('aria-selected', item === option ? 'true' : 'false'));
+            close();
+            trigger.focus();
+        });
+    });
+
+    document.addEventListener('click', event => {
+        if (!dropdown.contains(event.target)) close();
+    });
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') close();
+    });
+})();
+</script>
 
 <script>
 (() => {
