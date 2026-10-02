@@ -85,17 +85,7 @@ public sealed class RequestSubmissionPolicy(
 
         var user = await dbContext.Users
             .AsNoTracking()
-            .Where(item => item.Id == userId)
-            .Select(item => new
-            {
-                item.Email,
-                item.EmailConfirmed,
-                item.DisplayName,
-                item.IndividualProfileUpdateRequired,
-                item.LockoutEnabled,
-                item.LockoutEnd
-            })
-            .SingleAsync(cancellationToken);
+            .SingleAsync(item => item.Id == userId, cancellationToken);
 
         if (user.LockoutEnabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value > now)
         {
@@ -132,11 +122,18 @@ public sealed class RequestSubmissionPolicy(
 
         if (individualContext)
         {
-            if (string.IsNullOrWhiteSpace(user.DisplayName) ||
-                user.IndividualProfileUpdateRequired)
+            IReadOnlyList<string> missingIndividualFields =
+                user.GetMissingIndividualProfileFields();
+
+            if (user.IndividualProfileUpdateRequired ||
+                missingIndividualFields.Count > 0)
             {
+                string detail = missingIndividualFields.Count == 0
+                    ? "profile review"
+                    : string.Join(", ", missingIndividualFields);
+
                 throw Block(
-                    "Complete your individual profile before submitting a request.",
+                    $"Complete your individual profile before submitting a request. Missing: {detail}.",
                     "RP-SUBMISSION-PROFILE-INCOMPLETE");
             }
         }
