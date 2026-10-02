@@ -360,3 +360,47 @@
 <style>
 .individual-intake-form{display:grid;gap:16px}.profile-intake-section{display:grid;gap:10px;padding-top:4px}.profile-intake-section+.profile-intake-section{padding-top:14px;border-top:1px solid #e2e7ea}.profile-intake-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.profile-intake-heading strong{color:#18364d}.profile-intake-heading small{color:#68757f}
 </style>
+
+<script id="profile-age-script">
+(() => {
+    const dob = document.getElementById('profile-date-of-birth');
+    const age = document.getElementById('profile-age');
+    const warning = document.getElementById('profile-age-warning');
+    if (!dob || !age || !warning) return;
+
+    const refreshAge = () => {
+        if (!dob.value) {
+            age.textContent = 'Age —';
+            warning.hidden = true;
+            warning.textContent = '';
+            return;
+        }
+
+        const birth = new Date(dob.value + 'T00:00:00');
+        const today = new Date();
+        let years = today.getFullYear() - birth.getFullYear();
+        const monthDelta = today.getMonth() - birth.getMonth();
+
+        if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birth.getDate())) {
+            years--;
+        }
+
+        age.textContent = years >= 0 ? 'Age ' + years : 'Invalid date';
+
+        let message = '';
+        if (years < 0) {
+            message = 'Date of birth cannot be in the future.';
+        } else if (years < 18) {
+            message = 'Age is under 18. Confirm the date of birth is correct.';
+        } else if (years > 100) {
+            message = 'Age is unusually high. Confirm the date of birth is correct.';
+        }
+
+        warning.textContent = message;
+        warning.hidden = !message;
+    };
+
+    dob.addEventListener('change', refreshAge);
+    refreshAge();
+})();
+</script>
