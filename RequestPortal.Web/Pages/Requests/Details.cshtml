@@ -30,16 +30,16 @@
             </header>
 
             <nav class="request-detail-tabs" aria-label="Request detail sections">
-                <a href="#overview">Overview</a>
-                <a href="#items">Items (@Model.Request.Items.Count)</a>
-                <a href="#documents">Files (@Model.Documents.Count)</a>
-                <a href="#history">History (@Model.Request.History.Count)</a>
+                <a href="#overview"><span class="ui-icon">▦</span> Overview</a>
+                <a href="#items"><span class="ui-icon">▤</span> Items <b>@Model.Request.Items.Count</b></a>
+                <a href="#documents"><span class="ui-icon">▧</span> Files <b>@Model.Documents.Count</b></a>
+                <a href="#history"><span class="ui-icon">◷</span> History <b>@Model.Request.History.Count</b></a>
             </nav>
 
             <section id="overview" class="operational-panel request-progress" aria-label="Request progress">
-                <span><strong>Completed</strong> @(string.Join(" · ", Model.Request.History.Reverse().Where(item => item.Status != Model.Request.Status).Select(item => RequestStatusPresentation.Label(item.Status)).Distinct().DefaultIfEmpty("None yet")))</span>
-                <span aria-current="step"><strong>Current</strong> @RequestStatusPresentation.Label(Model.Request.Status)</span>
-                <span><strong>Next</strong> @RequestStatusPresentation.Next(Model.Request.Status)</span>
+                <span class="progress-completed"><strong><i>✓</i> Completed</strong> @(string.Join(" · ", Model.Request.History.Reverse().Where(item => item.Status != Model.Request.Status).Select(item => RequestStatusPresentation.Label(item.Status)).Distinct().DefaultIfEmpty("None yet")))</span>
+                <span class="progress-current" aria-current="step"><strong><i>●</i> Current</strong> @RequestStatusPresentation.Label(Model.Request.Status)</span>
+                <span class="progress-next"><strong><i>→</i> Next</strong> @RequestStatusPresentation.Next(Model.Request.Status)</span>
             </section>
 
             <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
@@ -47,7 +47,7 @@
                     <section id="conversation" class="operational-panel request-messages-card request-messages-always-visible">
                 <div class="panel-titlebar">
                     <div>
-                        <strong>Messages about this request</strong>
+                        <strong><span class="panel-icon panel-icon-message">✉</span> Messages about this request</strong>
                         <small class="muted">All messages connected to @Model.Request.PublicReference are kept with this request.</small>
                     </div>
                     <a asp-page="/Messages/Inbox">All messages</a>
@@ -79,11 +79,14 @@
                         @foreach (var item in requestMessages)
                         {
                             <article class="request-message-item @(item.Message.IsMine ? "is-mine" : "is-received")">
-                                <div class="request-message-meta">
-                                    <strong>@item.Message.SenderName</strong>
-                                    <time>@item.Message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time>
+                                <div class="request-message-avatar" aria-hidden="true">@(item.Message.SenderName.Length > 0 ? item.Message.SenderName.Substring(0,1).ToUpperInvariant() : "M")</div>
+                                <div class="request-message-content">
+                                    <div class="request-message-meta">
+                                        <strong>@item.Message.SenderName</strong>
+                                        <time>@item.Message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time>
+                                    </div>
+                                    <p>@item.Message.Body</p>
                                 </div>
-                                <p>@item.Message.Body</p>
                                 @foreach (var attachment in item.Message.Attachments)
                                 {
                                     <a asp-page="/Messages/Thread"
@@ -216,7 +219,7 @@
                     else
                     {
                         <section id="items" class="operational-panel">
-                            <h2>Requested items</h2>
+                            <h2><span class="panel-icon panel-icon-items">▤</span> Requested items <span class="panel-count">@Model.Request.Items.Count</span></h2>
                             @if (Model.Request.Items.Count == 0)
                             {
                                 <p class="muted">No items have been added yet.</p>
@@ -350,7 +353,7 @@
                     }
 
                     <section id="documents" class="operational-panel" style="margin-top:10px">
-                        <h2>Supporting documents</h2>
+                        <h2><span class="panel-icon panel-icon-files">▧</span> Supporting documents <span class="panel-count">@Model.Documents.Count</span></h2>
                         @if (Model.DocumentsUnavailable)
                         {
                             <div class="flash error" role="alert">Document storage is temporarily unavailable. Your request and conversation are still available. Reference: @HttpContext.TraceIdentifier</div>
@@ -402,7 +405,7 @@
                     @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
                     {
                         <section class="operational-panel" style="margin-top:10px">
-                            <h2>Cancel request</h2>
+                            <h2 class="danger-panel-heading"><span class="panel-icon panel-icon-danger">!</span> Cancel request</h2>
                             <p class="muted">Cancellation is permanent and is recorded in the request history.</p>
                             <form method="post" asp-page-handler="Cancel" class="form-grid">
                                 <input type="hidden" name="id" value="@Model.Request.Id" />
@@ -419,9 +422,15 @@
 
                 <aside class="request-detail-side">
                     <section class="operational-panel request-status-summary">
-                        <div class="panel-titlebar"><strong>Request status</strong></div>
+                        <div class="panel-titlebar status-panel-title"><strong><span class="panel-icon panel-icon-status">●</span> Current status</strong></div>
                         <div class="request-side-summary">
-                            <span class="status status-@Model.Request.Status">@RequestStatusPresentation.Label(Model.Request.Status)</span>
+                            <div class="status-hero">
+                                <span class="status-dot"></span>
+                                <div>
+                                    <strong>@RequestStatusPresentation.Label(Model.Request.Status)</strong>
+                                    <small>@RequestStatusPresentation.Next(Model.Request.Status)</small>
+                                </div>
+                            </div>
                             <dl>
                                 <div><dt>Reference</dt><dd>@Model.Request.PublicReference</dd></div>
                                 <div><dt>Request type</dt><dd>@Model.Request.Kind</dd></div>
@@ -435,7 +444,7 @@
 
                     <section id="history" class="operational-panel request-status-card">
                         <div class="panel-titlebar">
-                            <strong>Status history</strong>
+                            <strong><span class="panel-icon panel-icon-history">◷</span> Status history</strong>
                         </div>
                     <div class="timeline">
                         @foreach (RequestHistoryDetail history in Model.Request.History)
