@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Options;
+using RequestPortal.Application.Integration;
 using RequestPortal.Application.Messages;
+using RequestPortal.Infrastructure.Integration;
 using RequestPortal.Domain.Messages;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Infrastructure.Identity;
@@ -26,7 +29,7 @@ public sealed class PortalMessagingTests
         RequestPortal.Domain.Requests.AssistanceRequest request = new(Guid.NewGuid(), "RP-26-18427", organization.Id, applicant.Id, Now);
         database.Db.AssistanceRequests.Add(request);
         await database.Db.SaveChangesAsync(cancellationToken);
-        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+        PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
 
         Guid confirmationId = Guid.NewGuid();
         Guid canonical = await service.SendSystemMessageAsync(organization.Id, request.Id, null,
@@ -75,7 +78,7 @@ public sealed class PortalMessagingTests
         await database.Db.SaveChangesAsync(cancellationToken);
 
         CapturingRealtimeNotifier realtime = new();
-        PortalMessageService service = new(database.Db, realtime);
+        PortalMessageService service = CreateService(database.Db, realtime);
 
         Guid threadId = await service.SendToSharedStaffAsync(
             representative.Id,
@@ -152,7 +155,7 @@ public sealed class PortalMessagingTests
         database.Db.Organizations.AddRange(organization, otherOrganization);
         await database.Db.SaveChangesAsync(cancellationToken);
 
-        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+        PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
 
         Guid threadId = await service.SendAsync(
             maria.Id,
@@ -201,7 +204,7 @@ public sealed class PortalMessagingTests
         await database.Db.SaveChangesAsync(cancellationToken);
 
         CapturingRealtimeNotifier realtime = new();
-        PortalMessageService service = new(database.Db, realtime);
+        PortalMessageService service = CreateService(database.Db, realtime);
 
         Guid threadId = await service.SendSystemMessageAsync(
             organization.Id,
@@ -250,7 +253,7 @@ public sealed class PortalMessagingTests
         database.Db.Organizations.Add(organization);
         await database.Db.SaveChangesAsync(cancellationToken);
 
-        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+        PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => service.SendAsync(
@@ -299,7 +302,7 @@ public sealed class PortalMessagingTests
         database.Db.Organizations.Add(organization);
         await database.Db.SaveChangesAsync(cancellationToken);
 
-        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+        PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
 
         Guid threadId = await service.SendToSharedStaffAsync(
             representative.Id,
@@ -364,7 +367,7 @@ public sealed class PortalMessagingTests
         database.Db.Organizations.Add(organization);
         await database.Db.SaveChangesAsync(cancellationToken);
 
-        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+        PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
 
         await service.SendSystemMessageAsync(
             organization.Id,
@@ -421,7 +424,7 @@ public sealed class PortalMessagingTests
 
         await database.Db.SaveChangesAsync(cancellationToken);
 
-        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+        PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
 
         Guid threadId = await service.SendToSharedStaffAsync(
             representative.Id,
@@ -457,6 +460,42 @@ public sealed class PortalMessagingTests
             threadId,
             documentId,
             cancellationToken));
+    }
+
+    private static PortalMessageService CreateService(
+        RequestPortal.Infrastructure.Persistence.RequestPortalDbContext dbContext,
+        IPortalMessageRealtimeNotifier notifier)
+    {
+        return new PortalMessageService(
+            dbContext,
+            notifier,
+            new DisabledBridgeClient(),
+            Options.Create(new FfpManagerBridgeOptions { Enabled = false }));
+    }
+
+    private sealed class DisabledBridgeClient : IExternalApplicationBridgeClient
+    {
+        public Task<ExternalApplicationReference> SubmitApplicationAsync(
+            ExternalApplicationSubmission submission,
+            CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("FFP Manager bridge is disabled for this test.");
+
+        public Task UploadArtifactAsync(
+            string applicationId,
+            ExternalArtifactDescriptor descriptor,
+            Stream content,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<ExternalApplicationStatus> GetStatusAsync(
+            string applicationId,
+            CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("FFP Manager bridge is disabled for this test.");
+
+        public Task SendInformationResponseAsync(
+            ExternalInformationResponse response,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private static ApplicationUser CreateUser(
