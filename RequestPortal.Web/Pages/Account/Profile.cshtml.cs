@@ -45,6 +45,9 @@ public sealed class ProfileModel : PageModel
     public string RegisteredIdentity { get; private set; } = string.Empty;
     public bool IndividualProfileUpdateRequired { get; private set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
     [BindProperty]
     public PersonalProfileInput ProfileInput { get; set; } = new();
 
@@ -93,6 +96,11 @@ public sealed class ProfileModel : PageModel
         }
 
         TempData["Success"] = "Profile updated.";
+        if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
+        {
+            return LocalRedirect(ReturnUrl);
+        }
+
         return RedirectToPage();
     }
 
