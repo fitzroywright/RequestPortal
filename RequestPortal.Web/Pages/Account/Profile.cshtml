@@ -28,25 +28,184 @@
                     <strong>Personal &amp; contact</strong>
                     <small>Your Request Portal identity</small>
                 </div>
-                <form method="post" asp-page-handler="Profile" class="profile-compact-form">
+                <form method="post" asp-page-handler="Profile" class="profile-compact-form individual-intake-form">
                     <input type="hidden" asp-for="ReturnUrl" />
-                    <div class="field">
-                        <label asp-for="ProfileInput.DisplayName">Name</label>
-                        <input asp-for="ProfileInput.DisplayName" />
+
+                    <div class="profile-intake-section">
+                        <div class="profile-intake-heading">
+                            <strong>Identity &amp; contact</strong>
+                            <small>Required for individual assistance requests.</small>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="ProfileInput.DisplayName">Full name</label>
+                                <input asp-for="ProfileInput.DisplayName" />
+                                <span asp-validation-for="ProfileInput.DisplayName" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.DateOfBirth">Date of birth</label>
+                                <input asp-for="ProfileInput.DateOfBirth" type="date" />
+                                <span asp-validation-for="ProfileInput.DateOfBirth" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.Gender">Gender</label>
+                                <select asp-for="ProfileInput.Gender">
+                                    <option value="">Select gender</option>
+                                    <option>Female</option>
+                                    <option>Male</option>
+                                    <option>Other</option>
+                                    <option>Prefer not to say</option>
+                                </select>
+                                <span asp-validation-for="ProfileInput.Gender" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.NationalIdTrn">National ID / TRN</label>
+                                <input asp-for="ProfileInput.NationalIdTrn" />
+                                <span asp-validation-for="ProfileInput.NationalIdTrn" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.MaritalStatus">Marital status</label>
+                                <select asp-for="ProfileInput.MaritalStatus">
+                                    <option value="">Select marital status</option>
+                                    <option>Single</option>
+                                    <option>Married</option>
+                                    <option>Common-law</option>
+                                    <option>Separated</option>
+                                    <option>Divorced</option>
+                                    <option>Widowed</option>
+                                </select>
+                                <span asp-validation-for="ProfileInput.MaritalStatus" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.Email">Email</label>
+                                <input asp-for="ProfileInput.Email" type="email" />
+                                <span asp-validation-for="ProfileInput.Email" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.PhoneNumber">Primary telephone</label>
+                                <input asp-for="ProfileInput.PhoneNumber" type="tel" />
+                                <span asp-validation-for="ProfileInput.PhoneNumber" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.AlternativePhoneNumber">Alternative telephone</label>
+                                <input asp-for="ProfileInput.AlternativePhoneNumber" type="tel" />
+                                <span asp-validation-for="ProfileInput.AlternativePhoneNumber" class="validation"></span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="field">
-                        <label asp-for="ProfileInput.Email">Email</label>
-                        <input asp-for="ProfileInput.Email" type="email" />
+
+                    <div class="profile-intake-section">
+                        <div class="profile-intake-heading">
+                            <strong>Home address</strong>
+                        </div>
+                        <div class="field">
+                            <label asp-for="ProfileInput.HomeAddress">Home address</label>
+                            <input asp-for="ProfileInput.HomeAddress" />
+                            <span asp-validation-for="ProfileInput.HomeAddress" class="validation"></span>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="ProfileInput.Parish">Parish</label>
+                                <select asp-for="ProfileInput.Parish">
+                                    <option value="">Select parish</option>
+                                    <option>Kingston</option>
+                                    <option>St. Andrew</option>
+                                    <option>St. Catherine</option>
+                                    <option>Clarendon</option>
+                                    <option>Manchester</option>
+                                    <option>St. Elizabeth</option>
+                                    <option>Westmoreland</option>
+                                    <option>Hanover</option>
+                                    <option>St. James</option>
+                                    <option>Trelawny</option>
+                                    <option>St. Ann</option>
+                                    <option>St. Mary</option>
+                                    <option>Portland</option>
+                                    <option>St. Thomas</option>
+                                </select>
+                                <span asp-validation-for="ProfileInput.Parish" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.DistrictArea">District / area</label>
+                                <input asp-for="ProfileInput.DistrictArea" />
+                                <span asp-validation-for="ProfileInput.DistrictArea" class="validation"></span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="field">
-                        <label asp-for="ProfileInput.PhoneNumber">Phone number</label>
-                        <input asp-for="ProfileInput.PhoneNumber" type="tel" />
+
+                    <div class="profile-intake-section">
+                        <div class="profile-intake-heading">
+                            <strong>Employment &amp; household</strong>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="ProfileInput.EmploymentStatus">Employment status</label>
+                                <select asp-for="ProfileInput.EmploymentStatus">
+                                    <option value="">Select status</option>
+                                    <option>Employed</option>
+                                    <option>Self-employed</option>
+                                    <option>Unemployed</option>
+                                    <option>Student</option>
+                                    <option>Retired</option>
+                                    <option>Unable to work</option>
+                                    <option>Other</option>
+                                </select>
+                                <span asp-validation-for="ProfileInput.EmploymentStatus" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.EmployerInstitution">Employer / institution</label>
+                                <input asp-for="ProfileInput.EmployerInstitution" />
+                                <span asp-validation-for="ProfileInput.EmployerInstitution" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.MonthlyHouseholdIncome">Monthly household income</label>
+                                <input asp-for="ProfileInput.MonthlyHouseholdIncome" type="number" min="0" step="0.01" />
+                                <span asp-validation-for="ProfileInput.MonthlyHouseholdIncome" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.HouseholdSize">Persons in household</label>
+                                <input asp-for="ProfileInput.HouseholdSize" type="number" min="1" />
+                                <span asp-validation-for="ProfileInput.HouseholdSize" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.NumberOfDependants">Number of dependants</label>
+                                <input asp-for="ProfileInput.NumberOfDependants" type="number" min="0" />
+                                <span asp-validation-for="ProfileInput.NumberOfDependants" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.ChildrenUnder18">Children under 18</label>
+                                <input asp-for="ProfileInput.ChildrenUnder18" type="number" min="0" />
+                                <span asp-validation-for="ProfileInput.ChildrenUnder18" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.HousingSituation">Housing situation</label>
+                                <select asp-for="ProfileInput.HousingSituation">
+                                    <option value="">Select housing situation</option>
+                                    <option>Own home</option>
+                                    <option>Rent</option>
+                                    <option>Family / shared home</option>
+                                    <option>Informal / squatting</option>
+                                    <option>Temporary accommodation</option>
+                                    <option>Homeless</option>
+                                    <option>Other</option>
+                                </select>
+                                <span asp-validation-for="ProfileInput.HousingSituation" class="validation"></span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label asp-for="ProfileInput.HouseholdLivingSituation">Household / living situation</label>
+                            <textarea asp-for="ProfileInput.HouseholdLivingSituation" rows="4"
+                                      placeholder="Briefly describe the household and living situation."></textarea>
+                            <span asp-validation-for="ProfileInput.HouseholdLivingSituation" class="validation"></span>
+                        </div>
                     </div>
+
                     <div class="profile-readonly-row">
                         <span>Registered identity</span>
                         <strong>@Model.RegisteredIdentity</strong>
                     </div>
-                    <button class="button button-small" type="submit">Save contact details</button>
+                    <button class="button button-small" type="submit">Save individual profile</button>
                 </form>
             </section>
 
@@ -181,3 +340,7 @@
         </div>
     </div>
 </section>
+
+<style>
+.individual-intake-form{display:grid;gap:16px}.profile-intake-section{display:grid;gap:10px;padding-top:4px}.profile-intake-section+.profile-intake-section{padding-top:14px;border-top:1px solid #e2e7ea}.profile-intake-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.profile-intake-heading strong{color:#18364d}.profile-intake-heading small{color:#68757f}
+</style>
