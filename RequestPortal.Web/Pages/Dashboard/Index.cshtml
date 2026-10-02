@@ -76,11 +76,6 @@
                                     <td>@request.CreatedUtc.ToLocalTime().ToString("MMM dd yyyy")</td>
                                     <td><a asp-page="/Requests/Details" asp-route-id="@request.Id">Open</a></td>
                                 </tr>
-                                <tr data-request-status="@statusGroup" class="request-conversation-row">
-                                    <td colspan="5">
-                                        @await Component.InvokeAsync("RequestConversation", new { requestId = request.Id, returnUrl = Url.Page("/Dashboard/Index") ?? "/Dashboard", compact = true })
-                                    </td>
-                                </tr>
                             }
                             </tbody>
                         </table>
