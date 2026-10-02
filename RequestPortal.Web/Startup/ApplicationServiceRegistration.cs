@@ -91,6 +91,10 @@ internal static class ApplicationServiceRegistration
             , OrganizationMembershipGovernanceService>();
 
         builder.Services.AddScoped<
+            IOrganizationInvitationService
+            , OrganizationInvitationService>();
+
+        builder.Services.AddScoped<
             IOrganizationAccessService
             , OrganizationAccessService>();
 
