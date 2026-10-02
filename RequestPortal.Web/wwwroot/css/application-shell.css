@@ -2788,3 +2788,149 @@ body.authenticated-app{
         flex-wrap:wrap;
     }
 }
+
+
+/* ================================================================
+   New Request compact grouping refinements
+   ================================================================ */
+.authenticated-app .requester-strip{
+    grid-template-columns:max-content max-content minmax(140px,auto);
+    justify-content:start;
+    column-gap:18px;
+    align-items:end;
+}
+.authenticated-app .requester-org{
+    width:max-content;
+    max-width:100%;
+}
+.authenticated-app .requester-org select{
+    width:max-content;
+    max-width:100%;
+    min-width:0;
+}
+.authenticated-app .request-profile-link{
+    align-self:end;
+    padding-bottom:5px;
+}
+
+.authenticated-app .request-common-layout{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) max-content;
+    gap:8px 10px;
+    margin-top:8px;
+}
+.authenticated-app .request-common-layout>.request-summary-field{
+    grid-column:1/2;
+}
+.authenticated-app .request-common-layout>.request-compact-controls{
+    grid-column:2/3;
+    align-self:end;
+}
+.authenticated-app .request-common-layout>.request-mini-card{
+    grid-column:1/-1;
+}
+
+.authenticated-app .request-priority-field{
+    width:max-content;
+    max-width:100%;
+}
+.authenticated-app .request-priority-field select{
+    width:max-content;
+    max-width:100%;
+    min-width:0;
+}
+
+.authenticated-app .request-mini-card{
+    overflow:hidden;
+    border:1px solid #d4dee7;
+    border-radius:10px;
+    background:#fff;
+    box-shadow:0 1px 2px rgba(18,43,67,.04);
+}
+.authenticated-app .request-mini-card-title{
+    padding:7px 10px;
+    border-bottom:1px solid #dce4eb;
+    background:#f6f9fb;
+    color:#173955;
+    font-size:.78rem;
+    font-weight:800;
+}
+.authenticated-app .request-mini-card-body{
+    padding:9px 10px;
+}
+.authenticated-app .classification-grid{
+    display:grid;
+    grid-template-columns:max-content minmax(180px,1fr) max-content;
+    gap:9px 12px;
+    align-items:end;
+}
+.authenticated-app .classification-grid select{
+    width:max-content;
+    max-width:100%;
+}
+.authenticated-app .classification-grid input{
+    width:100%;
+}
+
+.authenticated-app .address-grid{
+    display:grid;
+    grid-template-columns:minmax(260px,1.5fr) minmax(180px,.8fr) max-content;
+    gap:9px 12px;
+    align-items:end;
+}
+.authenticated-app .request-address-card .request-address-field{
+    grid-column:auto;
+}
+.authenticated-app .request-parish-field{
+    width:max-content;
+    max-width:100%;
+}
+.authenticated-app .request-parish-field select{
+    width:max-content;
+    max-width:100%;
+    min-width:0;
+}
+.authenticated-app .request-mini-card-footer{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-height:42px;
+    padding:7px 10px;
+    border-top:1px solid #dce4eb;
+    background:#f8fafc;
+}
+.authenticated-app .request-mini-card-footer .button{
+    flex:0 0 auto;
+}
+.authenticated-app .request-mini-card-footer #location-status{
+    min-width:0;
+    font-size:.7rem;
+}
+
+@media(max-width:900px){
+    .authenticated-app .requester-strip{
+        grid-template-columns:1fr;
+        justify-content:stretch;
+    }
+    .authenticated-app .requester-org,
+    .authenticated-app .requester-org select,
+    .authenticated-app .request-priority-field,
+    .authenticated-app .request-priority-field select,
+    .authenticated-app .request-parish-field,
+    .authenticated-app .request-parish-field select,
+    .authenticated-app .classification-grid select{
+        width:100%;
+    }
+    .authenticated-app .request-common-layout{
+        grid-template-columns:1fr;
+    }
+    .authenticated-app .request-common-layout>.request-summary-field,
+    .authenticated-app .request-common-layout>.request-compact-controls,
+    .authenticated-app .request-common-layout>.request-mini-card{
+        grid-column:1;
+    }
+    .authenticated-app .classification-grid,
+    .authenticated-app .address-grid{
+        grid-template-columns:1fr;
+    }
+}
