@@ -168,72 +168,104 @@ public sealed class RequestSubmissionPolicy(
             RequestStatus.RepresentativeReviewRequired
         ];
 
+        int maxActiveRequests = individualContext
+            ? policy.MaxActiveRequestsPerUser
+            : policy.OrganizationMaxActiveRequests;
+
         int otherActiveRequests = await dbContext.AssistanceRequests
             .AsNoTracking()
             .CountAsync(
                 item =>
                     (!requestId.HasValue || item.Id != requestId.Value) &&
-                    (item.SubmittedByUserId == userId || item.CreatedByUserId == userId) &&
-                    activeStatuses.Contains(item.Status),
+                    activeStatuses.Contains(item.Status) &&
+                    (individualContext
+                        ? item.SubmittedByUserId == userId || item.CreatedByUserId == userId
+                        : item.OrganizationId == organizationId),
                 cancellationToken);
 
-        if (otherActiveRequests >= policy.MaxActiveRequestsPerUser)
+        if (otherActiveRequests >= maxActiveRequests)
         {
             throw Block(
-                $"You already have {otherActiveRequests} active requests. Complete or close an existing request before submitting another.",
+                individualContext
+                    ? $"You already have {otherActiveRequests} active requests. Complete or close an existing request before submitting another."
+                    : $"This organization already has {otherActiveRequests} active requests. Complete or close an existing request before submitting another.",
                 "RP-SUBMISSION-ACTIVE-LIMIT");
         }
 
         DateTimeOffset dayCutoff = now.AddHours(-24);
+        int maxSubmissionsPer24Hours = individualContext
+            ? policy.MaxSubmissionsPer24Hours
+            : policy.OrganizationMaxSubmissionsPer24Hours;
+
         int submissionsLast24Hours = await dbContext.AssistanceRequests
             .AsNoTracking()
             .CountAsync(
                 item =>
                     (!requestId.HasValue || item.Id != requestId.Value) &&
-                    item.SubmittedByUserId == userId &&
-                    item.SubmittedUtc >= dayCutoff,
+                    item.SubmittedUtc >= dayCutoff &&
+                    (individualContext
+                        ? item.SubmittedByUserId == userId
+                        : item.OrganizationId == organizationId),
                 cancellationToken);
 
-        if (submissionsLast24Hours >= policy.MaxSubmissionsPer24Hours)
+        if (submissionsLast24Hours >= maxSubmissionsPer24Hours)
         {
             throw Block(
-                $"You have reached the submission limit of {policy.MaxSubmissionsPer24Hours} requests in 24 hours. Please try again later.",
+                individualContext
+                    ? $"You have reached the submission limit of {maxSubmissionsPer24Hours} requests in 24 hours. Please try again later."
+                    : $"This organization has reached the submission limit of {maxSubmissionsPer24Hours} requests in 24 hours. Please try again later.",
                 "RP-SUBMISSION-24H-LIMIT");
         }
 
         DateTimeOffset monthCutoff = now.AddDays(-30);
+        int maxSubmissionsPer30Days = individualContext
+            ? policy.MaxSubmissionsPer30Days
+            : policy.OrganizationMaxSubmissionsPer30Days;
+
         int submissionsLast30Days = await dbContext.AssistanceRequests
             .AsNoTracking()
             .CountAsync(
                 item =>
                     (!requestId.HasValue || item.Id != requestId.Value) &&
-                    item.SubmittedByUserId == userId &&
-                    item.SubmittedUtc >= monthCutoff,
+                    item.SubmittedUtc >= monthCutoff &&
+                    (individualContext
+                        ? item.SubmittedByUserId == userId
+                        : item.OrganizationId == organizationId),
                 cancellationToken);
 
-        if (submissionsLast30Days >= policy.MaxSubmissionsPer30Days)
+        if (submissionsLast30Days >= maxSubmissionsPer30Days)
         {
             throw Block(
-                $"You have reached the submission limit of {policy.MaxSubmissionsPer30Days} requests in 30 days. Please contact Food For The Poor if you have another urgent need.",
+                individualContext
+                    ? $"You have reached the submission limit of {maxSubmissionsPer30Days} requests in 30 days. Please contact Food For The Poor if you have another urgent need."
+                    : $"This organization has reached the submission limit of {maxSubmissionsPer30Days} requests in 30 days. Please contact Food For The Poor if additional submissions are required.",
                 "RP-SUBMISSION-30D-LIMIT");
         }
+
+        int maxCancelledRequestsPer30Days = individualContext
+            ? policy.MaxCancelledRequestsPer30Days
+            : policy.OrganizationMaxCancelledRequestsPer30Days;
 
         int cancelledLast30Days = await dbContext.AssistanceRequests
             .AsNoTracking()
             .CountAsync(
                 item =>
                     (!requestId.HasValue || item.Id != requestId.Value) &&
-                    item.CreatedByUserId == userId &&
                     item.Status == RequestStatus.Cancelled &&
+                    (individualContext
+                        ? item.CreatedByUserId == userId
+                        : item.OrganizationId == organizationId) &&
                     item.StatusHistory.Any(history =>
                         history.Status == RequestStatus.Cancelled &&
                         history.ChangedUtc >= monthCutoff),
                 cancellationToken);
 
-        if (cancelledLast30Days >= policy.MaxCancelledRequestsPer30Days)
+        if (cancelledLast30Days >= maxCancelledRequestsPer30Days)
         {
             throw Block(
-                "Several requests from this account were recently cancelled. New submissions are temporarily limited; please contact Food For The Poor if you still need assistance.",
+                individualContext
+                    ? "Several requests from this account were recently cancelled. New submissions are temporarily limited; please contact Food For The Poor if you still need assistance."
+                    : "A high number of this organization's requests were recently cancelled. New submissions are temporarily limited; please contact Food For The Poor if additional submissions are required.",
                 "RP-SUBMISSION-CANCELLATION-LIMIT");
         }
 
