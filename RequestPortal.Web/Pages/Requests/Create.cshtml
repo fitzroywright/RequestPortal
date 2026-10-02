@@ -11,27 +11,6 @@
         <form method="post" enctype="multipart/form-data" id="new-request-form">
             <div asp-validation-summary="ModelOnly" class="validation request-validation"></div>
 
-            @if (!string.IsNullOrWhiteSpace(Model.FailureDetails))
-            {
-                <section class="request-debug-error" role="alert">
-                    <div class="request-debug-error-title">
-                        <strong>Create Request server exception</strong>
-                        <span>Temporary diagnostic display</span>
-                    </div>
-                    <dl>
-                        <div>
-                            <dt>Stage</dt>
-                            <dd>@Model.FailureStage</dd>
-                        </div>
-                        <div>
-                            <dt>Correlation</dt>
-                            <dd>@Model.FailureCorrelation</dd>
-                        </div>
-                    </dl>
-                    <pre>@Model.FailureDetails</pre>
-                </section>
-            }
-
             @if (Model.Organizations.Count == 0)
             {
                 <section class="request-empty-state">

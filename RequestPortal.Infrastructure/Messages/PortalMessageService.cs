@@ -495,6 +495,36 @@ public sealed class PortalMessageService : IPortalMessageService
         await EnsureApprovedMembershipAsync(senderUserId, organizationId, cancellationToken);
         await ValidateRequestScopeAsync(organizationId, requestId, cancellationToken);
 
+        if (requestId.HasValue && !threadId.HasValue)
+        {
+            var request = await dbContext.AssistanceRequests.AsNoTracking()
+                .Where(item => item.Id == requestId.Value)
+                .Select(item => new { item.CreatedByUserId, item.SubmittedByUserId })
+                .SingleAsync(cancellationToken);
+            bool owner = request.CreatedByUserId == senderUserId || request.SubmittedByUserId == senderUserId;
+            MessageThread? canonical = await dbContext.MessageThreads.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == requestId.Value, cancellationToken);
+            bool participant = canonical is not null && await CanViewThreadAsync(senderUserId, false, canonical, cancellationToken);
+            bool subscribedManager = await dbContext.OrganizationMemberships.AsNoTracking()
+                .AnyAsync(item => item.OrganizationId == organizationId && item.UserId == senderUserId &&
+                    item.Status == MembershipStatus.Approved && item.Role == OrganizationRole.Administrator &&
+                    item.ReceiveRequestNotifications, cancellationToken);
+            if (!owner && !participant && !subscribedManager)
+                throw new UnauthorizedAccessException("Only the request owner, a participant or a subscribed manager may use the request conversation.");
+            if (canonical?.ClosedUtc is not null)
+                throw new InvalidOperationException("This conversation is closed. Contact FFP to reopen it.");
+        }
+
+        if (threadId.HasValue)
+        {
+            MessageThread thread = await dbContext.MessageThreads.SingleAsync(item => item.Id == threadId.Value, cancellationToken);
+            if (!thread.StaffVisible || thread.Audience == MessageAudience.FfpInternal ||
+                !await CanViewThreadAsync(senderUserId, false, thread, cancellationToken))
+                throw new UnauthorizedAccessException("The current user cannot use this FFP conversation.");
+            if (thread.ClosedUtc.HasValue)
+                throw new InvalidOperationException("This conversation is closed. Contact FFP to reopen it.");
+        }
+
         Guid[] staffUserIds = await dbContext.Users
             .AsNoTracking()
             .Where(user => user.IsInternalStaff)
@@ -518,6 +548,7 @@ public sealed class PortalMessageService : IPortalMessageService
             staffVisible: true,
             cancellationToken,
             attachmentDocumentIds,
+            audience: requestId.HasValue ? MessageAudience.Request : MessageAudience.Individual,
             stableMessageId: stableMessageId);
     }
 
@@ -667,7 +698,27 @@ public sealed class PortalMessageService : IPortalMessageService
             .ToArrayAsync(cancellationToken);
 
         Guid[] recipients;
-        if (thread.Audience == MessageAudience.FfpInternal)
+        if (thread.Audience == MessageAudience.Request && thread.RequestId.HasValue)
+        {
+            var request = await dbContext.AssistanceRequests.AsNoTracking()
+                .Where(item => item.Id == thread.RequestId.Value)
+                .Select(item => new { item.CreatedByUserId, item.SubmittedByUserId })
+                .SingleAsync(cancellationToken);
+            Guid[] managers = await dbContext.OrganizationMemberships.AsNoTracking()
+                .Where(item => item.OrganizationId == thread.OrganizationId &&
+                    item.Status == MembershipStatus.Approved && item.Role == OrganizationRole.Administrator &&
+                    item.ReceiveRequestNotifications)
+                .Select(item => item.UserId).ToArrayAsync(cancellationToken);
+            Guid[] authors = await dbContext.PortalMessages.AsNoTracking()
+                .Where(item => item.ThreadId == threadId && item.SenderUserId != null)
+                .Select(item => item.SenderUserId!.Value).Distinct().ToArrayAsync(cancellationToken);
+            Guid[] staff = await dbContext.Users.AsNoTracking().Where(item => item.IsInternalStaff)
+                .Select(item => item.Id).ToArrayAsync(cancellationToken);
+            recipients = managers.Concat(authors).Concat(staff)
+                .Append(request.CreatedByUserId).Append(request.SubmittedByUserId ?? request.CreatedByUserId)
+                .Where(id => id != senderUserId).Distinct().ToArray();
+        }
+        else if (thread.Audience == MessageAudience.FfpInternal)
         {
             if (!senderIsStaff)
             {
@@ -793,8 +844,10 @@ public sealed class PortalMessageService : IPortalMessageService
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
         CancellationToken cancellationToken = default,
-        Guid? stableMessageId = null)
+        Guid? stableMessageId = null,
+        bool notifyExternally = true)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(body);
         if (recipientUserIds.Count == 0)
         {
             throw new ArgumentException("At least one message recipient is required.", nameof(recipientUserIds));
@@ -802,19 +855,20 @@ public sealed class PortalMessageService : IPortalMessageService
 
         await ValidateRequestScopeAsync(organizationId, requestId, cancellationToken);
 
+        Guid messageId = stableMessageId ?? Guid.NewGuid();
+        Guid? deliveredThreadId = await dbContext.PortalMessages.AsNoTracking()
+            .Where(item => item.Id == messageId).Select(item => (Guid?)item.ThreadId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (deliveredThreadId.HasValue) return deliveredThreadId.Value;
+
         MessageThread thread = await ResolveThreadAsync(
             threadId,
             organizationId,
             requestId,
             subject,
             staffVisible: true,
-            cancellationToken);
-
-        Guid messageId = stableMessageId ?? Guid.NewGuid();
-        if (await dbContext.PortalMessages.AsNoTracking().AnyAsync(item => item.Id == messageId, cancellationToken))
-        {
-            return thread.Id;
-        }
+            cancellationToken,
+            requestId.HasValue ? MessageAudience.Request : MessageAudience.Individual);
 
         PortalMessage message = new(
             messageId,
@@ -837,7 +891,8 @@ public sealed class PortalMessageService : IPortalMessageService
 
         dbContext.PortalMessages.Add(message);
         AddRecipients(message.Id, allRecipients, senderUserId: null);
-        AddExternalNotificationOutbox(message, thread, allRecipients);
+        if (notifyExternally)
+            AddExternalNotificationOutbox(message, thread, allRecipients);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (auditWriter is not null)
@@ -1049,6 +1104,7 @@ public sealed class PortalMessageService : IPortalMessageService
         MessageAudience audience = MessageAudience.Individual,
         Guid? stableMessageId = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(body);
         ApplicationUserProjection sender = await dbContext.Users
             .AsNoTracking()
             .Where(user => user.Id == senderUserId)
@@ -1150,6 +1206,36 @@ public sealed class PortalMessageService : IPortalMessageService
         CancellationToken cancellationToken,
         MessageAudience audience = MessageAudience.Individual)
     {
+        // One public FFP/applicant conversation per request. Explicit direct and
+        // restricted conversations keep their own IDs and are never folded into it.
+        if (!threadId.HasValue && audience == MessageAudience.Request && requestId.HasValue)
+        {
+            threadId = requestId.Value;
+            MessageThread? canonical = await dbContext.MessageThreads
+                .SingleOrDefaultAsync(item => item.Id == threadId.Value, cancellationToken);
+            if (canonical is not null)
+            {
+                if (canonical.RequestId != requestId || canonical.OrganizationId != organizationId || canonical.Audience != MessageAudience.Request)
+                    throw new InvalidOperationException("The request conversation has an invalid scope.");
+                return canonical;
+            }
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            string canonicalSubject = subject.Trim();
+            string canonicalAudience = MessageAudience.Request.ToString();
+            // Concurrent confirmation and reply operations converge on the same
+            // primary key instead of creating two conversations or failing an insert.
+            await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO message_threads ("Id", "OrganizationId", "RequestId", "Subject", "StaffVisible", "CreatedUtc", "Audience")
+                VALUES ({requestId.Value}, {organizationId}, {requestId}, {canonicalSubject}, {staffVisible}, {now}, {canonicalAudience})
+                ON CONFLICT ("Id") DO NOTHING
+                """, cancellationToken);
+            MessageThread resolved = await dbContext.MessageThreads.SingleAsync(item => item.Id == requestId.Value, cancellationToken);
+            if (resolved.RequestId != requestId || resolved.OrganizationId != organizationId || resolved.Audience != MessageAudience.Request)
+                throw new InvalidOperationException("The request conversation has an invalid scope.");
+            return resolved;
+        }
+
         if (threadId.HasValue)
         {
             MessageThread existing = await dbContext.MessageThreads

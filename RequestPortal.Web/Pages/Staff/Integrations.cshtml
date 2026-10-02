@@ -6,6 +6,10 @@
     ViewData["Title"] = "Integrations";
 }
 <section class="section"><div class="shell">
+<form method="post" asp-page-handler="TestSharePoint" class="operational-toolbar">
+    <button class="button button-small" type="submit">Test SharePoint</button>
+    <span>Test the configured Graph connection, library and document round trip.</span>
+</form>
 <div class="section-heading"><div class="eyebrow" style="color:#b45b09">FFP internal</div><h1>Integration status</h1><p>Track synchronization, retry failed submissions, and reconcile external status without coupling Request Portal records to the external system.</p></div>
 <section class="card">
 @if(Model.Items.Count==0){<p class="muted">No integration links have been created yet.</p>}else{<div class="table-wrap"><table><thead><tr><th>Request</th><th>Organization</th><th>System</th><th>Status</th><th>External reference</th><th>Last attempt</th><th>Error</th><th>Operations</th></tr></thead><tbody>

@@ -12,6 +12,49 @@ public sealed class PortalMessagingTests
     private static readonly DateTimeOffset Now = new(2026, 9, 24, 23, 59, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task RequestConversation_IsReusedAndRestrictedThreadsStaySeparate()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
+        ApplicationUser applicant = CreateUser("Maria Johnson", "maria@example.org", false);
+        ApplicationUser staff = CreateUser("David Brown", "david@example.org", true);
+        ApplicationUser otherRepresentative = CreateUser("Sarah Reid", "sarah@example.org", false);
+        database.Db.Users.AddRange(applicant, staff, otherRepresentative);
+        Organization organization = CreateApprovedOrganization(applicant.Id, "Community group");
+        organization.RequestMembership(Guid.NewGuid(), otherRepresentative.Id, Now).Approve(applicant.Id, Now);
+        database.Db.Organizations.Add(organization);
+        RequestPortal.Domain.Requests.AssistanceRequest request = new(Guid.NewGuid(), "RP-26-18427", organization.Id, applicant.Id, Now);
+        database.Db.AssistanceRequests.Add(request);
+        await database.Db.SaveChangesAsync(cancellationToken);
+        PortalMessageService service = new(database.Db, new CapturingRealtimeNotifier());
+
+        Guid confirmationId = Guid.NewGuid();
+        Guid canonical = await service.SendSystemMessageAsync(organization.Id, request.Id, null,
+            "Submission confirmed", "Quote RP-26-18427 when contacting FFP.", [applicant.Id], cancellationToken,
+            confirmationId, notifyExternally: false);
+        Guid reused = await service.SendToSharedStaffAsync(applicant.Id, organization.Id, request.Id, null,
+            "Question", "Please confirm the next step.", cancellationToken);
+        Assert.Equal(canonical, reused);
+        Assert.Equal(request.Id, canonical);
+
+        await service.SendSystemMessageAsync(organization.Id, request.Id, null,
+            "Submission confirmed", "Quote RP-26-18427 when contacting FFP.", [applicant.Id], cancellationToken,
+            confirmationId, notifyExternally: false);
+        Assert.Equal(2, database.Db.PortalMessages.Count());
+        Assert.Single(database.Db.MessageThreads);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SendToSharedStaffAsync(
+            otherRepresentative.Id, organization.Id, request.Id, null,
+            "Unrelated representative", "This user is not a participant.", cancellationToken));
+        Assert.Null(await service.GetThreadAsync(otherRepresentative.Id, false, canonical, cancellationToken));
+
+        Guid restricted = await service.SavePersonalNoteAsync(applicant.Id, organization.Id, request.Id, null,
+            "Private note", "This must remain private.", cancellationToken);
+        Assert.NotEqual(canonical, restricted);
+        Assert.Null(await service.GetThreadAsync(staff.Id, true, restricted, cancellationToken));
+    }
+
+    [Fact]
     public async Task SharedStaffMailbox_PreservesAuditIdentity_AndUsesNamesOnly()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;

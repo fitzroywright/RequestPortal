@@ -20,6 +20,39 @@ public sealed class PortalAuthorizationIsolationTests
     private static readonly DateTimeOffset Now = new(2026, 9, 7, 17, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task RequestCodes_AreUniqueAndNeverReusedAfterRollbackOrDeletion()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using PortalTestContext context = await PortalTestContext.CreateAsync(cancellationToken);
+        Guid userId = Guid.NewGuid();
+        Organization organization = CreateApprovedOrganization(userId, "Request code tests");
+        context.Db.Organizations.Add(organization);
+        await context.Db.SaveChangesAsync(cancellationToken);
+
+        string rolledBackCode;
+        await using (var transaction = await context.Db.Database.BeginTransactionAsync(cancellationToken))
+        {
+            Guid id = await context.Service.CreateRequestAsync(userId, organization.Id, "Rollback test request", cancellationToken);
+            rolledBackCode = (await context.Db.AssistanceRequests.SingleAsync(item => item.Id == id, cancellationToken)).PublicReference;
+            await transaction.RollbackAsync(cancellationToken);
+        }
+        context.Db.ChangeTracker.Clear();
+
+        Guid secondId = await context.Service.CreateRequestAsync(userId, organization.Id, "Permanent request reference", cancellationToken);
+        AssistanceRequest second = await context.Db.AssistanceRequests.SingleAsync(item => item.Id == secondId, cancellationToken);
+        string deletedCode = second.PublicReference;
+        Assert.Matches("^RP-26-[0-9]{5,}$", deletedCode);
+        Assert.NotEqual(rolledBackCode, deletedCode);
+        context.Db.AssistanceRequests.Remove(second);
+        await context.Db.SaveChangesAsync(cancellationToken);
+
+        Guid thirdId = await context.Service.CreateRequestAsync(userId, organization.Id, "Next permanent reference", cancellationToken);
+        AssistanceRequest third = await context.Db.AssistanceRequests.SingleAsync(item => item.Id == thirdId, cancellationToken);
+        Assert.NotEqual(deletedCode, third.PublicReference);
+        Assert.NotEqual(rolledBackCode, third.PublicReference);
+    }
+
+    [Fact]
     public async Task GetRequestsForUserAsync_ReturnsOnlyApprovedMembershipOrganizations()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;

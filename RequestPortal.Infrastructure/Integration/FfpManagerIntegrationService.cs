@@ -247,7 +247,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             .AsNoTracking()
             .Where(thread =>
                 thread.RequestId == request.Id &&
-                thread.StaffVisible)
+                thread.StaffVisible &&
+                thread.Audience == RequestPortal.Domain.Messages.MessageAudience.Request)
             .OrderByDescending(thread => thread.CreatedUtc)
             .Select(thread => (Guid?)thread.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -266,7 +267,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             body,
             recipients,
             cancellationToken,
-            stableMessageId: informationRequest.MessageId);
+            stableMessageId: informationRequest.MessageId,
+            notifyExternally: false);
 
         FfpManagerInformationRequestedMessage message = new(
             Guid.NewGuid(),
@@ -339,7 +341,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             .AsNoTracking()
             .Where(thread =>
                 thread.RequestId == request.Id &&
-                thread.StaffVisible)
+                thread.StaffVisible &&
+                thread.Audience == RequestPortal.Domain.Messages.MessageAudience.Request)
             .OrderByDescending(thread => thread.CreatedUtc)
             .Select(thread => (Guid?)thread.Id)
             .FirstOrDefaultAsync(cancellationToken);

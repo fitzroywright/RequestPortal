@@ -14,6 +14,22 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: requestportal
+          POSTGRES_PASSWORD: requestportal_ci
+          POSTGRES_DB: requestportal_tests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U requestportal -d requestportal_tests"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      REQUESTPORTAL_POSTGRES: Host=localhost;Port=5432;Database=requestportal_tests;Username=requestportal;Password=requestportal_ci
 
     steps:
       - name: Checkout RequestPortal

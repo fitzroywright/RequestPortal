@@ -13,7 +13,7 @@ using RequestPortal.Common.Diagnostics;
 
 namespace RequestPortal.Web.Pages;
 
-[Authorize]
+[Authorize(Policy = RequestPortal.Common.Security.PortalPolicies.FfpStaff)]
 [IgnoreAntiforgeryToken]
 public sealed class EngineeringDiagnosticsModel : PageModel
 {
