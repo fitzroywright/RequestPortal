@@ -2,6 +2,14 @@
 @using System.Security.Claims
 @{
     bool trainingEnabled = Configuration.GetValue("Training:Enabled", false);
+    bool isAuthenticated = User.Identity?.IsAuthenticated == true;
+    bool isFfpStaff = isAuthenticated &&
+        User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim, RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
+    bool canViewManagement = User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard);
+    bool isExternalReviewer = User.HasClaim("requestportal.external-review", "true");
+    string? currentPage = ViewContext.RouteData.Values["page"]?.ToString();
+    bool isOpeningPage = string.Equals(currentPage, "/Index", StringComparison.OrdinalIgnoreCase);
+    bool useApplicationShell = isAuthenticated && !isOpeningPage;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -17,24 +25,21 @@
     }
     <link rel="stylesheet" href="~/css/operational-workspace.css" asp-append-version="true" />
 </head>
-<body>
-    <header class="site-header">
-        <div class="shell nav-shell">
+<body class="@(useApplicationShell ? "authenticated-app" : "public-site")">
+    <header class="site-header @(useApplicationShell ? "app-header" : null)">
+        <div class="shell nav-shell @(useApplicationShell ? "app-nav-shell" : null)">
             <a class="brand" asp-page="/Index">
                 <img class="brand-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor" />
                 <span class="brand-copy">
                     <strong>Request Portal</strong>
-                    <small>Food For The Poor Jamaica</small>
+                    @if (!useApplicationShell)
+                    {
+                        <small>Food For The Poor Jamaica</small>
+                    }
                 </span>
             </a>
-            <nav class="main-nav">
-                @{
-                    bool isAuthenticated = User.Identity?.IsAuthenticated == true;
-                    bool isFfpStaff = isAuthenticated &&
-                        User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim, RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
-                    bool canViewManagement = User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard);
-                    bool isExternalReviewer = User.HasClaim("requestportal.external-review", "true");
-                }
+            <nav class="main-nav @(useApplicationShell ? "app-main-nav" : null)">
+
                 <a asp-page="/Index">Home</a>
                 @if (isAuthenticated)
                 {
@@ -122,7 +127,7 @@
         </div>
     </header>
 
-    <main>
+    <main class="@(useApplicationShell ? "app-main" : null)">
         @if (TempData["Success"] is string success)
         {
             <div class="shell flash success">@success</div>
@@ -134,7 +139,7 @@
         @RenderBody()
     </main>
 
-    @if (ViewData["HideFooter"] as bool? != true)
+    @if (!useApplicationShell && ViewData["HideFooter"] as bool? != true)
     {
         <footer class="site-footer">
             <div class="shell footer-grid ffp-footer-grid">
