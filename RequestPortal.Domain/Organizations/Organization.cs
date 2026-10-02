@@ -105,6 +105,50 @@ public sealed class Organization
 
     public void UpdateProfile(
         string? registrationNumber,
+        string? organizationType,
+        string? address,
+        string? phone,
+        string? email,
+        string? primaryContactName,
+        DateOnly? registrationExpiryDate)
+    {
+        UpdateProfile(
+            registrationNumber,
+            null,
+            organizationType,
+            null,
+            null,
+            "Jamaica",
+            address,
+            null,
+            null,
+            null,
+            phone,
+            null,
+            email,
+            null,
+            primaryContactName,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            registrationExpiryDate);
+    }
+
+    public void UpdateProfile(
+        string? registrationNumber,
         string? taxRegistrationNumber,
         string? organizationType,
         string? tradingName,
