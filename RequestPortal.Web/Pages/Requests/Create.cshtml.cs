@@ -37,6 +37,7 @@ public sealed class CreateModel : PageModel
     private readonly IOrganizationProfileService organizationProfileService;
     private readonly IDocumentService documentService;
     private readonly IPortalMessageService messageService;
+    private readonly IRequestSubmissionPolicy requestSubmissionPolicy;
     private readonly ILogger<CreateModel> logger;
     private readonly IDiagnosticOperationsRouter diagnostics;
 
@@ -51,6 +52,7 @@ public sealed class CreateModel : PageModel
         IOrganizationProfileService organizationProfileService,
         IDocumentService documentService,
         IPortalMessageService messageService,
+        IRequestSubmissionPolicy requestSubmissionPolicy,
         ILogger<CreateModel> logger,
         IDiagnosticOperationsRouter diagnostics)
     {
@@ -64,6 +66,7 @@ public sealed class CreateModel : PageModel
         this.organizationProfileService = organizationProfileService;
         this.documentService = documentService;
         this.messageService = messageService;
+        this.requestSubmissionPolicy = requestSubmissionPolicy;
         this.logger = logger;
         this.diagnostics = diagnostics;
     }
@@ -192,6 +195,27 @@ public sealed class CreateModel : PageModel
                 exception,
                 "checking production submission policy");
 
+            return Page();
+        }
+
+        try
+        {
+            await requestSubmissionPolicy.ValidateNewRequestAsync(
+                user.Id,
+                Input.OrganizationId,
+                Input.Kind,
+                Input.Summary,
+                HttpContext.RequestAborted);
+        }
+        catch (RequestSubmissionBlockedException exception)
+        {
+            logger.LogInformation(
+                "New request blocked by submission policy. Code={Code}; UserId={UserId}; OrganizationId={OrganizationId}",
+                exception.Code,
+                user.Id,
+                Input.OrganizationId);
+
+            ModelState.AddModelError(string.Empty, exception.Message);
             return Page();
         }
 
