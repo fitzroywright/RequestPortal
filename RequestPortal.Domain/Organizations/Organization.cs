@@ -39,17 +39,36 @@ public sealed class Organization
     public string CountryCode { get; private set; } = string.Empty;
 
     public string? RegistrationNumber { get; private set; }
-
+    public string? TaxRegistrationNumber { get; private set; }
     public string? OrganizationType { get; private set; }
-
+    public string? TradingName { get; private set; }
+    public DateOnly? DateEstablished { get; private set; }
+    public string? CountryOfRegistration { get; private set; }
     public string? Address { get; private set; }
-
+    public string? Parish { get; private set; }
+    public string? DistrictArea { get; private set; }
+    public string? MailingAddress { get; private set; }
     public string? Phone { get; private set; }
-
+    public string? AlternativePhone { get; private set; }
     public string? Email { get; private set; }
-
+    public string? Website { get; private set; }
     public string? PrimaryContactName { get; private set; }
-
+    public string? PrimaryContactTitle { get; private set; }
+    public string? AuthorizedSignatoryName { get; private set; }
+    public string? AuthorizedSignatoryTitle { get; private set; }
+    public string? SecondaryContactName { get; private set; }
+    public string? SecondaryContactEmail { get; private set; }
+    public string? SecondaryContactPhone { get; private set; }
+    public int? EmployeeCount { get; private set; }
+    public int? VolunteerCount { get; private set; }
+    public int? ApproximateBeneficiariesServed { get; private set; }
+    public string? GeographicServiceArea { get; private set; }
+    public string? MainActivities { get; private set; }
+    public string? PopulationGroupsServed { get; private set; }
+    public bool? PreviouslyReceivedFfpAssistance { get; private set; }
+    public decimal? AnnualOperatingBudget { get; private set; }
+    public string? PrimaryFundingSources { get; private set; }
+    public string? PremisesSituation { get; private set; }
     public DateOnly? RegistrationExpiryDate { get; private set; }
 
     public string? ApprovalNotes { get; private set; }
@@ -86,19 +105,69 @@ public sealed class Organization
 
     public void UpdateProfile(
         string? registrationNumber,
+        string? taxRegistrationNumber,
         string? organizationType,
+        string? tradingName,
+        DateOnly? dateEstablished,
+        string? countryOfRegistration,
         string? address,
+        string? parish,
+        string? districtArea,
+        string? mailingAddress,
         string? phone,
+        string? alternativePhone,
         string? email,
+        string? website,
         string? primaryContactName,
+        string? primaryContactTitle,
+        string? authorizedSignatoryName,
+        string? authorizedSignatoryTitle,
+        string? secondaryContactName,
+        string? secondaryContactEmail,
+        string? secondaryContactPhone,
+        int? employeeCount,
+        int? volunteerCount,
+        int? approximateBeneficiariesServed,
+        string? geographicServiceArea,
+        string? mainActivities,
+        string? populationGroupsServed,
+        bool? previouslyReceivedFfpAssistance,
+        decimal? annualOperatingBudget,
+        string? primaryFundingSources,
+        string? premisesSituation,
         DateOnly? registrationExpiryDate)
     {
         RegistrationNumber = Normalize(registrationNumber);
+        TaxRegistrationNumber = Normalize(taxRegistrationNumber);
         OrganizationType = Normalize(organizationType);
+        TradingName = Normalize(tradingName);
+        DateEstablished = dateEstablished;
+        CountryOfRegistration = Normalize(countryOfRegistration) ?? "Jamaica";
         Address = Normalize(address);
+        Parish = Normalize(parish);
+        DistrictArea = Normalize(districtArea);
+        MailingAddress = Normalize(mailingAddress);
         Phone = Normalize(phone);
+        AlternativePhone = Normalize(alternativePhone);
         Email = Normalize(email);
+        Website = Normalize(website);
         PrimaryContactName = Normalize(primaryContactName);
+        PrimaryContactTitle = Normalize(primaryContactTitle);
+        AuthorizedSignatoryName = Normalize(authorizedSignatoryName);
+        AuthorizedSignatoryTitle = Normalize(authorizedSignatoryTitle);
+        SecondaryContactName = Normalize(secondaryContactName);
+        SecondaryContactEmail = Normalize(secondaryContactEmail);
+        SecondaryContactPhone = Normalize(secondaryContactPhone);
+        EmployeeCount = employeeCount;
+        VolunteerCount = volunteerCount;
+        ApproximateBeneficiariesServed = approximateBeneficiariesServed;
+        GeographicServiceArea = Normalize(geographicServiceArea);
+        MainActivities = Normalize(mainActivities);
+        PopulationGroupsServed = Normalize(populationGroupsServed);
+        PreviouslyReceivedFfpAssistance = previouslyReceivedFfpAssistance;
+        AnnualOperatingBudget = annualOperatingBudget;
+        PrimaryFundingSources = Normalize(primaryFundingSources);
+        PremisesSituation = Normalize(premisesSituation);
         RegistrationExpiryDate = registrationExpiryDate;
     }
 
