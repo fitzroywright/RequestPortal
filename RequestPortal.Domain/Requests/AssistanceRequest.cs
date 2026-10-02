@@ -64,6 +64,8 @@ public sealed class AssistanceRequest
 
     public DateTimeOffset? SubmittedUtc { get; private set; }
 
+    public RequestStatus? StatusBeforeRepresentativeReview { get; private set; }
+
     public IReadOnlyCollection<AssistanceRequestItem> Items => items.AsReadOnly();
 
     public IReadOnlyCollection<RequestStatusHistory> StatusHistory => statusHistory.AsReadOnly();
@@ -151,6 +153,26 @@ public sealed class AssistanceRequest
         }
 
         TransitionTo(RequestStatus.Cancelled, userId, changedUtc, reason);
+    }
+
+    public void HoldForRepresentativeReview(Guid changedByUserId, DateTimeOffset changedUtc, string reason)
+    {
+        if (Status is RequestStatus.Rejected or RequestStatus.Cancelled or RequestStatus.Fulfilled or RequestStatus.Closed or RequestStatus.Duplicate)
+            return;
+
+        if (Status == RequestStatus.RepresentativeReviewRequired)
+            return;
+
+        StatusBeforeRepresentativeReview = Status;
+        TransitionTo(RequestStatus.RepresentativeReviewRequired, changedByUserId, changedUtc, reason);
+    }
+
+    public void ContinueAfterRepresentativeReview(Guid administratorUserId, DateTimeOffset changedUtc)
+    {
+        EnsureStatus(RequestStatus.RepresentativeReviewRequired);
+        RequestStatus resumeStatus = StatusBeforeRepresentativeReview ?? RequestStatus.Submitted;
+        StatusBeforeRepresentativeReview = null;
+        TransitionTo(resumeStatus, administratorUserId, changedUtc, "Organization administrator approved continuation after representative removal.");
     }
 
     public void MarkDuplicate(Guid staffUserId, DateTimeOffset changedUtc, string reason)
