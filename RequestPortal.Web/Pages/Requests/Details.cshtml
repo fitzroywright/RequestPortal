@@ -24,13 +24,7 @@
                     <p>@Model.Request.Summary</p>
                 </div>
                 <div class="action-row">
-                    @if (Model.CanStartRequestConversation)
-                    {
-                    <a class="button button-outline"
-                       asp-page="/Messages/New"
-                       asp-route-OrganizationId="@Model.Request.OrganizationId"
-                       asp-route-RequestId="@Model.Request.Id">Message FFP</a>
-                    }
+                    <a class="button button-outline" href="#conversation">Conversation</a>
                     <span class="status status-@Model.Request.Status">@RequestStatusPresentation.Label(Model.Request.Status)</span>
                 </div>
             </header>
@@ -299,8 +293,14 @@
                         }
                     </section>
 
-                    <section class="operational-panel request-messages-card">
-                        <div class="panel-titlebar"><strong>Conversation</strong><a asp-page="/Messages/Inbox">Inbox</a></div>
+                    <section id="conversation" class="operational-panel request-messages-card">
+                        <div class="panel-titlebar">
+                            <div>
+                                <strong>Request conversation</strong>
+                                <small class="muted">Messages about @Model.Request.PublicReference stay with this request.</small>
+                            </div>
+                            <a asp-page="/Messages/Inbox">All messages</a>
+                        </div>
                         <div asp-validation-summary="ModelOnly" class="validation"></div>
                         @if (Model.MessageThreads.Count == 0 && Model.CanStartRequestConversation)
                         {
