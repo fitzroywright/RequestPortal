@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Countries;
 using RequestPortal.Application.Notifications;
+using RequestPortal.Application.Organizations;
 using RequestPortal.Application.Portal;
 using RequestPortal.Domain.Notifications;
 using RequestPortal.Infrastructure.Identity;
@@ -19,6 +20,7 @@ public sealed class ProfileModel : PageModel
     private readonly IPortalWorkflowService workflowService;
     private readonly ICountryPolicyService countryPolicyService;
     private readonly INotificationPreferenceService notificationPreferenceService;
+    private readonly IOrganizationInvitationService invitationService;
     private readonly IConfiguration configuration;
 
     public ProfileModel(
@@ -26,17 +28,19 @@ public sealed class ProfileModel : PageModel
         IPortalWorkflowService workflowService,
         ICountryPolicyService countryPolicyService,
         INotificationPreferenceService notificationPreferenceService,
+        IOrganizationInvitationService invitationService,
         IConfiguration configuration)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.countryPolicyService = countryPolicyService;
         this.notificationPreferenceService = notificationPreferenceService;
+        this.invitationService = invitationService;
         this.configuration = configuration;
     }
 
     public IReadOnlyList<OrganizationSummary> Organizations { get; private set; } = Array.Empty<OrganizationSummary>();
-    public IReadOnlyList<OrganizationSummary> AvailableOrganizations { get; private set; } = Array.Empty<OrganizationSummary>();
+    public IReadOnlyList<OrganizationInvitationView> PendingInvitations { get; private set; } = Array.Empty<OrganizationInvitationView>();
     public IReadOnlyList<CountryOption> RegistrationCountries { get; private set; } = Array.Empty<CountryOption>();
     public IReadOnlyList<NotificationPreferenceView> Preferences { get; private set; } = Array.Empty<NotificationPreferenceView>();
     public IReadOnlyList<OrganizationNotificationSubscriptionView> OrganizationSubscriptions { get; private set; } = Array.Empty<OrganizationNotificationSubscriptionView>();
@@ -167,18 +171,6 @@ public sealed class ProfileModel : PageModel
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostRequestMembershipAsync(Guid organizationId)
-    {
-        ApplicationUser user = await GetUserAsync();
-        await workflowService.RequestMembershipAsync(
-            user.Id,
-            organizationId,
-            HttpContext.RequestAborted);
-
-        TempData["Success"] = "Membership request submitted.";
-        return RedirectToPage();
-    }
-
     public async Task<IActionResult> OnPostRegisterOrganizationAsync()
     {
         ApplicationUser user = await GetUserAsync();
@@ -263,8 +255,9 @@ public sealed class ProfileModel : PageModel
         Organizations = await workflowService.GetOrganizationsForUserAsync(
             user.Id,
             HttpContext.RequestAborted);
-        AvailableOrganizations = await workflowService.GetAvailableOrganizationsAsync(
+        PendingInvitations = await invitationService.GetPendingForUserAsync(
             user.Id,
+            user.Email,
             HttpContext.RequestAborted);
 
         IReadOnlyList<CountryOption> countries =
