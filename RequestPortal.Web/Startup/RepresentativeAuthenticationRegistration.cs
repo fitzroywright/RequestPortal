@@ -74,6 +74,13 @@ internal static class RepresentativeAuthenticationRegistration
         {
             options.ClientId = clientId;
             options.ClientSecret = clientSecret;
+            options.Events.OnRedirectToAuthorizationEndpoint = context =>
+            {
+                string separator = context.RedirectUri.Contains('?') ? "&" : "?";
+                string redirectUri = context.RedirectUri + separator + "prompt=select_account";
+                context.Response.Redirect(redirectUri);
+                return Task.CompletedTask;
+            };
         });
     }
 
