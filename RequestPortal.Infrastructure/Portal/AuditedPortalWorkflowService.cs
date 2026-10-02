@@ -21,19 +21,22 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     private readonly RequestPortalDbContext dbContext;
     private readonly IClock clock;
     private readonly IRequestPortalOperationsFlowPublisher operationsFlowPublisher;
+    private readonly IRequestSubmissionPolicy requestSubmissionPolicy;
 
     public AuditedPortalWorkflowService(
         PortalWorkflowService inner,
         IBusinessAuditWriter auditWriter,
         RequestPortalDbContext dbContext,
         IClock clock,
-        IRequestPortalOperationsFlowPublisher operationsFlowPublisher)
+        IRequestPortalOperationsFlowPublisher operationsFlowPublisher,
+        IRequestSubmissionPolicy requestSubmissionPolicy)
     {
         this.inner = inner;
         this.auditWriter = auditWriter;
         this.dbContext = dbContext;
         this.clock = clock;
         this.operationsFlowPublisher = operationsFlowPublisher;
+        this.requestSubmissionPolicy = requestSubmissionPolicy;
     }
 
     public Task<IReadOnlyList<OrganizationSummary>> GetOrganizationsForUserAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -137,6 +140,24 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     {
         RequestDetail? request = await inner.GetRequestAsync(userId, requestId, false, cancellationToken);
         await EnsureOrganizationEligibleForSubmissionAsync(request?.OrganizationId, cancellationToken);
+
+        try
+        {
+            await requestSubmissionPolicy.ValidateAsync(userId, requestId, cancellationToken);
+        }
+        catch (RequestSubmissionBlockedException exception)
+        {
+            await TryAuditAsync(
+                userId,
+                "RequestSubmissionBlocked",
+                "AssistanceRequest",
+                requestId,
+                request?.OrganizationId,
+                $"{exception.Code}: {exception.Message}",
+                cancellationToken);
+            throw;
+        }
+
         await inner.SubmitRequestAsync(userId, requestId, cancellationToken);
         await TryAuditAsync(
             userId,
