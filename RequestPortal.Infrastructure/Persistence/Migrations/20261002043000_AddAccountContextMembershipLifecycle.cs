@@ -1,9 +1,13 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using RequestPortal.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace RequestPortal.Infrastructure.Persistence.Migrations;
 
+[DbContext(typeof(RequestPortalDbContext))]
+[Migration("20261002043000_AddAccountContextMembershipLifecycle")]
 public partial class AddAccountContextMembershipLifecycle : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
