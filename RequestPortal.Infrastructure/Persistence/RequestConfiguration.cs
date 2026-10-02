@@ -20,6 +20,7 @@ internal sealed class AssistanceRequestConfiguration : IEntityTypeConfiguration<
         builder.Property(request => request.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(request => request.Priority).HasConversion<string>().HasMaxLength(24).IsRequired();
         builder.Property(request => request.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(request => request.StatusBeforeRepresentativeReview).HasConversion<string>().HasMaxLength(32);
         builder.HasIndex(request => request.PublicReference).IsUnique();
         builder.HasIndex(request => new { request.OrganizationId, request.Status });
         builder.HasIndex(request => new { request.OrganizationId, request.Kind });
