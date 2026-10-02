@@ -175,7 +175,8 @@ public interface IPortalMessageService
         string body,
         IReadOnlyCollection<Guid> recipientUserIds,
         CancellationToken cancellationToken = default,
-        Guid? stableMessageId = null);
+        Guid? stableMessageId = null,
+        bool notifyExternally = true);
 
     Task<bool> CanAccessAttachmentAsync(
         Guid userId,

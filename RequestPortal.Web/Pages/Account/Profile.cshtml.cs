@@ -65,6 +65,7 @@ public sealed class ProfileModel : PageModel
     public async Task<IActionResult> OnPostProfileAsync()
     {
         ApplicationUser user = await GetUserAsync();
+        KeepValidationFor(nameof(ProfileInput));
 
         if (!ModelState.IsValid)
         {
@@ -95,6 +96,7 @@ public sealed class ProfileModel : PageModel
     public async Task<IActionResult> OnPostPreferenceAsync()
     {
         ApplicationUser user = await GetUserAsync();
+        KeepValidationFor(nameof(Preference));
         LoadAvailability();
 
         if (Preference.Enabled && !IsAvailable(Preference.Channel))
@@ -124,9 +126,9 @@ public sealed class ProfileModel : PageModel
         await notificationPreferenceService.SaveOrganizationSubscriptionAsync(
             user.Id,
             OrganizationInput.MembershipId,
-            OrganizationInput.ReceiveOrganizationNotifications,
-            OrganizationInput.ReceiveRequestNotifications,
-            OrganizationInput.ReceiveMembershipNotifications,
+            OrganizationInput.ReceiveAllOrganizationActivity,
+            OrganizationInput.ReceiveAllOrganizationActivity,
+            OrganizationInput.ReceiveAllOrganizationActivity,
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Organization notification preferences saved.";
@@ -148,6 +150,7 @@ public sealed class ProfileModel : PageModel
     public async Task<IActionResult> OnPostRegisterOrganizationAsync()
     {
         ApplicationUser user = await GetUserAsync();
+        KeepValidationFor(nameof(Registration));
 
         if (!ModelState.IsValid)
         {
@@ -231,6 +234,13 @@ public sealed class ProfileModel : PageModel
             configuration.GetValue("Notifications:WhatsAppEnabled", false);
     }
 
+    private void KeepValidationFor(string prefix)
+    {
+        foreach (string key in ModelState.Keys.Where(key =>
+            !key.StartsWith(prefix + ".", StringComparison.Ordinal) && key != prefix).ToArray())
+            ModelState.Remove(key);
+    }
+
     private bool IsAvailable(NotificationChannel channel) =>
         channel switch
         {
@@ -265,9 +275,7 @@ public sealed class ProfileModel : PageModel
     public sealed class OrganizationSubscriptionInput
     {
         public Guid MembershipId { get; set; }
-        public bool ReceiveOrganizationNotifications { get; set; }
-        public bool ReceiveRequestNotifications { get; set; }
-        public bool ReceiveMembershipNotifications { get; set; }
+        public bool ReceiveAllOrganizationActivity { get; set; }
     }
 
     public sealed class RegistrationInput

@@ -4,6 +4,7 @@
 @using RequestPortal.Application.ReferenceData
 @using RequestPortal.Application.Requests
 @using RequestPortal.Domain.Documents
+@using RequestPortal.Domain.Requests
 @{
     ViewData["Title"] = "Request Details";
 }
@@ -19,17 +20,26 @@
             <header class="workspace-titlebar">
                 <div class="section-heading" style="margin-bottom:0">
                     <div class="eyebrow" style="color:#b45b09">@Model.Request.OrganizationName</div>
-                    <h1>@Model.Request.PublicReference</h1>
+                    <h1>Request # @Model.Request.PublicReference</h1>
                     <p>@Model.Request.Summary</p>
                 </div>
                 <div class="action-row">
+                    @if (Model.CanStartRequestConversation)
+                    {
                     <a class="button button-outline"
                        asp-page="/Messages/New"
                        asp-route-OrganizationId="@Model.Request.OrganizationId"
                        asp-route-RequestId="@Model.Request.Id">Message FFP</a>
-                    <span class="status status-@Model.Request.Status">@Model.Request.Status</span>
+                    }
+                    <span class="status status-@Model.Request.Status">@RequestStatusPresentation.Label(Model.Request.Status)</span>
                 </div>
             </header>
+
+            <section class="operational-panel request-progress" aria-label="Request progress">
+                <span><strong>Completed</strong> @(string.Join(" · ", Model.Request.History.Reverse().Where(item => item.Status != Model.Request.Status).Select(item => RequestStatusPresentation.Label(item.Status)).Distinct().DefaultIfEmpty("None yet")))</span>
+                <span aria-current="step"><strong>Current</strong> @RequestStatusPresentation.Label(Model.Request.Status)</span>
+                <span><strong>Next</strong> @RequestStatusPresentation.Next(Model.Request.Status)</span>
+            </section>
 
             <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
                 <div>
@@ -243,6 +253,10 @@
 
                     <section class="operational-panel" style="margin-top:10px">
                         <h2>Supporting documents</h2>
+                        @if (Model.DocumentsUnavailable)
+                        {
+                            <div class="flash error" role="alert">Document storage is temporarily unavailable. Your request and conversation are still available. Reference: @HttpContext.TraceIdentifier</div>
+                        }
                         @if (Model.Documents.Count == 0)
                         {
                             <p class="muted">No supporting documents have been uploaded.</p>
@@ -285,6 +299,54 @@
                         }
                     </section>
 
+                    <section class="operational-panel request-messages-card">
+                        <div class="panel-titlebar"><strong>Conversation</strong><a asp-page="/Messages/Inbox">Inbox</a></div>
+                        <div asp-validation-summary="ModelOnly" class="validation"></div>
+                        @if (Model.MessageThreads.Count == 0 && Model.CanStartRequestConversation)
+                        {
+                            <form method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="request-reply-form">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <div class="request-reply-box">
+                                    <textarea name="Reply" rows="3" maxlength="10000" required placeholder="Message FFP about this request" aria-label="Message FFP">@Model.Reply</textarea>
+                                    <label class="reply-paperclip" title="Attach a document">📎<input name="ReplyAttachment" type="file" aria-label="Attach a document" /></label>
+                                </div>
+                                <button class="button button-small" type="submit">Send</button>
+                            </form>
+                        }
+                        @foreach (var thread in Model.MessageThreads)
+                        {
+                            <div class="request-conversation">
+                                <strong>@thread.Subject</strong>
+                                <div class="request-conversation-history">
+                                @foreach (var message in thread.Messages)
+                                {
+                                    <article class="request-message-item">
+                                        <div><strong>@message.SenderName</strong> <time>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt")</time></div>
+                                        <p style="white-space:pre-wrap">@message.Body</p>
+                                        @foreach (var attachment in message.Attachments)
+                                        {
+                                            <a asp-page="/Messages/Thread" asp-page-handler="Attachment" asp-route-id="@thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
+                                        }
+                                    </article>
+                                }
+                                </div>
+                                @if (!thread.ClosedUtc.HasValue)
+                                {
+                                    <form method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="request-reply-form">
+                                        <input type="hidden" name="id" value="@Model.Request.Id" />
+                                        <input type="hidden" name="ReplyThreadId" value="@thread.ThreadId" />
+                                        <div class="request-reply-box">
+                                            <textarea name="Reply" rows="3" maxlength="10000" required placeholder="Reply in this conversation" aria-label="Reply">@(Model.ReplyThreadId == thread.ThreadId ? Model.Reply : string.Empty)</textarea>
+                                            <label class="reply-paperclip" title="Attach a document">📎<input name="ReplyAttachment" type="file" aria-label="Attach a document" /></label>
+                                        </div>
+                                        <span asp-validation-for="Reply" class="validation"></span>
+                                        <button class="button button-small" type="submit">Send reply</button>
+                                    </form>
+                                }
+                            </div>
+                        }
+                    </section>
+
                     @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
                     {
                         <section class="operational-panel" style="margin-top:10px">
@@ -304,45 +366,6 @@
                 </div>
 
                 <aside class="request-detail-side">
-                    <section class="operational-panel request-messages-card">
-                        <div class="panel-titlebar">
-                            <div>
-                                <strong>Messages</strong>
-                                <small>@Model.MessageThreads.Sum(thread => thread.Messages.Count) messages · @Model.MessageThreads.Count conversations</small>
-                            </div>
-                            <a asp-page="/Messages/New" asp-route-OrganizationId="@Model.Request.OrganizationId" asp-route-RequestId="@Model.Request.Id">New</a>
-                        </div>
-                        @if (Model.MessageThreads.Count == 0)
-                        {
-                            <div class="workspace-empty compact">
-                                <strong>No messages</strong>
-                                <p>Messages about this application will appear here.</p>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="request-message-list">
-                                @foreach (var thread in Model.MessageThreads)
-                                {
-                                    <a class="request-message-thread" asp-page="/Messages/Thread" asp-route-id="@thread.ThreadId">
-                                        <div class="request-message-thread-head">
-                                            <strong>@thread.Subject</strong>
-                                            <span>@thread.Audience.ToString().Replace("OrganizationManager", "Organization Manager").Replace("FfpInternal", "FFP Internal")</span>
-                                        </div>
-                                        @foreach (var message in thread.Messages.TakeLast(3))
-                                        {
-                                            <div class="request-message-item">
-                                                <strong>@message.SenderName</strong>
-                                                <span>@message.Body</span>
-                                                <small>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt") @if (message.Attachments.Count > 0) { <text> · 📎</text> }</small>
-                                            </div>
-                                        }
-                                    </a>
-                                }
-                            </div>
-                        }
-                    </section>
-
                     <section class="operational-panel request-status-card">
                         <div class="panel-titlebar">
                             <strong>Status history</strong>
@@ -351,7 +374,7 @@
                         @foreach (RequestHistoryDetail history in Model.Request.History)
                         {
                             <div class="timeline-item">
-                                <strong>@history.Status</strong>
+                                <strong>@RequestStatusPresentation.Label(history.Status)</strong>
                                 @if (!string.IsNullOrWhiteSpace(history.Reason))
                                 {
                                     <span>@history.Reason</span>
@@ -368,11 +391,22 @@
 </section>
 
 <style>
+    .request-progress { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px; }
+    .request-progress span { display:flex; flex-direction:column; flex:1; min-width:170px; }
+    .request-progress [aria-current] { border-left:4px solid #d46b08; padding-left:8px; }
+    .request-reply-form { padding:8px; }
+    .request-reply-box { position:relative; }
+    .request-reply-box textarea { width:100%; padding-right:45px; box-sizing:border-box; }
+    .reply-paperclip { position:absolute; right:8px; bottom:12px; cursor:pointer; font-size:20px; }
+    .reply-paperclip input { position:absolute; inset:0; width:28px; opacity:0; cursor:pointer; }
+    .request-conversation { border-bottom:1px solid #dde3e8; padding:8px; }
+    .request-conversation-history { max-height:350px; overflow:auto; }
+    .request-conversation-history time { font-size:.75rem; color:#53616b; }
     .proposal-document {
         margin-top: 18px;
         background: #fff;
         border: 1px solid #e0e4e7;
-        padding: 32px 38px;
+        padding: 16px 20px;
         font-family: Georgia, 'Times New Roman', serif;
         line-height: 1.65;
         overflow-wrap: anywhere;

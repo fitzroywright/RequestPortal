@@ -258,7 +258,12 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         await EnsureApprovedMemberAsync(userId, organizationId, cancellationToken);
 
         DateTimeOffset now = clock.UtcNow;
-        string publicReference = $"RP-{now:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}";
+        // PostgreSQL nextval is atomic and never rolls back a reserved value.
+        // The sequence is global: years and deleted drafts cannot recycle codes.
+        long number = await dbContext.Database
+            .SqlQueryRaw<long>("SELECT nextval('request_code_sequence') AS \"Value\"")
+            .SingleAsync(cancellationToken);
+        string publicReference = $"RP-{now:yy}-{number:D5}";
         AssistanceRequest request = new(Guid.NewGuid(), publicReference, organizationId, userId, now);
         request.SetSummary(summary);
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -23,11 +24,18 @@ public sealed class IndexModel : PageModel
 
     public IReadOnlyList<RequestSummary> Requests { get; private set; } = Array.Empty<RequestSummary>();
 
-    public async Task OnGetAsync()
+    public string? Query { get; private set; }
+
+    public async Task OnGetAsync(string? query = null)
     {
         ApplicationUser user = await userManager.GetUserAsync(User)
             ?? throw new InvalidOperationException("Authenticated portal user could not be resolved.");
 
         Requests = await workflowService.GetRequestsForUserAsync(user.Id, HttpContext.RequestAborted);
+        Query = query?.Trim();
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            Requests = Requests.Where(request => request.PublicReference.Contains(Query, StringComparison.OrdinalIgnoreCase)).ToArray();
+        }
     }
 }

@@ -20,6 +20,8 @@ using RequestPortal.Domain.Documents;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Web.Security;
+using Common.Storage;
+using Common.Diagnostics;
 
 namespace RequestPortal.Web.Pages.Requests;
 
@@ -70,6 +72,65 @@ public sealed class DetailsModel : PageModel
     public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
     public IReadOnlyList<MessageThreadView> MessageThreads { get; private set; } = Array.Empty<MessageThreadView>();
+    public bool DocumentsUnavailable { get; private set; }
+    public bool CanStartRequestConversation { get; private set; }
+
+    [BindProperty] public string Reply { get; set; } = string.Empty;
+    [BindProperty] public Guid? ReplyThreadId { get; set; }
+    [BindProperty] public IFormFile? ReplyAttachment { get; set; }
+
+    public async Task<IActionResult> OnPostReplyAsync(Guid id)
+    {
+        ApplicationUser user = await GetUserAsync();
+        RequestDetail? request = await workflowService.GetRequestAsync(user.Id, id, false, HttpContext.RequestAborted);
+        if (request is null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(Reply) || Reply.Length > 10000)
+        {
+            ModelState.AddModelError(nameof(Reply), "Enter a reply of up to 10,000 characters.");
+            return await LoadPageAsync(user, id);
+        }
+
+        if (ReplyThreadId.HasValue)
+        {
+            MessageThreadView? thread = await messageService.GetThreadAsync(user.Id, false, ReplyThreadId.Value, HttpContext.RequestAborted);
+            if (thread is null || thread.RequestId != id) return NotFound();
+            if (thread.ClosedUtc.HasValue)
+            {
+                ModelState.AddModelError(nameof(Reply), "This conversation is closed. Contact FFP to reopen it.");
+                return await LoadPageAsync(user, id);
+            }
+        }
+
+        List<Guid> attachments = [];
+        if (ReplyAttachment is { Length: > 0 })
+        {
+            try
+            {
+                await using System.IO.Stream content = ReplyAttachment.OpenReadStream();
+                attachments.Add(await documentService.UploadForRequestAsync(user.Id, id,
+                    RequestPortal.Domain.Documents.DocumentType.RequestSupport,
+                    ReplyAttachment.FileName, ReplyAttachment.ContentType, ReplyAttachment.Length, content,
+                    HttpContext.RequestAborted));
+            }
+            catch (Exception exception) when (exception is System.IO.IOException or HttpRequestException)
+            {
+                await ReportStorageFailureAsync(exception);
+                ModelState.AddModelError(nameof(Reply), "The attachment could not be stored. Your reply has not been sent. You can retry or send it without the attachment.");
+                return await LoadPageAsync(user, id);
+            }
+        }
+
+        if (ReplyThreadId.HasValue)
+            await messageService.ReplyAsync(user.Id, false, ReplyThreadId.Value, Reply,
+                HttpContext.RequestAborted, attachments);
+        else
+            await messageService.SendToSharedStaffAsync(user.Id, request.OrganizationId, id, null,
+                $"Request # {request.PublicReference}", Reply, HttpContext.RequestAborted, attachments);
+
+        TempData["Success"] = "Reply sent to FFP.";
+        return RedirectToPage(new { id });
+    }
 
     [BindProperty]
     public ItemInput Item { get; set; } = new();
@@ -129,8 +190,10 @@ public sealed class DetailsModel : PageModel
             return await LoadPageAsync(user, id);
         }
 
-        await using System.IO.Stream content = Document.File.OpenReadStream();
-        await documentService.UploadForRequestAsync(
+        try
+        {
+            await using System.IO.Stream content = Document.File.OpenReadStream();
+            await documentService.UploadForRequestAsync(
             user.Id,
             id,
             Document.DocumentType,
@@ -138,7 +201,13 @@ public sealed class DetailsModel : PageModel
             Document.File.ContentType ?? "application/octet-stream",
             Document.File.Length,
             content,
-            HttpContext.RequestAborted);
+                HttpContext.RequestAborted);
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or HttpRequestException)
+        {
+            await ReportStorageFailureAsync(exception);
+            return await LoadPageAsync(user, id);
+        }
 
         TempData["Success"] = "Supporting document uploaded.";
         return RedirectToPage(new { id });
@@ -147,11 +216,21 @@ public sealed class DetailsModel : PageModel
     public async Task<IActionResult> OnGetDownloadAsync(Guid id, Guid documentId)
     {
         ApplicationUser user = await GetUserAsync();
-        DocumentDownload? download = await documentService.DownloadAsync(
+        DocumentDownload? download;
+        try
+        {
+            download = await documentService.DownloadAsync(
             user.Id,
             documentId,
             isStaff: false,
-            HttpContext.RequestAborted);
+                HttpContext.RequestAborted);
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or HttpRequestException)
+        {
+            await ReportStorageFailureAsync(exception);
+            TempData["Error"] = "Document storage is temporarily unavailable. Please try again later.";
+            return RedirectToPage(new { id });
+        }
 
         if (download is null)
         {
@@ -245,6 +324,27 @@ public sealed class DetailsModel : PageModel
         return unit?.Name ?? "Unit";
     }
 
+    private async Task ReportStorageFailureAsync(Exception exception)
+    {
+        DocumentsUnavailable = true;
+        string correlation = HttpContext.TraceIdentifier;
+        ILogger logger = HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("RequestPortal.Documents");
+        logger.LogError(exception, "Document operation failed. CorrelationId={CorrelationId}", correlation);
+        try
+        {
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(5));
+            await HttpContext.RequestServices.GetRequiredService<IDiagnosticOperationsRouter>().RouteAsync(
+                new DiagnosticTelemetryEvent(DateTimeOffset.UtcNow, "RequestPortal.Common.Storage",
+                    "RP-DOCUMENT-STORAGE-FAILED", DiagnosticSeverity.Error,
+                    "A document operation failed. The request remains available.", correlation,
+                    new Dictionary<string, string> { ["Exception"] = exception.ToString() }), timeout.Token);
+        }
+        catch (Exception diagnosticException)
+        {
+            logger.LogError(diagnosticException, "Diagnostic routing failed. CorrelationId={CorrelationId}", correlation);
+        }
+    }
+
     private async Task<IActionResult> LoadPageAsync(ApplicationUser user, Guid id)
     {
         Request = await workflowService.GetRequestAsync(
@@ -277,7 +377,8 @@ public sealed class DetailsModel : PageModel
         Guid[] threadIds = await dbContext.MessageThreads
             .AsNoTracking()
             .Where(thread => thread.RequestId == id)
-            .OrderByDescending(thread => thread.CreatedUtc)
+            .OrderByDescending(thread => thread.Id == id)
+            .ThenByDescending(thread => thread.CreatedUtc)
             .Select(thread => thread.Id)
             .Take(20)
             .ToArrayAsync(HttpContext.RequestAborted);
@@ -297,6 +398,14 @@ public sealed class DetailsModel : PageModel
         }
 
         MessageThreads = visibleThreads;
+        CanStartRequestConversation = await dbContext.AssistanceRequests.AsNoTracking()
+            .AnyAsync(item => item.Id == id && (item.CreatedByUserId == user.Id || item.SubmittedByUserId == user.Id), HttpContext.RequestAborted)
+            || visibleThreads.Any(item => item.Audience == RequestPortal.Domain.Messages.MessageAudience.Request)
+            || await dbContext.OrganizationMemberships.AsNoTracking().AnyAsync(item =>
+                item.OrganizationId == Request.OrganizationId && item.UserId == user.Id &&
+                item.Status == RequestPortal.Domain.Organizations.MembershipStatus.Approved &&
+                item.Role == RequestPortal.Domain.Organizations.OrganizationRole.Administrator && item.ReceiveRequestNotifications,
+                HttpContext.RequestAborted);
         Documents = await documentService.GetRequestDocumentsAsync(
             user.Id,
             id,

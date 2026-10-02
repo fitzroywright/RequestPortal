@@ -58,9 +58,7 @@ public sealed class OrganizationMembership
     {
         EnsurePending();
         Role = OrganizationRole.Administrator;
-        ReceiveOrganizationNotifications = true;
-        ReceiveRequestNotifications = true;
-        ReceiveMembershipNotifications = true;
+        // Broad organization activity is opt-in per person.
         Status = MembershipStatus.Approved;
         ApprovedByUserId = approvedByUserId;
         ApprovedUtc = approvedUtc;
@@ -79,9 +77,7 @@ public sealed class OrganizationMembership
     {
         EnsureApproved();
         Role = OrganizationRole.Administrator;
-        ReceiveOrganizationNotifications = true;
-        ReceiveRequestNotifications = true;
-        ReceiveMembershipNotifications = true;
+        // Broad organization activity is opt-in per person.
     }
 
     public void DemoteToMember()

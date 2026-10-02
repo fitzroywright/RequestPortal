@@ -9,7 +9,6 @@ using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Pages.Account;
 
-[IgnoreAntiforgeryToken]
 public sealed class LogoutModel : PageModel
 {
     private readonly SignInManager<ApplicationUser> signInManager;
@@ -36,6 +35,9 @@ public sealed class LogoutModel : PageModel
             HttpContext.RequestAborted);
         await signInManager.SignOutAsync();
         await HttpContext.SignOutAsync(StaffOidcOptions.StaffCookieScheme);
+        await HttpContext.SignOutAsync("ExternalReviewer");
+        HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
+        Response.Headers.CacheControl = "no-store";
         return RedirectToPage("/Index");
     }
 }

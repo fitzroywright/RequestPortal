@@ -6,7 +6,8 @@ public enum MessageAudience
     Organization = 1,
     OrganizationManager = 2,
     FfpInternal = 3,
-    PersonalNote = 4
+    PersonalNote = 4,
+    Request = 5
 }
 
 public sealed class MessageThread

@@ -86,9 +86,13 @@ public sealed class NotificationWorkflowTests
             await service.GetOrganizationSubscriptionsAsync(manager.Id, cancellationToken);
 
         Assert.Equal(2, initial.Count);
-        Assert.All(initial, item => Assert.True(item.ReceiveOrganizationNotifications));
-        Assert.All(initial, item => Assert.True(item.ReceiveRequestNotifications));
-        Assert.All(initial, item => Assert.True(item.ReceiveMembershipNotifications));
+        Assert.All(initial, item => Assert.False(item.ReceiveOrganizationNotifications));
+        Assert.All(initial, item => Assert.False(item.ReceiveRequestNotifications));
+        Assert.All(initial, item => Assert.False(item.ReceiveMembershipNotifications));
+
+        OrganizationNotificationSubscriptionView firstSubscription = Assert.Single(initial, item => item.OrganizationId == first.Id);
+        await service.SaveOrganizationSubscriptionAsync(manager.Id, firstSubscription.MembershipId,
+            true, true, true, cancellationToken);
 
         OrganizationNotificationSubscriptionView secondSubscription =
             Assert.Single(initial, item => item.OrganizationId == second.Id);
@@ -131,6 +135,7 @@ public sealed class NotificationWorkflowTests
         database.Db.Users.AddRange(representative, manager, optedOutManager, unrelatedManager);
 
         Organization organization = CreateApprovedOrganization(manager.Id, "Organization A");
+        organization.Memberships.Single(item => item.UserId == manager.Id).SetNotificationSubscriptions(true, true, true);
         OrganizationMembership representativeMembership =
             organization.RequestMembership(Guid.NewGuid(), representative.Id, Now.AddMinutes(1));
         representativeMembership.Approve(manager.Id, Now.AddMinutes(2));
@@ -210,13 +215,18 @@ public sealed class NotificationWorkflowTests
                 WhatsAppEnabled = false
             }),
             NullLogger<OutboxDispatcher>.Instance,
-            new NullOperationsFlowPublisher());
+            new NullOperationsFlowPublisher(),
+            new RequestPortal.Infrastructure.Messages.PortalMessageService(database.Db, new NullRealtimeNotifier()));
 
         int processed = await dispatcher.DispatchBatchAsync(
             batchSize: 10,
             cancellationToken);
 
         Assert.Equal(1, processed);
+        var confirmation = Assert.Single(database.Db.PortalMessages);
+        Assert.Contains(request.PublicReference, confirmation.Body);
+        Assert.Contains("quote this request code", confirmation.Body);
+        Assert.Equal(2, database.Db.MessageRecipients.Count());
 
         using CancellationTokenSource timeout =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -327,6 +337,12 @@ public sealed class NotificationWorkflowTests
             string? detail = null,
             CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+    }
+
+    private sealed class NullRealtimeNotifier : RequestPortal.Application.Messages.IPortalMessageRealtimeNotifier
+    {
+        public Task NotifyAsync(RequestPortal.Application.Messages.PortalMessageCreated message,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class NullOperationsFlowPublisher : IRequestPortalOperationsFlowPublisher

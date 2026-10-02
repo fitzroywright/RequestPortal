@@ -17,7 +17,7 @@
                 <h1>Profile</h1>
                 <p>Your personal details, organization memberships and notification preferences in one place.</p>
             </div>
-            <a class="button button-small button-outline" asp-page="/Dashboard/Index">Back to workspace</a>
+            <a class="button button-small button-outline" asp-page="/Dashboard/Index">Back to requests</a>
         </header>
 
         <div asp-validation-summary="ModelOnly" class="validation profile-validation"></div>
@@ -170,9 +170,7 @@
                             <form method="post" asp-page-handler="OrganizationSubscription" class="profile-org-notification-row">
                                 <input type="hidden" name="OrganizationInput.MembershipId" value="@subscription.MembershipId" />
                                 <span title="@subscription.OrganizationName">@subscription.OrganizationName</span>
-                                <label title="Organization notices"><input type="checkbox" name="OrganizationInput.ReceiveOrganizationNotifications" value="true" @(subscription.ReceiveOrganizationNotifications ? "checked" : null) /> Org</label>
-                                <label title="Request updates"><input type="checkbox" name="OrganizationInput.ReceiveRequestNotifications" value="true" @(subscription.ReceiveRequestNotifications ? "checked" : null) /> Requests</label>
-                                <label title="Membership events"><input type="checkbox" name="OrganizationInput.ReceiveMembershipNotifications" value="true" @(subscription.ReceiveMembershipNotifications ? "checked" : null) /> Members</label>
+                                <label><input type="checkbox" name="OrganizationInput.ReceiveAllOrganizationActivity" value="true" @(subscription.ReceiveOrganizationNotifications && subscription.ReceiveRequestNotifications && subscription.ReceiveMembershipNotifications ? "checked" : null) /> Notify me about all organization activity</label>
                                 <button class="button button-small button-outline" type="submit">Save</button>
                             </form>
                         }

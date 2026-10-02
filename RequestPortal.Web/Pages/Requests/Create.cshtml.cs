@@ -19,6 +19,7 @@ using RequestPortal.Application.Requests;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
+using Common.Diagnostics;
 
 namespace RequestPortal.Web.Pages.Requests;
 
@@ -37,6 +38,7 @@ public sealed class CreateModel : PageModel
     private readonly IDocumentService documentService;
     private readonly IPortalMessageService messageService;
     private readonly ILogger<CreateModel> logger;
+    private readonly IDiagnosticOperationsRouter diagnostics;
 
     public CreateModel(
         UserManager<ApplicationUser> userManager,
@@ -49,7 +51,8 @@ public sealed class CreateModel : PageModel
         IOrganizationProfileService organizationProfileService,
         IDocumentService documentService,
         IPortalMessageService messageService,
-        ILogger<CreateModel> logger)
+        ILogger<CreateModel> logger,
+        IDiagnosticOperationsRouter diagnostics)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -62,6 +65,7 @@ public sealed class CreateModel : PageModel
         this.documentService = documentService;
         this.messageService = messageService;
         this.logger = logger;
+        this.diagnostics = diagnostics;
     }
 
     public IReadOnlyList<OrganizationRequesterOption> Organizations { get; private set; } = Array.Empty<OrganizationRequesterOption>();
@@ -103,7 +107,7 @@ public sealed class CreateModel : PageModel
         }
         catch (Exception exception)
         {
-            CaptureFailure(
+            await CaptureFailureAsync(
                 exception,
                 "loading the New Request page");
         }
@@ -119,7 +123,7 @@ public sealed class CreateModel : PageModel
         }
         catch (Exception exception)
         {
-            CaptureFailure(
+            await CaptureFailureAsync(
                 exception,
                 "loading request data before submission");
 
@@ -181,7 +185,7 @@ public sealed class CreateModel : PageModel
         }
         catch (Exception exception)
         {
-            CaptureFailure(
+            await CaptureFailureAsync(
                 exception,
                 "checking production submission policy");
 
@@ -275,13 +279,11 @@ public sealed class CreateModel : PageModel
         }
         catch (Exception exception)
         {
-            string correlation =
-                System.Diagnostics.Activity.Current?.Id
-                ?? HttpContext.TraceIdentifier;
+            string correlation = HttpContext.TraceIdentifier;
 
             logger.LogError(
                 exception,
-                "Create Request failed while {Stage}. RequestId={RequestId}; Correlation={Correlation}",
+                "Create Request failed while {Stage}. RequestId={RequestId}; CorrelationId={CorrelationId}",
                 stage,
                 requestId,
                 correlation);
@@ -306,17 +308,11 @@ public sealed class CreateModel : PageModel
             {
                 logger.LogWarning(
                     alertException,
-                    "The Create Request failure could not also be posted to the FFP Staff inbox. Correlation={Correlation}",
+                    "The Create Request failure could not also be posted to the FFP Staff inbox. CorrelationId={CorrelationId}",
                     correlation);
             }
 
-            FailureStage = stage;
-            FailureCorrelation = correlation;
-            FailureDetails = exception.ToString();
-
-            ModelState.AddModelError(
-                string.Empty,
-                $"The request could not be completed while {stage}. The full server exception is displayed below. Reference: {correlation}");
+            await CaptureFailureAsync(exception, stage);
 
             return Page();
         }
@@ -325,27 +321,46 @@ public sealed class CreateModel : PageModel
         return RedirectToPage("/Requests/Details", new { id = requestId });
     }
 
-    private void CaptureFailure(
+    private async Task CaptureFailureAsync(
         Exception exception,
         string stage)
     {
-        string correlation =
-            System.Diagnostics.Activity.Current?.Id
-            ?? HttpContext.TraceIdentifier;
+        string correlation = HttpContext.TraceIdentifier;
 
         FailureStage = stage;
         FailureCorrelation = correlation;
-        FailureDetails = exception.ToString();
+        FailureDetails = null;
 
         logger.LogError(
             exception,
-            "Create Request failed while {Stage}; Correlation={Correlation}",
+            "Create Request failed while {Stage}; CorrelationId={CorrelationId}",
             stage,
             correlation);
 
+        try
+        {
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(5));
+            await diagnostics.RouteAsync(new DiagnosticTelemetryEvent(
+                DateTimeOffset.UtcNow,
+                "RequestPortal.Requests.Create",
+                "RP-REQUEST-CREATE-FAILED",
+                DiagnosticSeverity.Error,
+                $"Request creation failed while {stage}.",
+                correlation,
+                new Dictionary<string, string>
+                {
+                    ["Stage"] = stage,
+                    ["Exception"] = exception.ToString()
+                }), timeout.Token);
+        }
+        catch (Exception diagnosticException)
+        {
+            logger.LogError(diagnosticException, "Diagnostic routing failed. CorrelationId={CorrelationId}", correlation);
+        }
+
         ModelState.AddModelError(
             string.Empty,
-            $"The request could not be completed while {stage}. The full server exception is displayed below. Reference: {correlation}");
+            $"We could not complete this action. Please try again or contact FFP and quote this reference: {correlation}.");
     }
 
     private void ValidateItems()

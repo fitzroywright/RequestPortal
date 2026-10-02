@@ -3,7 +3,7 @@
 @using RequestPortal.Application.Administration
 @using RequestPortal.Application.Portal
 @{
-    ViewData["Title"] = "FFP Staff Workspace";
+    ViewData["Title"] = "FFP Staff requests";
 }
 
 <section class="section portal-workspace staff-workspace">
@@ -11,10 +11,14 @@
         <header class="workspace-titlebar">
             <div>
                 <div class="eyebrow request-eyebrow">FFP internal</div>
-                <h1>Staff workspace</h1>
+                <h1>Staff requests</h1>
                 <p>Review work requiring attention, open operational queues, and move directly into the next action.</p>
             </div>
             <div class="workspace-toolbar">
+                <form method="get" class="operational-toolbar">
+                    <input name="requestCode" maxlength="40" placeholder="Request code" aria-label="Request code" />
+                    <button class="button button-small" type="submit">Find request</button>
+                </form>
                 <a class="button" asp-page="/Staff/Operations">Action queues</a>
                 <a class="button button-secondary" asp-page="/Staff/Organizations">Organizations</a>
                 <a class="button button-secondary" asp-page="/Staff/Reports">Reports</a>
@@ -64,7 +68,7 @@
                 <div class="panel-titlebar panel-titlebar-secondary">
                     <strong>Actions</strong>
                 </div>
-                <nav class="actions-list" aria-label="Staff workspace actions">
+                <nav class="actions-list" aria-label="Staff requests actions">
                     <a asp-page="/Staff/Operations">Action &amp; aging queues <span>›</span></a>
                     <a asp-page="/Staff/Organizations">Organizations <span>›</span></a>
                     <a asp-page="/Staff/Fulfilment">Fulfilment <span>›</span></a>

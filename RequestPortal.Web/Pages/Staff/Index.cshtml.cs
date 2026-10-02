@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Administration;
 using RequestPortal.Application.Portal;
 using RequestPortal.Infrastructure.Identity;
+using Microsoft.EntityFrameworkCore;
+using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Web.Pages.Staff;
 
@@ -16,15 +18,18 @@ public sealed class IndexModel : PageModel
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IPortalWorkflowService workflowService;
     private readonly IStaffOperationsService staffOperationsService;
+    private readonly RequestPortalDbContext dbContext;
 
     public IndexModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
-        IStaffOperationsService staffOperationsService)
+        IStaffOperationsService staffOperationsService,
+        RequestPortalDbContext dbContext)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.staffOperationsService = staffOperationsService;
+        this.dbContext = dbContext;
     }
 
     public IReadOnlyList<OrganizationSummary> PendingOrganizations { get; private set; } = Array.Empty<OrganizationSummary>();
@@ -54,23 +59,24 @@ public sealed class IndexModel : PageModel
             ? 0
             : Operations.OpenReviewRequests.Max(item => item.AgeDays);
 
-    public async Task OnGetAsync()
+    public async Task<IActionResult> OnGetAsync(string? requestCode = null)
     {
-        Task<IReadOnlyList<OrganizationSummary>> pendingOrganizationsTask =
-            workflowService.GetPendingOrganizationsAsync(HttpContext.RequestAborted);
-        Task<IReadOnlyList<RequestSummary>> submittedRequestsTask =
-            workflowService.GetSubmittedRequestsAsync(HttpContext.RequestAborted);
-        Task<StaffOperationsSnapshot> operationsTask =
-            staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
+        if (!string.IsNullOrWhiteSpace(requestCode))
+        {
+            string reference = requestCode.Trim().ToUpperInvariant();
+            Guid? requestId = await dbContext.AssistanceRequests.AsNoTracking()
+                .Where(item => item.PublicReference == reference)
+                .Select(item => (Guid?)item.Id).SingleOrDefaultAsync(HttpContext.RequestAborted);
+            if (requestId.HasValue)
+                return RedirectToPage("/Staff/Review", new { id = requestId.Value });
+            TempData["Error"] = "No request was found with that request code.";
+        }
 
-        await Task.WhenAll(
-            pendingOrganizationsTask,
-            submittedRequestsTask,
-            operationsTask);
-
-        PendingOrganizations = await pendingOrganizationsTask;
-        SubmittedRequests = await submittedRequestsTask;
-        Operations = await operationsTask;
+        // These services share the scoped EF context; queries must be sequential.
+        PendingOrganizations = await workflowService.GetPendingOrganizationsAsync(HttpContext.RequestAborted);
+        SubmittedRequests = await workflowService.GetSubmittedRequestsAsync(HttpContext.RequestAborted);
+        Operations = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
+        return Page();
     }
 
     public async Task<IActionResult> OnPostApproveOrganizationAsync(Guid organizationId)

@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Integration;
+using RequestPortal.Application.Messages;
 using RequestPortal.Application.Portal;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Notifications;
@@ -32,6 +33,7 @@ public sealed class OutboxDispatcher
     private readonly NotificationOptions notificationOptions;
     private readonly ILogger<OutboxDispatcher> logger;
     private readonly IRequestPortalOperationsFlowPublisher operationsFlowPublisher;
+    private readonly IPortalMessageService portalMessageService;
 
     public OutboxDispatcher(
         RequestPortalDbContext dbContext,
@@ -40,7 +42,8 @@ public sealed class OutboxDispatcher
         IOptions<FfpManagerBridgeOptions> ffpManagerOptions,
         IOptions<NotificationOptions> notificationOptions,
         ILogger<OutboxDispatcher> logger,
-        IRequestPortalOperationsFlowPublisher operationsFlowPublisher)
+        IRequestPortalOperationsFlowPublisher operationsFlowPublisher,
+        IPortalMessageService portalMessageService)
     {
         this.dbContext = dbContext;
         this.notificationSender = notificationSender;
@@ -49,6 +52,7 @@ public sealed class OutboxDispatcher
         this.notificationOptions = notificationOptions.Value;
         this.logger = logger;
         this.operationsFlowPublisher = operationsFlowPublisher;
+        this.portalMessageService = portalMessageService;
     }
 
     public async Task<int> DispatchBatchAsync(int batchSize = 20, CancellationToken cancellationToken = default)
@@ -399,12 +403,19 @@ public sealed class OutboxDispatcher
             request.OrganizationId,
             recipientUserId,
             cancellationToken);
+        string body = $"Request # {request.PublicReference} has been submitted to FFP for review. " +
+            "Please quote this request code whenever you contact FFP about your application.";
+        await portalMessageService.SendSystemMessageAsync(
+            request.OrganizationId, message.RequestId, null,
+            $"Request submitted: {request.PublicReference}", body, recipients,
+            cancellationToken, CreateDeterministicGuid(message.MessageId, "SubmissionConfirmation"),
+            notifyExternally: false);
         await DeliverToRecipientsAsync(
             recipients,
             request.OrganizationId,
             message.RequestId,
             $"Request submitted: {request.PublicReference}",
-            $"Request {request.PublicReference} has been submitted to FFP for review.",
+            body,
             cancellationToken);
     }
 
@@ -412,13 +423,19 @@ public sealed class OutboxDispatcher
     {
         AssistanceRequest request = await dbContext.AssistanceRequests.AsNoTracking().Include(item => item.StatusHistory).SingleAsync(item => item.Id == message.RequestId, cancellationToken);
         Guid recipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
-        string? reason = request.StatusHistory.OrderByDescending(item => item.ChangedUtc).Select(item => item.Reason).FirstOrDefault();
-        string body = $"Request {request.PublicReference} is now {request.Status}.";
+        RequestStatus eventStatus = (RequestStatus)message.Status;
+        string? reason = request.StatusHistory.Where(item => item.Status == eventStatus && item.ChangedUtc <= message.OccurredUtc)
+            .OrderByDescending(item => item.ChangedUtc).Select(item => item.Reason).FirstOrDefault();
+        string body = $"Request # {request.PublicReference}: {RequestStatusPresentation.Label(eventStatus.ToString())}.";
         if (!string.IsNullOrWhiteSpace(reason)) body += $"\n\n{reason}";
         IReadOnlyCollection<Guid> recipients = await GetRequestNotificationRecipientsAsync(
             request.OrganizationId,
             recipientUserId,
             cancellationToken);
+        await portalMessageService.SendSystemMessageAsync(
+            request.OrganizationId, request.Id, null, $"Request status: {request.PublicReference}",
+            body, recipients, cancellationToken,
+            CreateDeterministicGuid(message.MessageId, "StatusNotification"), notifyExternally: false);
         await DeliverToRecipientsAsync(
             recipients,
             request.OrganizationId,
