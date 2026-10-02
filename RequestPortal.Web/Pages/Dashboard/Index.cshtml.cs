@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Portal;
+using RequestPortal.Application.Messages;
 using RequestPortal.Infrastructure.Identity;
 
 namespace RequestPortal.Web.Pages.Dashboard;
@@ -13,13 +14,16 @@ public sealed class IndexModel : PageModel
 {
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IPortalWorkflowService workflowService;
+    private readonly IPortalMessageService messageService;
 
     public IndexModel(
         UserManager<ApplicationUser> userManager,
-        IPortalWorkflowService workflowService)
+        IPortalWorkflowService workflowService,
+        IPortalMessageService messageService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
+        this.messageService = messageService;
     }
 
     public string DisplayName { get; private set; } = string.Empty;
@@ -29,6 +33,8 @@ public sealed class IndexModel : PageModel
     public IReadOnlyList<RequestSummary> Requests { get; private set; } = Array.Empty<RequestSummary>();
 
     public IReadOnlyList<RequestSummary> ActionRequired { get; private set; } = Array.Empty<RequestSummary>();
+
+    public IReadOnlyList<MailboxMessageView> RecentMessages { get; private set; } = Array.Empty<MailboxMessageView>();
 
     public int ApprovedOrganizations => Organizations.Count(
         organization =>
@@ -55,5 +61,11 @@ public sealed class IndexModel : PageModel
             .Where(request => request.Status == "MoreInformationRequired" || request.Status == "Draft")
             .OrderByDescending(request => request.CreatedUtc)
             .ToArray();
+
+        RecentMessages = await messageService.GetInboxAsync(
+            user.Id,
+            isStaff: false,
+            take: 3,
+            HttpContext.RequestAborted);
     }
 }
