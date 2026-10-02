@@ -162,7 +162,9 @@ public sealed class LoginModel : PageModel
                 DisplayName = displayName,
                 IsInternalStaff = false,
                 CreatedUtc = clock.UtcNow,
-                LastSignInUtc = clock.UtcNow
+                LastSignInUtc = clock.UtcNow,
+                IndividualProfileUpdateRequired = true,
+                IndividualProfileUpdateRequiredUtc = clock.UtcNow
             };
 
             IdentityResult createResult = await userManager.CreateAsync(user);
