@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RequestPortal.Application.Messages;
+using RequestPortal.Application.Integration;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Domain.Messages;
 using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Infrastructure.Integration;
 using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Messages;
@@ -13,15 +16,21 @@ public sealed class PortalMessageService : IPortalMessageService
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IPortalMessageRealtimeNotifier realtimeNotifier;
+    private readonly IExternalApplicationBridgeClient bridgeClient;
+    private readonly FfpManagerBridgeOptions bridgeOptions;
     private readonly IBusinessAuditWriter? auditWriter;
 
     public PortalMessageService(
         RequestPortalDbContext dbContext,
         IPortalMessageRealtimeNotifier realtimeNotifier,
+        IExternalApplicationBridgeClient bridgeClient,
+        IOptions<FfpManagerBridgeOptions> bridgeOptions,
         IBusinessAuditWriter? auditWriter = null)
     {
         this.dbContext = dbContext;
         this.realtimeNotifier = realtimeNotifier;
+        this.bridgeClient = bridgeClient;
+        this.bridgeOptions = bridgeOptions.Value;
         this.auditWriter = auditWriter;
     }
 
@@ -595,6 +604,11 @@ public sealed class PortalMessageService : IPortalMessageService
         MessageAudience audience = MessageAudience.Individual,
         IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
     {
+        if (recipientUserIds.Contains(senderUserId))
+        {
+            throw new InvalidOperationException("You cannot send a message to yourself.");
+        }
+
         if (audience == MessageAudience.Individual && recipientUserIds.Count == 0)
         {
             throw new ArgumentException("An individual recipient is required for an individual conversation.", nameof(recipientUserIds));
@@ -1203,6 +1217,21 @@ public sealed class PortalMessageService : IPortalMessageService
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (senderKind == PortalMessageSenderKind.Representative &&
+            staffVisible &&
+            requestId.HasValue &&
+            audience == MessageAudience.Request)
+        {
+            await MirrorApplicantMessageToFfpManagerAsync(
+                message.Id,
+                requestId.Value,
+                senderUserId,
+                message.SenderDisplayName,
+                body,
+                cancellationToken);
+        }
+
         if (auditWriter is not null)
         {
             await auditWriter.WriteAsync(
@@ -1225,6 +1254,51 @@ public sealed class PortalMessageService : IPortalMessageService
         }
 
         return thread.Id;
+    }
+
+    private async Task MirrorApplicantMessageToFfpManagerAsync(
+        Guid messageId,
+        Guid requestId,
+        Guid senderUserId,
+        string senderName,
+        string body,
+        CancellationToken cancellationToken)
+    {
+        if (!bridgeOptions.Enabled)
+        {
+            return;
+        }
+
+        string? applicationId = await dbContext.IntegrationLinks
+            .AsNoTracking()
+            .Where(link =>
+                link.RequestId == requestId &&
+                link.SystemName == bridgeOptions.SystemName &&
+                link.ExternalReference != null)
+            .Select(link => link.ExternalReference)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(applicationId))
+        {
+            return;
+        }
+
+        string note = string.IsNullOrWhiteSpace(senderName)
+            ? body
+            : $"{senderName}: {body}";
+
+        ExternalInformationResponse response = new(
+            messageId,
+            requestId,
+            applicationId,
+            senderUserId,
+            note,
+            DateTimeOffset.UtcNow,
+            Array.Empty<ExternalArtifactDescriptor>());
+
+        await bridgeClient.SendInformationResponseAsync(
+            response,
+            cancellationToken);
     }
 
     private async Task<MessageThread> ResolveThreadAsync(
