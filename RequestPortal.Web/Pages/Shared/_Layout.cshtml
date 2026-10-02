@@ -1,4 +1,5 @@
 @inject IConfiguration Configuration
+@inject Microsoft.AspNetCore.Identity.UserManager<RequestPortal.Infrastructure.Identity.ApplicationUser> LayoutUserManager
 @using System.Security.Claims
 @{
     bool trainingEnabled = Configuration.GetValue("Training:Enabled", false);
@@ -10,6 +11,30 @@
     string? currentPage = ViewContext.RouteData.Values["page"]?.ToString();
     bool isOpeningPage = string.Equals(currentPage, "/Index", StringComparison.OrdinalIgnoreCase);
     bool useApplicationShell = isAuthenticated && !isOpeningPage;
+
+    RequestPortal.Infrastructure.Identity.ApplicationUser? layoutUser =
+        isAuthenticated ? await LayoutUserManager.GetUserAsync(User) : null;
+
+    string? profileGivenNameClaim = User.FindFirst(ClaimTypes.GivenName)?.Value;
+    string? profileNameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
+    string? profileEmailClaim = User.FindFirst(ClaimTypes.Email)?.Value;
+
+    string profileName =
+        !string.IsNullOrWhiteSpace(layoutUser?.DisplayName) ? layoutUser.DisplayName :
+        !string.IsNullOrWhiteSpace(profileGivenNameClaim) ? profileGivenNameClaim :
+        !string.IsNullOrWhiteSpace(profileNameClaim) ? profileNameClaim :
+        !string.IsNullOrWhiteSpace(User.Identity?.Name) ? User.Identity.Name! :
+        !string.IsNullOrWhiteSpace(profileEmailClaim) ? profileEmailClaim :
+        "Account";
+
+    if (profileName.Contains('@'))
+    {
+        profileName = profileName.Split('@', 2)[0];
+    }
+
+    string[] profileParts = profileName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    string profileFirstName = profileParts.Length > 0 ? profileParts[0] : "Account";
+    string profileInitials = profileFirstName[..Math.Min(2, profileFirstName.Length)].ToUpperInvariant();
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -93,18 +118,6 @@
                                 aria-expanded="false"
                                 aria-controls="profileMenuPanel"
                                 data-profile-menu-trigger>
-                            @{
-                                string? profileNameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
-                                string? profileGivenName = User.FindFirst(ClaimTypes.GivenName)?.Value;
-                                string profileName = !string.IsNullOrWhiteSpace(profileGivenName) && !profileGivenName.Contains('@')
-                                    ? profileGivenName
-                                    : !string.IsNullOrWhiteSpace(profileNameClaim) && !profileNameClaim.Contains('@')
-                                        ? profileNameClaim
-                                        : "User";
-                                string[] profileParts = profileName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                string profileFirstName = profileParts.Length > 0 ? profileParts[0] : "User";
-                                string profileInitials = profileFirstName[..Math.Min(2, profileFirstName.Length)].ToUpperInvariant();
-                            }
                             <span class="profile-menu-name">@profileFirstName</span>
                             <span class="profile-avatar profile-avatar-studio" aria-hidden="true">@profileInitials</span>
                         </button>
