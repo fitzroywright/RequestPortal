@@ -31,55 +31,9 @@
                     </div>
                 </header>
 
-                <section class="requester-strip" aria-label="Requester summary">
-                    <div class="requester-field requester-org">
-                        <span class="requester-label">Requesting as</span>
-                        <select asp-for="Input.OrganizationId" id="requester-select">
-                            @foreach (var organization in Model.Organizations)
-                            {
-                                <option value="@organization.Id"
-                                        data-name="@organization.Name"
-                                        data-role="@organization.Role"
-                                        data-complete="@organization.ProfileComplete.ToString().ToLowerInvariant()"
-                                        data-missing="@organization.MissingProfileFields"
-                                        data-individual="@organization.IsIndividualContext.ToString().ToLowerInvariant()">
-                                    @organization.Name
-                                </option>
-                            }
-                        </select>
-                        <span asp-validation-for="Input.OrganizationId" class="validation"></span>
-                    </div>
-                    <div class="requester-field">
-                        <span class="requester-label">Submitted by</span>
-                        <strong>@Model.SubmittedByName</strong>
-                    </div>
-                    <a id="edit-profile-link"
-                       class="request-profile-link"
-                       href="#">Review / edit profile</a>
-                </section>
-
-                <section id="profile-warning" class="profile-warning" hidden>
-                    <strong>Complete Your Profile</strong>
-                    <span id="profile-warning-text"></span>
-                    <a id="complete-profile-link" class="button button-small" href="#">Complete profile</a>
-                </section>
-
-                <section class="request-common-layout">
-                    <div class="field request-summary-field">
-                        <label asp-for="Input.Summary">Request summary</label>
-                        <input asp-for="Input.Summary" placeholder="A short title or one-line summary of the need" />
-                        <span asp-validation-for="Input.Summary" class="validation"></span>
-                    </div>
-
-                    <div class="request-compact-controls">
-                        <div class="field request-priority-field">
-                            <label asp-for="Input.Priority">Priority</label>
-                            <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
-                        </div>
-                    </div>
-
+                <section class="request-common-layout" aria-label="Request application details">
                     <section class="request-mini-card request-classification-card">
-                        <div class="request-mini-card-title">Request classification</div>
+                        <div class="request-mini-card-title">Request Classification</div>
                         <div class="request-mini-card-body classification-grid">
                             <div class="field">
                                 <label asp-for="Input.Category">Category</label>
@@ -109,7 +63,7 @@
                     </section>
 
                     <section class="request-mini-card request-address-card">
-                        <div class="request-mini-card-title">Request location</div>
+                        <div class="request-mini-card-title">Request Location</div>
                         <div class="request-mini-card-body address-grid">
                             <div class="field request-address-field">
                                 <label asp-for="Input.Address">Address</label>
@@ -153,6 +107,53 @@
                             <small id="location-status" class="muted"></small>
                         </footer>
                     </section>
+
+                    <section class="request-mini-card request-summary-card">
+                        <div class="request-mini-card-title">Request Summary</div>
+                        <div class="request-mini-card-body request-summary-grid">
+                            <div class="requester-field requester-org">
+                                <span class="requester-label">Requesting as</span>
+                                <select asp-for="Input.OrganizationId" id="requester-select">
+                                    @foreach (var organization in Model.Organizations)
+                                    {
+                                        <option value="@organization.Id"
+                                                data-name="@organization.Name"
+                                                data-role="@organization.Role"
+                                                data-complete="@organization.ProfileComplete.ToString().ToLowerInvariant()"
+                                                data-missing="@organization.MissingProfileFields"
+                                                data-individual="@organization.IsIndividualContext.ToString().ToLowerInvariant()">
+                                            @organization.Name
+                                        </option>
+                                    }
+                                </select>
+                                <span asp-validation-for="Input.OrganizationId" class="validation"></span>
+                            </div>
+                            <div class="requester-field">
+                                <span class="requester-label">Submitted by</span>
+                                <strong>@Model.SubmittedByName</strong>
+                            </div>
+                            <a id="edit-profile-link"
+                               class="request-profile-link"
+                               href="#">Review / edit profile</a>
+
+                            <div class="field request-summary-field">
+                                <label asp-for="Input.Summary">Request summary</label>
+                                <input asp-for="Input.Summary" placeholder="A short title or one-line summary of the need" />
+                                <span asp-validation-for="Input.Summary" class="validation"></span>
+                            </div>
+
+                            <div class="field request-priority-field">
+                                <label asp-for="Input.Priority">Priority</label>
+                                <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
+                            </div>
+                        </div>
+                    </section>
+                </section>
+
+                <section id="profile-warning" class="profile-warning" hidden>
+                    <strong>Complete Your Profile</strong>
+                    <span id="profile-warning-text"></span>
+                    <a id="complete-profile-link" class="button button-small" href="#">Complete profile</a>
                 </section>
 
                 <section class="request-type-row" aria-label="Request type">
