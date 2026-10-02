@@ -54,7 +54,6 @@ public sealed class InvitationModel : PageModel
         {
             await invitationService.AcceptAsync(
                 user.Id,
-                user.Email,
                 Id,
                 Token,
                 HttpContext.RequestAborted);
