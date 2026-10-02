@@ -146,6 +146,14 @@ internal static class ApplicationServiceRegistration
     private static void AddRequestServices(
         WebApplicationBuilder builder)
     {
+        builder.Services
+            .AddOptions<RequestSubmissionPolicyOptions>()
+            .Bind(builder.Configuration.GetSection(RequestSubmissionPolicyOptions.SectionName));
+
+        builder.Services.AddScoped<
+            IRequestSubmissionPolicy
+            , RequestSubmissionPolicy>();
+
         builder.Services.AddScoped<
             IDocumentService
             , DocumentService>();
