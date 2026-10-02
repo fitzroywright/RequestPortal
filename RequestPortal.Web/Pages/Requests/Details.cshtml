@@ -17,8 +17,7 @@
         }
         else
         {
-            @{
-                var requestMessages = Model.MessageThreads
+            var requestMessages = Model.MessageThreads
                     .SelectMany(thread => thread.Messages.Select(message => new { Thread = thread, Message = message }))
                     .OrderByDescending(item => item.Message.SentUtc)
                     .ToArray();
@@ -40,10 +39,9 @@
                         ? Model.RequesterCard.Parish
                         : "—";
 
-                string submittedByContext = Model.DetailMeta.IsIndividualRequest
-                    ? "Individual"
-                    : Model.Request.OrganizationName;
-            }
+            string submittedByContext = Model.DetailMeta.IsIndividualRequest
+                ? "Individual"
+                : Model.Request.OrganizationName;
 
             <header class="mock-request-header">
                 <div class="mock-request-heading">
@@ -402,6 +400,6 @@
 .mock-form-grid{display:grid;gap:9px;margin-top:10px}.mock-form-grid label,.mock-cancel-form label{display:grid;gap:4px;color:#334c63;font-size:12px;font-weight:700}.mock-form-grid input,.mock-form-grid select,.mock-form-grid textarea,.mock-cancel-form textarea{min-height:34px;border:1px solid #b8c7d5;border-radius:4px;padding:7px 8px;font:inherit}.mock-form-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .mock-submit-row{display:flex;justify-content:flex-end}.mock-cancel-panel .mock-panel-head{background:#fffafa}.mock-cancel-form{padding:14px 16px 17px}.mock-cancel-form p{margin:0 0 10px;color:#66788a;font-size:12px}
 .proposal-document{margin-top:12px;padding:14px;border:1px solid #e0e6eb;background:#fff;line-height:1.55}.proposal-document table{width:100%;border-collapse:collapse}.proposal-document td,.proposal-document th{border:1px solid #dbe2e8;padding:6px}.proposal-document img{max-width:100%;height:auto}
-@media(max-width:1050px){.mock-detail-grid{grid-template-columns:1fr}.mock-detail-side{grid-template-columns:repeat(2,minmax(0,1fr))}.mock-summary-content{grid-template-columns:1fr}}
-@media(max-width:720px){.mock-request-shell{width:calc(100% - 18px)}.mock-request-header{align-items:flex-start;flex-direction:column}.mock-tabs{overflow-x:auto}.mock-detail-side{grid-template-columns:1fr}.mock-summary-list>div,.mock-summary-description dl>div,.mock-side-list>div,.mock-related-list>div{grid-template-columns:1fr}.mock-form-row{grid-template-columns:1fr}}
+@@media(max-width:1050px){.mock-detail-grid{grid-template-columns:1fr}.mock-detail-side{grid-template-columns:repeat(2,minmax(0,1fr))}.mock-summary-content{grid-template-columns:1fr}}
+@@media(max-width:720px){.mock-request-shell{width:calc(100% - 18px)}.mock-request-header{align-items:flex-start;flex-direction:column}.mock-tabs{overflow-x:auto}.mock-detail-side{grid-template-columns:1fr}.mock-summary-list>div,.mock-summary-description dl>div,.mock-side-list>div,.mock-related-list>div{grid-template-columns:1fr}.mock-form-row{grid-template-columns:1fr}}
 </style>
