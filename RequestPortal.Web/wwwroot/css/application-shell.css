@@ -2499,3 +2499,134 @@ body.authenticated-app{
 .authenticated-app .dashboard-right-stack .dashboard-card:last-child{
     align-self:stretch;
 }
+
+
+/* Request Workspace viewport layout */
+@media(min-width:1081px){
+    .authenticated-app .dashboard-mock-page{
+        height:calc(100vh - 52px);
+        min-height:0;
+        overflow:hidden;
+        box-sizing:border-box;
+        padding:16px 0 18px;
+    }
+
+    .authenticated-app .dashboard-mock-shell{
+        height:100%;
+        min-height:0;
+        display:grid;
+        grid-template-rows:auto minmax(0,1fr);
+    }
+
+    .authenticated-app .dashboard-hero{
+        min-height:88px;
+        margin-bottom:12px;
+    }
+
+    .authenticated-app .dashboard-mock-grid{
+        min-height:0;
+        height:100%;
+        align-items:stretch;
+    }
+
+    .authenticated-app .dashboard-left-stack,
+    .authenticated-app .dashboard-right-stack,
+    .authenticated-app .dashboard-requests-card{
+        min-height:0;
+        height:100%;
+    }
+
+    .authenticated-app .dashboard-left-stack{
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+    }
+
+    .authenticated-app .dashboard-left-stack .dashboard-card{
+        flex:0 0 auto;
+    }
+
+    .authenticated-app .dashboard-left-stack .dashboard-card:last-child{
+        margin-top:auto;
+    }
+
+    .authenticated-app .dashboard-filter-row{
+        min-height:38px;
+    }
+
+    .authenticated-app .dashboard-actions-list a,
+    .authenticated-app .dashboard-quick-links a{
+        min-height:36px;
+    }
+
+    .authenticated-app .dashboard-card-head{
+        min-height:48px;
+        padding-top:7px;
+        padding-bottom:7px;
+    }
+
+    .authenticated-app .dashboard-requests-card{
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+    }
+
+    .authenticated-app .dashboard-table-wrap{
+        min-height:0;
+        flex:1 1 auto;
+        overflow-y:auto;
+        overflow-x:hidden;
+        scrollbar-gutter:stable;
+    }
+
+    .authenticated-app .dashboard-table{
+        margin:0;
+    }
+
+    .authenticated-app .dashboard-table thead{
+        position:sticky;
+        top:0;
+        z-index:2;
+    }
+
+    .authenticated-app .dashboard-table td{
+        height:39px;
+    }
+
+    .authenticated-app .dashboard-right-stack{
+        display:grid;
+        grid-template-rows:repeat(3,minmax(0,1fr));
+        gap:10px;
+    }
+
+    .authenticated-app .dashboard-right-stack .dashboard-card{
+        min-height:0;
+        height:100%;
+        display:flex;
+        flex-direction:column;
+    }
+
+    .authenticated-app .dashboard-right-stack .dashboard-organization-list,
+    .authenticated-app .dashboard-right-stack .dashboard-attention-list,
+    .authenticated-app .dashboard-right-stack .dashboard-message-list{
+        min-height:0;
+        flex:1 1 auto;
+        overflow:auto;
+    }
+
+    .authenticated-app .dashboard-right-stack .dashboard-empty.compact{
+        min-height:0;
+    }
+}
+
+@media(max-width:1080px){
+    .authenticated-app .dashboard-mock-page{
+        height:auto;
+        min-height:calc(100vh - 52px);
+        overflow:visible;
+    }
+
+    .authenticated-app .dashboard-left-stack .dashboard-card:last-child{
+        margin-top:0;
+    }
+}
