@@ -491,10 +491,14 @@ public sealed class CreateModel : PageModel
         {
             if (organization.IsIndividualContext)
             {
-                List<string> individualMissing = [];
-                if (string.IsNullOrWhiteSpace(user.DisplayName)) individualMissing.Add("name");
-                if (string.IsNullOrWhiteSpace(user.Email)) individualMissing.Add("email");
-                if (user.IndividualProfileUpdateRequired) individualMissing.Add("profile review");
+                List<string> individualMissing =
+                    user.GetMissingIndividualProfileFields().ToList();
+
+                if (user.IndividualProfileUpdateRequired &&
+                    individualMissing.Count == 0)
+                {
+                    individualMissing.Add("profile review");
+                }
 
                 options.Add(new OrganizationRequesterOption(
                     organization.Id,
