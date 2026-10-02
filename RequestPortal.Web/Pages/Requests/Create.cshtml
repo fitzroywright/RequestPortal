@@ -270,6 +270,7 @@
                             <table class="goods-grid" id="goods-grid">
                                 <thead>
                                     <tr>
+                                        <th class="goods-row-number-head">#</th>
                                         <th>Item / Service</th>
                                         <th>Description / Specification</th>
                                         <th>Quantity</th>
@@ -282,6 +283,7 @@
                                     @if (Model.Items.Count == 0)
                                     {
                                         <tr data-item-row>
+                                            <td class="goods-row-number">1</td>
                                             <td><input name="Items[0].ItemName" aria-label="Item or service" /></td>
                                             <td><input name="Items[0].Description" aria-label="Description or specification" /></td>
                                             <td><input name="Items[0].Quantity" type="number" min="0.001" step="0.001" value="1" aria-label="Quantity" /></td>
@@ -303,6 +305,7 @@
                                         @for (int index = 0; index < Model.Items.Count; index++)
                                         {
                                             <tr data-item-row>
+                                                <td class="goods-row-number">@(index + 1)</td>
                                                 <td><input asp-for="Items[index].ItemName" aria-label="Item or service" /></td>
                                                 <td><input asp-for="Items[index].Description" aria-label="Description or specification" /></td>
                                                 <td><input asp-for="Items[index].Quantity" type="number" min="0.001" step="0.001" aria-label="Quantity" /></td>
@@ -354,7 +357,7 @@
                 </section>
 
                 <footer class="request-sticky-submit">
-                    <span id="sticky-profile-state" class="muted"></span>
+                    <span id="sticky-profile-state" class="request-profile-state"></span>
                     <div class="request-submit-actions">
                         <button class="button button-outline" type="button" id="review-request-bottom">Review</button>
                         <button class="button" type="submit">Submit Request</button>
@@ -367,6 +370,7 @@
 
 <template id="goods-row-template">
     <tr data-item-row>
+        <td class="goods-row-number"></td>
         <td><input data-field="ItemName" aria-label="Item or service" /></td>
         <td><input data-field="Description" aria-label="Description or specification" /></td>
         <td><input data-field="Quantity" type="number" min="0.001" step="0.001" value="1" aria-label="Quantity" /></td>
@@ -424,6 +428,8 @@
         editProfile.href = profileUrl;
         completeProfile.href = profileUrl;
         stickyProfileState.textContent = complete ? 'Profile complete' : 'Profile incomplete — complete it before submission';
+        stickyProfileState.classList.toggle('is-incomplete', !complete);
+        stickyProfileState.classList.toggle('is-complete', complete);
     }
 
     function updateMode() {
@@ -470,6 +476,9 @@
 
     function renumberRows() {
         rows?.querySelectorAll('[data-item-row]').forEach((row, index) => {
+            const rowNumber = row.querySelector('.goods-row-number');
+            if (rowNumber) rowNumber.textContent = String(index + 1);
+
             row.querySelectorAll('input,select,textarea').forEach(control => {
                 const field = control.dataset.field || control.name?.replace(/^Items\[\d+\]\./, '');
                 if (!field) return;
@@ -497,6 +506,33 @@
         }
         button.closest('[data-item-row]')?.remove();
         renumberRows();
+    });
+
+    document.getElementById('goods-grid')?.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey) return;
+
+        const control = event.target.closest('input,select');
+        if (!control || control.closest('button')) return;
+
+        const currentRow = control.closest('[data-item-row]');
+        const currentCell = control.closest('td');
+        if (!currentRow || !currentCell) return;
+
+        event.preventDefault();
+
+        const rowList = Array.from(rows.querySelectorAll('[data-item-row]'));
+        const rowIndex = rowList.indexOf(currentRow);
+        const cellIndex = Array.from(currentRow.children).indexOf(currentCell);
+
+        if (rowIndex === rowList.length - 1) {
+            const fragment = rowTemplate.content.cloneNode(true);
+            rows.appendChild(fragment);
+            renumberRows();
+        }
+
+        const nextRow = rows.querySelectorAll('[data-item-row]')[rowIndex + 1];
+        const nextCell = nextRow?.children[cellIndex];
+        nextCell?.querySelector('input,select')?.focus();
     });
 
     document.querySelectorAll('.doc-check').forEach(check => {
