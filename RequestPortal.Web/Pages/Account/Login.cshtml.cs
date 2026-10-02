@@ -218,9 +218,8 @@ public sealed class LoginModel : PageModel
         ApplicationUser? user = await userManager.FindByEmailAsync(demoEmail);
         if (user is null)
         {
-            ErrorMessage = "Demo data is not initialized. Start the application with Demo:EnsureDatabase enabled once.";
-            await LoadProvidersAsync();
-            return Page();
+            TempData["Error"] = "Demo data is not initialized.";
+            return RedirectToPage("/Index");
         }
 
         user.LastSignInUtc = clock.UtcNow;
