@@ -456,18 +456,18 @@ public sealed class CreateModel : PageModel
         {
             if (organization.IsIndividualContext)
             {
-                List<string> missing = [];
-                if (string.IsNullOrWhiteSpace(user.DisplayName)) missing.Add("name");
-                if (string.IsNullOrWhiteSpace(user.Email)) missing.Add("email");
-                if (user.IndividualProfileUpdateRequired) missing.Add("profile review");
+                List<string> individualMissing = [];
+                if (string.IsNullOrWhiteSpace(user.DisplayName)) individualMissing.Add("name");
+                if (string.IsNullOrWhiteSpace(user.Email)) individualMissing.Add("email");
+                if (user.IndividualProfileUpdateRequired) individualMissing.Add("profile review");
 
                 options.Add(new OrganizationRequesterOption(
                     organization.Id,
                     "Myself",
                     organization.CountryCode,
                     organization.Role,
-                    missing.Count == 0,
-                    string.Join(", ", missing),
+                    individualMissing.Count == 0,
+                    string.Join(", ", individualMissing),
                     true));
 
                 continue;
