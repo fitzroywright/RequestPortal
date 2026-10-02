@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Portal;
 using RequestPortal.Infrastructure.Identity;
@@ -34,11 +35,18 @@ public sealed class IndexModel : PageModel
 
     public string? Status { get; private set; }
 
-    public async Task OnGetAsync(
+    public async Task<IActionResult> OnGetAsync(
         string? query = null,
         string? organization = null,
         string? status = null)
     {
+        if (User.HasClaim(
+            RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim,
+            RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue))
+        {
+            return RedirectToPage("/Staff/Operations");
+        }
+
         ApplicationUser user = await userManager.GetUserAsync(User)
             ?? throw new InvalidOperationException("Authenticated portal user could not be resolved.");
 
@@ -86,5 +94,7 @@ public sealed class IndexModel : PageModel
         Requests = filtered
             .OrderByDescending(request => request.SubmittedUtc ?? request.CreatedUtc)
             .ToArray();
+
+        return Page();
     }
 }
