@@ -75,10 +75,8 @@ public sealed class LoginModel : PageModel
 
         if (!configured)
         {
-            ReturnUrl = LocalReturnUrl(returnUrl);
-            ErrorMessage = $"{provider} sign-in is not configured yet.";
-            await LoadProvidersAsync();
-            return Page();
+            TempData["Error"] = $"{provider} sign-in is not configured yet.";
+            return RedirectToPage("/Index");
         }
 
         string redirectUrl = Url.Page(
