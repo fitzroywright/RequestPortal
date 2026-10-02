@@ -1,0 +1,48 @@
+@page
+@model RequestPortal.Web.Pages.Organizations.InvitationModel
+@{
+    ViewData["Title"] = "Organization Invitation";
+}
+
+<section class="operational-page">
+    <div class="shell" style="max-width:760px">
+        <div class="section-heading">
+            <div class="eyebrow">Organization invitation</div>
+            <h1>Accept representative access</h1>
+            <p>An organization has invited you to represent it in Request Portal.</p>
+        </div>
+
+        @if (Model.Invitation is not null)
+        {
+            <section class="operational-panel">
+                <div class="panel-titlebar">
+                    <strong>@Model.Invitation.OrganizationName</strong>
+                </div>
+                <div style="padding:16px">
+                    <dl class="detail-list">
+                        <div>
+                            <dt>Invited email</dt>
+                            <dd>@Model.Invitation.Email</dd>
+                        </div>
+                        <div>
+                            <dt>Expires</dt>
+                            <dd>@Model.Invitation.ExpiresUtc.ToLocalTime().ToString("f")</dd>
+                        </div>
+                    </dl>
+
+                    <p class="muted" style="margin-top:16px">
+                        Accepting gives this signed-in account representative access to the organization.
+                        Administrator access is granted separately.
+                    </p>
+
+                    <form method="post" asp-page-handler="Accept" class="action-row" style="margin-top:16px">
+                        <input type="hidden" asp-for="Id" />
+                        <input type="hidden" asp-for="Token" />
+                        <button class="button" type="submit">Accept invitation</button>
+                        <a class="button button-secondary" asp-page="/Organizations/Index">Not now</a>
+                    </form>
+                </div>
+            </section>
+        }
+    </div>
+</section>
