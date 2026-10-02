@@ -71,7 +71,9 @@
                     @foreach (MailboxMessageView message in Model.Messages)
                     {
                         <a class="outlook-message-grid outlook-message-row @(message.ReadUtc is null ? "outlook-unread" : null)"
-                           asp-page="/Messages/Thread" asp-route-id="@message.ThreadId">
+                           href="@(message.RequestId.HasValue
+                               ? Url.Page("/Requests/Details", new { id = message.RequestId.Value }) + "#conversation"
+                               : Url.Page("/Messages/Thread", new { id = message.ThreadId }))">
                             <span class="outlook-message-state" aria-hidden="true">
                                 @(message.ReadUtc is null ? "●" : "○")
                             </span>
