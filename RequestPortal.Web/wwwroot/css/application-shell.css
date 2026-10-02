@@ -2181,11 +2181,11 @@ body.authenticated-app{
     letter-spacing:.045em;
     text-align:left;
 }
-.authenticated-app .dashboard-table th:nth-child(1){width:24%}
-.authenticated-app .dashboard-table th:nth-child(2){width:30%}
-.authenticated-app .dashboard-table th:nth-child(3){width:22%}
-.authenticated-app .dashboard-table th:nth-child(4){width:16%}
-.authenticated-app .dashboard-table th:nth-child(5){width:8%}
+.authenticated-app .dashboard-table th:nth-child(1){width:22%}
+.authenticated-app .dashboard-table th:nth-child(2){width:27%}
+.authenticated-app .dashboard-table th:nth-child(3){width:23%}
+.authenticated-app .dashboard-table th:nth-child(4){width:17%}
+.authenticated-app .dashboard-table th:nth-child(5){width:11%}
 .authenticated-app .dashboard-table td{
     height:43px;
     padding:7px 16px;
@@ -2208,7 +2208,10 @@ body.authenticated-app{
     font-weight:850;
 }
 .authenticated-app .dashboard-open-cell{
+    padding-left:8px;
+    padding-right:12px;
     text-align:right;
+    overflow:visible;
 }
 .authenticated-app .dashboard-open-cell a{
     color:#0b69ca;
