@@ -66,6 +66,6 @@ public sealed class IndexModel : PageModel
             user.Id,
             isStaff: false,
             take: 3,
-            HttpContext.RequestAborted);
+            cancellationToken: HttpContext.RequestAborted);
     }
 }
