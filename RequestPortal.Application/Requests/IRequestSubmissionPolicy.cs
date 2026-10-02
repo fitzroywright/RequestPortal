@@ -11,6 +11,12 @@ public sealed class RequestSubmissionPolicyOptions
     public int MaxSubmissionsPer24Hours { get; set; } = 2;
     public int MaxSubmissionsPer30Days { get; set; } = 5;
     public int MaxCancelledRequestsPer30Days { get; set; } = 3;
+
+    public int OrganizationMaxActiveRequests { get; set; } = 25;
+    public int OrganizationMaxSubmissionsPer24Hours { get; set; } = 10;
+    public int OrganizationMaxSubmissionsPer30Days { get; set; } = 100;
+    public int OrganizationMaxCancelledRequestsPer30Days { get; set; } = 20;
+
     public int DuplicateLookbackDays { get; set; } = 90;
 }
 
