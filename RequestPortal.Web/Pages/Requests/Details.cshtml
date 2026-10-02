@@ -89,6 +89,8 @@
 
                 @if (Model.CanStartRequestConversation || replyThread is not null)
                 {
+                    bool startingNewMessage = requestMessages.Length == 0 || replyThread is null;
+
                     <form method="post"
                           enctype="multipart/form-data"
                           asp-page-handler="Reply"
@@ -99,23 +101,26 @@
                             <input type="hidden" name="ReplyThreadId" value="@replyThread.ThreadId" />
                         }
 
-                        <label for="request-reply-box"><strong>Reply</strong></label>
+                        <label for="request-reply-box">
+                            <strong>@(startingNewMessage ? "New Message" : "Reply")</strong>
+                        </label>
                         <div class="request-reply-box">
                             <textarea id="request-reply-box"
                                       name="Reply"
                                       rows="4"
                                       maxlength="10000"
                                       required
-                                      placeholder="Type your reply here..."
-                                      aria-label="Reply to messages about this request">@Model.Reply</textarea>
-                            <label class="reply-paperclip" title="Attach a document">
+                                      placeholder="@(startingNewMessage ? "Type a new message about this request..." : "Type your reply here...")"
+                                      aria-label="@(startingNewMessage ? "New message about this request" : "Reply to messages about this request")">@Model.Reply</textarea>
+                            <label class="reply-paperclip" title="Attach a file">
                                 📎
-                                <input name="ReplyAttachment" type="file" aria-label="Attach a document" />
+                                <input name="ReplyAttachment" type="file" aria-label="Attach a file" />
                             </label>
                         </div>
+                        <div class="request-attachment-hint">You can attach a supporting file to this message.</div>
                         <span asp-validation-for="Reply" class="validation"></span>
                         <div class="action-row">
-                            <button class="button button-small" type="submit">Send reply</button>
+                            <button class="button button-small" type="submit">@(startingNewMessage ? "New Message" : "Send reply")</button>
                         </div>
                     </form>
                 }
@@ -444,6 +449,7 @@
     .request-message-item p { margin:5px 0 0; white-space:pre-wrap; line-height:1.45; }
     .request-detail-reply { border-top:0; background:#fafbfc; }
     .request-detail-reply > label { display:block; margin-bottom:6px; }
+    .request-attachment-hint { margin-top:5px; color:#6b7780; font-size:.78rem; }
     .proposal-document {
         margin-top: 18px;
         background: #fff;
