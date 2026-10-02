@@ -1,3 +1,5 @@
+using RequestPortal.Domain.Requests;
+
 namespace RequestPortal.Application.Requests;
 
 public sealed class RequestSubmissionPolicyOptions
@@ -24,6 +26,13 @@ public sealed class RequestSubmissionBlockedException : InvalidOperationExceptio
 
 public interface IRequestSubmissionPolicy
 {
+    Task ValidateNewRequestAsync(
+        Guid userId,
+        Guid organizationId,
+        RequestKind kind,
+        string summary,
+        CancellationToken cancellationToken = default);
+
     Task ValidateAsync(
         Guid userId,
         Guid requestId,
