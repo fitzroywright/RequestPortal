@@ -70,6 +70,11 @@
                                 </td>
                                 <td><a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.Id">Open</a></td>
                             </tr>
+                            <tr class="request-conversation-row">
+                                <td colspan="7">
+                                    @await Component.InvokeAsync("RequestConversation", new { requestId = request.Id, returnUrl = Context.Request.Path + Context.Request.QueryString, compact = true })
+                                </td>
+                            </tr>
                         }
                         </tbody>
                     </table>
