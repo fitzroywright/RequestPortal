@@ -33,6 +33,7 @@ public sealed class StaffOrganizationService : IStaffOrganizationService
     {
         List<StaffOrganizationSummary> organizations = await dbContext.Organizations
             .AsNoTracking()
+            .Where(item => item.OrganizationType != "IndividualContext")
             .OrderBy(item => item.Name)
             .Select(item => new StaffOrganizationSummary(
                 item.Id,
