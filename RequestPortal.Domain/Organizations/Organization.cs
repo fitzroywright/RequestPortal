@@ -27,6 +27,7 @@ public sealed class Organization
         Id = id;
         Name = name.Trim();
         CountryCode = countryCode.Trim().ToUpperInvariant();
+        CountryOfRegistration = "Jamaica";
         RegisteredByUserId = registeredByUserId;
         Status = OrganizationStatus.PendingApproval;
         CreatedUtc = createdUtc;
