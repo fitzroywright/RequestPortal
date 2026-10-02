@@ -251,20 +251,25 @@
                     }
                 </div>
 
-                <div class="profile-membership-actions">
-                    @if (Model.AvailableOrganizations.Count > 0)
-                    {
-                        <form method="post" asp-page-handler="RequestMembership" class="profile-inline-form">
-                            <select name="organizationId" aria-label="Organization to join">
-                                @foreach (OrganizationSummary organization in Model.AvailableOrganizations)
-                                {
-                                    <option value="@organization.Id">@organization.Name (@organization.CountryCode)</option>
-                                }
-                            </select>
-                            <button class="button button-small" type="submit">Request to join</button>
-                        </form>
-                    }
+                @if (Model.PendingInvitations.Count > 0)
+                {
+                    <div class="profile-membership-invitations">
+                        <strong>Pending invitations</strong>
+                        @foreach (var invitation in Model.PendingInvitations)
+                        {
+                            <div class="profile-membership-row">
+                                <div>
+                                    <strong>@invitation.OrganizationName</strong>
+                                    <small>Invitation sent to @invitation.Email · expires @invitation.ExpiresUtc.ToLocalTime().ToString("g")</small>
+                                </div>
+                                <span class="status status-Pending">Pending</span>
+                            </div>
+                        }
+                        <small class="muted">Use the secure invitation link sent to your email address to accept membership.</small>
+                    </div>
+                }
 
+                <div class="profile-membership-actions">
                     @if (Model.RegistrationCountries.Count > 0)
                     {
                         <form method="post" asp-page-handler="RegisterOrganization" class="profile-register-form">
