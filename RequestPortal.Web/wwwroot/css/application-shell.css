@@ -2630,3 +2630,161 @@ body.authenticated-app{
         margin-top:0;
     }
 }
+
+
+/* ================================================================
+   My Requests fixed workspace
+   ================================================================ */
+.authenticated-app .requests-workspace-page{
+    min-height:calc(100vh - 52px);
+    padding:16px 0 18px;
+    overflow:hidden;
+}
+.authenticated-app .requests-workspace-shell{
+    height:calc(100vh - 86px);
+    min-height:0;
+    display:grid;
+    grid-template-rows:auto auto minmax(0,1fr);
+    gap:10px;
+}
+.authenticated-app .requests-workspace-titlebar{
+    margin:0;
+}
+.authenticated-app .requests-filterbar{
+    display:flex;
+    align-items:end;
+    justify-content:space-between;
+    gap:14px;
+    padding:10px 12px;
+    border:1px solid #d4dee7;
+    border-radius:10px;
+    background:#fff;
+    box-shadow:0 1px 3px rgba(19,45,70,.05);
+}
+.authenticated-app .requests-filter-form{
+    display:grid;
+    grid-template-columns:minmax(190px,1fr) minmax(190px,1fr) minmax(180px,.8fr) auto;
+    gap:10px;
+    align-items:end;
+    flex:1;
+}
+.authenticated-app .requests-filter-field{
+    display:grid;
+    gap:4px;
+}
+.authenticated-app .requests-filter-field label{
+    color:#334d64;
+    font-size:.72rem;
+    font-weight:800;
+}
+.authenticated-app .requests-filter-field input,
+.authenticated-app .requests-filter-field select{
+    min-height:34px;
+    padding:6px 8px;
+}
+.authenticated-app .requests-filter-actions{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    white-space:nowrap;
+}
+.authenticated-app .requests-filter-summary{
+    display:flex;
+    align-items:baseline;
+    gap:5px;
+    min-width:88px;
+    justify-content:flex-end;
+    color:#66798c;
+    font-size:.75rem;
+}
+.authenticated-app .requests-filter-summary strong{
+    color:#173955;
+    font-size:1rem;
+}
+.authenticated-app .requests-queue-panel{
+    min-height:0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    border-radius:12px;
+}
+.authenticated-app .requests-queue-titlebar{
+    flex:0 0 auto;
+}
+.authenticated-app .requests-queue-body{
+    min-height:0;
+    flex:1 1 auto;
+    display:flex;
+    flex-direction:column;
+}
+.authenticated-app .requests-queue-scroll{
+    min-height:0;
+    flex:1 1 auto;
+    overflow-y:auto;
+    overflow-x:hidden;
+    border:0;
+    border-radius:0;
+    scrollbar-gutter:stable;
+}
+.authenticated-app .requests-queue-table{
+    margin:0;
+}
+.authenticated-app .requests-queue-table thead{
+    position:sticky;
+    top:0;
+    z-index:2;
+}
+.authenticated-app .requests-queue-table td{
+    height:40px;
+}
+.authenticated-app .requests-queue-table th:nth-child(1){width:15%}
+.authenticated-app .requests-queue-table th:nth-child(2){width:20%}
+.authenticated-app .requests-queue-table th:nth-child(3){width:30%}
+.authenticated-app .requests-queue-table th:nth-child(4){width:17%}
+.authenticated-app .requests-queue-table th:nth-child(5){width:14%}
+.authenticated-app .requests-queue-table th:nth-child(6){width:4%}
+.authenticated-app .requests-queue-empty{
+    min-height:0;
+    flex:1 1 auto;
+    display:grid;
+    place-content:center;
+    justify-items:center;
+    align-content:center;
+    padding:24px;
+}
+.authenticated-app .requests-queue-empty p{
+    margin:4px 0 12px;
+}
+
+@media(max-width:980px){
+    .authenticated-app .requests-workspace-page{
+        min-height:calc(100vh - 52px);
+        overflow:visible;
+    }
+    .authenticated-app .requests-workspace-shell{
+        height:auto;
+        min-height:calc(100vh - 86px);
+        display:block;
+    }
+    .authenticated-app .requests-filterbar{
+        margin:10px 0;
+        align-items:stretch;
+        flex-direction:column;
+    }
+    .authenticated-app .requests-filter-form{
+        grid-template-columns:1fr 1fr;
+    }
+    .authenticated-app .requests-queue-panel{
+        min-height:520px;
+    }
+}
+
+@media(max-width:640px){
+    .authenticated-app .requests-filter-form{
+        grid-template-columns:1fr;
+    }
+    .authenticated-app .requests-filter-actions{
+        flex-wrap:wrap;
+    }
+}
