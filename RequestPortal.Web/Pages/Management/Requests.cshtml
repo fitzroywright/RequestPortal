@@ -72,7 +72,7 @@
                             </tr>
                             <tr class="request-conversation-row">
                                 <td colspan="7">
-                                    @await Component.InvokeAsync("RequestConversation", new { requestId = request.Id, returnUrl = Context.Request.Path + Context.Request.QueryString, compact = true })
+                                    @await Component.InvokeAsync("RequestConversation", new { requestId = request.Id, returnUrl = HttpContext.Request.Path + HttpContext.Request.QueryString, compact = true })
                                 </td>
                             </tr>
                         }
