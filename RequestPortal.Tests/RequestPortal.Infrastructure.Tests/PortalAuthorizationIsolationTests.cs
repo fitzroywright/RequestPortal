@@ -169,27 +169,24 @@ public sealed class PortalAuthorizationIsolationTests
         Assert.Equal(OrganizationRole.Administrator, approvedAdministrator.Role);
         Assert.Equal(staffUserId, approvedAdministrator.ApprovedByUserId);
 
-        await context.Service.RequestMembershipAsync(
+        InvalidOperationException invitationOnly = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => context.Service.RequestMembershipAsync(
+                secondUserId,
+                organizationId,
+                cancellationToken));
+        Assert.Contains("invitation-only", invitationOnly.Message, StringComparison.OrdinalIgnoreCase);
+
+        Organization approvedOrganization = await context.Db.Organizations
+            .Include(item => item.Memberships)
+            .SingleAsync(item => item.Id == organizationId, cancellationToken);
+
+        OrganizationMembership secondMembership = approvedOrganization.RequestMembership(
+            Guid.NewGuid(),
             secondUserId,
-            organizationId,
-            cancellationToken);
-
-        OrganizationMembership secondMembership = await context.Db.OrganizationMemberships
-            .SingleAsync(
-                item => item.OrganizationId == organizationId && item.UserId == secondUserId,
-                cancellationToken);
-
-        Assert.Equal(MembershipStatus.Pending, secondMembership.Status);
-        Assert.Equal(OrganizationRole.Member, secondMembership.Role);
-
-        await context.Service.ApproveMembershipAsync(
-            firstUserId,
-            organizationId,
-            secondMembership.Id,
-            cancellationToken);
-
-        secondMembership = await context.Db.OrganizationMemberships
-            .SingleAsync(item => item.Id == secondMembership.Id, cancellationToken);
+            Now.AddMinutes(2));
+        secondMembership.Approve(firstUserId, Now.AddMinutes(3));
+        context.Db.OrganizationMemberships.Add(secondMembership);
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         Assert.Equal(MembershipStatus.Approved, secondMembership.Status);
         Assert.Equal(firstUserId, secondMembership.ApprovedByUserId);
