@@ -150,6 +150,10 @@
     </header>
 
     <main class="@(useApplicationShell ? "app-main" : null)">
+        @if (string.Equals(Context.Request.Query["navigationError"], "not-found", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="shell flash error">We couldn’t find the page you were trying to open. You’ve been returned to the Request Portal home page.</div>
+        }
         @if (TempData["Success"] is string success)
         {
             <div class="shell flash success">@success</div>
