@@ -17,10 +17,11 @@
         }
         else
         {
-            <header class="workspace-titlebar">
+            <header class="workspace-titlebar request-detail-header">
                 <div class="section-heading" style="margin-bottom:0">
+                    <a class="request-back-link" asp-page="/Requests/Index">‹ Back to My Requests</a>
                     <div class="eyebrow" style="color:#b45b09">@Model.Request.OrganizationName</div>
-                    <h1>Request # @Model.Request.PublicReference</h1>
+                    <h1>@Model.Request.PublicReference</h1>
                     <p>@Model.Request.Summary</p>
                 </div>
                 <div class="action-row">
@@ -29,7 +30,15 @@
                 </div>
             </header>
 
-            <section class="operational-panel request-progress" aria-label="Request progress">
+            <nav class="request-detail-tabs" aria-label="Request detail sections">
+                <a href="#overview">Overview</a>
+                <a href="#items">Items (@Model.Request.Items.Count)</a>
+                <a href="#conversation">Messages (@Model.MessageThreads.Sum(thread => thread.Messages.Count))</a>
+                <a href="#documents">Files (@Model.Documents.Count)</a>
+                <a href="#history">History (@Model.Request.History.Count)</a>
+            </nav>
+
+            <section id="overview" class="operational-panel request-progress" aria-label="Request progress">
                 <span><strong>Completed</strong> @(string.Join(" · ", Model.Request.History.Reverse().Where(item => item.Status != Model.Request.Status).Select(item => RequestStatusPresentation.Label(item.Status)).Distinct().DefaultIfEmpty("None yet")))</span>
                 <span aria-current="step"><strong>Current</strong> @RequestStatusPresentation.Label(Model.Request.Status)</span>
                 <span><strong>Next</strong> @RequestStatusPresentation.Next(Model.Request.Status)</span>
@@ -136,7 +145,7 @@
                 <div>
                     @if (Model.ProjectProposal is not null)
                     {
-                        <section class="operational-panel">
+                        <section id="items" class="operational-panel">
                             <div class="action-row" style="justify-content:space-between;align-items:center">
                                 <div>
                                     <div class="eyebrow" style="color:#b45b09">Project proposal</div>
@@ -208,7 +217,7 @@
                     }
                     else
                     {
-                        <section class="operational-panel">
+                        <section id="items" class="operational-panel">
                             <h2>Requested items</h2>
                             @if (Model.Request.Items.Count == 0)
                             {
@@ -342,7 +351,7 @@
                         </section>
                     }
 
-                    <section class="operational-panel" style="margin-top:10px">
+                    <section id="documents" class="operational-panel" style="margin-top:10px">
                         <h2>Supporting documents</h2>
                         @if (Model.DocumentsUnavailable)
                         {
@@ -411,9 +420,9 @@
                 </div>
 
                 <aside class="request-detail-side">
-                    <section class="operational-panel request-status-card">
+                    <section id="history" class="operational-panel request-status-card">
                         <div class="panel-titlebar">
-                            <strong>Status history</strong>
+                            <strong>Current status &amp; history</strong>
                         </div>
                     <div class="timeline">
                         @foreach (RequestHistoryDetail history in Model.Request.History)
