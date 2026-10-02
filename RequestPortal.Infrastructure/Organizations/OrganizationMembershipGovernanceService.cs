@@ -10,6 +10,7 @@ using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Infrastructure.Persistence;
+using RequestPortal.Domain.Requests;
 
 namespace RequestPortal.Infrastructure.Organizations;
 
@@ -129,10 +130,62 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
         }
 
         Organization organization = await LoadForAdministrationAsync(administratorUserId, organizationId, cancellationToken);
-        organization.RevokeMembership(membershipId, administratorUserId, clock.UtcNow, reason);
+        DateTimeOffset now = clock.UtcNow;
+        organization.RevokeMembership(membershipId, administratorUserId, now, reason);
         OrganizationMembership membership = organization.Memberships.Single(item => item.Id == membershipId);
+
+        List<AssistanceRequest> affectedRequests = await dbContext.AssistanceRequests
+            .Include(item => item.StatusHistory)
+            .Where(item => item.OrganizationId == organizationId && item.CreatedByUserId == membership.UserId)
+            .ToListAsync(cancellationToken);
+
+        foreach (AssistanceRequest request in affectedRequests)
+            request.HoldForRepresentativeReview(administratorUserId, now, "Responsible organization representative was removed.");
+
+        bool hasAnotherApprovedMembership = await dbContext.OrganizationMemberships
+            .AsNoTracking()
+            .AnyAsync(item => item.UserId == membership.UserId
+                && item.Id != membership.Id
+                && item.Status == MembershipStatus.Approved, cancellationToken);
+
+        if (!hasAnotherApprovedMembership)
+        {
+            var user = await dbContext.Users.SingleAsync(item => item.Id == membership.UserId, cancellationToken);
+            user.IndividualProfileUpdateRequired = true;
+            user.IndividualProfileUpdateRequiredUtc = now;
+        }
+
         AddMembershipChangedOutbox(organizationId, membership, "Revoked", reason);
+        OrganizationMembershipEndedMessage ended = new(
+            Guid.NewGuid(), now, organizationId, membership.Id, membership.UserId,
+            administratorUserId, reason, affectedRequests
+                .Where(item => item.Status == RequestStatus.RepresentativeReviewRequired)
+                .Select(item => item.Id).ToArray());
+        dbContext.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = ended.MessageId,
+            MessageType = typeof(OrganizationMembershipEndedMessage).FullName ?? nameof(OrganizationMembershipEndedMessage),
+            Payload = System.Text.Json.JsonSerializer.Serialize(ended),
+            OccurredUtc = ended.OccurredUtc,
+            AttemptCount = 0
+        });
         await SaveAndAuditAsync(administratorUserId, organizationId, membershipId, "MembershipRevoked", reason, cancellationToken);
+    }
+
+    public async Task ContinueAffectedRequestAsync(
+        Guid administratorUserId,
+        Guid organizationId,
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureAdministratorAsync(administratorUserId, organizationId, cancellationToken);
+        AssistanceRequest request = await dbContext.AssistanceRequests
+            .Include(item => item.StatusHistory)
+            .SingleAsync(item => item.Id == requestId && item.OrganizationId == organizationId, cancellationToken);
+        request.ContinueAfterRepresentativeReview(administratorUserId, clock.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(administratorUserId, "RepresentativeReviewContinued",
+            "AssistanceRequest", requestId, organizationId, null, cancellationToken);
     }
 
     private async Task<Organization> LoadForAdministrationAsync(
