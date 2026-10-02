@@ -9,6 +9,7 @@ using RequestPortal.Common.Time;
 using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Organizations;
+using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Portal;
 using Xunit;
@@ -113,6 +114,23 @@ public sealed class PortalAuthorizationIsolationTests
         Guid firstUserId = Guid.NewGuid();
         Guid secondUserId = Guid.NewGuid();
         Guid staffUserId = Guid.NewGuid();
+
+        context.Db.Users.AddRange(
+            new ApplicationUser
+            {
+                Id = firstUserId,
+                UserName = $"lifecycle-first-{firstUserId:N}@example.test",
+                Email = $"lifecycle-first-{firstUserId:N}@example.test",
+                DisplayName = "Lifecycle First User"
+            },
+            new ApplicationUser
+            {
+                Id = secondUserId,
+                UserName = $"lifecycle-second-{secondUserId:N}@example.test",
+                Email = $"lifecycle-second-{secondUserId:N}@example.test",
+                DisplayName = "Lifecycle Second User"
+            });
+        await context.Db.SaveChangesAsync(cancellationToken);
 
         Guid organizationId = await context.Service.RegisterOrganizationAsync(
             firstUserId,
