@@ -24,6 +24,7 @@
         <link rel="stylesheet" href="~/css/contextual-training.css" asp-append-version="true" />
     }
     <link rel="stylesheet" href="~/css/operational-workspace.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/application-shell.css" asp-append-version="true" />
 </head>
 <body class="@(useApplicationShell ? "authenticated-app" : "public-site")">
     <header class="site-header @(useApplicationShell ? "app-header" : null)">
@@ -64,10 +65,11 @@
                     }
                     else
                     {
-                        <a asp-page="/Dashboard/Index">Request overview</a>
-                        <a asp-page="/Organizations/Index">Organizations</a>
-                        <a asp-page="/Requests/Index">Requests</a>
+                        <a asp-page="/Dashboard/Index">Overview</a>
+                        <a asp-page="/Requests/Index">My Requests</a>
+                        <a asp-page="/Requests/Create">New Request</a>
                         <a asp-page="/Messages/Inbox" class="messages-nav-link">Messages <span id="messageUnreadBadge" class="message-badge" hidden>0</span></a>
+                        <a asp-page="/Organizations/Index">Organizations</a>
                     }
                     <div class="profile-menu">
                         <button type="button"
