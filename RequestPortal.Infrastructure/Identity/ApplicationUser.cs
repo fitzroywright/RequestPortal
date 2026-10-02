@@ -33,4 +33,30 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public int? ChildrenUnder18 { get; set; }
     public string? HousingSituation { get; set; }
     public string? HouseholdLivingSituation { get; set; }
+
+    public IReadOnlyList<string> GetMissingIndividualProfileFields()
+    {
+        List<string> missing = [];
+        if (string.IsNullOrWhiteSpace(DisplayName)) missing.Add("name");
+        if (string.IsNullOrWhiteSpace(Email)) missing.Add("email");
+        if (string.IsNullOrWhiteSpace(PhoneNumber)) missing.Add("primary telephone");
+        if (!DateOfBirth.HasValue) missing.Add("date of birth");
+        if (string.IsNullOrWhiteSpace(Gender)) missing.Add("gender");
+        if (string.IsNullOrWhiteSpace(NationalIdTrn)) missing.Add("national ID / TRN");
+        if (string.IsNullOrWhiteSpace(MaritalStatus)) missing.Add("marital status");
+        if (string.IsNullOrWhiteSpace(HomeAddress)) missing.Add("home address");
+        if (string.IsNullOrWhiteSpace(Parish)) missing.Add("parish");
+        if (string.IsNullOrWhiteSpace(DistrictArea)) missing.Add("district / area");
+        if (string.IsNullOrWhiteSpace(EmploymentStatus)) missing.Add("employment status");
+        if (!MonthlyHouseholdIncome.HasValue) missing.Add("monthly household income");
+        if (!HouseholdSize.HasValue) missing.Add("persons in household");
+        if (!NumberOfDependants.HasValue) missing.Add("dependants");
+        if (!ChildrenUnder18.HasValue) missing.Add("children under 18");
+        if (string.IsNullOrWhiteSpace(HousingSituation)) missing.Add("housing situation");
+        if (string.IsNullOrWhiteSpace(HouseholdLivingSituation)) missing.Add("household / living situation");
+        return missing;
+    }
+
+    public bool IsIndividualProfileComplete =>
+        GetMissingIndividualProfileFields().Count == 0;
 }
