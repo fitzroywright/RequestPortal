@@ -1427,6 +1427,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<string>("HomeAddress")
                         .HasColumnType("text");
 
+                    b.Property<string>("HomeAddressLine2")
+                        .HasColumnType("text");
+
                     b.Property<string>("HouseholdLivingSituation")
                         .HasColumnType("text");
 
@@ -1449,6 +1452,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("Parish")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Town")
                         .HasColumnType("text");
 
 
