@@ -82,8 +82,26 @@ public sealed class ProfileModel : PageModel
         user.PhoneNumber = string.IsNullOrWhiteSpace(ProfileInput.PhoneNumber)
             ? null
             : ProfileInput.PhoneNumber.Trim();
-        user.IndividualProfileUpdateRequired = false;
-        user.IndividualProfileUpdateRequiredUtc = null;
+        user.DateOfBirth = ProfileInput.DateOfBirth;
+        user.Gender = ProfileInput.Gender.Trim();
+        user.NationalIdTrn = ProfileInput.NationalIdTrn.Trim();
+        user.MaritalStatus = ProfileInput.MaritalStatus.Trim();
+        user.HomeAddress = ProfileInput.HomeAddress.Trim();
+        user.Parish = ProfileInput.Parish.Trim();
+        user.DistrictArea = ProfileInput.DistrictArea.Trim();
+        user.AlternativePhoneNumber = Normalize(ProfileInput.AlternativePhoneNumber);
+        user.EmploymentStatus = ProfileInput.EmploymentStatus.Trim();
+        user.EmployerInstitution = Normalize(ProfileInput.EmployerInstitution);
+        user.MonthlyHouseholdIncome = ProfileInput.MonthlyHouseholdIncome;
+        user.HouseholdSize = ProfileInput.HouseholdSize;
+        user.NumberOfDependants = ProfileInput.NumberOfDependants;
+        user.ChildrenUnder18 = ProfileInput.ChildrenUnder18;
+        user.HousingSituation = ProfileInput.HousingSituation.Trim();
+        user.HouseholdLivingSituation = ProfileInput.HouseholdLivingSituation.Trim();
+        user.IndividualProfileUpdateRequired = !user.IsIndividualProfileComplete;
+        user.IndividualProfileUpdateRequiredUtc = user.IndividualProfileUpdateRequired
+            ? DateTimeOffset.UtcNow
+            : null;
 
         IdentityResult result = await userManager.UpdateAsync(user);
         if (!result.Succeeded)
@@ -201,7 +219,23 @@ public sealed class ProfileModel : PageModel
             {
                 DisplayName = user.DisplayName,
                 Email = user.Email ?? string.Empty,
-                PhoneNumber = user.PhoneNumber
+                PhoneNumber = user.PhoneNumber,
+                DateOfBirth = user.DateOfBirth,
+                Gender = user.Gender ?? string.Empty,
+                NationalIdTrn = user.NationalIdTrn ?? string.Empty,
+                MaritalStatus = user.MaritalStatus ?? string.Empty,
+                HomeAddress = user.HomeAddress ?? string.Empty,
+                Parish = user.Parish ?? string.Empty,
+                DistrictArea = user.DistrictArea ?? string.Empty,
+                AlternativePhoneNumber = user.AlternativePhoneNumber,
+                EmploymentStatus = user.EmploymentStatus ?? string.Empty,
+                EmployerInstitution = user.EmployerInstitution,
+                MonthlyHouseholdIncome = user.MonthlyHouseholdIncome,
+                HouseholdSize = user.HouseholdSize,
+                NumberOfDependants = user.NumberOfDependants,
+                ChildrenUnder18 = user.ChildrenUnder18,
+                HousingSituation = user.HousingSituation ?? string.Empty,
+                HouseholdLivingSituation = user.HouseholdLivingSituation ?? string.Empty
             };
         }
 
@@ -253,6 +287,11 @@ public sealed class ProfileModel : PageModel
             ModelState.Remove(key);
     }
 
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
+
     private bool IsAvailable(NotificationChannel channel) =>
         channel switch
         {
@@ -269,8 +308,56 @@ public sealed class ProfileModel : PageModel
         [Required, EmailAddress, StringLength(320)]
         public string Email { get; set; } = string.Empty;
 
-        [Phone, StringLength(100)]
+        [Required, Phone, StringLength(100)]
         public string? PhoneNumber { get; set; }
+
+        [Required]
+        public DateOnly? DateOfBirth { get; set; }
+
+        [Required, StringLength(50)]
+        public string Gender { get; set; } = string.Empty;
+
+        [Required, StringLength(100)]
+        public string NationalIdTrn { get; set; } = string.Empty;
+
+        [Required, StringLength(50)]
+        public string MaritalStatus { get; set; } = string.Empty;
+
+        [Required, StringLength(500)]
+        public string HomeAddress { get; set; } = string.Empty;
+
+        [Required, StringLength(100)]
+        public string Parish { get; set; } = string.Empty;
+
+        [Required, StringLength(200)]
+        public string DistrictArea { get; set; } = string.Empty;
+
+        [Phone, StringLength(100)]
+        public string? AlternativePhoneNumber { get; set; }
+
+        [Required, StringLength(100)]
+        public string EmploymentStatus { get; set; } = string.Empty;
+
+        [StringLength(250)]
+        public string? EmployerInstitution { get; set; }
+
+        [Required, Range(typeof(decimal), "0", "999999999999")]
+        public decimal? MonthlyHouseholdIncome { get; set; }
+
+        [Required, Range(1, 100)]
+        public int? HouseholdSize { get; set; }
+
+        [Required, Range(0, 100)]
+        public int? NumberOfDependants { get; set; }
+
+        [Required, Range(0, 100)]
+        public int? ChildrenUnder18 { get; set; }
+
+        [Required, StringLength(100)]
+        public string HousingSituation { get; set; } = string.Empty;
+
+        [Required, StringLength(4000, MinimumLength = 5)]
+        public string HouseholdLivingSituation { get; set; } = string.Empty;
     }
 
     public sealed class PreferenceInput
