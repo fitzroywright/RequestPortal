@@ -24,13 +24,7 @@
                     <p>@Model.Request.Summary</p>
                 </div>
                 <div class="action-row">
-                    @if (Model.CanStartRequestConversation)
-                    {
-                    <a class="button button-outline"
-                       asp-page="/Messages/New"
-                       asp-route-OrganizationId="@Model.Request.OrganizationId"
-                       asp-route-RequestId="@Model.Request.Id">Message FFP</a>
-                    }
+                    <a class="button button-outline" href="#conversation">Conversation</a>
                     <span class="status status-@Model.Request.Status">@RequestStatusPresentation.Label(Model.Request.Status)</span>
                 </div>
             </header>
@@ -40,6 +34,61 @@
                 <span aria-current="step"><strong>Current</strong> @RequestStatusPresentation.Label(Model.Request.Status)</span>
                 <span><strong>Next</strong> @RequestStatusPresentation.Next(Model.Request.Status)</span>
             </section>
+
+            <section id="conversation" class="operational-panel request-messages-card">
+                <div class="panel-titlebar">
+                    <div>
+                        <strong>Request conversation</strong>
+                        <small class="muted">Messages about @Model.Request.PublicReference stay with this request.</small>
+                    </div>
+                    <a asp-page="/Messages/Inbox">All messages</a>
+                </div>
+                <div asp-validation-summary="ModelOnly" class="validation"></div>
+                @if (Model.MessageThreads.Count == 0 && Model.CanStartRequestConversation)
+                {
+                    <form method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="request-reply-form">
+                        <input type="hidden" name="id" value="@Model.Request.Id" />
+                        <div class="request-reply-box">
+                            <textarea name="Reply" rows="3" maxlength="10000" required placeholder="Message FFP about this request" aria-label="Message FFP">@Model.Reply</textarea>
+                            <label class="reply-paperclip" title="Attach a document">📎<input name="ReplyAttachment" type="file" aria-label="Attach a document" /></label>
+                        </div>
+                        <button class="button button-small" type="submit">Send</button>
+                    </form>
+                }
+                @foreach (var thread in Model.MessageThreads)
+                {
+                    <div class="request-conversation">
+                        <strong>@thread.Subject</strong>
+                        <div class="request-conversation-history">
+                        @foreach (var message in thread.Messages)
+                        {
+                            <article class="request-message-item">
+                                <div><strong>@message.SenderName</strong> <time>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt")</time></div>
+                                <p style="white-space:pre-wrap">@message.Body</p>
+                                @foreach (var attachment in message.Attachments)
+                                {
+                                    <a asp-page="/Messages/Thread" asp-page-handler="Attachment" asp-route-id="@thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
+                                }
+                            </article>
+                        }
+                        </div>
+                        @if (!thread.ClosedUtc.HasValue)
+                        {
+                            <form method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="request-reply-form">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <input type="hidden" name="ReplyThreadId" value="@thread.ThreadId" />
+                                <div class="request-reply-box">
+                                    <textarea name="Reply" rows="3" maxlength="10000" required placeholder="Reply in this conversation" aria-label="Reply">@(Model.ReplyThreadId == thread.ThreadId ? Model.Reply : string.Empty)</textarea>
+                                    <label class="reply-paperclip" title="Attach a document">📎<input name="ReplyAttachment" type="file" aria-label="Attach a document" /></label>
+                                </div>
+                                <span asp-validation-for="Reply" class="validation"></span>
+                                <button class="button button-small" type="submit">Send reply</button>
+                            </form>
+                        }
+                    </div>
+                }
+            </section>
+
 
             <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
                 <div>
@@ -299,53 +348,7 @@
                         }
                     </section>
 
-                    <section class="operational-panel request-messages-card">
-                        <div class="panel-titlebar"><strong>Conversation</strong><a asp-page="/Messages/Inbox">Inbox</a></div>
-                        <div asp-validation-summary="ModelOnly" class="validation"></div>
-                        @if (Model.MessageThreads.Count == 0 && Model.CanStartRequestConversation)
-                        {
-                            <form method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="request-reply-form">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <div class="request-reply-box">
-                                    <textarea name="Reply" rows="3" maxlength="10000" required placeholder="Message FFP about this request" aria-label="Message FFP">@Model.Reply</textarea>
-                                    <label class="reply-paperclip" title="Attach a document">📎<input name="ReplyAttachment" type="file" aria-label="Attach a document" /></label>
-                                </div>
-                                <button class="button button-small" type="submit">Send</button>
-                            </form>
-                        }
-                        @foreach (var thread in Model.MessageThreads)
-                        {
-                            <div class="request-conversation">
-                                <strong>@thread.Subject</strong>
-                                <div class="request-conversation-history">
-                                @foreach (var message in thread.Messages)
-                                {
-                                    <article class="request-message-item">
-                                        <div><strong>@message.SenderName</strong> <time>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt")</time></div>
-                                        <p style="white-space:pre-wrap">@message.Body</p>
-                                        @foreach (var attachment in message.Attachments)
-                                        {
-                                            <a asp-page="/Messages/Thread" asp-page-handler="Attachment" asp-route-id="@thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
-                                        }
-                                    </article>
-                                }
-                                </div>
-                                @if (!thread.ClosedUtc.HasValue)
-                                {
-                                    <form method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="request-reply-form">
-                                        <input type="hidden" name="id" value="@Model.Request.Id" />
-                                        <input type="hidden" name="ReplyThreadId" value="@thread.ThreadId" />
-                                        <div class="request-reply-box">
-                                            <textarea name="Reply" rows="3" maxlength="10000" required placeholder="Reply in this conversation" aria-label="Reply">@(Model.ReplyThreadId == thread.ThreadId ? Model.Reply : string.Empty)</textarea>
-                                            <label class="reply-paperclip" title="Attach a document">📎<input name="ReplyAttachment" type="file" aria-label="Attach a document" /></label>
-                                        </div>
-                                        <span asp-validation-for="Reply" class="validation"></span>
-                                        <button class="button button-small" type="submit">Send reply</button>
-                                    </form>
-                                }
-                            </div>
-                        }
-                    </section>
+                    
 
                     @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
                     {

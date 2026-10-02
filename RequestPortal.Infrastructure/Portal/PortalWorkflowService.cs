@@ -41,6 +41,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
             join organization in dbContext.Organizations.AsNoTracking()
                 on membership.OrganizationId equals organization.Id
             where membership.UserId == userId
+                && organization.OrganizationType != "IndividualContext"
             orderby organization.Name
             select new OrganizationSummary(
                 organization.Id,
@@ -52,6 +53,33 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
             .ToListAsync(cancellationToken);
 
         return organizations;
+    }
+
+    public async Task<IReadOnlyList<OrganizationSummary>> GetRequestContextsForUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureIndividualContextAsync(userId, cancellationToken);
+
+        List<OrganizationSummary> contexts = await (
+            from membership in dbContext.OrganizationMemberships.AsNoTracking()
+            join organization in dbContext.Organizations.AsNoTracking()
+                on membership.OrganizationId equals organization.Id
+            where membership.UserId == userId
+                && membership.Status == MembershipStatus.Approved
+                && organization.Status == OrganizationStatus.Approved
+            orderby organization.OrganizationType == "IndividualContext" descending, organization.Name
+            select new OrganizationSummary(
+                organization.Id,
+                organization.OrganizationType == "IndividualContext" ? "Myself" : organization.Name,
+                organization.CountryCode,
+                organization.Status.ToString(),
+                membership.Status.ToString(),
+                membership.Role.ToString(),
+                organization.OrganizationType == "IndividualContext"))
+            .ToListAsync(cancellationToken);
+
+        return contexts;
     }
 
     public async Task<IReadOnlyList<OrganizationSummary>> GetAvailableOrganizationsAsync(
@@ -68,6 +96,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
             .AsNoTracking()
             .Where(organization =>
                 organization.Status == OrganizationStatus.Approved &&
+                organization.OrganizationType != "IndividualContext" &&
                 !existingOrganizationIds.Contains(organization.Id))
             .OrderBy(organization => organization.Name)
             .Select(organization => new OrganizationSummary(
@@ -80,6 +109,61 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
             .ToListAsync(cancellationToken);
 
         return organizations;
+    }
+
+    private async Task EnsureIndividualContextAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        bool exists = await (
+            from membership in dbContext.OrganizationMemberships.AsNoTracking()
+            join organization in dbContext.Organizations.AsNoTracking()
+                on membership.OrganizationId equals organization.Id
+            where membership.UserId == userId
+                && organization.OrganizationType == "IndividualContext"
+                && membership.Status == MembershipStatus.Approved
+            select membership.Id)
+            .AnyAsync(cancellationToken);
+
+        if (exists)
+        {
+            return;
+        }
+
+        ApplicationUser user = await dbContext.Users
+            .SingleAsync(item => item.Id == userId, cancellationToken);
+
+        DateTimeOffset now = clock.UtcNow;
+        string displayName = string.IsNullOrWhiteSpace(user.DisplayName)
+            ? user.Email ?? user.UserName ?? "Individual Applicant"
+            : user.DisplayName.Trim();
+
+        Organization organization = new(
+            Guid.NewGuid(),
+            displayName,
+            "JM",
+            userId,
+            now);
+
+        organization.UpdateProfile(
+            null,
+            "IndividualContext",
+            null,
+            user.PhoneNumber,
+            user.Email,
+            displayName,
+            null);
+
+        OrganizationMembership membership = organization.RequestMembership(
+            Guid.NewGuid(),
+            userId,
+            now);
+
+        dbContext.Organizations.Add(organization);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        organization.Approve(userId, now);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<Guid> RegisterOrganizationAsync(

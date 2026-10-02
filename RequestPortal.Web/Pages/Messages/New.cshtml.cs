@@ -174,7 +174,7 @@ public sealed class NewModel(
         else
         {
             IReadOnlyList<OrganizationSummary> organizations =
-                await workflowService.GetOrganizationsForUserAsync(userId, HttpContext.RequestAborted);
+                await workflowService.GetRequestContextsForUserAsync(userId, HttpContext.RequestAborted);
             OrganizationSummary[] approvedOrganizations = organizations
                 .Where(item =>
                     item.OrganizationStatus == "Approved" &&

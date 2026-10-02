@@ -221,12 +221,173 @@
                 }
                 else
                 {
-                    <a class="home-quick-card" asp-page="/Account/Login"><strong>Sign In</strong><small>Sign in to submit and track requests.</small><b>→</b></a>
+                    <div class="home-signin-card">
+                        <div class="home-signin-heading">
+                            <span class="home-signin-icon" aria-hidden="true">↗</span>
+                            <div>
+                                <strong>Sign in to Request Portal</strong>
+                                <small>Submit a request, follow its progress, and continue conversations with FFP.</small>
+                            </div>
+                        </div>
+
+                        <form method="post"
+                              asp-page="/Account/Login"
+                              asp-page-handler="External"
+                              class="home-signin-form">
+                            <input type="hidden" name="returnUrl" value="/Dashboard" />
+                            <label for="home-signin-provider">Sign in with</label>
+                            <div class="home-signin-provider-row">
+                                <select id="home-signin-provider" name="provider" aria-label="Choose sign-in provider">
+                                    <option value="Google" selected>Google</option>
+                                    <option value="Facebook">Facebook</option>
+                                    <option value="Yahoo">Yahoo</option>
+                                    <option value="Microsoft">Microsoft</option>
+                                    <option value="Apple">Apple</option>
+                                </select>
+                                <button class="button home-signin-submit" type="submit">Continue</button>
+                            </div>
+                        </form>
+
+                        <div class="home-signin-divider"><span>FFP team member?</span></div>
+
+                        <a class="home-staff-signin" asp-page="/Account/StaffLogin">
+                            <span>
+                                <strong>FFP User Sign In</strong>
+                                <small>Use your Food For The Poor staff account.</small>
+                            </span>
+                            <b aria-hidden="true">→</b>
+                        </a>
+                    </div>
                 }
             </div>
         </aside>
     </div>
 </section>
+
+<style>
+    .home-signin-card {
+        grid-column: 1 / -1;
+        padding: 20px;
+        border: 1px solid #d8dee3;
+        border-radius: 14px;
+        background:
+            radial-gradient(circle at 100% 0, rgba(244,155,47,.12), transparent 34%),
+            linear-gradient(145deg, #ffffff 0%, #f7f9fa 100%);
+        box-shadow: 0 14px 34px rgba(25,39,52,.10);
+    }
+    .home-signin-heading {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e3e7ea;
+    }
+    .home-signin-heading strong {
+        display: block;
+        font-size: 1.08rem;
+        color: #172735;
+    }
+    .home-signin-heading small {
+        display: block;
+        margin-top: 4px;
+        line-height: 1.45;
+        color: #5d6871;
+    }
+    .home-signin-icon {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        border-radius: 10px;
+        background: #172735;
+        color: #fff;
+        font-size: 1.15rem;
+        font-weight: 800;
+    }
+    .home-signin-form {
+        padding: 17px 0 4px;
+    }
+    .home-signin-form label {
+        display: block;
+        margin-bottom: 7px;
+        color: #34434f;
+        font-size: .78rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .home-signin-provider-row {
+        display: grid;
+        grid-template-columns: minmax(0,1fr) auto;
+        gap: 9px;
+    }
+    .home-signin-provider-row select {
+        min-width: 0;
+        border: 1px solid #bec8cf;
+        border-radius: 9px;
+        background: #fff;
+        padding: 10px 38px 10px 12px;
+        font: inherit;
+        color: #172735;
+    }
+    .home-signin-submit {
+        min-width: 104px;
+        border-radius: 9px;
+    }
+    .home-signin-divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 15px 0 10px;
+        color: #7a858e;
+        font-size: .74rem;
+        font-weight: 700;
+    }
+    .home-signin-divider::before,
+    .home-signin-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #dde2e6;
+    }
+    .home-staff-signin {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 11px 12px;
+        border: 1px solid #d7dde1;
+        border-radius: 10px;
+        background: rgba(255,255,255,.72);
+        color: #243746;
+        text-decoration: none;
+    }
+    .home-staff-signin:hover {
+        border-color: #b45b09;
+        background: #fff;
+    }
+    .home-staff-signin strong,
+    .home-staff-signin small {
+        display: block;
+    }
+    .home-staff-signin small {
+        margin-top: 2px;
+        color: #69747c;
+    }
+    .home-staff-signin b {
+        color: #b45b09;
+        font-size: 1.15rem;
+    }
+    @@media (max-width: 560px) {
+        .home-signin-provider-row {
+            grid-template-columns: 1fr;
+        }
+        .home-signin-submit {
+            width: 100%;
+        }
+    }
+</style>
 
 <script src="~/js/carousel-extra/craig-1.js"></script>
 <script src="~/js/carousel-extra/kivette-1.js"></script>

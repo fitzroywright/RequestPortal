@@ -45,7 +45,10 @@
                     </div>
                     @foreach (MailboxMessageView message in Model.Messages)
                     {
-                        <a class="outlook-message-grid outlook-message-row" asp-page="/Messages/Thread" asp-route-id="@message.ThreadId">
+                        <a class="outlook-message-grid outlook-message-row"
+   href="@(message.RequestId.HasValue
+       ? Url.Page("/Requests/Details", new { id = message.RequestId.Value }) + "#conversation"
+       : Url.Page("/Messages/Thread", new { id = message.ThreadId }))">
                             <span class="outlook-message-state">○</span>
                             <span class="outlook-sender"><strong>@message.SenderName</strong><small>@message.SenderKind</small></span>
                             <span class="outlook-subject"><strong>@message.Subject</strong><small>@message.Preview</small></span>

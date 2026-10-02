@@ -42,6 +42,9 @@ public sealed class AuditedPortalWorkflowService : IPortalWorkflowService
     public Task<IReadOnlyList<OrganizationSummary>> GetAvailableOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default)
         => inner.GetAvailableOrganizationsAsync(userId, cancellationToken);
 
+    public Task<IReadOnlyList<OrganizationSummary>> GetRequestContextsForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+        => inner.GetRequestContextsForUserAsync(userId, cancellationToken);
+
     public async Task<Guid> RegisterOrganizationAsync(Guid userId, string name, string countryCode, CancellationToken cancellationToken = default)
     {
         Guid organizationId = await inner.RegisterOrganizationAsync(userId, name, countryCode, cancellationToken);

@@ -29,6 +29,7 @@
                     <small>Your Request Portal identity</small>
                 </div>
                 <form method="post" asp-page-handler="Profile" class="profile-compact-form">
+                    <input type="hidden" asp-for="ReturnUrl" />
                     <div class="field">
                         <label asp-for="ProfileInput.DisplayName">Name</label>
                         <input asp-for="ProfileInput.DisplayName" />

@@ -11,7 +11,8 @@ public sealed record OrganizationSummary(
     string CountryCode,
     string OrganizationStatus,
     string MembershipStatus,
-    string Role);
+    string Role,
+    bool IsIndividualContext = false);
 
 public sealed record PendingMembershipSummary(
     Guid MembershipId,
@@ -67,6 +68,10 @@ public interface IPortalWorkflowService
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<OrganizationSummary>> GetAvailableOrganizationsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OrganizationSummary>> GetRequestContextsForUserAsync(
         Guid userId,
         CancellationToken cancellationToken = default);
 

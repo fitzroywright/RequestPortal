@@ -15,8 +15,7 @@
             {
                 <section class="request-empty-state">
                     <h1>New Request</h1>
-                    <p>You need an approved organization membership before you can submit an organization request.</p>
-                    <a class="button" asp-page="/Organizations/Index">Manage organizations</a>
+                    <p>Your request context could not be loaded. Please refresh the page or contact FFP if the problem continues.</p>
                 </section>
             }
             else
@@ -42,7 +41,8 @@
                                         data-name="@organization.Name"
                                         data-role="@organization.Role"
                                         data-complete="@organization.ProfileComplete.ToString().ToLowerInvariant()"
-                                        data-missing="@organization.MissingProfileFields">
+                                        data-missing="@organization.MissingProfileFields"
+                                        data-individual="@organization.IsIndividualContext.ToString().ToLowerInvariant()">
                                     @organization.Name
                                 </option>
                             }
@@ -59,9 +59,7 @@
                     </div>
                     <a id="edit-profile-link"
                        class="request-profile-link"
-                       asp-page="/Organizations/Profile"
-                       asp-route-id="@Model.Input.OrganizationId"
-                       asp-route-returnUrl="/Requests/Create">Review / edit profile</a>
+                       href="#">Review / edit profile</a>
                 </section>
 
                 <section id="profile-warning" class="profile-warning" hidden>
@@ -400,12 +398,17 @@
         if (!requester || !requester.selectedOptions.length) return;
         const option = requester.selectedOptions[0];
         const complete = option.dataset.complete === 'true';
+        const individual = option.dataset.individual === 'true';
         const id = option.value;
-        const profileUrl = '/Organizations/Profile?id=' + encodeURIComponent(id) + '&returnUrl=' + encodeURIComponent('/Requests/Create');
+        const profileUrl = individual
+            ? '/Account/Profile?returnUrl=' + encodeURIComponent('/Requests/Create')
+            : '/Organizations/Profile/' + encodeURIComponent(id) + '?returnUrl=' + encodeURIComponent('/Requests/Create');
         profileStatus.textContent = complete ? 'Complete' : 'Incomplete';
         profileStatus.className = 'status ' + (complete ? 'status-Approved' : 'status-rejected');
         profileWarning.hidden = complete;
-        profileWarningText.textContent = complete ? '' : ' Missing: ' + (option.dataset.missing || 'required organization information') + '.';
+        profileWarningText.textContent = complete
+            ? ''
+            : ' Missing: ' + (option.dataset.missing || (individual ? 'required personal information' : 'required organization information')) + '.';
         editProfile.href = profileUrl;
         completeProfile.href = profileUrl;
         stickyProfileState.textContent = complete ? 'Profile complete' : 'Profile incomplete — complete it before submission';

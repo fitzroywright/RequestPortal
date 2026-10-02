@@ -23,6 +23,7 @@ public sealed class StaffOrganizationDirectoryService : IStaffOrganizationDirect
     {
         List<StaffOrganizationSummary> organizations = await dbContext.Organizations
             .AsNoTracking()
+            .Where(organization => organization.OrganizationType != "IndividualContext")
             .OrderBy(organization => organization.Name)
             .Select(organization => new StaffOrganizationSummary(
                 organization.Id,

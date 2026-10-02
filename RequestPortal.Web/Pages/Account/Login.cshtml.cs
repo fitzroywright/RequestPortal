@@ -54,10 +54,12 @@ public sealed class LoginModel : PageModel
 
     public string? ErrorMessage { get; private set; }
 
-    public async Task OnGetAsync(string? returnUrl = null)
+    public IActionResult OnGet(string? returnUrl = null)
     {
-        ReturnUrl = LocalReturnUrl(returnUrl);
-        await LoadProvidersAsync();
+        string target = string.IsNullOrWhiteSpace(returnUrl)
+            ? "/"
+            : $"/?returnUrl={Uri.EscapeDataString(LocalReturnUrl(returnUrl))}";
+        return LocalRedirect(target);
     }
 
     public async Task<IActionResult> OnPostExternalAsync(string provider, string? returnUrl = null)
@@ -73,10 +75,8 @@ public sealed class LoginModel : PageModel
 
         if (!configured)
         {
-            ReturnUrl = LocalReturnUrl(returnUrl);
-            ErrorMessage = $"{provider} sign-in is not configured yet.";
-            await LoadProvidersAsync();
-            return Page();
+            TempData["Error"] = $"{provider} sign-in is not configured yet.";
+            return RedirectToPage("/Index");
         }
 
         string redirectUrl = Url.Page(
@@ -94,17 +94,15 @@ public sealed class LoginModel : PageModel
 
         if (!string.IsNullOrWhiteSpace(remoteError))
         {
-            ErrorMessage = "The external sign-in provider could not complete authentication.";
-            await LoadProvidersAsync();
-            return Page();
+            TempData["Error"] = "The external sign-in provider could not complete authentication.";
+            return RedirectToPage("/Index");
         }
 
         ExternalLoginInfo? loginInfo = await signInManager.GetExternalLoginInfoAsync();
         if (loginInfo is null)
         {
-            ErrorMessage = "External sign-in information was not available.";
-            await LoadProvidersAsync();
-            return Page();
+            TempData["Error"] = "External sign-in information was not available.";
+            return RedirectToPage("/Index");
         }
 
         Microsoft.AspNetCore.Identity.SignInResult existingResult = await signInManager.ExternalLoginSignInAsync(
@@ -128,9 +126,8 @@ public sealed class LoginModel : PageModel
 
             if (existingUser is null)
             {
-                ErrorMessage = "The external sign-in account could not be found.";
-                await LoadProvidersAsync();
-                return Page();
+                TempData["Error"] = "The external sign-in account could not be found.";
+                return RedirectToPage("/Index");
             }
 
             await signInManager.SignInWithClaimsAsync(
@@ -148,9 +145,8 @@ public sealed class LoginModel : PageModel
         string? email = loginInfo.Principal.FindFirstValue(ClaimTypes.Email);
         if (string.IsNullOrWhiteSpace(email))
         {
-            ErrorMessage = "The identity provider did not supply an email address.";
-            await LoadProvidersAsync();
-            return Page();
+            TempData["Error"] = "The identity provider did not supply the required account identity.";
+            return RedirectToPage("/Index");
         }
 
         ApplicationUser? user = await userManager.FindByEmailAsync(email);
@@ -172,19 +168,17 @@ public sealed class LoginModel : PageModel
             IdentityResult createResult = await userManager.CreateAsync(user);
             if (!createResult.Succeeded)
             {
-                ErrorMessage = "The Request Portal account could not be created.";
+                TempData["Error"] = "The Request Portal account could not be created.";
                 await EmitAsync("RP-AUTH-EXTERNAL-LOCALUSER-FAIL", "External user local account creation failed.", string.Join("; ", createResult.Errors.Select(error => error.Code)));
-                await LoadProvidersAsync();
-                return Page();
+                return RedirectToPage("/Index");
             }
         }
 
         IdentityResult loginResult = await userManager.AddLoginAsync(user, loginInfo);
         if (!loginResult.Succeeded && !loginResult.Errors.Any(error => error.Code == "LoginAlreadyAssociated"))
         {
-            ErrorMessage = "The external sign-in could not be linked to the Request Portal account.";
-            await LoadProvidersAsync();
-            return Page();
+            TempData["Error"] = "The external sign-in could not be linked to the Request Portal account.";
+            return RedirectToPage("/Index");
         }
 
         user.LastSignInUtc = clock.UtcNow;
@@ -224,9 +218,8 @@ public sealed class LoginModel : PageModel
         ApplicationUser? user = await userManager.FindByEmailAsync(demoEmail);
         if (user is null)
         {
-            ErrorMessage = "Demo data is not initialized. Start the application with Demo:EnsureDatabase enabled once.";
-            await LoadProvidersAsync();
-            return Page();
+            TempData["Error"] = "Demo data is not initialized.";
+            return RedirectToPage("/Index");
         }
 
         user.LastSignInUtc = clock.UtcNow;
