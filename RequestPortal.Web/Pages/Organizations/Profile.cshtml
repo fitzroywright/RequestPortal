@@ -20,41 +20,198 @@
 
             <div class="grid-2">
                 <section class="card">
-                    <h2>Registration details</h2>
+                    <h2>Organization details</h2>
+                    <p class="muted">Fields marked * are required before the organization can submit requests.</p>
+
                     <form method="post" asp-page-handler="Save" class="form-grid">
                         <input type="hidden" name="id" value="@Model.Organization.Id" />
                         <input type="hidden" asp-for="ReturnUrl" />
-                        <input type="hidden" asp-for="ReturnUrl" />
-                        <div class="field">
-                            <label asp-for="Input.RegistrationNumber">Registration number</label>
-                            <input asp-for="Input.RegistrationNumber" />
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.RegistrationNumber">Registration / identifying number *</label>
+                                <input asp-for="Input.RegistrationNumber" />
+                                <span asp-validation-for="Input.RegistrationNumber" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.TaxRegistrationNumber">TRN / tax number</label>
+                                <input asp-for="Input.TaxRegistrationNumber" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.OrganizationType">Organization type *</label>
+                                <select asp-for="Input.OrganizationType">
+                                    <option value="">Select organization type</option>
+                                    <option>Charity / NGO</option>
+                                    <option>Church / Faith-based organization</option>
+                                    <option>School / Educational institution</option>
+                                    <option>Community-based organization</option>
+                                    <option>Government entity</option>
+                                    <option>Health facility</option>
+                                    <option>Children's home</option>
+                                    <option>Elder-care facility</option>
+                                    <option>Disaster-response group</option>
+                                    <option>Foundation</option>
+                                    <option>Other</option>
+                                </select>
+                                <span asp-validation-for="Input.OrganizationType" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.TradingName">Trading / common name</label>
+                                <input asp-for="Input.TradingName" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.DateEstablished">Date established</label>
+                                <input asp-for="Input.DateEstablished" type="date" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.CountryOfRegistration">Country of registration *</label>
+                                <input asp-for="Input.CountryOfRegistration" />
+                                <span asp-validation-for="Input.CountryOfRegistration" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.RegistrationExpiryDate">Registration expiry date</label>
+                                <input asp-for="Input.RegistrationExpiryDate" type="date" />
+                            </div>
                         </div>
+
+                        <h3>Location</h3>
                         <div class="field">
-                            <label asp-for="Input.OrganizationType">Organization type</label>
-                            <input asp-for="Input.OrganizationType" placeholder="Charity, church, school, NGO..." />
-                        </div>
-                        <div class="field">
-                            <label asp-for="Input.PrimaryContactName">Primary contact</label>
-                            <input asp-for="Input.PrimaryContactName" />
+                            <label asp-for="Input.Address">Physical address *</label>
+                            <textarea asp-for="Input.Address" rows="3"></textarea>
+                            <span asp-validation-for="Input.Address" class="validation"></span>
                         </div>
                         <div class="grid-2">
                             <div class="field">
-                                <label asp-for="Input.Email">Email</label>
-                                <input asp-for="Input.Email" />
+                                <label asp-for="Input.Parish">Parish *</label>
+                                <select asp-for="Input.Parish">
+                                    <option value="">Select parish</option>
+                                    <option>Kingston</option><option>St. Andrew</option><option>St. Catherine</option>
+                                    <option>Clarendon</option><option>Manchester</option><option>St. Elizabeth</option>
+                                    <option>Westmoreland</option><option>Hanover</option><option>St. James</option>
+                                    <option>Trelawny</option><option>St. Ann</option><option>St. Mary</option>
+                                    <option>Portland</option><option>St. Thomas</option>
+                                </select>
+                                <span asp-validation-for="Input.Parish" class="validation"></span>
                             </div>
                             <div class="field">
-                                <label asp-for="Input.Phone">Phone</label>
-                                <input asp-for="Input.Phone" />
+                                <label asp-for="Input.DistrictArea">District / community</label>
+                                <input asp-for="Input.DistrictArea" />
                             </div>
                         </div>
                         <div class="field">
-                            <label asp-for="Input.Address">Address</label>
-                            <textarea asp-for="Input.Address" rows="3"></textarea>
+                            <label asp-for="Input.MailingAddress">Mailing address</label>
+                            <textarea asp-for="Input.MailingAddress" rows="2"></textarea>
+                        </div>
+
+                        <h3>Primary contact</h3>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.PrimaryContactName">Primary contact *</label>
+                                <input asp-for="Input.PrimaryContactName" />
+                                <span asp-validation-for="Input.PrimaryContactName" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.PrimaryContactTitle">Job title *</label>
+                                <input asp-for="Input.PrimaryContactTitle" />
+                                <span asp-validation-for="Input.PrimaryContactTitle" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.Email">Email *</label>
+                                <input asp-for="Input.Email" type="email" />
+                                <span asp-validation-for="Input.Email" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.Phone">Phone *</label>
+                                <input asp-for="Input.Phone" type="tel" />
+                                <span asp-validation-for="Input.Phone" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.AlternativePhone">Alternative phone</label>
+                                <input asp-for="Input.AlternativePhone" type="tel" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.Website">Website</label>
+                                <input asp-for="Input.Website" type="url" placeholder="https://" />
+                            </div>
+                        </div>
+
+                        <h3>Governance contacts</h3>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.AuthorizedSignatoryName">Authorized signatory</label>
+                                <input asp-for="Input.AuthorizedSignatoryName" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.AuthorizedSignatoryTitle">Signatory title</label>
+                                <input asp-for="Input.AuthorizedSignatoryTitle" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.SecondaryContactName">Secondary contact</label>
+                                <input asp-for="Input.SecondaryContactName" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.SecondaryContactEmail">Secondary contact email</label>
+                                <input asp-for="Input.SecondaryContactEmail" type="email" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.SecondaryContactPhone">Secondary contact phone</label>
+                                <input asp-for="Input.SecondaryContactPhone" type="tel" />
+                            </div>
+                        </div>
+
+                        <h3>Operations &amp; reach</h3>
+                        <div class="field">
+                            <label asp-for="Input.MainActivities">Main activities / mission *</label>
+                            <textarea asp-for="Input.MainActivities" rows="4"></textarea>
+                            <span asp-validation-for="Input.MainActivities" class="validation"></span>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.EmployeeCount">Employees</label>
+                                <input asp-for="Input.EmployeeCount" type="number" min="0" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.VolunteerCount">Volunteers</label>
+                                <input asp-for="Input.VolunteerCount" type="number" min="0" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.ApproximateBeneficiariesServed">Approx. beneficiaries served</label>
+                                <input asp-for="Input.ApproximateBeneficiariesServed" type="number" min="0" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.GeographicServiceArea">Geographic service area</label>
+                                <input asp-for="Input.GeographicServiceArea" />
+                            </div>
                         </div>
                         <div class="field">
-                            <label asp-for="Input.RegistrationExpiryDate">Registration expiry date</label>
-                            <input asp-for="Input.RegistrationExpiryDate" type="date" />
+                            <label asp-for="Input.PopulationGroupsServed">Population groups served</label>
+                            <textarea asp-for="Input.PopulationGroupsServed" rows="3"></textarea>
                         </div>
+                        <div class="field">
+                            <label asp-for="Input.PremisesSituation">Premises / operating location</label>
+                            <input asp-for="Input.PremisesSituation" />
+                        </div>
+
+                        <h3>Financial &amp; relationship information</h3>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="Input.AnnualOperatingBudget">Approx. annual operating budget</label>
+                                <input asp-for="Input.AnnualOperatingBudget" type="number" min="0" step="0.01" />
+                            </div>
+                            <div class="field">
+                                <label asp-for="Input.PreviouslyReceivedFfpAssistance">Previously received FFP assistance?</label>
+                                <select asp-for="Input.PreviouslyReceivedFfpAssistance">
+                                    <option value="">Not specified</option>
+                                    <option value="true">Yes</option>
+                                    <option value="false">No</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label asp-for="Input.PrimaryFundingSources">Primary funding sources</label>
+                            <textarea asp-for="Input.PrimaryFundingSources" rows="3"></textarea>
+                        </div>
+
                         <button class="button" type="submit">Save organization profile</button>
                     </form>
                 </section>
@@ -64,6 +221,7 @@
                     <p class="muted">Upload the organization's registration certificate or equivalent verification document.</p>
                     <form method="post" enctype="multipart/form-data" asp-page-handler="UploadCertificate" class="form-grid">
                         <input type="hidden" name="id" value="@Model.Organization.Id" />
+                        <input type="hidden" asp-for="ReturnUrl" />
                         <div class="field">
                             <label asp-for="RegistrationCertificate">Registration certificate</label>
                             <input asp-for="RegistrationCertificate" type="file" />
