@@ -3084,3 +3084,34 @@ body.authenticated-app{
 .authenticated-app .request-type-option span {
     border-radius: 8px !important;
 }
+
+
+/* My Profile age display */
+.authenticated-app .profile-dob-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.authenticated-app .profile-dob-row input{
+    flex:1 1 auto;
+}
+.authenticated-app .profile-age-chip{
+    display:inline-flex;
+    align-items:center;
+    min-height:30px;
+    padding:0 10px;
+    border:1px solid #c7d6e3;
+    border-radius:8px;
+    background:#f3f8fc;
+    color:#173955;
+    font-size:.76rem;
+    font-weight:800;
+    white-space:nowrap;
+}
+.authenticated-app .profile-age-warning{
+    display:block;
+    margin-top:4px;
+    color:#b42318;
+    font-size:.72rem;
+    font-weight:800;
+}
