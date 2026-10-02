@@ -17,20 +17,23 @@ public sealed class IndexModel : PageModel
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IPortalWorkflowService workflowService;
     private readonly ICountryPolicyService countryPolicyService;
+    private readonly RequestPortal.Application.Organizations.IOrganizationInvitationService invitationService;
 
     public IndexModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
-        ICountryPolicyService countryPolicyService)
+        ICountryPolicyService countryPolicyService,
+        RequestPortal.Application.Organizations.IOrganizationInvitationService invitationService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.countryPolicyService = countryPolicyService;
+        this.invitationService = invitationService;
     }
 
     public IReadOnlyList<OrganizationSummary> Organizations { get; private set; } = Array.Empty<OrganizationSummary>();
 
-    public IReadOnlyList<OrganizationSummary> AvailableOrganizations { get; private set; } = Array.Empty<OrganizationSummary>();
+    public IReadOnlyList<RequestPortal.Application.Organizations.OrganizationInvitationView> PendingInvitations { get; private set; } = Array.Empty<RequestPortal.Application.Organizations.OrganizationInvitationView>();
 
     public IReadOnlyList<CountryOption> RegistrationCountries { get; private set; } = Array.Empty<CountryOption>();
 
@@ -76,18 +79,17 @@ public sealed class IndexModel : PageModel
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostRequestMembershipAsync(Guid organizationId)
-    {
-        ApplicationUser user = await GetUserAsync();
-        await workflowService.RequestMembershipAsync(user.Id, organizationId, HttpContext.RequestAborted);
-        TempData["Success"] = "Membership request submitted to the organization's administrator.";
-        return RedirectToPage();
-    }
-
     private async Task LoadAsync(Guid userId)
     {
         Organizations = await workflowService.GetOrganizationsForUserAsync(userId, HttpContext.RequestAborted);
-        AvailableOrganizations = await workflowService.GetAvailableOrganizationsAsync(userId, HttpContext.RequestAborted);
+
+        ApplicationUser user = await userManager.FindByIdAsync(userId.ToString())
+            ?? throw new InvalidOperationException("Authenticated portal user could not be resolved.");
+
+        PendingInvitations = await invitationService.GetPendingForUserAsync(
+            userId,
+            user.Email,
+            HttpContext.RequestAborted);
 
         IReadOnlyList<CountryOption> countries = await countryPolicyService.GetActiveCountriesAsync(HttpContext.RequestAborted);
         RegistrationCountries = countries
