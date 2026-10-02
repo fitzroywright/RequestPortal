@@ -17,6 +17,7 @@ using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
 using RequestPortal.Domain.Documents;
+using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Web.Security;
