@@ -10,8 +10,63 @@
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">Organization administration</div>
             <h1>Representatives & administrators</h1>
-            <p>Approve recognized representatives, remove access when needed, and control who may administer this organization.</p>
+            <p>Invite representatives, remove access when needed, and control who may administer this organization. New representative access is invitation-only.</p>
         </div>
+
+        <section class="card" style="margin-bottom:1rem">
+            <h2>Invite representative</h2>
+            <p class="muted">Send an invitation to the person's email address. They must sign in with that email address and accept before access is granted.</p>
+            <form method="post" asp-page-handler="Invite" class="action-row">
+                <input type="hidden" name="organizationId" value="@Model.OrganizationId" />
+                <input type="email" name="email" required maxlength="320" placeholder="person@example.com" style="min-width:280px" />
+                <button class="button button-small" type="submit">Send invitation</button>
+            </form>
+        </section>
+
+        <section class="card" style="margin-bottom:1rem">
+            <h2>Invitations</h2>
+            @if (Model.Invitations.Count == 0)
+            {
+                <p class="muted">No invitations have been sent.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Sent</th>
+                                <th>Expires</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (OrganizationInvitationView invitation in Model.Invitations)
+                        {
+                            <tr>
+                                <td>@invitation.Email</td>
+                                <td><span class="status status-@invitation.Status">@invitation.Status</span></td>
+                                <td>@invitation.CreatedUtc.ToLocalTime().ToString("g")</td>
+                                <td>@invitation.ExpiresUtc.ToLocalTime().ToString("g")</td>
+                                <td>
+                                    @if (invitation.Status == "Pending")
+                                    {
+                                        <form method="post" asp-page-handler="RevokeInvitation">
+                                            <input type="hidden" name="organizationId" value="@Model.OrganizationId" />
+                                            <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                            <button class="button button-small button-secondary" type="submit">Revoke</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
 
         <section class="card">
             @if (Model.Memberships.Count == 0)
@@ -45,10 +100,11 @@
                                     @if (membership.Status == "Pending")
                                     {
                                         <div class="action-row">
+                                            <span class="muted">Legacy membership request</span>
                                             <form method="post" asp-page-handler="Approve">
                                                 <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
                                                 <input type="hidden" name="membershipId" value="@membership.MembershipId" />
-                                                <button class="button button-small" type="submit">Approve</button>
+                                                <button class="button button-small" type="submit">Approve legacy request</button>
                                             </form>
                                             <form method="post" asp-page-handler="Reject" class="action-row">
                                                 <input type="hidden" name="organizationId" value="@membership.OrganizationId" />
