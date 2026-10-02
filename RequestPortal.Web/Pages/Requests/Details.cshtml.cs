@@ -73,7 +73,8 @@ public sealed class DetailsModel : PageModel
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
     public IReadOnlyList<MessageThreadView> MessageThreads { get; private set; } = Array.Empty<MessageThreadView>();
     public bool DocumentsUnavailable { get; private set; }
-    public bool CanStartRequestConversation { get; private set; }
+    public bool RequestConversationReadOnly { get; private set; }
+    public string? RequestConversationReadOnlyReason { get; private set; }
 
     [BindProperty] public string Reply { get; set; } = string.Empty;
     [BindProperty] public Guid? ReplyThreadId { get; set; }
@@ -84,6 +85,25 @@ public sealed class DetailsModel : PageModel
         ApplicationUser user = await GetUserAsync();
         RequestDetail? request = await workflowService.GetRequestAsync(user.Id, id, false, HttpContext.RequestAborted);
         if (request is null) return NotFound();
+
+        if (IsExternalReviewer())
+        {
+            return Forbid();
+        }
+
+        IReadOnlyList<MessageThreadView> requestThreads =
+            await messageService.GetRequestThreadsAsync(
+                user.Id,
+                isStaff: false,
+                id,
+                HttpContext.RequestAborted);
+
+        string? messagingRestriction = GetMessagingRestriction(request, requestThreads);
+        if (messagingRestriction is not null)
+        {
+            ModelState.AddModelError(nameof(Reply), messagingRestriction);
+            return await LoadPageAsync(user, id);
+        }
 
         if (string.IsNullOrWhiteSpace(Reply) || Reply.Length > 10000)
         {
@@ -399,11 +419,8 @@ public sealed class DetailsModel : PageModel
 
         MessageThreads = visibleThreads;
 
-        // Reaching Request Detail means the current user has already passed
-        // request authorization through GetRequestAsync. Any authorized viewer
-        // of the request must be able to start its request-bound conversation,
-        // even when no message thread exists yet.
-        CanStartRequestConversation = true;
+        RequestConversationReadOnlyReason = GetMessagingRestriction(Request, visibleThreads);
+        RequestConversationReadOnly = RequestConversationReadOnlyReason is not null;
         Documents = await documentService.GetRequestDocumentsAsync(
             user.Id,
             id,
@@ -418,6 +435,37 @@ public sealed class DetailsModel : PageModel
         }
 
         return Page();
+    }
+
+    private bool IsExternalReviewer()
+    {
+        return User.HasClaim("requestportal.external-review", "true");
+    }
+
+    private string? GetMessagingRestriction(
+        RequestDetail request,
+        IReadOnlyList<MessageThreadView> threads)
+    {
+        if (IsExternalReviewer())
+        {
+            return "External review access is read-only.";
+        }
+
+        if (request.Status is "Rejected" or "Cancelled" or "Duplicate" or "Closed")
+        {
+            return $"Messaging is closed because this request is {RequestStatusPresentation.Label(request.Status).ToLowerInvariant()}.";
+        }
+
+        MessageThreadView[] requestThreads = threads
+            .Where(thread => thread.Audience == RequestPortal.Domain.Messages.MessageAudience.Request)
+            .ToArray();
+
+        if (requestThreads.Length > 0 && requestThreads.All(thread => thread.ClosedUtc.HasValue))
+        {
+            return "This request conversation is closed. Contact FFP to reopen it.";
+        }
+
+        return null;
     }
 
     private async Task<ApplicationUser> GetUserAsync()
