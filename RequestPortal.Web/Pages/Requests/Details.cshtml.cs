@@ -398,14 +398,12 @@ public sealed class DetailsModel : PageModel
         }
 
         MessageThreads = visibleThreads;
-        CanStartRequestConversation = await dbContext.AssistanceRequests.AsNoTracking()
-            .AnyAsync(item => item.Id == id && (item.CreatedByUserId == user.Id || item.SubmittedByUserId == user.Id), HttpContext.RequestAborted)
-            || visibleThreads.Any(item => item.Audience == RequestPortal.Domain.Messages.MessageAudience.Request)
-            || await dbContext.OrganizationMemberships.AsNoTracking().AnyAsync(item =>
-                item.OrganizationId == Request.OrganizationId && item.UserId == user.Id &&
-                item.Status == RequestPortal.Domain.Organizations.MembershipStatus.Approved &&
-                item.Role == RequestPortal.Domain.Organizations.OrganizationRole.Administrator && item.ReceiveRequestNotifications,
-                HttpContext.RequestAborted);
+
+        // Reaching Request Detail means the current user has already passed
+        // request authorization through GetRequestAsync. Any authorized viewer
+        // of the request must be able to start its request-bound conversation,
+        // even when no message thread exists yet.
+        CanStartRequestConversation = true;
         Documents = await documentService.GetRequestDocumentsAsync(
             user.Id,
             id,
