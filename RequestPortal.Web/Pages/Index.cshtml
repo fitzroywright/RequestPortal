@@ -290,7 +290,12 @@
                         <div class="home-signin-divider"><span>FFP team member?</span></div>
 
                         <a class="home-staff-signin" asp-page="/Account/StaffLogin">
-                            <span>
+                            <span class="home-staff-signin-logo-wrap">
+                                <img src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png"
+                                     alt=""
+                                     class="home-staff-signin-logo" />
+                            </span>
+                            <span class="home-staff-signin-copy">
                                 <strong>FFP User Sign In</strong>
                                 <small>Use your Food For The Poor staff account.</small>
                             </span>
@@ -306,7 +311,10 @@
 <style>
     .home-signin-card {
         grid-column: 1 / -1;
-        padding: 20px;
+        width: min(100%, 420px);
+        justify-self: center;
+        box-sizing: border-box;
+        padding: 18px;
         border: 1px solid #d8dee3;
         border-radius: 14px;
         background:
@@ -501,18 +509,39 @@
     .home-staff-signin {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 11px 12px;
-        border: 1px solid #d7dde1;
-        border-radius: 10px;
-        background: rgba(255,255,255,.72);
-        color: #243746;
+        gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid #0f5faa;
+        border-radius: 8px;
+        background: linear-gradient(#1976c9, #0f5fa8);
+        color: #fff;
         text-decoration: none;
+        box-shadow: 0 2px 5px rgba(15,95,168,.22);
     }
     .home-staff-signin:hover {
-        border-color: #b45b09;
+        background: linear-gradient(#2384d7, #146bb8);
+        border-color: #0b5598;
+    }
+    .home-staff-signin-logo-wrap {
+        width: 42px;
+        height: 34px;
+        flex: 0 0 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 5px;
         background: #fff;
+        padding: 3px;
+        box-sizing: border-box;
+    }
+    .home-staff-signin-logo {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        display: block;
+    }
+    .home-staff-signin-copy {
+        min-width: 0;
+        flex: 1;
     }
     .home-staff-signin strong,
     .home-staff-signin small {
@@ -520,10 +549,10 @@
     }
     .home-staff-signin small {
         margin-top: 2px;
-        color: #69747c;
+        color: rgba(255,255,255,.82);
     }
     .home-staff-signin b {
-        color: #b45b09;
+        color: #fff;
         font-size: 1.15rem;
     }
     @@media (max-width: 560px) {
