@@ -9,372 +9,148 @@
     ViewData["Title"] = "Request Details";
 }
 
-<section class="operational-page">
-    <div class="shell">
+<section class="mock-request-detail">
+    <div class="mock-request-shell">
         @if (Model.Request is null)
         {
-            <section class="operational-panel"><h1>Request not found</h1></section>
+            <section class="mock-panel"><div class="mock-panel-head"><strong>Request not found</strong></div></section>
         }
         else
         {
-            <header class="workspace-titlebar request-detail-header">
-                <div class="section-heading" style="margin-bottom:0">
-                    <a class="request-back-link" asp-page="/Requests/Index">‹ Back to My Requests</a>
-                    <div class="eyebrow" style="color:#b45b09">@Model.Request.OrganizationName</div>
-                    <h1>@Model.Request.PublicReference</h1>
-                    <p>@Model.Request.Summary</p>
+            @{
+                var requestMessages = Model.MessageThreads
+                    .SelectMany(thread => thread.Messages.Select(message => new { Thread = thread, Message = message }))
+                    .OrderByDescending(item => item.Message.SentUtc)
+                    .ToArray();
+
+                var replyThread = Model.MessageThreads
+                    .Where(thread => !thread.ClosedUtc.HasValue)
+                    .OrderByDescending(thread => thread.Messages.LastOrDefault()?.SentUtc ?? DateTimeOffset.MinValue)
+                    .FirstOrDefault();
+
+                string categoryDisplay = !string.IsNullOrWhiteSpace(Model.DetailMeta.Subcategory)
+                    ? Model.DetailMeta.Subcategory
+                    : !string.IsNullOrWhiteSpace(Model.DetailMeta.Category)
+                        ? Model.DetailMeta.Category
+                        : "—";
+
+                string locationDisplay = !string.IsNullOrWhiteSpace(Model.DetailMeta.Location)
+                    ? Model.DetailMeta.Location
+                    : !string.IsNullOrWhiteSpace(Model.RequesterCard.Parish)
+                        ? Model.RequesterCard.Parish
+                        : "—";
+
+                string submittedByContext = Model.DetailMeta.IsIndividualRequest
+                    ? "Individual"
+                    : Model.Request.OrganizationName;
+            }
+
+            <header class="mock-request-header">
+                <div class="mock-request-heading">
+                    <a class="mock-back-link" asp-page="/Requests/Index">‹&nbsp; Back to My Requests</a>
+                    <div class="mock-title-row">
+                        <h1>@Model.Request.PublicReference</h1>
+                        <span class="mock-status-pill">@RequestStatusPresentation.Label(Model.Request.Status)</span>
+                    </div>
+                    <h2>@(Model.DetailMeta.Category ?? Model.Request.Summary)</h2>
+                    <p>
+                        @(Model.DetailMeta.SubmittedUtc.HasValue
+                            ? $"Submitted on {Model.DetailMeta.SubmittedUtc.Value.ToLocalTime():d MMM yyyy 'at' h:mm tt}"
+                            : $"Created on {Model.DetailMeta.CreatedUtc.ToLocalTime():d MMM yyyy 'at' h:mm tt}")
+                        by @Model.DetailMeta.SubmittedByName (@submittedByContext)
+                    </p>
                 </div>
-                <div class="action-row">
-                    <span class="status status-@Model.Request.Status">@RequestStatusPresentation.Label(Model.Request.Status)</span>
+                <div class="mock-header-actions">
+                    @if (Model.Request.Status == "Draft" || Model.Request.Status == "MoreInformationRequired")
+                    {
+                        <a class="mock-action-button mock-action-edit" href="#items">✎&nbsp; Edit Request</a>
+                    }
+                    @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
+                    {
+                        <a class="mock-action-button mock-action-cancel" href="#cancel-request">Cancel Request</a>
+                    }
                 </div>
             </header>
 
-            <nav class="request-detail-tabs" aria-label="Request detail sections">
-                <a href="#overview"><span class="ui-icon">▦</span> Overview</a>
-                <a href="#items"><span class="ui-icon">▤</span> Items <b>@Model.Request.Items.Count</b></a>
-                <a href="#documents"><span class="ui-icon">▧</span> Files <b>@Model.Documents.Count</b></a>
-                <a href="#history"><span class="ui-icon">◷</span> History <b>@Model.Request.History.Count</b></a>
+            <nav class="mock-tabs" aria-label="Request detail sections">
+                <a class="is-active" href="#summary">Overview</a>
+                <a href="#items">Items (@Model.Request.Items.Count)</a>
+                <a href="#messages">Messages (@requestMessages.Length)</a>
+                <a href="#files">Files (@Model.Documents.Count)</a>
+                <a href="#history">History (@Model.Request.History.Count)</a>
             </nav>
 
-            <section id="overview" class="operational-panel request-progress" aria-label="Request progress">
-                <span class="progress-completed"><strong><i>✓</i> Completed</strong> @(string.Join(" · ", Model.Request.History.Reverse().Where(item => item.Status != Model.Request.Status).Select(item => RequestStatusPresentation.Label(item.Status)).Distinct().DefaultIfEmpty("None yet")))</span>
-                <span class="progress-current" aria-current="step"><strong><i>●</i> Current</strong> @RequestStatusPresentation.Label(Model.Request.Status)</span>
-                <span class="progress-next"><strong><i>→</i> Next</strong> @RequestStatusPresentation.Next(Model.Request.Status)</span>
-            </section>
+            <div class="mock-detail-grid">
+                <main class="mock-detail-main">
+                    <section id="summary" class="mock-panel">
+                        <div class="mock-panel-head">
+                            <div class="mock-panel-title"><span class="mock-panel-icon">▧</span><strong>Request Summary</strong></div>
+                            @if (Model.Request.Status == "Draft" || Model.Request.Status == "MoreInformationRequired")
+                            {
+                                <a class="mock-mini-button" href="#items">Edit</a>
+                            }
+                        </div>
+                        <div class="mock-summary-content">
+                            <dl class="mock-summary-list">
+                                <div><dt>Request ID</dt><dd>@Model.Request.PublicReference</dd></div>
+                                <div><dt>Status</dt><dd><span class="mock-inline-status">@RequestStatusPresentation.Label(Model.Request.Status)</span></dd></div>
+                                <div><dt>Request Type</dt><dd>@Model.DetailMeta.RequestType</dd></div>
+                                <div><dt>Category</dt><dd>@categoryDisplay</dd></div>
+                                <div><dt>Priority</dt><dd><span class="mock-priority">@Model.DetailMeta.Priority</span></dd></div>
+                                <div><dt>Submitted</dt><dd>@(Model.DetailMeta.SubmittedUtc?.ToLocalTime().ToString("d MMM yyyy, h:mm tt") ?? "Not submitted")</dd></div>
+                                <div><dt>Last Updated</dt><dd>@Model.DetailMeta.LastUpdatedUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</dd></div>
+                                <div><dt>Country</dt><dd>@(Model.RelatedCard.Country ?? "Jamaica")</dd></div>
+                                <div><dt>Location / Parish</dt><dd>@locationDisplay</dd></div>
+                                <div><dt>Beneficiary</dt><dd>@Model.RequesterCard.Name @(Model.DetailMeta.IsIndividualRequest ? "(Self)" : "")</dd></div>
+                                <div><dt>Number of People</dt><dd>@(Model.RequesterCard.HouseholdSize?.ToString() ?? "—")</dd></div>
+                            </dl>
 
-            <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
-                <div class="request-detail-main">
-                    @if (Model.ProjectProposal is not null)
-                    {
-                        <section id="items" class="operational-panel">
-                            <div class="action-row" style="justify-content:space-between;align-items:center">
-                                <div>
-                                    <div class="eyebrow" style="color:#b45b09">Project proposal</div>
-                                    <h2>@Model.ProjectProposal.Title</h2>
-                                    <p class="muted">Version @Model.ProjectProposal.Version · updated @Model.ProjectProposal.UpdatedUtc.ToString("u")</p>
-                                </div>
-                                @if (Model.ProjectProposal.CanEdit)
-                                {
-                                    <a class="button" asp-page="/Requests/Proposal" asp-route-id="@Model.Request.Id">Edit proposal</a>
-                                }
+                            <div class="mock-summary-description">
+                                <h3>Description</h3>
+                                <p>@Model.Request.Summary</p>
+                                <hr />
+                                <h3>Additional Details</h3>
+                                <dl>
+                                    <div><dt>Employment Status</dt><dd>@(Model.RequesterCard.EmploymentStatus ?? "—")</dd></div>
+                                    <div><dt>Household Income</dt><dd>@(Model.RequesterCard.MonthlyHouseholdIncome.HasValue ? $"J$ {Model.RequesterCard.MonthlyHouseholdIncome.Value:N0}" : "—")</dd></div>
+                                    <div><dt>Housing Situation</dt><dd>@(Model.RequesterCard.HousingSituation ?? "—")</dd></div>
+                                    <div><dt>Parish / Area</dt><dd>@string.Join(" / ", new[] { Model.RequesterCard.Parish, Model.RequesterCard.DistrictArea }.Where(x => !string.IsNullOrWhiteSpace(x)))</dd></div>
+                                    <div><dt>Contact Phone</dt><dd>@(Model.RequesterCard.Phone ?? "—")</dd></div>
+                                    <div><dt>Alternative Phone</dt><dd>@(Model.RequesterCard.AlternativePhone ?? "—")</dd></div>
+                                    <div><dt>Email</dt><dd>@(Model.RequesterCard.Email ?? "—")</dd></div>
+                                </dl>
                             </div>
-                            <article class="proposal-document">@Html.Raw(Model.ProjectProposal.RichContentHtml)</article>
-                        </section>
+                        </div>
+                    </section>
 
-                        @if (Model.ProjectPlanning is not null)
+                    <section id="items" class="mock-panel">
+                        <div class="mock-panel-head">
+                            <div class="mock-panel-title"><span class="mock-panel-icon">▤</span><strong>Requested Items (@Model.Request.Items.Count)</strong></div>
+                        </div>
+                        @if (Model.ProjectProposal is not null)
                         {
-                            <section class="operational-panel" style="margin-top:10px">
-                                <h2>Project budget</h2>
-                                <div class="table-wrap">
-                                    <table>
-                                        <thead><tr><th>Description</th><th>Qty</th><th>Unit cost</th><th>Total</th><th>FFP requested</th><th>Organization</th><th>Other funding</th></tr></thead>
-                                        <tbody>
-                                        @foreach (ProjectBudgetItemDetail item in Model.ProjectPlanning.Budget)
-                                        {
-                                            <tr>
-                                                <td>@item.Description</td>
-                                                <td>@item.Quantity</td>
-                                                <td>@item.UnitCost.ToString("N2")</td>
-                                                <td>@item.TotalCost.ToString("N2")</td>
-                                                <td>@item.FfpRequested.ToString("N2")</td>
-                                                <td>@item.OrganizationContribution.ToString("N2")</td>
-                                                <td>@item.OtherFunding.ToString("N2")</td>
-                                            </tr>
-                                        }
-                                        </tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <th colspan="3">Totals</th>
-                                                <th>@Model.ProjectPlanning.TotalCost.ToString("N2")</th>
-                                                <th>@Model.ProjectPlanning.TotalFfpRequested.ToString("N2")</th>
-                                                <th>@Model.ProjectPlanning.TotalOrganizationContribution.ToString("N2")</th>
-                                                <th>@Model.ProjectPlanning.TotalOtherFunding.ToString("N2")</th>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </section>
-
-                            <section class="operational-panel" style="margin-top:10px">
-                                <h2>Implementation milestones</h2>
-                                <div class="table-wrap">
-                                    <table>
-                                        <thead><tr><th>#</th><th>Milestone</th><th>Expected outcome</th><th>Target date</th></tr></thead>
-                                        <tbody>
-                                        @foreach (ProjectMilestoneDetail milestone in Model.ProjectPlanning.Milestones)
-                                        {
-                                            <tr>
-                                                <td>@milestone.Sequence</td>
-                                                <td>@milestone.Title</td>
-                                                <td>@milestone.ExpectedOutcome</td>
-                                                <td>@milestone.TargetDate.ToString("yyyy-MM-dd")</td>
-                                            </tr>
-                                        }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </section>
-                        }
-                    }
-                    else
-                    {
-                        <section id="items" class="operational-panel">
-                            <h2><span class="panel-icon panel-icon-items">▤</span> Requested items <span class="panel-count">@Model.Request.Items.Count</span></h2>
-                            @if (Model.Request.Items.Count == 0)
-                            {
-                                <p class="muted">No items have been added yet.</p>
-                            }
-                            else
-                            {
-                                <div class="table-wrap">
-                                    <table>
-                                        <thead><tr><th>Item / Service</th><th>Description / Specification</th><th>Quantity</th><th>Unit</th><th>Notes</th></tr></thead>
-                                        <tbody>
-                                        @foreach (RequestItemDetail item in Model.Request.Items)
-                                        {
-                                            <tr>
-                                                <td>@item.ItemName</td>
-                                                <td>@item.Description</td>
-                                                <td>@item.Quantity</td>
-                                                <td>@Model.UnitName(item.UnitOfMeasureId)</td>
-                                                <td>@(item.Notes ?? "—")</td>
-                                            </tr>
-                                        }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            }
-
-                            @if (Model.Request.Status == "Draft")
-                            {
-                                <hr style="border:0;border-top:1px solid #dde3e8;margin:26px 0" />
-                                <h3>Add line item</h3>
-                                <form method="post" asp-page-handler="AddItem" class="form-grid">
-                                    <input type="hidden" name="id" value="@Model.Request.Id" />
-                                    <div class="field">
-                                        <label asp-for="Item.ItemName">Item / Service</label>
-                                        <input asp-for="Item.ItemName" placeholder="e.g. School bags" />
-                                        <span asp-validation-for="Item.ItemName" class="validation"></span>
-                                    </div>
-                                    <div class="field">
-                                        <label asp-for="Item.Description">Description / Specification</label>
-                                        <input asp-for="Item.Description" placeholder="Size, model, service scope or other specification" />
-                                        <span asp-validation-for="Item.Description" class="validation"></span>
-                                    </div>
-                                    <div class="grid-2">
-                                        <div class="field">
-                                            <label asp-for="Item.Quantity"></label>
-                                            <input asp-for="Item.Quantity" type="number" step="0.001" min="0.001" />
-                                            <span asp-validation-for="Item.Quantity" class="validation"></span>
-                                        </div>
-                                        <div class="field">
-                                            <label asp-for="Item.UnitOfMeasureId">Unit of measure</label>
-                                            <select asp-for="Item.UnitOfMeasureId">
-                                                @foreach (UnitOfMeasureOption unit in Model.UnitsOfMeasure)
-                                                {
-                                                    <option value="@unit.Id">@unit.Name (@unit.Code)</option>
-                                                }
-                                            </select>
-                                            <span asp-validation-for="Item.UnitOfMeasureId" class="validation"></span>
-                                        </div>
-                                    </div>
-                                    <div class="field">
-                                        <label asp-for="Item.Notes">Notes</label>
-                                        <input asp-for="Item.Notes" />
-                                    </div>
-                                    <button class="button button-outline" type="submit">Add item</button>
-                                </form>
-
-                                <form method="post" asp-page-handler="Submit" style="margin-top:18px">
-                                    <input type="hidden" name="id" value="@Model.Request.Id" />
-                                    <button class="button" type="submit" @(Model.Request.Items.Count == 0 ? "disabled" : null)>Submit request to FFP</button>
-                                </form>
-                            }
-                        </section>
-                    }
-
-                    @if (Model.Request.Status == "MoreInformationRequired")
-                    {
-                        <section class="operational-panel" style="margin-top:10px">
-                            <div class="flash error">
-                                FFP requested additional information. The latest request from FFP appears in the status history. Add any supporting documents below, then send your response here.
+                            <div class="mock-project-body">
+                                <h3>@Model.ProjectProposal.Title</h3>
+                                <article class="proposal-document">@Html.Raw(Model.ProjectProposal.RichContentHtml)</article>
                             </div>
-                            @if (Model.ProjectProposal is not null)
-                            {
-                                <a class="button button-outline" asp-page="/Requests/Proposal" asp-route-id="@Model.Request.Id">Update project proposal</a>
-                            }
-                            <form method="post" asp-page-handler="InformationResponse" class="form-grid" style="margin-top:18px">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <div class="field">
-                                    <label asp-for="InformationResponse.Message">Response to FFP</label>
-                                    <textarea asp-for="InformationResponse.Message" rows="5" placeholder="Provide the information requested by FFP."></textarea>
-                                    <span asp-validation-for="InformationResponse.Message" class="validation"></span>
-                                </div>
-                                @if (Model.Documents.Count > 0)
-                                {
-                                    <fieldset class="field" style="border:1px solid #dde3e8;padding:14px">
-                                        <legend style="font-weight:700">Include supporting documents</legend>
-                                        @foreach (DocumentSummary document in Model.Documents)
-                                        {
-                                            <label style="display:flex;gap:8px;align-items:center;font-weight:500">
-                                                <input type="checkbox" name="InformationResponse.DocumentIds" value="@document.Id" />
-                                                <span>@document.OriginalFileName <small class="muted">(@document.DocumentType)</small></span>
-                                            </label>
-                                        }
-                                    </fieldset>
-                                }
-                                <button class="button" type="submit">Send response to FFP</button>
-                            </form>
-                        </section>
-                    }
-
-
-                    @if (Model.Deliveries.Count > 0)
-                    {
-                        <section class="operational-panel" style="margin-top:10px">
-                            <h2>Delivery / Proof of Delivery</h2>
-                            <div class="table-wrap"><table>
-                                <thead><tr><th>Reference</th><th>Recipient</th><th>Status</th><th>Acknowledged</th><th>Evidence</th><th>Notes</th></tr></thead>
-                                <tbody>
-                                @foreach (RequestPortal.Application.Delivery.DeliveryView delivery in Model.Deliveries)
-                                {
-                                    <tr>
-                                        <td>@delivery.DocumentReference</td>
-                                        <td>@delivery.RecipientName</td>
-                                        <td><strong>@delivery.Status</strong></td>
-                                        <td>@(delivery.AcknowledgedUtc?.ToLocalTime().ToString("g") ?? "Awaiting acknowledgement")</td>
-                                        <td>@(delivery.EvidenceDocumentId.HasValue ? "Attached" : "—")</td>
-                                        <td>@(delivery.Notes ?? "—")</td>
-                                    </tr>
-                                }
-                                </tbody>
-                            </table></div>
-                        </section>
-                    }
-
-                    <section id="conversation" class="operational-panel request-messages-card request-messages-always-visible">
-                <div class="panel-titlebar">
-                    <div>
-                        <strong><span class="panel-icon panel-icon-message">✉</span> Messages about this request</strong>
-                        <small class="muted">All messages connected to @Model.Request.PublicReference are kept with this request.</small>
-                    </div>
-                    <a asp-page="/Messages/Inbox">All messages</a>
-                </div>
-
-                <div asp-validation-summary="ModelOnly" class="validation"></div>
-
-                @{
-                    var requestMessages = Model.MessageThreads
-                        .SelectMany(thread => thread.Messages.Select(message => new { Thread = thread, Message = message }))
-                        .OrderBy(item => item.Message.SentUtc)
-                        .ToArray();
-
-                    var replyThread = Model.MessageThreads
-                        .Where(thread => !thread.ClosedUtc.HasValue)
-                        .OrderByDescending(thread => thread.Messages.LastOrDefault()?.SentUtc ?? DateTimeOffset.MinValue)
-                        .FirstOrDefault();
-                }
-
-                <div class="request-conversation-history request-message-list">
-                    @if (requestMessages.Length == 0)
-                    {
-                        <div class="workspace-empty compact">
-                            <p>No messages have been received for this request yet.</p>
-                        </div>
-                    }
-                    else
-                    {
-                        @foreach (var item in requestMessages)
-                        {
-                            <article class="request-message-item @(item.Message.IsMine ? "is-mine" : "is-received")">
-                                <div class="request-message-avatar" aria-hidden="true">@(item.Message.SenderName.Length > 0 ? item.Message.SenderName.Substring(0,1).ToUpperInvariant() : "M")</div>
-                                <div class="request-message-content">
-                                    <div class="request-message-meta">
-                                        <strong>@item.Message.SenderName</strong>
-                                        <time>@item.Message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time>
-                                    </div>
-                                    <p>@item.Message.Body</p>
-                                </div>
-                                @foreach (var attachment in item.Message.Attachments)
-                                {
-                                    <a asp-page="/Messages/Thread"
-                                       asp-page-handler="Attachment"
-                                       asp-route-id="@item.Thread.ThreadId"
-                                       asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
-                                }
-                            </article>
                         }
-                    }
-                </div>
-
-                @if (Model.RequestConversationReadOnly)
-                {
-                    <div class="request-conversation-readonly">
-                        @Model.RequestConversationReadOnlyReason
-                    </div>
-                }
-                else
-                {
-                    bool startingNewMessage = requestMessages.Length == 0 || replyThread is null;
-
-                    <form method="post"
-                          enctype="multipart/form-data"
-                          asp-page-handler="Reply"
-                          class="request-reply-form request-detail-reply">
-                        <input type="hidden" name="id" value="@Model.Request.Id" />
-                        @if (replyThread is not null)
+                        else if (Model.Request.Items.Count == 0)
                         {
-                            <input type="hidden" name="ReplyThreadId" value="@replyThread.ThreadId" />
-                        }
-
-                        <label for="request-reply-box">
-                            <strong>@(startingNewMessage ? "New Message" : "Reply")</strong>
-                        </label>
-                        <div class="request-reply-box">
-                            <textarea id="request-reply-box"
-                                      name="Reply"
-                                      rows="4"
-                                      maxlength="10000"
-                                      required
-                                      placeholder="@(startingNewMessage ? "Type a new message about this request..." : "Type your reply here...")"
-                                      aria-label="@(startingNewMessage ? "New message about this request" : "Reply to messages about this request")">@Model.Reply</textarea>
-                            <label class="reply-paperclip" title="Attach a file">
-                                📎
-                                <input name="ReplyAttachment" type="file" aria-label="Attach a file" />
-                            </label>
-                        </div>
-                        <div class="request-attachment-hint">You can attach a supporting file to this message.</div>
-                        <span asp-validation-for="Reply" class="validation"></span>
-                        <div class="action-row">
-                            <button class="button button-small" type="submit">@(startingNewMessage ? "New Message" : "Send reply")</button>
-                        </div>
-                    </form>
-                }
-            </section>
-
-                    <section id="documents" class="operational-panel" style="margin-top:10px">
-                        <h2><span class="panel-icon panel-icon-files">▧</span> Supporting documents <span class="panel-count">@Model.Documents.Count</span></h2>
-                        @if (Model.DocumentsUnavailable)
-                        {
-                            <div class="flash error" role="alert">Document storage is temporarily unavailable. Your request and conversation are still available. Reference: @HttpContext.TraceIdentifier</div>
-                        }
-                        @if (Model.Documents.Count == 0)
-                        {
-                            <p class="muted">No supporting documents have been uploaded.</p>
+                            <div class="mock-empty">No requested items have been added.</div>
                         }
                         else
                         {
-                            <div class="table-wrap">
-                                <table>
-                                    <thead><tr><th>File</th><th>Type</th><th>Uploaded UTC</th><th></th></tr></thead>
+                            <div class="mock-table-wrap">
+                                <table class="mock-table">
+                                    <thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Description</th></tr></thead>
                                     <tbody>
-                                    @foreach (DocumentSummary document in Model.Documents)
+                                    @foreach (RequestItemDetail item in Model.Request.Items)
                                     {
                                         <tr>
-                                            <td>@document.OriginalFileName</td>
-                                            <td>@document.DocumentType</td>
-                                            <td>@document.UploadedUtc.ToString("u")</td>
-                                            <td><a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@document.Id">Download</a></td>
+                                            <td>@item.ItemName</td>
+                                            <td>@item.Quantity</td>
+                                            <td>@Model.UnitName(item.UnitOfMeasureId)</td>
+                                            <td>@item.Description</td>
                                         </tr>
                                     }
                                     </tbody>
@@ -382,83 +158,186 @@
                             </div>
                         }
 
-                        @if (Model.Request.Status == "Draft" || Model.Request.Status == "MoreInformationRequired")
+                        @if (Model.Request.Status == "Draft")
                         {
-                            <form method="post" enctype="multipart/form-data" asp-page-handler="UploadDocument" class="form-grid" style="margin-top:1rem">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <div class="field">
-                                    <label asp-for="Document.DocumentType">Document type</label>
-                                    <select asp-for="Document.DocumentType" asp-items="Html.GetEnumSelectList<DocumentType>()"></select>
-                                </div>
-                                <div class="field">
-                                    <label asp-for="Document.File">File</label>
-                                    <input asp-for="Document.File" type="file" />
-                                    <span asp-validation-for="Document.File" class="validation"></span>
-                                </div>
-                                <button class="button button-outline" type="submit">Upload document</button>
-                            </form>
+                            <details class="mock-edit-details">
+                                <summary>Add requested item</summary>
+                                <form method="post" asp-page-handler="AddItem" class="mock-form-grid">
+                                    <input type="hidden" name="id" value="@Model.Request.Id" />
+                                    <label>Item / Service<input asp-for="Item.ItemName" /></label>
+                                    <label>Description<input asp-for="Item.Description" /></label>
+                                    <div class="mock-form-row">
+                                        <label>Quantity<input asp-for="Item.Quantity" type="number" step="0.001" min="0.001" /></label>
+                                        <label>Unit<select asp-for="Item.UnitOfMeasureId">@foreach (UnitOfMeasureOption unit in Model.UnitsOfMeasure){<option value="@unit.Id">@unit.Name (@unit.Code)</option>}</select></label>
+                                    </div>
+                                    <label>Notes<input asp-for="Item.Notes" /></label>
+                                    <button class="mock-blue-button" type="submit">Add Item</button>
+                                </form>
+                            </details>
                         }
                     </section>
 
-                    
-
-                    @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
-                    {
-                        <section class="operational-panel" style="margin-top:10px">
-                            <h2 class="danger-panel-heading"><span class="panel-icon panel-icon-danger">!</span> Cancel request</h2>
-                            <p class="muted">Cancellation is permanent and is recorded in the request history.</p>
-                            <form method="post" asp-page-handler="Cancel" class="form-grid">
+                    <section id="messages" class="mock-panel mock-messages-panel">
+                        <div class="mock-panel-head">
+                            <div class="mock-panel-title"><span class="mock-panel-icon">✉</span><strong>Messages (@requestMessages.Length)</strong></div>
+                            @if (!Model.RequestConversationReadOnly)
+                            {
+                                <a class="mock-blue-button" href="#message-composer">✉&nbsp; New Message</a>
+                            }
+                        </div>
+                        <div class="mock-message-list">
+                            @if (requestMessages.Length == 0)
+                            {
+                                <div class="mock-empty">No messages have been received for this request yet.</div>
+                            }
+                            else
+                            {
+                                @foreach (var item in requestMessages.Take(5))
+                                {
+                                    <article class="mock-message-row">
+                                        <div class="mock-avatar @(item.Message.IsMine ? "is-requester" : "is-staff")">@(item.Message.SenderName.Length > 0 ? item.Message.SenderName.Substring(0,1).ToUpperInvariant() : "M")</div>
+                                        <div class="mock-message-copy">
+                                            <div class="mock-message-meta"><strong>@item.Message.SenderName</strong><span>@item.Message.SentUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</span><span class="mock-message-more">•••</span></div>
+                                            <p>@item.Message.Body</p>
+                                            @foreach (var attachment in item.Message.Attachments)
+                                            {
+                                                <a class="mock-attachment-link" asp-page="/Messages/Thread" asp-page-handler="Attachment" asp-route-id="@item.Thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
+                                            }
+                                        </div>
+                                    </article>
+                                }
+                            }
+                        </div>
+                        @if (!Model.RequestConversationReadOnly)
+                        {
+                            bool startingNewMessage = requestMessages.Length == 0 || replyThread is null;
+                            <form id="message-composer" method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="mock-message-composer">
                                 <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <div class="field">
-                                    <label asp-for="Cancellation.Reason">Reason</label>
-                                    <textarea asp-for="Cancellation.Reason" rows="3"></textarea>
-                                    <span asp-validation-for="Cancellation.Reason" class="validation"></span>
+                                @if (replyThread is not null){<input type="hidden" name="ReplyThreadId" value="@replyThread.ThreadId" />}
+                                <textarea name="Reply" rows="3" maxlength="10000" required placeholder="@(startingNewMessage ? "Type a new message..." : "Type your reply...")">@Model.Reply</textarea>
+                                <div class="mock-composer-actions">
+                                    <label class="mock-attach-button">📎 Attach<input name="ReplyAttachment" type="file" /></label>
+                                    <button class="mock-blue-button" type="submit">@(startingNewMessage ? "New Message" : "Send Reply")</button>
                                 </div>
-                                <button class="button button-outline" type="submit">Cancel request</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="mock-readonly">@Model.RequestConversationReadOnlyReason</div>
+                        }
+                    </section>
+
+                    @if (Model.Request.Status == "MoreInformationRequired")
+                    {
+                        <section class="mock-panel">
+                            <div class="mock-panel-head"><div class="mock-panel-title"><strong>Additional Information Required</strong></div></div>
+                            <form method="post" asp-page-handler="InformationResponse" class="mock-form-grid mock-panel-body">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <label>Response to FFP<textarea asp-for="InformationResponse.Message" rows="4"></textarea></label>
+                                <button class="mock-blue-button" type="submit">Send Response</button>
                             </form>
                         </section>
                     }
-                </div>
 
-                <aside class="request-detail-side">
-                    <section class="operational-panel request-status-summary">
-                        <div class="panel-titlebar status-panel-title"><strong><span class="panel-icon panel-icon-status">●</span> Current status</strong></div>
-                        <div class="request-side-summary">
-                            <div class="status-hero">
-                                <span class="status-dot"></span>
-                                <div>
-                                    <strong>@RequestStatusPresentation.Label(Model.Request.Status)</strong>
-                                    <small>@RequestStatusPresentation.Next(Model.Request.Status)</small>
+                    @if (Model.Request.Status == "Draft")
+                    {
+                        <form method="post" asp-page-handler="Submit" class="mock-submit-row">
+                            <input type="hidden" name="id" value="@Model.Request.Id" />
+                            <button class="mock-blue-button" type="submit" @(Model.Request.Items.Count == 0 && Model.ProjectProposal is null ? "disabled" : null)>Submit Request to FFP</button>
+                        </form>
+                    }
+
+                    @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
+                    {
+                        <section id="cancel-request" class="mock-panel mock-cancel-panel">
+                            <div class="mock-panel-head"><div class="mock-panel-title"><strong>Cancel Request</strong></div></div>
+                            <form method="post" asp-page-handler="Cancel" class="mock-cancel-form">
+                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                <p>Cancellation is permanent and is recorded in the request history.</p>
+                                <label>Reason<textarea asp-for="Cancellation.Reason" rows="3"></textarea></label>
+                                <button class="mock-action-button mock-action-cancel" type="submit">Cancel Request</button>
+                            </form>
+                        </section>
+                    }
+                </main>
+
+                <aside class="mock-detail-side">
+                    <section class="mock-panel">
+                        <div class="mock-panel-head">
+                            <div class="mock-panel-title"><span class="mock-panel-icon">◉</span><strong>Current Status</strong></div>
+                            <span class="mock-status-pill">@RequestStatusPresentation.Label(Model.Request.Status)</span>
+                        </div>
+                        <div class="mock-status-steps" id="history">
+                            @{
+                                string[] statusSteps = { "Submitted", "Under Review", "More Information Required", "Approved", "In Progress", "Completed", "Closed" };
+                                string currentLabel = RequestStatusPresentation.Label(Model.Request.Status);
+                            }
+                            @for (int i = 0; i < statusSteps.Length; i++)
+                            {
+                                bool active = string.Equals(statusSteps[i], currentLabel, StringComparison.OrdinalIgnoreCase) || (Model.Request.Status == "Submitted" && i == 0);
+                                <div class="mock-status-step @(active ? "is-active" : null)">
+                                    <span class="mock-status-node"></span>
+                                    <div><strong>@statusSteps[i]</strong>@if(active){<small>@Model.DetailMeta.LastUpdatedUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</small>}</div>
                                 </div>
-                            </div>
-                            <dl>
-                                <div><dt>Reference</dt><dd>@Model.Request.PublicReference</dd></div>
-                                <div><dt>Request type</dt><dd>@Model.Request.Kind</dd></div>
-                                <div><dt>Organization</dt><dd>@Model.Request.OrganizationName</dd></div>
-                                <div><dt>Items</dt><dd>@Model.Request.Items.Count</dd></div>
-                                <div><dt>Files</dt><dd>@Model.Documents.Count</dd></div>
-                                <div><dt>Messages</dt><dd>@Model.MessageThreads.Sum(thread => thread.Messages.Count)</dd></div>
-                            </dl>
+                            }
+                        </div>
+                        <div class="mock-status-footer">
+                            <div><span>Last Updated</span><strong>@Model.DetailMeta.LastUpdatedUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</strong></div>
+                            <div><span>Updated By</span><strong>@Model.DetailMeta.SubmittedByName</strong></div>
                         </div>
                     </section>
 
-                    <section id="history" class="operational-panel request-status-card">
-                        <div class="panel-titlebar">
-                            <strong><span class="panel-icon panel-icon-history">◷</span> Status history</strong>
-                        </div>
-                    <div class="timeline">
-                        @foreach (RequestHistoryDetail history in Model.Request.History)
-                        {
-                            <div class="timeline-item">
-                                <strong>@RequestStatusPresentation.Label(history.Status)</strong>
-                                @if (!string.IsNullOrWhiteSpace(history.Reason))
+                    <section class="mock-panel">
+                        <div class="mock-panel-head"><div class="mock-panel-title"><span class="mock-panel-icon">♟</span><strong>Requester Information</strong></div></div>
+                        <dl class="mock-side-list">
+                            <div><dt>Name</dt><dd>@Model.RequesterCard.Name</dd></div>
+                            <div><dt>Date of Birth</dt><dd>@(Model.RequesterCard.DateOfBirth?.ToString("dd MMM yyyy") ?? "—")</dd></div>
+                            <div><dt>National ID / TRN</dt><dd>@(Model.RequesterCard.NationalIdTrn ?? "—")</dd></div>
+                            <div><dt>Phone</dt><dd>@(Model.RequesterCard.Phone ?? "—")</dd></div>
+                            <div><dt>Email</dt><dd>@(Model.RequesterCard.Email ?? "—")</dd></div>
+                            <div><dt>Address</dt><dd>@(Model.RequesterCard.Address ?? "—")<br />@string.Join(", ", new[] { Model.RequesterCard.DistrictArea, Model.RequesterCard.Parish }.Where(x => !string.IsNullOrWhiteSpace(x)))</dd></div>
+                            <div><dt>Household Size</dt><dd>@(Model.RequesterCard.HouseholdSize?.ToString() ?? "—")</dd></div>
+                            <div><dt>Employment</dt><dd>@(Model.RequesterCard.EmploymentStatus ?? "—")</dd></div>
+                        </dl>
+                    </section>
+
+                    <section class="mock-panel">
+                        <div class="mock-panel-head"><div class="mock-panel-title"><span class="mock-panel-icon">↗</span><strong>Related Information</strong></div></div>
+                        <dl class="mock-related-list">
+                            <div><dt>▧&nbsp; Organization</dt><dd>@Model.RelatedCard.Organization</dd></div>
+                            <div><dt>♟&nbsp; Assigned To</dt><dd>—</dd></div>
+                            <div><dt>⌘&nbsp; FFP Reference</dt><dd>@(Model.RelatedCard.FfpReference ?? "—")</dd></div>
+                            <div><dt>↗&nbsp; External Links</dt><dd>—</dd></div>
+                        </dl>
+                    </section>
+
+                    <section id="files" class="mock-panel">
+                        <div class="mock-panel-head"><div class="mock-panel-title"><span class="mock-panel-icon">⌕</span><strong>Files (@Model.Documents.Count)</strong></div></div>
+                        <div class="mock-files-list">
+                            @if (Model.Documents.Count == 0)
+                            {
+                                <div class="mock-empty">No files uploaded.</div>
+                            }
+                            else
+                            {
+                                @foreach (DocumentSummary document in Model.Documents)
                                 {
-                                    <span>@history.Reason</span>
+                                    <div class="mock-file-row"><span class="mock-file-icon">▧</span><a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@document.Id">@document.OriginalFileName</a><time>@document.UploadedUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</time></div>
                                 }
-                                <small>@history.ChangedUtc.ToLocalTime().ToString("f")</small>
-                            </div>
+                            }
+                        </div>
+                        @if (Model.Request.Status == "Draft" || Model.Request.Status == "MoreInformationRequired")
+                        {
+                            <details class="mock-upload-details">
+                                <summary>Upload file</summary>
+                                <form method="post" enctype="multipart/form-data" asp-page-handler="UploadDocument" class="mock-form-grid">
+                                    <input type="hidden" name="id" value="@Model.Request.Id" />
+                                    <label>Document type<select asp-for="Document.DocumentType" asp-items="Html.GetEnumSelectList<DocumentType>()"></select></label>
+                                    <label>File<input asp-for="Document.File" type="file" /></label>
+                                    <button class="mock-blue-button" type="submit">Upload</button>
+                                </form>
+                            </details>
                         }
-                    </div>
                     </section>
                 </aside>
             </div>
@@ -467,50 +346,62 @@
 </section>
 
 <style>
-    .request-progress { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px; }
-    .request-progress span { display:flex; flex-direction:column; flex:1; min-width:170px; }
-    .request-progress [aria-current] { border-left:4px solid #d46b08; padding-left:8px; }
-    .request-reply-form { padding:8px; }
-    .request-reply-box { position:relative; }
-    .request-reply-box textarea { width:100%; padding-right:45px; box-sizing:border-box; }
-    .reply-paperclip { position:absolute; right:8px; bottom:12px; cursor:pointer; font-size:20px; }
-    .reply-paperclip input { position:absolute; inset:0; width:28px; opacity:0; cursor:pointer; }
-    .request-conversation { border-bottom:1px solid #dde3e8; padding:8px; }
-    .request-conversation-history { max-height:350px; overflow:auto; }
-    .request-conversation-history time { font-size:.75rem; color:#53616b; }
-    .request-message-list { background:#fff; border-top:1px solid #e3e7ea; border-bottom:1px solid #e3e7ea; }
-    .request-message-item { padding:10px 12px; border-bottom:1px solid #edf0f2; }
-    .request-message-item:last-child { border-bottom:0; }
-    .request-message-item.is-mine { background:#f7fafc; }
-    .request-message-meta { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
-    .request-message-item p { margin:5px 0 0; white-space:pre-wrap; line-height:1.45; }
-    .request-detail-reply { border-top:0; background:#fafbfc; }
-    .request-detail-reply > label { display:block; margin-bottom:6px; }
-    .request-attachment-hint { margin-top:5px; color:#6b7780; font-size:.78rem; }
-    .request-conversation-readonly { padding:10px 12px; border-top:1px solid #e3e7ea; background:#f7f8f9; color:#5e6870; font-size:.86rem; }
-    .proposal-document {
-        margin-top: 18px;
-        background: #fff;
-        border: 1px solid #e0e4e7;
-        padding: 16px 20px;
-        font-family: Georgia, 'Times New Roman', serif;
-        line-height: 1.65;
-        overflow-wrap: anywhere;
-    }
-
-    .proposal-document table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 16px 0;
-    }
-
-    .proposal-document th, .proposal-document td {
-        border: 1px solid #8b949c;
-        padding: 8px;
-    }
-
-    .proposal-document img {
-        max-width: 100%;
-        height: auto;
-    }
+.mock-request-detail{background:#f4f7fa;min-height:calc(100vh - 52px);padding:18px 0 34px;color:#162d45}
+.mock-request-shell{width:min(1500px,calc(100% - 34px));margin:0 auto}
+.mock-request-header{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;margin-bottom:15px}
+.mock-back-link{display:inline-block;margin-bottom:12px;color:#0c67c7;font-size:13px;font-weight:650;text-decoration:none}
+.mock-title-row{display:flex;align-items:center;gap:14px;margin-bottom:5px}
+.mock-title-row h1{margin:0;color:#122c46;font-size:28px;line-height:1.05;font-weight:800}
+.mock-request-heading h2{margin:0 0 6px;color:#142d46;font-size:18px;font-weight:750}
+.mock-request-heading p{margin:0;color:#5f7183;font-size:14px}
+.mock-status-pill,.mock-inline-status{display:inline-flex;align-items:center;min-height:30px;padding:0 14px;border:1px solid #70c386;border-radius:12px;background:#dff4e4;color:#14722f;font-size:13px;font-weight:800}
+.mock-inline-status{min-height:23px;padding:0 8px;border-radius:5px;font-size:12px}
+.mock-header-actions{display:flex;gap:9px;padding-bottom:7px}
+.mock-action-button,.mock-blue-button,.mock-mini-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-weight:700;cursor:pointer}
+.mock-action-button{min-height:38px;padding:0 14px;border-radius:4px;background:#fff;font-size:13px}
+.mock-action-edit{border:1px solid #7fb3e3;color:#0c67c7}.mock-action-cancel{border:1px solid #ee8f85;color:#d33e34}
+.mock-blue-button{min-height:34px;padding:0 13px;border:1px solid #0c5cb5;border-radius:4px;background:#0f6fd4;color:#fff;font-size:12px}
+.mock-mini-button{min-height:30px;padding:0 10px;border:1px solid #71a9df;border-radius:4px;background:#fff;color:#0d67c5;font-size:12px}
+.mock-tabs{display:flex;gap:4px;border-bottom:1px solid #d6dee6;margin-bottom:18px;padding-left:4px}
+.mock-tabs a{position:relative;padding:11px 16px 12px;color:#4e6278;text-decoration:none;font-size:13px;font-weight:650}
+.mock-tabs a.is-active{color:#0f67c7;font-weight:800}.mock-tabs a.is-active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:#0f67c7}
+.mock-detail-grid{display:grid;grid-template-columns:minmax(0,2.25fr) minmax(330px,.92fr);gap:18px;align-items:start}
+.mock-detail-main,.mock-detail-side{display:grid;gap:16px}
+.mock-panel{overflow:hidden;border:1px solid #d4dde6;border-radius:5px;background:#fff;box-shadow:0 1px 2px rgba(18,45,70,.035)}
+.mock-panel-head{min-height:49px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #d9e1e8;background:#fff}
+.mock-panel-title{display:flex;align-items:center;gap:10px;color:#172f48;font-size:14px}.mock-panel-title strong{font-weight:800}
+.mock-panel-icon{display:grid;place-items:center;width:20px;height:20px;color:#0f73d5;font-weight:900}
+.mock-summary-content{display:grid;grid-template-columns:.98fr 1.08fr;gap:28px;padding:18px 18px 20px}
+.mock-summary-list,.mock-summary-description dl,.mock-side-list,.mock-related-list{margin:0}
+.mock-summary-list>div,.mock-summary-description dl>div,.mock-side-list>div,.mock-related-list>div{display:grid;grid-template-columns:145px minmax(0,1fr);gap:10px;align-items:start;margin:0 0 10px}
+.mock-summary-list dt,.mock-summary-description dt,.mock-side-list dt,.mock-related-list dt{color:#435a70;font-size:13px}
+.mock-summary-list dd,.mock-summary-description dd,.mock-side-list dd,.mock-related-list dd{margin:0;color:#172f48;font-size:13px;overflow-wrap:anywhere}
+.mock-summary-description h3{margin:0 0 7px;color:#172f48;font-size:14px}.mock-summary-description p{margin:0;color:#172f48;font-size:13px;line-height:1.55}
+.mock-summary-description hr{border:0;border-top:1px solid #dfe5ea;margin:20px 0 16px}
+.mock-priority{display:inline-flex;padding:3px 8px;border:1px solid #efc14f;border-radius:4px;background:#fff3c9;color:#5e4a09;font-weight:800}
+.mock-table-wrap{padding:13px 16px 17px}.mock-table{width:100%;border-collapse:collapse;border:1px solid #dbe2e8;font-size:13px}
+.mock-table th{padding:11px 15px;text-align:left;background:#eef3f7;color:#1f354b;font-weight:800;border-right:1px solid #dbe2e8}
+.mock-table td{padding:10px 15px;border-top:1px solid #e1e6eb;border-right:1px solid #e1e6eb}.mock-table tbody tr:nth-child(even){background:#fbfcfd}
+.mock-empty{padding:17px 18px;color:#66788a;font-size:13px}.mock-project-body{padding:16px}
+.mock-message-list{padding:0 18px}.mock-message-row{display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;padding:13px 2px;border-bottom:1px solid #e0e6eb}
+.mock-avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font-size:12px;font-weight:800}.mock-avatar.is-requester{background:#0f72d3;color:#fff}.mock-avatar.is-staff{background:#8d969e;color:#fff}
+.mock-message-meta{display:flex;align-items:center;gap:12px;margin-bottom:4px}.mock-message-meta strong{font-size:13px}.mock-message-meta span{font-size:12px;color:#657789}.mock-message-more{margin-left:auto;font-weight:900}
+.mock-message-copy p{margin:0;font-size:13px;line-height:1.45}.mock-attachment-link{display:inline-block;margin-top:5px;font-size:12px;color:#0f67c7}
+.mock-message-composer{padding:14px 18px 16px;border-top:1px solid #e0e6eb;background:#f9fbfd}.mock-message-composer textarea{width:100%;box-sizing:border-box;resize:vertical;border:1px solid #b8c8d6;border-radius:4px;padding:9px 10px;font:inherit}
+.mock-composer-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}.mock-attach-button{position:relative;color:#0f67c7;font-size:12px;font-weight:700;cursor:pointer}.mock-attach-button input{position:absolute;opacity:0;width:1px;height:1px}
+.mock-readonly{padding:12px 18px;background:#f6f8fa;color:#667789}
+.mock-status-steps{padding:15px 20px 14px}.mock-status-step{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;min-height:39px;color:#4c6074}
+.mock-status-step:not(:last-child)::after{content:"";position:absolute;left:7px;top:18px;bottom:-2px;width:1px;background:#b7c6d2}
+.mock-status-node{position:relative;z-index:1;width:12px;height:12px;margin-top:3px;border:2px solid #9eafbf;border-radius:50%;background:#fff}
+.mock-status-step.is-active .mock-status-node{width:16px;height:16px;margin-left:-2px;margin-top:1px;border-color:#1f9c43;background:#1f9c43;box-shadow:0 0 0 2px #dff2e4}
+.mock-status-step strong{display:block;color:#40556a;font-size:13px;font-weight:500}.mock-status-step.is-active strong{color:#172f48;font-weight:800}.mock-status-step small{display:block;margin-top:3px;color:#687b8e;font-size:11px}
+.mock-status-footer{margin:0 18px 16px;padding-top:14px;border-top:1px solid #dbe2e8}.mock-status-footer>div{display:grid;grid-template-columns:105px 1fr;gap:10px;margin-bottom:8px}.mock-status-footer span,.mock-status-footer strong{font-size:12px}.mock-status-footer span{color:#5a6d80}.mock-status-footer strong{font-weight:500}
+.mock-side-list,.mock-related-list{padding:15px 17px 12px}.mock-side-list>div,.mock-related-list>div{grid-template-columns:125px minmax(0,1fr);margin-bottom:10px}.mock-related-list>div{grid-template-columns:118px minmax(0,1fr)}
+.mock-files-list{padding:10px 16px 12px}.mock-file-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 0}.mock-file-row a{color:#0f67c7;font-size:12px;text-decoration:underline}.mock-file-row time{color:#6b7d8e;font-size:11px}.mock-file-icon{color:#687d91}
+.mock-upload-details,.mock-edit-details{border-top:1px solid #e1e6eb;padding:10px 16px 14px}.mock-upload-details summary,.mock-edit-details summary{color:#0f67c7;font-size:12px;font-weight:700;cursor:pointer}
+.mock-form-grid{display:grid;gap:9px;margin-top:10px}.mock-form-grid label,.mock-cancel-form label{display:grid;gap:4px;color:#334c63;font-size:12px;font-weight:700}.mock-form-grid input,.mock-form-grid select,.mock-form-grid textarea,.mock-cancel-form textarea{min-height:34px;border:1px solid #b8c7d5;border-radius:4px;padding:7px 8px;font:inherit}.mock-form-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mock-submit-row{display:flex;justify-content:flex-end}.mock-cancel-panel .mock-panel-head{background:#fffafa}.mock-cancel-form{padding:14px 16px 17px}.mock-cancel-form p{margin:0 0 10px;color:#66788a;font-size:12px}
+.proposal-document{margin-top:12px;padding:14px;border:1px solid #e0e6eb;background:#fff;line-height:1.55}.proposal-document table{width:100%;border-collapse:collapse}.proposal-document td,.proposal-document th{border:1px solid #dbe2e8;padding:6px}.proposal-document img{max-width:100%;height:auto}
+@media(max-width:1050px){.mock-detail-grid{grid-template-columns:1fr}.mock-detail-side{grid-template-columns:repeat(2,minmax(0,1fr))}.mock-summary-content{grid-template-columns:1fr}}
+@media(max-width:720px){.mock-request-shell{width:calc(100% - 18px)}.mock-request-header{align-items:flex-start;flex-direction:column}.mock-tabs{overflow-x:auto}.mock-detail-side{grid-template-columns:1fr}.mock-summary-list>div,.mock-summary-description dl>div,.mock-side-list>div,.mock-related-list>div{grid-template-columns:1fr}.mock-form-row{grid-template-columns:1fr}}
 </style>
