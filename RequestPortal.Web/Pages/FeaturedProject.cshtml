@@ -1,0 +1,82 @@
+@page
+@model RequestPortal.Web.Pages.FeaturedProjectModel
+@{
+    ViewData["Title"] = "Featured Project";
+}
+
+<section class="section">
+    <div class="shell">
+        <section class="featured-project-coming-soon">
+            <div class="featured-project-kicker">Featured Project</div>
+            <h1>Safer Homes, Stronger Communities</h1>
+            <p class="featured-project-lead">
+                This area will provide a fuller look at the projects and programmes being showcased by Food For The Poor Jamaica.
+            </p>
+
+            <div class="featured-project-placeholder">
+                <div class="featured-project-placeholder-copy">
+                    <strong>Project showcase coming soon</strong>
+                    <p>
+                        Project details, photographs, progress highlights, community impact, and related information will appear here once the showcase feature is completed.
+                    </p>
+                </div>
+            </div>
+
+            <a class="button button-secondary" asp-page="/Index">Back to Home</a>
+        </section>
+    </div>
+</section>
+
+<style>
+.featured-project-coming-soon{
+    max-width:860px;
+    margin:48px auto;
+    padding:36px;
+    border:1px solid #dce3e8;
+    border-radius:12px;
+    background:#fff;
+    box-shadow:0 10px 28px rgba(16,38,58,.08)
+}
+.featured-project-kicker{
+    margin-bottom:8px;
+    color:#b45b09;
+    font-size:.78rem;
+    font-weight:800;
+    letter-spacing:.12em;
+    text-transform:uppercase
+}
+.featured-project-coming-soon h1{
+    margin:0 0 12px;
+    color:#102f4a
+}
+.featured-project-lead{
+    max-width:700px;
+    color:#586875;
+    line-height:1.6
+}
+.featured-project-placeholder{
+    margin:28px 0;
+    min-height:220px;
+    display:grid;
+    place-items:center;
+    padding:28px;
+    border:1px dashed #b8c7d2;
+    border-radius:10px;
+    background:linear-gradient(145deg,#f7fafc,#eef4f8)
+}
+.featured-project-placeholder-copy{
+    max-width:560px;
+    text-align:center
+}
+.featured-project-placeholder-copy strong{
+    display:block;
+    margin-bottom:8px;
+    color:#102f4a;
+    font-size:1.2rem
+}
+.featured-project-placeholder-copy p{
+    margin:0;
+    color:#667681;
+    line-height:1.55
+}
+</style>
