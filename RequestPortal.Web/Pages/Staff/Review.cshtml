@@ -29,6 +29,8 @@
                 </div>
             </div>
 
+            @await Component.InvokeAsync("RequestConversation", new { requestId = Model.Request.Id, returnUrl = Url.Page("/Staff/Review", new { id = Model.Request.Id }) ?? $"/Staff/Review/{Model.Request.Id}", compact = false })
+
             <div class="dashboard-grid">
                 <div>
                     @if (Model.ProjectProposal is not null)
