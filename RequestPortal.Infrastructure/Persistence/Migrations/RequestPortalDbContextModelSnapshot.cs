@@ -501,6 +501,10 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("StatusBeforeRepresentativeReview")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId");
@@ -1328,6 +1332,12 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("IsInternalStaff")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IndividualProfileUpdateRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("IndividualProfileUpdateRequiredUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("LastSignInUtc")
                         .HasColumnType("timestamp with time zone");
