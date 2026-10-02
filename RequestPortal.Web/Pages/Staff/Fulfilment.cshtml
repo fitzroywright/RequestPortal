@@ -31,9 +31,7 @@ else if (item.RequestStatus == "PendingFulfilment" && item.FulfilmentId.HasValue
     }
     <div class="action-row" style="margin-top:12px"><form method="post" asp-page-handler="Complete"><input type="hidden" name="requestId" value="@item.RequestId"/><input name="notes" placeholder="Completion notes"/><button class="button button-small" type="submit">Mark fulfilled</button></form><form method="post" asp-page-handler="Cancel"><input type="hidden" name="requestId" value="@item.RequestId"/><input name="reason" placeholder="Cancellation reason" required/><button class="button button-small button-outline" type="submit">Cancel fulfilment</button></form></div>
 }
-else { <span class="muted">Completed</span> }
-
-@await Component.InvokeAsync("RequestConversation", new { requestId = item.RequestId, returnUrl = Url.Page("/Staff/Fulfilment") ?? "/Staff/Fulfilment", compact = true })
+else { <span class="muted">Completed</span> }?? "/Staff/Fulfilment", compact = true })
 </section>
 }
 </div></section>
