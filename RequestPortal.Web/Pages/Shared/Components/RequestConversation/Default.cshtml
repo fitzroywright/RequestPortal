@@ -1,0 +1,57 @@
+@model RequestPortal.Web.ViewComponents.RequestConversationPanelModel
+@using RequestPortal.Application.Messages
+
+<section class="request-conversation-panel @(Model.Compact ? "is-compact" : string.Empty)">
+    <div class="request-conversation-panel-title">
+        <strong>Messages</strong>
+        <a asp-page="/Messages/Inbox">All messages</a>
+    </div>
+
+    <div class="request-conversation-panel-list">
+        @if (Model.Threads.Count == 0)
+        {
+            <div class="request-conversation-empty">No messages yet.</div>
+        }
+        else
+        {
+            @foreach (MessageThreadView thread in Model.Threads)
+            {
+                @foreach (MessageDetailView message in thread.Messages)
+                {
+                    <article class="request-conversation-message">
+                        <div class="request-conversation-message-meta">
+                            <strong>@message.SenderName</strong>
+                            <time>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt")</time>
+                        </div>
+                        <div class="request-conversation-message-body">@message.Body</div>
+                    </article>
+                }
+            }
+        }
+    </div>
+
+    @{
+        MessageThreadView? replyThread = Model.Threads
+            .Where(thread => !thread.ClosedUtc.HasValue)
+            .LastOrDefault();
+    }
+
+    <form method="post"
+          asp-page="/Messages/RequestReply"
+          class="request-conversation-inline-reply">
+        <input type="hidden" name="RequestId" value="@Model.RequestId" />
+        <input type="hidden" name="ThreadId" value="@replyThread?.ThreadId" />
+        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+        <textarea name="Body"
+                  rows="2"
+                  maxlength="10000"
+                  required
+                  placeholder="Write a reply..."
+                  aria-label="Reply to request conversation"></textarea>
+        <button class="button button-small" type="submit">Reply</button>
+    </form>
+</section>
+
+<style>
+.request-conversation-panel{margin-top:8px;border:1px solid #d7dde2;background:#fff;border-radius:6px;overflow:hidden}.request-conversation-panel-title{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;background:#f4f6f8;border-bottom:1px solid #dde2e6}.request-conversation-panel-title strong{font-size:.88rem}.request-conversation-panel-title a{font-size:.78rem}.request-conversation-panel-list{max-height:220px;overflow:auto}.request-conversation-empty{padding:10px;color:#6d7780;font-size:.84rem}.request-conversation-message{padding:8px 10px;border-bottom:1px solid #edf0f2}.request-conversation-message-meta{display:flex;justify-content:space-between;gap:12px;font-size:.78rem}.request-conversation-message-meta time{color:#737d85}.request-conversation-message-body{margin-top:3px;white-space:pre-wrap;font-size:.86rem;line-height:1.35}.request-conversation-inline-reply{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:8px;background:#fafbfc}.request-conversation-inline-reply textarea{min-width:0;resize:vertical}.request-conversation-inline-reply .button{align-self:end}.request-conversation-panel.is-compact .request-conversation-panel-list{max-height:150px}.request-conversation-panel.is-compact .request-conversation-message{padding:6px 8px}.request-conversation-panel.is-compact .request-conversation-inline-reply{padding:6px}@media(max-width:640px){.request-conversation-inline-reply{grid-template-columns:1fr}.request-conversation-inline-reply .button{width:100%}}
+</style>
