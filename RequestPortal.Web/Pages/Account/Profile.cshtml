@@ -104,9 +104,21 @@
                             <strong>Home address</strong>
                         </div>
                         <div class="field">
-                            <label asp-for="ProfileInput.HomeAddress">Home address</label>
+                            <label asp-for="ProfileInput.HomeAddress">Address line 1</label>
                             <input asp-for="ProfileInput.HomeAddress" />
                             <span asp-validation-for="ProfileInput.HomeAddress" class="validation"></span>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label asp-for="ProfileInput.HomeAddressLine2">Address line 2</label>
+                                <input asp-for="ProfileInput.HomeAddressLine2" />
+                                <span asp-validation-for="ProfileInput.HomeAddressLine2" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.Town">Town</label>
+                                <input asp-for="ProfileInput.Town" />
+                                <span asp-validation-for="ProfileInput.Town" class="validation"></span>
+                            </div>
                         </div>
                         <div class="grid-2">
                             <div class="field">
