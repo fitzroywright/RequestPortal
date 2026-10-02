@@ -169,7 +169,7 @@
                         @foreach (MessageRecipientOption recipient in Model.Recipients)
                         {
                             <option value="@recipient.UserId">
-                                @recipient.DisplayName@if (!string.IsNullOrWhiteSpace(recipient.Email)) { <text> · @recipient.Email</text> }
+                                @recipient.DisplayName
                             </option>
                         }
                     </select>
