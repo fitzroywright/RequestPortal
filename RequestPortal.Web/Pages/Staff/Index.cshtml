@@ -127,6 +127,11 @@
                                         <a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.Id">Review</a>
                                     </td>
                                 </tr>
+                                <tr class="request-conversation-row">
+                                    <td colspan="5">
+                                        @await Component.InvokeAsync("RequestConversation", new { requestId = request.Id, returnUrl = Url.Page("/Staff/Index") ?? "/Staff", compact = true })
+                                    </td>
+                                </tr>
                             }
                             </tbody>
                         </table>
