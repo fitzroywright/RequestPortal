@@ -209,19 +209,47 @@ public sealed class OrganizationInvitationService : IOrganizationInvitationServi
                 item.Status != MembershipStatus.Revoked &&
                 item.Status != MembershipStatus.Rejected);
 
+        OrganizationMembership approvedMembership;
         if (existing is null)
         {
-            OrganizationMembership membership = organization.RequestMembership(
+            approvedMembership = organization.RequestMembership(
                 Guid.NewGuid(),
                 userId,
                 now);
-            membership.Approve(invitation.InvitedByUserId, now);
-            dbContext.OrganizationMemberships.Add(membership);
+            approvedMembership.Approve(invitation.InvitedByUserId, now);
+            dbContext.OrganizationMemberships.Add(approvedMembership);
         }
-        else if (existing.Status != MembershipStatus.Approved)
+        else
         {
-            existing.Approve(invitation.InvitedByUserId, now);
+            approvedMembership = existing;
+            if (approvedMembership.Status != MembershipStatus.Approved)
+            {
+                approvedMembership.Approve(invitation.InvitedByUserId, now);
+            }
         }
+
+        var acceptedUser = await dbContext.Users
+            .SingleAsync(user => user.Id == userId, cancellationToken);
+        acceptedUser.IndividualProfileUpdateRequired = false;
+        acceptedUser.IndividualProfileUpdateRequiredUtc = null;
+
+        MembershipChangedMessage changed = new(
+            Guid.NewGuid(),
+            now,
+            invitation.OrganizationId,
+            approvedMembership.Id,
+            userId,
+            "ApprovedByInvitation",
+            invitation.Id.ToString("D"));
+
+        dbContext.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = changed.MessageId,
+            MessageType = typeof(MembershipChangedMessage).FullName ?? nameof(MembershipChangedMessage),
+            Payload = System.Text.Json.JsonSerializer.Serialize(changed),
+            OccurredUtc = changed.OccurredUtc,
+            AttemptCount = 0
+        });
 
         invitation.Accept(userId, now);
         await dbContext.SaveChangesAsync(cancellationToken);
