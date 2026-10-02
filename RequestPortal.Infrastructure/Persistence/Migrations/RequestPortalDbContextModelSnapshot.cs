@@ -501,10 +501,6 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<string>("StatusBeforeRepresentativeReview")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId");
@@ -980,6 +976,10 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("StatusBeforeRepresentativeReview")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
