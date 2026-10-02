@@ -11,9 +11,42 @@
             <div class="eyebrow" style="color:#b45b09">Organization access</div>
             <h1>My organizations</h1>
             <p>
-                Use organizations when submitting on behalf of a church, school, NGO, community group or other entity. Personal requests do not require organization membership. New organizations require FFP approval, and representatives joining an existing organization require approval by that organization's administrator.
+                Use organizations when submitting on behalf of a church, school, NGO, community group or other entity. Personal requests do not require organization membership. New organizations require FFP approval. Existing organizations add representatives by invitation; users cannot request to join an organization.
             </p>
         </div>
+
+        @if (Model.PendingInvitations.Count > 0)
+        {
+            <section class="operational-panel" style="margin-bottom:1rem">
+                <div class="panel-titlebar">
+                    <div>
+                        <strong>Pending invitations</strong>
+                        <small>Open the secure invitation link sent to your email address to accept.</small>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Organization</th>
+                                <th>Invited email</th>
+                                <th>Expires</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var invitation in Model.PendingInvitations)
+                        {
+                            <tr>
+                                <td><strong>@invitation.OrganizationName</strong></td>
+                                <td>@invitation.Email</td>
+                                <td>@invitation.ExpiresUtc.ToLocalTime().ToString("g")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
 
         <section class="operational-panel">
             <div class="panel-titlebar">
