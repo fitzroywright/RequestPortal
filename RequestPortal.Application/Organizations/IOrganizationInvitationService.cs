@@ -38,7 +38,6 @@ public interface IOrganizationInvitationService
 
     Task AcceptAsync(
         Guid userId,
-        string? userEmail,
         Guid invitationId,
         string token,
         CancellationToken cancellationToken = default);
