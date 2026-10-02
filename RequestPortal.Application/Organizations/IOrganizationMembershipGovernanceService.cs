@@ -50,6 +50,12 @@ public interface IOrganizationMembershipGovernanceService
         Guid membershipId,
         CancellationToken cancellationToken = default);
 
+    Task ContinueAffectedRequestAsync(
+        Guid administratorUserId,
+        Guid organizationId,
+        Guid requestId,
+        CancellationToken cancellationToken = default);
+
     Task RevokeAsync(
         Guid administratorUserId,
         Guid organizationId,
