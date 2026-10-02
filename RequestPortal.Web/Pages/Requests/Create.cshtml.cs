@@ -133,11 +133,14 @@ public sealed class CreateModel : PageModel
         OrganizationRequesterOption? selectedOrganization = Organizations.FirstOrDefault(item => item.Id == Input.OrganizationId);
         if (selectedOrganization is null)
         {
-            ModelState.AddModelError(nameof(Input.OrganizationId), "Select an approved organization that you are authorized to represent.");
+            ModelState.AddModelError(nameof(Input.OrganizationId), "Select who you are making this request for.");
         }
         else if (!selectedOrganization.ProfileComplete)
         {
-            ModelState.AddModelError(nameof(Input.OrganizationId), $"Complete the organization profile before submitting this request. Missing: {selectedOrganization.MissingProfileFields}.");
+            string subject = selectedOrganization.IsIndividualContext ? "individual" : "organization";
+            ModelState.AddModelError(
+                nameof(Input.OrganizationId),
+                $"Complete the {subject} profile before submitting this request. Missing: {selectedOrganization.MissingProfileFields}.");
         }
 
         if (!string.IsNullOrWhiteSpace(Input.Category) &&
@@ -438,7 +441,7 @@ public sealed class CreateModel : PageModel
         Programs = await referenceDataService.GetProgramsAsync(HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
 
-        IReadOnlyList<OrganizationSummary> organizations = await workflowService.GetOrganizationsForUserAsync(user.Id, HttpContext.RequestAborted);
+        IReadOnlyList<OrganizationSummary> organizations = await workflowService.GetRequestContextsForUserAsync(user.Id, HttpContext.RequestAborted);
         IReadOnlyList<CountryOption> countries = await countryPolicyService.GetActiveCountriesAsync(HttpContext.RequestAborted);
         HashSet<string> requestEnabledCountries = countries
             .Where(country => country.RequestSubmissionEnabled)
@@ -451,6 +454,25 @@ public sealed class CreateModel : PageModel
                      item.MembershipStatus == "Approved" &&
                      requestEnabledCountries.Contains(item.CountryCode)))
         {
+            if (organization.IsIndividualContext)
+            {
+                List<string> missing = [];
+                if (string.IsNullOrWhiteSpace(user.DisplayName)) missing.Add("name");
+                if (string.IsNullOrWhiteSpace(user.Email)) missing.Add("email");
+                if (user.IndividualProfileUpdateRequired) missing.Add("profile review");
+
+                options.Add(new OrganizationRequesterOption(
+                    organization.Id,
+                    "Myself",
+                    organization.CountryCode,
+                    organization.Role,
+                    missing.Count == 0,
+                    string.Join(", ", missing),
+                    true));
+
+                continue;
+            }
+
             OrganizationProfile? profile = await organizationProfileService.GetAsync(user.Id, organization.Id, HttpContext.RequestAborted);
             if (profile is null)
                 continue;
@@ -462,7 +484,8 @@ public sealed class CreateModel : PageModel
                 organization.CountryCode,
                 organization.Role,
                 missing.Length == 0,
-                string.Join(", ", missing)));
+                string.Join(", ", missing),
+                false));
         }
 
         Organizations = options;
@@ -512,7 +535,8 @@ public sealed class CreateModel : PageModel
         string CountryCode,
         string Role,
         bool ProfileComplete,
-        string MissingProfileFields);
+        string MissingProfileFields,
+        bool IsIndividualContext);
 
     public sealed class RequestInput
     {
