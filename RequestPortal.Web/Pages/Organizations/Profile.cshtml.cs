@@ -269,4 +269,5 @@ public sealed class ProfileModel : PageModel
         public string? PremisesSituation { get; set; }
 
         public DateOnly? RegistrationExpiryDate { get; set; }
-    }}
+    }
+}
