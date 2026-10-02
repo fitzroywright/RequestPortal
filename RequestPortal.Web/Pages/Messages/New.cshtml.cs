@@ -79,6 +79,11 @@ public sealed class NewModel(
             ModelState.AddModelError(nameof(RecipientUserId), "Choose an individual recipient.");
         }
 
+        if (IsStaff && RecipientUserId.HasValue && RecipientUserId.Value == userId)
+        {
+            ModelState.AddModelError(nameof(RecipientUserId), "You cannot send a message to yourself.");
+        }
+
         if (!IsStaff &&
             string.Equals(Destination, "note", StringComparison.OrdinalIgnoreCase) &&
             !RequestId.HasValue)
@@ -219,11 +224,13 @@ public sealed class NewModel(
 
         if (OrganizationId.HasValue)
         {
-            Recipients = await messageService.GetOrganizationRecipientsAsync(
-                userId,
-                IsStaff,
-                OrganizationId.Value,
-                HttpContext.RequestAborted);
+            Recipients = (await messageService.GetOrganizationRecipientsAsync(
+                    userId,
+                    IsStaff,
+                    OrganizationId.Value,
+                    HttpContext.RequestAborted))
+                .Where(recipient => recipient.UserId != userId)
+                .ToArray();
         }
 
         if (RequestId.HasValue)
