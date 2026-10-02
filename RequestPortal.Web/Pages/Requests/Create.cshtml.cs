@@ -551,12 +551,16 @@ public sealed class CreateModel : PageModel
     private static string[] MissingProfileFields(OrganizationProfile profile)
     {
         List<string> missing = [];
-        if (string.IsNullOrWhiteSpace(profile.RegistrationNumber)) missing.Add("registration number");
+        if (string.IsNullOrWhiteSpace(profile.RegistrationNumber)) missing.Add("registration / identifying number");
         if (string.IsNullOrWhiteSpace(profile.OrganizationType)) missing.Add("organization type");
-        if (string.IsNullOrWhiteSpace(profile.Address)) missing.Add("address");
+        if (string.IsNullOrWhiteSpace(profile.CountryOfRegistration)) missing.Add("country of registration");
+        if (string.IsNullOrWhiteSpace(profile.Address)) missing.Add("physical address");
+        if (string.IsNullOrWhiteSpace(profile.Parish)) missing.Add("parish");
         if (string.IsNullOrWhiteSpace(profile.Phone)) missing.Add("phone");
         if (string.IsNullOrWhiteSpace(profile.Email)) missing.Add("email");
         if (string.IsNullOrWhiteSpace(profile.PrimaryContactName)) missing.Add("primary contact");
+        if (string.IsNullOrWhiteSpace(profile.PrimaryContactTitle)) missing.Add("primary contact title");
+        if (string.IsNullOrWhiteSpace(profile.MainActivities)) missing.Add("main activity / mission");
         if (profile.RegistrationExpiryDate.HasValue && profile.RegistrationExpiryDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
             missing.Add("current registration");
         return missing.ToArray();
