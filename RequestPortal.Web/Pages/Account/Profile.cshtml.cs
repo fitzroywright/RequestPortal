@@ -87,6 +87,8 @@ public sealed class ProfileModel : PageModel
         user.NationalIdTrn = ProfileInput.NationalIdTrn.Trim();
         user.MaritalStatus = ProfileInput.MaritalStatus.Trim();
         user.HomeAddress = ProfileInput.HomeAddress.Trim();
+        user.HomeAddressLine2 = Normalize(ProfileInput.HomeAddressLine2);
+        user.Town = ProfileInput.Town.Trim();
         user.Parish = ProfileInput.Parish.Trim();
         user.DistrictArea = ProfileInput.DistrictArea.Trim();
         user.AlternativePhoneNumber = Normalize(ProfileInput.AlternativePhoneNumber);
@@ -225,6 +227,8 @@ public sealed class ProfileModel : PageModel
                 NationalIdTrn = user.NationalIdTrn ?? string.Empty,
                 MaritalStatus = user.MaritalStatus ?? string.Empty,
                 HomeAddress = user.HomeAddress ?? string.Empty,
+                HomeAddressLine2 = user.HomeAddressLine2,
+                Town = user.Town ?? string.Empty,
                 Parish = user.Parish ?? string.Empty,
                 DistrictArea = user.DistrictArea ?? string.Empty,
                 AlternativePhoneNumber = user.AlternativePhoneNumber,
@@ -325,6 +329,12 @@ public sealed class ProfileModel : PageModel
 
         [Required, StringLength(500)]
         public string HomeAddress { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string? HomeAddressLine2 { get; set; }
+
+        [Required, StringLength(150)]
+        public string Town { get; set; } = string.Empty;
 
         [Required, StringLength(100)]
         public string Parish { get; set; } = string.Empty;
