@@ -408,6 +408,36 @@ public sealed class PortalMessageService : IPortalMessageService
             projected);
     }
 
+    public async Task<IReadOnlyList<MessageThreadView>> GetRequestThreadsAsync(
+        Guid userId,
+        bool isStaff,
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        Guid[] threadIds = await dbContext.MessageThreads
+            .AsNoTracking()
+            .Where(thread => thread.RequestId == requestId)
+            .OrderBy(thread => thread.CreatedUtc)
+            .Select(thread => thread.Id)
+            .ToArrayAsync(cancellationToken);
+
+        List<MessageThreadView> threads = [];
+        foreach (Guid threadId in threadIds)
+        {
+            MessageThreadView? thread = await GetThreadAsync(
+                userId,
+                isStaff,
+                threadId,
+                cancellationToken);
+            if (thread is not null)
+            {
+                threads.Add(thread);
+            }
+        }
+
+        return threads;
+    }
+
     public async Task<IReadOnlyList<MessageRecipientOption>> GetOrganizationRecipientsAsync(
         Guid userId,
         bool isStaff,
