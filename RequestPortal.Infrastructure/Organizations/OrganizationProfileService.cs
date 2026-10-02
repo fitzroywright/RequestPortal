@@ -131,4 +131,5 @@ public sealed class OrganizationProfileService : IOrganizationProfileService
             update.RegistrationExpiryDate);
 
         await dbContext.SaveChangesAsync(cancellationToken);
-    }}
+    }
+}
