@@ -91,7 +91,7 @@ public sealed class PortalMessagingTests
 
         Assert.Equal("Maria", staffInbox.SenderName);
         Assert.Equal("Representative", staffInbox.SenderKind);
-        Assert.Equal("maria@example.org", staffInbox.SenderEmail);
+        Assert.Null(staffInbox.SenderEmail);
 
         await service.ReplyAsync(
             staff.Id,
