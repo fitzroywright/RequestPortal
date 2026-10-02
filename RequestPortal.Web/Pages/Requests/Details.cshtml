@@ -38,57 +38,88 @@
             <section id="conversation" class="operational-panel request-messages-card">
                 <div class="panel-titlebar">
                     <div>
-                        <strong>Request conversation</strong>
-                        <small class="muted">Messages about @Model.Request.PublicReference stay with this request.</small>
+                        <strong>Messages about this request</strong>
+                        <small class="muted">All messages connected to @Model.Request.PublicReference are kept with this request.</small>
                     </div>
                     <a asp-page="/Messages/Inbox">All messages</a>
                 </div>
+
                 <div asp-validation-summary="ModelOnly" class="validation"></div>
-                @if (Model.MessageThreads.Count == 0 && Model.CanStartRequestConversation)
-                {
-                    <form method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="request-reply-form">
-                        <input type="hidden" name="id" value="@Model.Request.Id" />
-                        <div class="request-reply-box">
-                            <textarea name="Reply" rows="3" maxlength="10000" required placeholder="Message FFP about this request" aria-label="Message FFP">@Model.Reply</textarea>
-                            <label class="reply-paperclip" title="Attach a document">📎<input name="ReplyAttachment" type="file" aria-label="Attach a document" /></label>
-                        </div>
-                        <button class="button button-small" type="submit">Send</button>
-                    </form>
+
+                @{
+                    var requestMessages = Model.MessageThreads
+                        .SelectMany(thread => thread.Messages.Select(message => new { Thread = thread, Message = message }))
+                        .OrderBy(item => item.Message.SentUtc)
+                        .ToArray();
+
+                    var replyThread = Model.MessageThreads
+                        .Where(thread => !thread.ClosedUtc.HasValue)
+                        .OrderByDescending(thread => thread.Messages.LastOrDefault()?.SentUtc ?? DateTimeOffset.MinValue)
+                        .FirstOrDefault();
                 }
-                @foreach (var thread in Model.MessageThreads)
-                {
-                    <div class="request-conversation">
-                        <strong>@thread.Subject</strong>
-                        <div class="request-conversation-history">
-                        @foreach (var message in thread.Messages)
+
+                <div class="request-conversation-history request-message-list">
+                    @if (requestMessages.Length == 0)
+                    {
+                        <div class="workspace-empty compact">
+                            <p>No messages have been received for this request yet.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var item in requestMessages)
                         {
-                            <article class="request-message-item">
-                                <div><strong>@message.SenderName</strong> <time>@message.SentUtc.ToLocalTime().ToString("MMM d, h:mm tt")</time></div>
-                                <p style="white-space:pre-wrap">@message.Body</p>
-                                @foreach (var attachment in message.Attachments)
+                            <article class="request-message-item @(item.Message.IsMine ? "is-mine" : "is-received")">
+                                <div class="request-message-meta">
+                                    <strong>@item.Message.SenderName</strong>
+                                    <time>@item.Message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time>
+                                </div>
+                                <p>@item.Message.Body</p>
+                                @foreach (var attachment in item.Message.Attachments)
                                 {
-                                    <a asp-page="/Messages/Thread" asp-page-handler="Attachment" asp-route-id="@thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
+                                    <a asp-page="/Messages/Thread"
+                                       asp-page-handler="Attachment"
+                                       asp-route-id="@item.Thread.ThreadId"
+                                       asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
                                 }
                             </article>
                         }
-                        </div>
-                        @if (!thread.ClosedUtc.HasValue)
+                    }
+                </div>
+
+                @if (Model.CanStartRequestConversation || replyThread is not null)
+                {
+                    <form method="post"
+                          enctype="multipart/form-data"
+                          asp-page-handler="Reply"
+                          class="request-reply-form request-detail-reply">
+                        <input type="hidden" name="id" value="@Model.Request.Id" />
+                        @if (replyThread is not null)
                         {
-                            <form method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="request-reply-form">
-                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                <input type="hidden" name="ReplyThreadId" value="@thread.ThreadId" />
-                                <div class="request-reply-box">
-                                    <textarea name="Reply" rows="3" maxlength="10000" required placeholder="Reply in this conversation" aria-label="Reply">@(Model.ReplyThreadId == thread.ThreadId ? Model.Reply : string.Empty)</textarea>
-                                    <label class="reply-paperclip" title="Attach a document">📎<input name="ReplyAttachment" type="file" aria-label="Attach a document" /></label>
-                                </div>
-                                <span asp-validation-for="Reply" class="validation"></span>
-                                <button class="button button-small" type="submit">Send reply</button>
-                            </form>
+                            <input type="hidden" name="ReplyThreadId" value="@replyThread.ThreadId" />
                         }
-                    </div>
+
+                        <label for="request-reply-box"><strong>Reply</strong></label>
+                        <div class="request-reply-box">
+                            <textarea id="request-reply-box"
+                                      name="Reply"
+                                      rows="4"
+                                      maxlength="10000"
+                                      required
+                                      placeholder="Type your reply here..."
+                                      aria-label="Reply to messages about this request">@Model.Reply</textarea>
+                            <label class="reply-paperclip" title="Attach a document">
+                                📎
+                                <input name="ReplyAttachment" type="file" aria-label="Attach a document" />
+                            </label>
+                        </div>
+                        <span asp-validation-for="Reply" class="validation"></span>
+                        <div class="action-row">
+                            <button class="button button-small" type="submit">Send reply</button>
+                        </div>
+                    </form>
                 }
             </section>
-
 
             <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
                 <div>
@@ -405,6 +436,14 @@
     .request-conversation { border-bottom:1px solid #dde3e8; padding:8px; }
     .request-conversation-history { max-height:350px; overflow:auto; }
     .request-conversation-history time { font-size:.75rem; color:#53616b; }
+    .request-message-list { background:#fff; border-top:1px solid #e3e7ea; border-bottom:1px solid #e3e7ea; }
+    .request-message-item { padding:10px 12px; border-bottom:1px solid #edf0f2; }
+    .request-message-item:last-child { border-bottom:0; }
+    .request-message-item.is-mine { background:#f7fafc; }
+    .request-message-meta { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
+    .request-message-item p { margin:5px 0 0; white-space:pre-wrap; line-height:1.45; }
+    .request-detail-reply { border-top:0; background:#fafbfc; }
+    .request-detail-reply > label { display:block; margin-bottom:6px; }
     .proposal-document {
         margin-top: 18px;
         background: #fff;
