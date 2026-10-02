@@ -46,7 +46,10 @@
             </a>
             <nav class="main-nav @(useApplicationShell ? "app-main-nav" : null)">
 
-                <a asp-page="/Index">Home</a>
+                @if (!useApplicationShell)
+                {
+                    <a asp-page="/Index">Home</a>
+                }
                 @if (isAuthenticated)
                 {
                     if (isExternalReviewer)
