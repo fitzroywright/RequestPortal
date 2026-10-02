@@ -9,9 +9,9 @@
     <div class="shell">
         <header class="workspace-titlebar">
             <div>
-                <div class="eyebrow request-eyebrow">Representative workspace</div>
+                <div class="eyebrow request-eyebrow">Request workspace</div>
                 <h1>Hello, @Model.DisplayName</h1>
-                <p>Requests, messages, documents and actions for your organizations.</p>
+                <p>Your requests, messages, documents and organization activity in one workspace.</p>
             </div>
             <div class="workspace-toolbar">
                 <a class="button" asp-page="/Requests/Create">New request</a>
@@ -57,7 +57,7 @@
                 {
                     <div class="workspace-empty">
                         <strong>No requests yet</strong>
-                        <p>Create a request once you have an approved organization membership.</p>
+                        <p>Create a personal request or submit one for an approved organization.</p>
                     </div>
                 }
                 else
