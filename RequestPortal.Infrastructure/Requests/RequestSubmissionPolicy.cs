@@ -108,10 +108,14 @@ public sealed class RequestSubmissionPolicy(
             {
                 item.OrganizationType,
                 item.RegistrationNumber,
+                item.CountryOfRegistration,
                 item.Address,
+                item.Parish,
                 item.Phone,
                 item.Email,
-                item.PrimaryContactName
+                item.PrimaryContactName,
+                item.PrimaryContactTitle,
+                item.MainActivities
             })
             .SingleAsync(cancellationToken);
 
@@ -140,12 +144,16 @@ public sealed class RequestSubmissionPolicy(
         else
         {
             List<string> missingOrganizationFields = [];
-            if (string.IsNullOrWhiteSpace(organization.RegistrationNumber)) missingOrganizationFields.Add("registration number");
+            if (string.IsNullOrWhiteSpace(organization.RegistrationNumber)) missingOrganizationFields.Add("registration / identifying number");
             if (string.IsNullOrWhiteSpace(organization.OrganizationType)) missingOrganizationFields.Add("organization type");
-            if (string.IsNullOrWhiteSpace(organization.Address)) missingOrganizationFields.Add("address");
+            if (string.IsNullOrWhiteSpace(organization.CountryOfRegistration)) missingOrganizationFields.Add("country of registration");
+            if (string.IsNullOrWhiteSpace(organization.Address)) missingOrganizationFields.Add("physical address");
+            if (string.IsNullOrWhiteSpace(organization.Parish)) missingOrganizationFields.Add("parish");
             if (string.IsNullOrWhiteSpace(organization.Phone)) missingOrganizationFields.Add("phone");
             if (string.IsNullOrWhiteSpace(organization.Email)) missingOrganizationFields.Add("email");
             if (string.IsNullOrWhiteSpace(organization.PrimaryContactName)) missingOrganizationFields.Add("primary contact");
+            if (string.IsNullOrWhiteSpace(organization.PrimaryContactTitle)) missingOrganizationFields.Add("primary contact title");
+            if (string.IsNullOrWhiteSpace(organization.MainActivities)) missingOrganizationFields.Add("main activity / mission");
 
             if (missingOrganizationFields.Count > 0)
             {
