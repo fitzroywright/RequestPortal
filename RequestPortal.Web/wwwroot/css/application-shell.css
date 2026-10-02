@@ -3073,3 +3073,14 @@ body.authenticated-app{
     color:#647789;
     font-weight:650;
 }
+
+
+/* Global authenticated button rounding */
+.authenticated-app button,
+.authenticated-app .button,
+.authenticated-app .icon-button,
+.authenticated-app .nav-link-button,
+.authenticated-app .message-destination-option span,
+.authenticated-app .request-type-option span {
+    border-radius: 8px !important;
+}
