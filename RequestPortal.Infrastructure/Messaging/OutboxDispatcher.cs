@@ -149,6 +149,11 @@ public sealed class OutboxDispatcher
             await SendMembershipChangedAsync(Deserialize<MembershipChangedMessage>(outbox.Payload), cancellationToken);
             return;
         }
+        if (outbox.MessageType.EndsWith(nameof(OrganizationMembershipEndedMessage), StringComparison.Ordinal))
+        {
+            await SendOrganizationMembershipEndedAsync(Deserialize<OrganizationMembershipEndedMessage>(outbox.Payload), cancellationToken);
+            return;
+        }
         if (outbox.MessageType.EndsWith(nameof(OrganizationStatusChangedMessage), StringComparison.Ordinal))
         {
             await SendOrganizationStatusChangedAsync(Deserialize<OrganizationStatusChangedMessage>(outbox.Payload), cancellationToken);
@@ -229,6 +234,52 @@ public sealed class OutboxDispatcher
             OccurredUtc = message.OccurredUtc,
             AttemptCount = 0
         });
+    }
+
+    private async Task SendOrganizationMembershipEndedAsync(
+        OrganizationMembershipEndedMessage message,
+        CancellationToken cancellationToken)
+    {
+        Organization organization = await dbContext.Organizations.AsNoTracking()
+            .SingleAsync(item => item.Id == message.OrganizationId, cancellationToken);
+        var removedUser = await dbContext.Users.AsNoTracking()
+            .SingleAsync(item => item.Id == message.UserId, cancellationToken);
+        var actor = await dbContext.Users.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == message.EndedByUserId, cancellationToken);
+
+        string affected = message.AffectedRequestIds.Count == 0
+            ? "No active requests require representative review."
+            : $"{message.AffectedRequestIds.Count} active request(s) were placed in Representative Review Required.";
+
+        await DeliverToRecipientsAsync(
+            new[] { message.UserId },
+            message.OrganizationId,
+            null,
+            $"Organization membership ended: {organization.Name}",
+            $"Your membership in {organization.Name} has ended and you no longer have access to its requests, messages or documents. {affected} If you no longer represent another organization, update your Individual Profile before submitting a personal request.",
+            cancellationToken);
+
+        Guid[] managerIds = await dbContext.OrganizationMemberships.AsNoTracking()
+            .Where(item => item.OrganizationId == message.OrganizationId
+                && item.Status == MembershipStatus.Approved
+                && item.Role == OrganizationRole.Administrator)
+            .Select(item => item.UserId)
+            .ToArrayAsync(cancellationToken);
+
+        if (managerIds.Length > 0)
+        {
+            await DeliverToRecipientsAsync(
+                managerIds,
+                message.OrganizationId,
+                null,
+                $"Representative removed: {removedUser.DisplayName}",
+                $"{removedUser.DisplayName} is no longer a representative of {organization.Name}. Removed by {actor?.DisplayName ?? "an authorized administrator"} at {message.OccurredUtc:u}. {affected}",
+                cancellationToken);
+        }
+
+        logger.LogInformation(
+            "Organization membership ended. Organization={OrganizationId}; User={UserId}; Actor={ActorId}; AffectedRequests={AffectedRequestCount}",
+            message.OrganizationId, message.UserId, message.EndedByUserId, message.AffectedRequestIds.Count);
     }
 
     private async Task SendOrganizationApprovedAsync(OrganizationApprovedMessage message, CancellationToken cancellationToken)
