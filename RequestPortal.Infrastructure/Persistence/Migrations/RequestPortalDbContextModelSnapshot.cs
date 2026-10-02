@@ -1308,6 +1308,54 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
+                    b.Property<string>("AlternativePhoneNumber")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("ChildrenUnder18")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DistrictArea")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EmployerInstitution")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EmploymentStatus")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Gender")
+                        .HasColumnType("text");
+
+                    b.Property<string>("HomeAddress")
+                        .HasColumnType("text");
+
+                    b.Property<string>("HouseholdLivingSituation")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("HouseholdSize")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HousingSituation")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MaritalStatus")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("MonthlyHouseholdIncome")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("NationalIdTrn")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("NumberOfDependants")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Parish")
+                        .HasColumnType("text");
+
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
