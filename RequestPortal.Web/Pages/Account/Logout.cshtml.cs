@@ -34,6 +34,8 @@ public sealed class LogoutModel : PageModel
             $"name={User.Identity?.Name}",
             HttpContext.RequestAborted);
         await signInManager.SignOutAsync();
+        await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
         await HttpContext.SignOutAsync(StaffOidcOptions.StaffCookieScheme);
         await HttpContext.SignOutAsync("ExternalReviewer");
         HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
