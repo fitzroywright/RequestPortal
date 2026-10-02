@@ -216,7 +216,11 @@ public sealed class NotificationWorkflowTests
             }),
             NullLogger<OutboxDispatcher>.Instance,
             new NullOperationsFlowPublisher(),
-            new RequestPortal.Infrastructure.Messages.PortalMessageService(database.Db, new NullRealtimeNotifier()));
+            new RequestPortal.Infrastructure.Messages.PortalMessageService(
+                database.Db,
+                new NullRealtimeNotifier(),
+                new DisabledBridgeClient(),
+                Options.Create(new FfpManagerBridgeOptions { Enabled = false })));
 
         int processed = await dispatcher.DispatchBatchAsync(
             batchSize: 10,
@@ -354,6 +358,31 @@ public sealed class NotificationWorkflowTests
             string? detail = null,
             bool failed = false)
             => true;
+    }
+
+    private sealed class DisabledBridgeClient : IExternalApplicationBridgeClient
+    {
+        public Task<ExternalApplicationReference> SubmitApplicationAsync(
+            ExternalApplicationSubmission submission,
+            CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("FFP Manager bridge is disabled for this test.");
+
+        public Task UploadArtifactAsync(
+            string applicationId,
+            ExternalArtifactDescriptor descriptor,
+            Stream content,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<ExternalApplicationStatus> GetStatusAsync(
+            string applicationId,
+            CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("FFP Manager bridge is disabled for this test.");
+
+        public Task SendInformationResponseAsync(
+            ExternalInformationResponse response,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private sealed class DisabledFfpManagerIntegrationService : IExternalApplicationIntegrationService
