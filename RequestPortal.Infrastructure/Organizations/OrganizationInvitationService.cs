@@ -159,12 +159,17 @@ public sealed class OrganizationInvitationService : IOrganizationInvitationServi
 
     public async Task AcceptAsync(
         Guid userId,
-        string? userEmail,
         Guid invitationId,
         string token,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(userEmail))
+        var account = await dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new { user.Email, user.EmailConfirmed })
+            .SingleAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(account.Email) || !account.EmailConfirmed)
         {
             throw new InvalidOperationException("Your signed-in account does not have a verified email address.");
         }
@@ -179,7 +184,7 @@ public sealed class OrganizationInvitationService : IOrganizationInvitationServi
             throw new InvalidOperationException("This invitation is no longer active.");
         }
 
-        if (!string.Equals(invitation.Email, NormalizeEmail(userEmail), StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(invitation.Email, NormalizeEmail(account.Email), StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("This invitation was sent to a different email address. Sign in with the invited account.");
         }
