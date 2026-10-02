@@ -2934,3 +2934,142 @@ body.authenticated-app{
         grid-template-columns:1fr;
     }
 }
+
+
+/* ================================================================
+   Goods & Services spreadsheet grid + profile warning
+   ================================================================ */
+.authenticated-app .goods-grid-wrap{
+    overflow:auto;
+    border:1px solid #bfcbd6;
+    border-radius:8px;
+    background:#fff;
+}
+.authenticated-app .goods-grid{
+    width:100%;
+    min-width:980px;
+    table-layout:fixed;
+    border-collapse:separate;
+    border-spacing:0;
+    background:#fff;
+}
+.authenticated-app .goods-grid th,
+.authenticated-app .goods-grid td{
+    padding:0;
+    border-right:1px solid #d8e0e7;
+    border-bottom:1px solid #d8e0e7;
+    background:#fff;
+    vertical-align:middle;
+}
+.authenticated-app .goods-grid th:last-child,
+.authenticated-app .goods-grid td:last-child{
+    border-right:0;
+}
+.authenticated-app .goods-grid thead th{
+    position:sticky;
+    top:0;
+    z-index:2;
+    height:34px;
+    padding:0 8px;
+    background:#edf3f8;
+    color:#3b556d;
+    font-size:.68rem;
+    font-weight:850;
+    text-transform:uppercase;
+    letter-spacing:.035em;
+    text-align:left;
+}
+.authenticated-app .goods-grid tbody tr:last-child td{
+    border-bottom:0;
+}
+.authenticated-app .goods-grid tbody tr:hover td{
+    background:#f7fbff;
+}
+.authenticated-app .goods-grid td input,
+.authenticated-app .goods-grid td select{
+    width:100%;
+    min-width:0;
+    height:36px;
+    min-height:36px;
+    margin:0;
+    padding:5px 7px;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    box-shadow:none;
+    font-size:.79rem;
+}
+.authenticated-app .goods-grid td input:focus,
+.authenticated-app .goods-grid td select:focus{
+    position:relative;
+    z-index:1;
+    outline:2px solid #2482df;
+    outline-offset:-2px;
+    background:#fff;
+}
+.authenticated-app .goods-grid th:nth-child(1),
+.authenticated-app .goods-grid td:nth-child(1){
+    width:42px;
+}
+.authenticated-app .goods-grid th:nth-child(2),
+.authenticated-app .goods-grid td:nth-child(2){
+    width:20%;
+}
+.authenticated-app .goods-grid th:nth-child(3),
+.authenticated-app .goods-grid td:nth-child(3){
+    width:29%;
+}
+.authenticated-app .goods-grid th:nth-child(4),
+.authenticated-app .goods-grid td:nth-child(4){
+    width:10%;
+}
+.authenticated-app .goods-grid th:nth-child(5),
+.authenticated-app .goods-grid td:nth-child(5){
+    width:15%;
+}
+.authenticated-app .goods-grid th:nth-child(6),
+.authenticated-app .goods-grid td:nth-child(6){
+    width:22%;
+}
+.authenticated-app .goods-grid th:nth-child(7),
+.authenticated-app .goods-grid td:nth-child(7){
+    width:42px;
+}
+.authenticated-app .goods-row-number-head,
+.authenticated-app .goods-row-number{
+    text-align:center!important;
+}
+.authenticated-app .goods-row-number{
+    background:#f4f7fa!important;
+    color:#6f8191;
+    font-size:.7rem;
+    font-weight:800;
+    user-select:none;
+}
+.authenticated-app .goods-grid .remove-item{
+    width:100%;
+    height:36px;
+    min-height:36px;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    color:#b42318;
+    font-size:1rem;
+}
+.authenticated-app .goods-grid .remove-item:hover{
+    background:#fff0ef;
+}
+.authenticated-app .goods-context{
+    margin-top:10px;
+}
+.authenticated-app .request-profile-state{
+    font-size:.79rem;
+}
+.authenticated-app .request-profile-state.is-incomplete{
+    color:#c62828;
+    font-weight:900;
+}
+.authenticated-app .request-profile-state.is-complete{
+    color:#647789;
+    font-weight:650;
+}
