@@ -67,7 +67,17 @@ public sealed class OrganizationMembershipGovernanceService : IOrganizationMembe
     {
         Organization organization = await LoadForAdministrationAsync(administratorUserId, organizationId, cancellationToken);
         OrganizationMembership membership = organization.Memberships.Single(item => item.Id == membershipId);
+        bool alreadyApprovedElsewhere = await dbContext.OrganizationMemberships.AsNoTracking()
+            .AnyAsync(item => item.UserId == membership.UserId
+                && item.Id != membership.Id
+                && item.Status == MembershipStatus.Approved, cancellationToken);
+        if (alreadyApprovedElsewhere)
+            throw new InvalidOperationException("This account is already tied to another organization.");
+
         membership.Approve(administratorUserId, clock.UtcNow);
+        var approvedUser = await dbContext.Users.SingleAsync(item => item.Id == membership.UserId, cancellationToken);
+        approvedUser.IndividualProfileUpdateRequired = false;
+        approvedUser.IndividualProfileUpdateRequiredUtc = null;
         AddMembershipChangedOutbox(organizationId, membership, "Approved", null);
         await SaveAndAuditAsync(administratorUserId, organizationId, membershipId, "MembershipApproved", null, cancellationToken);
     }
