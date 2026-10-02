@@ -1291,3 +1291,620 @@ body.authenticated-app{
 .authenticated-app .danger-panel-heading+*{
     background:#fffdfd;
 }
+
+
+/* ================================================================
+   Canonical authenticated RequestPortal theme
+   Based on the approved compact blue/navy mockup.
+   The public opening page is unaffected because every selector is
+   scoped to body.authenticated-app.
+   ================================================================ */
+
+.authenticated-app{
+    --mock-navy:#12395d;
+    --mock-navy-dark:#0d2f4f;
+    --mock-blue:#0f67c7;
+    --mock-blue-2:#1b7add;
+    --mock-blue-soft:#eaf3fc;
+    --mock-green:#1d9a42;
+    --mock-green-soft:#eaf8ee;
+    --mock-orange:#f1a11f;
+    --mock-orange-soft:#fff5df;
+    --mock-red:#d7473f;
+    --mock-red-soft:#fff0ef;
+    --mock-canvas:#f4f7fa;
+    --mock-panel:#fff;
+    --mock-panel-head:#f7f9fb;
+    --mock-line:#d5dee7;
+    --mock-text:#132c45;
+    --mock-muted:#627385;
+    background:var(--mock-canvas);
+    color:var(--mock-text);
+}
+
+/* Application top bar */
+.authenticated-app .site-header.app-header{
+    height:52px;
+    min-height:52px;
+    background:linear-gradient(90deg,var(--mock-navy-dark),var(--mock-navy));
+    border-bottom:0;
+    box-shadow:0 1px 3px rgba(8,33,55,.2);
+}
+.authenticated-app .app-nav-shell{
+    min-height:52px;
+    height:52px;
+}
+.authenticated-app .app-brand{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:#fff;
+}
+.authenticated-app .app-brand-mark{
+    display:grid;
+    place-items:center;
+    width:29px;
+    height:29px;
+    border:1px solid rgba(255,255,255,.45);
+    border-radius:50%;
+    background:#fff;
+    color:#145b9e;
+    font-size:.67rem;
+    font-weight:900;
+    letter-spacing:-.02em;
+}
+.authenticated-app .app-brand .brand-copy strong{
+    color:#fff;
+    font-size:.98rem;
+    font-weight:800;
+}
+.authenticated-app .app-main-nav{
+    gap:3px;
+}
+.authenticated-app .app-main-nav>a:not(.button),
+.authenticated-app .app-main-nav .nav-link-button{
+    min-height:32px;
+    padding:0 10px;
+    border-radius:4px;
+    color:#eaf2f8;
+    font-size:.83rem;
+    font-weight:650;
+}
+.authenticated-app .app-main-nav>a:not(.button):hover,
+.authenticated-app .app-main-nav .nav-link-button:hover{
+    background:rgba(255,255,255,.09);
+}
+.authenticated-app .app-message-link{
+    position:relative;
+    display:grid!important;
+    place-items:center;
+    width:34px;
+    padding:0!important;
+}
+.authenticated-app .app-message-icon{
+    font-size:1rem;
+    line-height:1;
+}
+.authenticated-app .app-message-link .message-badge{
+    position:absolute;
+    top:-2px;
+    right:-2px;
+    min-width:16px;
+    height:16px;
+    padding:0 4px;
+    border:2px solid var(--mock-navy);
+    background:#e53935;
+    color:#fff;
+}
+.authenticated-app .profile-menu-trigger{
+    min-height:34px;
+    gap:7px;
+}
+.authenticated-app .profile-avatar{
+    width:28px;
+    height:28px;
+    background:#c8daea;
+    color:#163a59;
+    border:1px solid rgba(255,255,255,.45);
+}
+.authenticated-app .profile-menu-name{
+    font-size:.81rem;
+}
+
+/* Canvas and width */
+.authenticated-app .app-main{
+    min-height:calc(100vh - 52px);
+    padding-bottom:28px;
+    background:linear-gradient(180deg,#f8fafc 0,#f2f6f9 150px,#f4f7fa 100%);
+}
+.authenticated-app .shell{
+    width:min(1480px,calc(100% - 34px));
+}
+
+/* Page titles */
+.authenticated-app .section,
+.authenticated-app .operational-page,
+.authenticated-app .portal-workspace,
+.authenticated-app .profile-workspace,
+.authenticated-app .new-request-page{
+    padding-top:16px;
+}
+.authenticated-app .section-heading,
+.authenticated-app .operational-titlebar,
+.authenticated-app .workspace-titlebar,
+.authenticated-app .profile-titlebar,
+.authenticated-app .request-topbar{
+    margin-bottom:11px;
+}
+.authenticated-app .section-heading h1,
+.authenticated-app .operational-titlebar h1,
+.authenticated-app .workspace-titlebar h1,
+.authenticated-app .profile-titlebar h1,
+.authenticated-app .request-topbar h1{
+    margin:2px 0 3px;
+    color:#102c49;
+    font-size:1.48rem;
+    font-weight:800;
+    letter-spacing:-.015em;
+}
+.authenticated-app .section-heading p,
+.authenticated-app .operational-titlebar p,
+.authenticated-app .workspace-titlebar p,
+.authenticated-app .profile-titlebar p{
+    color:var(--mock-muted);
+    font-size:.82rem;
+    line-height:1.4;
+}
+.authenticated-app .eyebrow,
+.authenticated-app .request-eyebrow{
+    color:#b86b00;
+    font-size:.68rem;
+    font-weight:800;
+    letter-spacing:.11em;
+    text-transform:uppercase;
+}
+
+/* Canonical panels */
+.authenticated-app .card,
+.authenticated-app .operational-panel,
+.authenticated-app .workspace-panel,
+.authenticated-app .profile-panel,
+.authenticated-app .mg-panel,
+.authenticated-app .outlook-folder-card,
+.authenticated-app .outlook-message-workspace{
+    border:1px solid var(--mock-line);
+    border-radius:5px;
+    background:var(--mock-panel);
+    box-shadow:0 1px 2px rgba(17,43,66,.05);
+}
+.authenticated-app .panel-titlebar,
+.authenticated-app .profile-panel-title,
+.authenticated-app .operational-panel-titlebar,
+.authenticated-app .workspace-titlebar,
+.authenticated-app .outlook-workspace-titlebar,
+.authenticated-app .outlook-folder-title{
+    background:linear-gradient(#fbfcfd,#f3f6f9);
+    border-bottom:1px solid var(--mock-line);
+}
+.authenticated-app .panel-titlebar,
+.authenticated-app .profile-panel-title,
+.authenticated-app .operational-panel-titlebar,
+.authenticated-app .outlook-workspace-titlebar,
+.authenticated-app .outlook-folder-title{
+    min-height:39px;
+    padding:8px 11px;
+}
+.authenticated-app .panel-titlebar strong,
+.authenticated-app .profile-panel-title strong,
+.authenticated-app .operational-panel-titlebar strong,
+.authenticated-app .outlook-workspace-titlebar strong,
+.authenticated-app .outlook-folder-title{
+    color:#173955;
+    font-size:.88rem;
+    font-weight:800;
+}
+.authenticated-app .panel-titlebar small,
+.authenticated-app .profile-panel-title small,
+.authenticated-app .operational-panel-titlebar small{
+    color:#6f8090;
+    font-size:.7rem;
+}
+
+/* Icon treatment for generic card titles */
+.authenticated-app .card>h2:first-child,
+.authenticated-app .card>h3:first-child,
+.authenticated-app .mg-panel>h2:first-child{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:#173955;
+}
+.authenticated-app .card>h2:first-child::before,
+.authenticated-app .card>h3:first-child::before,
+.authenticated-app .mg-panel>h2:first-child::before{
+    content:"▦";
+    display:grid;
+    place-items:center;
+    width:22px;
+    height:22px;
+    flex:0 0 22px;
+    border-radius:5px;
+    background:#e5f1fd;
+    color:#176ac0;
+    font-size:.72rem;
+    font-weight:900;
+}
+
+/* Buttons */
+.authenticated-app .button{
+    min-height:32px;
+    padding:0 11px;
+    border-radius:4px;
+    border:1px solid #0e5eb2;
+    background:linear-gradient(#1978d5,#0f67c7);
+    color:#fff;
+    font-size:.79rem;
+    font-weight:750;
+    box-shadow:0 1px 1px rgba(17,67,112,.12);
+}
+.authenticated-app .button:hover{
+    background:linear-gradient(#126fc8,#0b58a8);
+}
+.authenticated-app .button-outline,
+.authenticated-app .button-secondary{
+    background:#fff;
+    color:#155c9e;
+    border-color:#88afd2;
+}
+.authenticated-app .button-outline:hover,
+.authenticated-app .button-secondary:hover{
+    background:#edf6ff;
+}
+.authenticated-app .button-danger{
+    background:#fff;
+    color:#c43e35;
+    border-color:#e28f89;
+}
+.authenticated-app .button-danger:hover{
+    background:#fff3f2;
+}
+
+/* Status chips */
+.authenticated-app .status{
+    min-height:22px;
+    padding:0 8px;
+    border-radius:10px;
+    border:1px solid #d7e0e7;
+    background:#eef2f5;
+    color:#3a5268;
+    font-size:.69rem;
+    font-weight:800;
+}
+.authenticated-app .status-Submitted,
+.authenticated-app .status-submitted{
+    background:#e9f7ed;
+    color:#157232;
+    border-color:#9fd0aa;
+}
+.authenticated-app .status-Approved,
+.authenticated-app .status-approved,
+.authenticated-app .status-Fulfilled,
+.authenticated-app .status-fulfilled{
+    background:#e9f7ed;
+    color:#157232;
+    border-color:#9fd0aa;
+}
+.authenticated-app .status-MoreInformationRequired{
+    background:#fff3d8;
+    color:#8b5f05;
+    border-color:#ead08b;
+}
+.authenticated-app .status-Rejected,
+.authenticated-app .status-Cancelled{
+    background:#fff0ef;
+    color:#a52b24;
+    border-color:#e5aaa5;
+}
+
+/* Tables */
+.authenticated-app .table-wrap,
+.authenticated-app .operational-table-wrap{
+    border:1px solid var(--mock-line);
+    border-radius:4px;
+    overflow:auto;
+    background:#fff;
+}
+.authenticated-app table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:.8rem;
+}
+.authenticated-app thead th{
+    padding:7px 9px;
+    background:#eef3f7;
+    color:#496178;
+    border-bottom:1px solid #d7e0e8;
+    font-size:.68rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.045em;
+}
+.authenticated-app tbody td{
+    padding:8px 9px;
+    border-bottom:1px solid #e5eaee;
+}
+.authenticated-app tbody tr:nth-child(even){
+    background:#fbfcfd;
+}
+.authenticated-app tbody tr:hover{
+    background:#edf6ff;
+}
+
+/* Forms */
+.authenticated-app .field{
+    gap:4px;
+}
+.authenticated-app .field label{
+    color:#2c465d;
+    font-size:.75rem;
+    font-weight:750;
+}
+.authenticated-app input,
+.authenticated-app select,
+.authenticated-app textarea{
+    border:1px solid #bccbd8;
+    border-radius:4px;
+    background:#fff;
+    color:#1f3549;
+}
+.authenticated-app .field input,
+.authenticated-app .field select{
+    min-height:34px;
+    padding:6px 8px;
+}
+.authenticated-app .field textarea{
+    min-height:80px;
+    padding:7px 8px;
+}
+.authenticated-app input:focus,
+.authenticated-app select:focus,
+.authenticated-app textarea:focus{
+    outline:2px solid rgba(15,103,199,.14);
+    border-color:#6da3d3;
+}
+
+/* Dashboard */
+.authenticated-app .portal-workspace-grid{
+    grid-template-columns:220px minmax(0,1.75fr) minmax(255px,.72fr);
+    gap:10px;
+}
+.authenticated-app .workspace-panel{
+    overflow:hidden;
+}
+.authenticated-app .status-panel .panel-titlebar,
+.authenticated-app .context-panel .panel-titlebar{
+    background:#f2f7fb;
+}
+.authenticated-app .status-row{
+    min-height:34px;
+    padding:6px 9px;
+    border-left:3px solid transparent;
+    font-size:.79rem;
+}
+.authenticated-app .status-row.is-active{
+    background:#e8f3fd;
+    color:#145b9e;
+    border-left-color:#1473d1;
+}
+.authenticated-app .actions-list a,
+.authenticated-app .organization-row,
+.authenticated-app .attention-list a{
+    padding:8px 10px;
+    border-bottom:1px solid #e7ebef;
+}
+.authenticated-app .organization-row:hover,
+.authenticated-app .attention-list a:hover{
+    background:#f0f7fd;
+}
+
+/* Mailbox */
+.authenticated-app .outlook-mailbox{
+    display:grid;
+    grid-template-columns:210px minmax(0,1fr);
+    gap:10px;
+}
+.authenticated-app .outlook-folder{
+    min-height:34px;
+    padding:6px 9px;
+    border-left:3px solid transparent;
+    border-radius:0;
+}
+.authenticated-app .outlook-folder.is-active{
+    background:#e9f3fc;
+    color:#155d9f;
+    border-left-color:#1473d1;
+}
+.authenticated-app .outlook-message-grid-header{
+    background:#edf2f6;
+}
+.authenticated-app .outlook-message-row{
+    min-height:48px;
+    border-bottom:1px solid #e3e8ed;
+}
+.authenticated-app .outlook-message-row:hover{
+    background:#eef6fd;
+}
+
+/* Profile and organization screens */
+.authenticated-app .profile-dashboard{
+    grid-template-columns:minmax(0,1.5fr) minmax(300px,.72fr);
+    gap:10px;
+}
+.authenticated-app .profile-panel{
+    overflow:hidden;
+}
+.authenticated-app .profile-personal .profile-panel-title{
+    background:#eef6fd;
+}
+.authenticated-app .profile-membership .profile-panel-title{
+    background:#f4f8fb;
+}
+.authenticated-app .profile-notifications .profile-panel-title{
+    background:#f6f9fb;
+}
+.authenticated-app .profile-intake-section{
+    background:#fff;
+}
+.authenticated-app .profile-intake-heading strong{
+    color:#173955!important;
+}
+.authenticated-app .profile-membership-row{
+    border-bottom:1px solid #e7ebef;
+}
+
+/* Request creation */
+.authenticated-app .request-topbar{
+    padding:10px 12px;
+    border:1px solid var(--mock-line);
+    border-radius:5px;
+    background:#fff;
+}
+.authenticated-app .requester-strip{
+    border-color:#cdd9e3;
+    background:#f8fbfd;
+}
+.authenticated-app .request-common-grid{
+    gap:10px;
+}
+.authenticated-app .request-sticky-submit{
+    background:rgba(255,255,255,.96);
+    border:1px solid #cbd7e1;
+    box-shadow:0 -4px 14px rgba(22,49,73,.08);
+}
+
+/* Staff */
+.authenticated-app .staff-workspace .workspace-titlebar,
+.authenticated-app .staff-titlebar{
+    padding:10px 12px;
+    border:1px solid var(--mock-line);
+    border-radius:5px;
+    background:#fff;
+}
+.authenticated-app .staff-select-row{
+    cursor:pointer;
+}
+.authenticated-app .staff-select-row:hover{
+    background:#edf6ff;
+}
+
+/* Management */
+.authenticated-app .management-shell{
+    max-width:1480px!important;
+    padding:16px 17px 32px!important;
+}
+.authenticated-app .management-head{
+    padding:10px 12px;
+    margin-bottom:10px!important;
+    border:1px solid var(--mock-line);
+    border-radius:5px;
+    background:#fff;
+}
+.authenticated-app .metric-link{
+    position:relative;
+    overflow:hidden;
+    border-color:#d1dce5!important;
+    background:#fff!important;
+}
+.authenticated-app .metric-link::before{
+    content:"";
+    position:absolute;
+    left:0;
+    top:0;
+    bottom:0;
+    width:3px;
+    background:#1473d1;
+}
+.authenticated-app .metric-link:hover{
+    border-color:#8db8db!important;
+    background:#f5faff!important;
+}
+.authenticated-app .metric-value{
+    color:#153a5a;
+}
+.authenticated-app .mg-panel{
+    border-color:#d3dde6!important;
+    background:#fff!important;
+}
+.authenticated-app .mg-panel>h2{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding-bottom:8px;
+    border-bottom:1px solid #e4e9ed;
+    color:#173955;
+}
+.authenticated-app .mg-panel>h2::before{
+    content:"▦";
+    display:grid;
+    place-items:center;
+    width:21px;
+    height:21px;
+    border-radius:4px;
+    background:#e7f1fb;
+    color:#176ac0;
+    font-size:.68rem;
+}
+.authenticated-app .bar-fill{
+    background:#1473d1!important;
+}
+.authenticated-app .trend-bar.completed span:first-child{
+    background:#1e9b45!important;
+}
+.authenticated-app .attention a{
+    border-color:#ead9ae!important;
+    background:#fff9eb!important;
+}
+.authenticated-app .performance>div{
+    border-left-color:#1473d1!important;
+    background:#f7fafc!important;
+}
+
+/* Shared small metadata blocks */
+.authenticated-app .operational-summary-strip{
+    background:#fff;
+    border-color:#d2dce5;
+}
+.authenticated-app .timeline-item{
+    border-left-color:#ed8a23;
+}
+.authenticated-app .flash.success{
+    background:#eaf7ee;
+    color:#176d32;
+    border:1px solid #b6d9bf;
+}
+.authenticated-app .flash.error{
+    background:#fff0ef;
+    color:#9c3029;
+    border:1px solid #e6b2ad;
+}
+
+/* Responsive */
+@media(max-width:1180px){
+    .authenticated-app .portal-workspace-grid{
+        grid-template-columns:210px minmax(0,1fr);
+    }
+    .authenticated-app .portal-workspace-grid>.context-panel{
+        grid-column:1/-1;
+    }
+}
+@media(max-width:900px){
+    .authenticated-app .app-main-nav{
+        overflow-x:auto;
+        scrollbar-width:none;
+    }
+    .authenticated-app .app-main-nav::-webkit-scrollbar{display:none}
+    .authenticated-app .profile-dashboard,
+    .authenticated-app .outlook-mailbox{
+        grid-template-columns:1fr;
+    }
+}
