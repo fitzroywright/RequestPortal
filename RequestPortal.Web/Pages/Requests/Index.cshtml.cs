@@ -24,18 +24,67 @@ public sealed class IndexModel : PageModel
 
     public IReadOnlyList<RequestSummary> Requests { get; private set; } = Array.Empty<RequestSummary>();
 
+    public IReadOnlyList<string> OrganizationOptions { get; private set; } = Array.Empty<string>();
+
+    public IReadOnlyList<string> StatusOptions { get; private set; } = Array.Empty<string>();
+
     public string? Query { get; private set; }
 
-    public async Task OnGetAsync(string? query = null)
+    public string? Organization { get; private set; }
+
+    public string? Status { get; private set; }
+
+    public async Task OnGetAsync(
+        string? query = null,
+        string? organization = null,
+        string? status = null)
     {
         ApplicationUser user = await userManager.GetUserAsync(User)
             ?? throw new InvalidOperationException("Authenticated portal user could not be resolved.");
 
-        Requests = await workflowService.GetRequestsForUserAsync(user.Id, HttpContext.RequestAborted);
+        IReadOnlyList<RequestSummary> allRequests =
+            await workflowService.GetRequestsForUserAsync(user.Id, HttpContext.RequestAborted);
+
+        OrganizationOptions = allRequests
+            .Select(request => request.OrganizationName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        StatusOptions = allRequests
+            .Select(request => request.Status)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         Query = query?.Trim();
+        Organization = organization?.Trim();
+        Status = status?.Trim();
+
+        IEnumerable<RequestSummary> filtered = allRequests;
+
         if (!string.IsNullOrWhiteSpace(Query))
         {
-            Requests = Requests.Where(request => request.PublicReference.Contains(Query, StringComparison.OrdinalIgnoreCase)).ToArray();
+            filtered = filtered.Where(request =>
+                request.PublicReference.Contains(Query, StringComparison.OrdinalIgnoreCase));
         }
+
+        if (!string.IsNullOrWhiteSpace(Organization))
+        {
+            filtered = filtered.Where(request =>
+                string.Equals(request.OrganizationName, Organization, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Status))
+        {
+            filtered = filtered.Where(request =>
+                string.Equals(request.Status, Status, StringComparison.OrdinalIgnoreCase));
+        }
+
+        Requests = filtered
+            .OrderByDescending(request => request.SubmittedUtc ?? request.CreatedUtc)
+            .ToArray();
     }
 }
