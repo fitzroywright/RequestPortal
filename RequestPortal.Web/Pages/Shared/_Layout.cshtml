@@ -71,10 +71,6 @@
             </a>
             <nav class="main-nav @(useApplicationShell ? "app-main-nav" : null)">
 
-                @if (!useApplicationShell)
-                {
-                    <a asp-page="/Index">Home</a>
-                }
                 @if (isAuthenticated)
                 {
                     if (isExternalReviewer)
@@ -86,7 +82,6 @@
                     }
                     else if (isFfpStaff)
                     {
-                        <a asp-page="/Staff/Index">Home</a>
                         <a asp-page="/Staff/Operations">Requests</a>
                         <a asp-page="/Staff/Organizations">Organizations</a>
                         <a asp-page="/Staff/Reports">Reports</a>
