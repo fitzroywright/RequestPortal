@@ -13,6 +13,22 @@
             ? parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant()
             : string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
     }
+
+    string FirstName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "there";
+        return name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "there";
+    }
+
+    string HumanizeStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return string.Empty;
+
+        return string.Concat(status.Select((character, index) =>
+            index > 0 && char.IsUpper(character) && !char.IsUpper(status[index - 1])
+                ? " " + character
+                : character.ToString()));
+    }
 }
 
 <section class="dashboard-mock-page">
@@ -20,8 +36,7 @@
         <header class="dashboard-hero">
             <div>
                 <div class="dashboard-eyebrow">REQUEST WORKSPACE</div>
-                <h1>Hello, @Model.DisplayName</h1>
-                <p>Your requests, messages, documents and organization activity in one workspace.</p>
+                <h1>Hello, @FirstName(Model.DisplayName)</h1>
             </div>
             <div class="dashboard-hero-actions">
                 <a class="dashboard-primary-button" asp-page="/Requests/Create"><span>＋</span> New request</a>
@@ -145,7 +160,7 @@
                                     <td>@request.OrganizationName</td>
                                     <td>
                                         <span class="dashboard-status-pill @statusClass">
-                                            <i></i>@request.Status
+                                            <i></i>@HumanizeStatus(request.Status)
                                         </span>
                                     </td>
                                     <td>@request.CreatedUtc.ToLocalTime().ToString("MMM dd yyyy")</td>
@@ -161,37 +176,6 @@
             </main>
 
             <aside class="dashboard-right-stack">
-                <section class="dashboard-card">
-                    <div class="dashboard-card-head dashboard-card-head-wide">
-                        <span class="dashboard-card-icon">♟</span>
-                        <div class="dashboard-card-head-copy">
-                            <strong>Organizations</strong>
-                            <small>@Model.ApprovedOrganizations approved</small>
-                        </div>
-                        <a class="dashboard-head-link" asp-page="/Organizations/Index">Manage</a>
-                    </div>
-                    <div class="dashboard-organization-list">
-                        @if (Model.Organizations.Count == 0)
-                        {
-                            <div class="dashboard-empty compact">No organization membership yet.</div>
-                        }
-                        else
-                        {
-                            @foreach (OrganizationSummary organization in Model.Organizations.Take(3))
-                            {
-                                <a class="dashboard-organization-row" asp-page="/Organizations/Profile" asp-route-id="@organization.Id">
-                                    <span class="dashboard-org-avatar">@Initials(organization.Name)</span>
-                                    <span>
-                                        <strong>@organization.Name</strong>
-                                        <small>@organization.Role · @organization.MembershipStatus</small>
-                                    </span>
-                                    <b>›</b>
-                                </a>
-                            }
-                        }
-                    </div>
-                </section>
-
                 <section class="dashboard-card">
                     <div class="dashboard-card-head dashboard-card-head-wide">
                         <span class="dashboard-card-icon warning">▲</span>
@@ -211,7 +195,7 @@
                             {
                                 <a asp-page="/Requests/Details" asp-route-id="@request.Id">
                                     <strong>@request.PublicReference</strong>
-                                    <span>@request.Status</span>
+                                    <span>@HumanizeStatus(request.Status)</span>
                                 </a>
                             }
                         }
@@ -244,6 +228,37 @@
                                         </span>
                                         <small>@message.Preview</small>
                                     </span>
+                                </a>
+                            }
+                        }
+                    </div>
+                </section>
+
+                <section class="dashboard-card">
+                    <div class="dashboard-card-head dashboard-card-head-wide">
+                        <span class="dashboard-card-icon">♟</span>
+                        <div class="dashboard-card-head-copy">
+                            <strong>Organizations</strong>
+                            <small>@Model.ApprovedOrganizations approved</small>
+                        </div>
+                        <a class="dashboard-head-link" asp-page="/Organizations/Index">Manage</a>
+                    </div>
+                    <div class="dashboard-organization-list">
+                        @if (Model.Organizations.Count == 0)
+                        {
+                            <div class="dashboard-empty compact">No organization membership yet.</div>
+                        }
+                        else
+                        {
+                            @foreach (OrganizationSummary organization in Model.Organizations.Take(3))
+                            {
+                                <a class="dashboard-organization-row" asp-page="/Organizations/Profile" asp-route-id="@organization.Id">
+                                    <span class="dashboard-org-avatar">@Initials(organization.Name)</span>
+                                    <span>
+                                        <strong>@organization.Name</strong>
+                                        <small>@organization.Role · @organization.MembershipStatus</small>
+                                    </span>
+                                    <b>›</b>
                                 </a>
                             }
                         }
