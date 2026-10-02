@@ -42,7 +42,9 @@
                 <span><strong>Next</strong> @RequestStatusPresentation.Next(Model.Request.Status)</span>
             </section>
 
-            <section id="conversation" class="operational-panel request-messages-card request-messages-always-visible">
+            <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
+                <div class="request-detail-main">
+                    <section id="conversation" class="operational-panel request-messages-card request-messages-always-visible">
                 <div class="panel-titlebar">
                     <div>
                         <strong>Messages about this request</strong>
@@ -138,9 +140,7 @@
                     </form>
                 }
             </section>
-
-            <div class="portal-workspace-grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,.75fr);">
-                <div>
+                    
                     @if (Model.ProjectProposal is not null)
                     {
                         <section id="items" class="operational-panel">
@@ -418,9 +418,24 @@
                 </div>
 
                 <aside class="request-detail-side">
+                    <section class="operational-panel request-status-summary">
+                        <div class="panel-titlebar"><strong>Request status</strong></div>
+                        <div class="request-side-summary">
+                            <span class="status status-@Model.Request.Status">@RequestStatusPresentation.Label(Model.Request.Status)</span>
+                            <dl>
+                                <div><dt>Reference</dt><dd>@Model.Request.PublicReference</dd></div>
+                                <div><dt>Request type</dt><dd>@Model.Request.Kind</dd></div>
+                                <div><dt>Organization</dt><dd>@Model.Request.OrganizationName</dd></div>
+                                <div><dt>Items</dt><dd>@Model.Request.Items.Count</dd></div>
+                                <div><dt>Files</dt><dd>@Model.Documents.Count</dd></div>
+                                <div><dt>Messages</dt><dd>@Model.MessageThreads.Sum(thread => thread.Messages.Count)</dd></div>
+                            </dl>
+                        </div>
+                    </section>
+
                     <section id="history" class="operational-panel request-status-card">
                         <div class="panel-titlebar">
-                            <strong>Current status &amp; history</strong>
+                            <strong>Status history</strong>
                         </div>
                     <div class="timeline">
                         @foreach (RequestHistoryDetail history in Model.Request.History)
