@@ -263,7 +263,17 @@ public sealed class DetailsModel : PageModel
     public async Task<IActionResult> OnPostSubmitAsync(Guid id)
     {
         ApplicationUser user = await GetUserAsync();
-        await workflowService.SubmitRequestAsync(user.Id, id, HttpContext.RequestAborted);
+
+        try
+        {
+            await workflowService.SubmitRequestAsync(user.Id, id, HttpContext.RequestAborted);
+        }
+        catch (RequestSubmissionBlockedException exception)
+        {
+            ModelState.AddModelError(string.Empty, exception.Message);
+            return await LoadPageAsync(user, id);
+        }
+
         TempData["Success"] = "Request submitted to FFP for review.";
         return RedirectToPage(new { id });
     }
