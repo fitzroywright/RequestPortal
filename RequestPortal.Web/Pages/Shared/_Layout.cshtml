@@ -74,27 +74,23 @@
                             @{
                                 string? profileNameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
                                 string? profileGivenName = User.FindFirst(ClaimTypes.GivenName)?.Value;
-                                string profileName = !string.IsNullOrWhiteSpace(profileNameClaim) && !profileNameClaim.Contains('@')
-                                    ? profileNameClaim
-                                    : !string.IsNullOrWhiteSpace(profileGivenName) && !profileGivenName.Contains('@')
-                                        ? profileGivenName
+                                string profileName = !string.IsNullOrWhiteSpace(profileGivenName) && !profileGivenName.Contains('@')
+                                    ? profileGivenName
+                                    : !string.IsNullOrWhiteSpace(profileNameClaim) && !profileNameClaim.Contains('@')
+                                        ? profileNameClaim
                                         : "User";
                                 string[] profileParts = profileName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                string profileInitials = profileParts.Length switch
-                                {
-                                    0 => "U",
-                                    1 => profileParts[0][..Math.Min(2, profileParts[0].Length)].ToUpperInvariant(),
-                                    _ => $"{profileParts[0][0]}{profileParts[^1][0]}".ToUpperInvariant()
-                                };
+                                string profileFirstName = profileParts.Length > 0 ? profileParts[0] : "User";
+                                string profileInitials = profileFirstName[..Math.Min(2, profileFirstName.Length)].ToUpperInvariant();
                             }
-                            <span class="profile-menu-name">@profileName</span>
+                            <span class="profile-menu-name">@profileFirstName</span>
                             <span class="profile-avatar profile-avatar-studio" aria-hidden="true">@profileInitials</span>
                         </button>
                         <div id="profileMenuPanel" class="profile-menu-panel" hidden data-profile-menu-panel>
                             <div class="profile-menu-header">
                                 <span class="profile-avatar profile-avatar-large profile-avatar-studio" aria-hidden="true">@profileInitials</span>
                                 <div>
-                                    <strong>@profileName</strong>
+                                    <strong>@profileFirstName</strong>
                                     <small>@(isFfpStaff ? "FFP Staff" : "Applicant / Representative")</small>
                                 </div>
                             </div>
