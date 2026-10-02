@@ -15,6 +15,20 @@ public sealed class RequestSubmissionPolicy(
 {
     private readonly RequestSubmissionPolicyOptions policy = options.Value;
 
+    public Task ValidateNewRequestAsync(
+        Guid userId,
+        Guid organizationId,
+        RequestKind kind,
+        string summary,
+        CancellationToken cancellationToken = default) =>
+        ValidateCandidateAsync(
+            userId,
+            organizationId,
+            kind,
+            summary,
+            requestId: null,
+            cancellationToken);
+
     public async Task ValidateAsync(
         Guid userId,
         Guid requestId,
@@ -25,20 +39,16 @@ public sealed class RequestSubmissionPolicy(
             return;
         }
 
-        var request = await (
-            from item in dbContext.AssistanceRequests.AsNoTracking()
-            join organization in dbContext.Organizations.AsNoTracking()
-                on item.OrganizationId equals organization.Id
-            where item.Id == requestId
-            select new
+        var request = await dbContext.AssistanceRequests
+            .AsNoTracking()
+            .Where(item => item.Id == requestId)
+            .Select(item => new
             {
                 item.Id,
                 item.OrganizationId,
                 item.CreatedByUserId,
-                item.Status,
                 item.Kind,
-                item.Summary,
-                OrganizationType = organization.OrganizationType
+                item.Summary
             })
             .SingleAsync(cancellationToken);
 
@@ -48,6 +58,30 @@ public sealed class RequestSubmissionPolicy(
                 "Only the person who created this request may submit it.",
                 "RP-SUBMISSION-OWNER");
         }
+
+        await ValidateCandidateAsync(
+            userId,
+            request.OrganizationId,
+            request.Kind,
+            request.Summary ?? string.Empty,
+            request.Id,
+            cancellationToken);
+    }
+
+    private async Task ValidateCandidateAsync(
+        Guid userId,
+        Guid organizationId,
+        RequestKind kind,
+        string summary,
+        Guid? requestId,
+        CancellationToken cancellationToken)
+    {
+        if (!policy.Enabled)
+        {
+            return;
+        }
+
+        DateTimeOffset now = clock.UtcNow;
 
         var user = await dbContext.Users
             .AsNoTracking()
@@ -63,8 +97,6 @@ public sealed class RequestSubmissionPolicy(
             })
             .SingleAsync(cancellationToken);
 
-        DateTimeOffset now = clock.UtcNow;
-
         if (user.LockoutEnabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value > now)
         {
             throw Block(
@@ -79,12 +111,51 @@ public sealed class RequestSubmissionPolicy(
                 "RP-SUBMISSION-UNVERIFIED");
         }
 
-        if (string.Equals(request.OrganizationType, "IndividualContext", StringComparison.Ordinal) &&
-            (string.IsNullOrWhiteSpace(user.DisplayName) || user.IndividualProfileUpdateRequired))
+        var organization = await dbContext.Organizations
+            .AsNoTracking()
+            .Where(item => item.Id == organizationId)
+            .Select(item => new
+            {
+                item.OrganizationType,
+                item.RegistrationNumber,
+                item.Address,
+                item.Phone,
+                item.Email,
+                item.PrimaryContactName
+            })
+            .SingleAsync(cancellationToken);
+
+        bool individualContext = string.Equals(
+            organization.OrganizationType,
+            "IndividualContext",
+            StringComparison.Ordinal);
+
+        if (individualContext)
         {
-            throw Block(
-                "Complete your individual profile before submitting a request.",
-                "RP-SUBMISSION-PROFILE-INCOMPLETE");
+            if (string.IsNullOrWhiteSpace(user.DisplayName) ||
+                user.IndividualProfileUpdateRequired)
+            {
+                throw Block(
+                    "Complete your individual profile before submitting a request.",
+                    "RP-SUBMISSION-PROFILE-INCOMPLETE");
+            }
+        }
+        else
+        {
+            List<string> missingOrganizationFields = [];
+            if (string.IsNullOrWhiteSpace(organization.RegistrationNumber)) missingOrganizationFields.Add("registration number");
+            if (string.IsNullOrWhiteSpace(organization.OrganizationType)) missingOrganizationFields.Add("organization type");
+            if (string.IsNullOrWhiteSpace(organization.Address)) missingOrganizationFields.Add("address");
+            if (string.IsNullOrWhiteSpace(organization.Phone)) missingOrganizationFields.Add("phone");
+            if (string.IsNullOrWhiteSpace(organization.Email)) missingOrganizationFields.Add("email");
+            if (string.IsNullOrWhiteSpace(organization.PrimaryContactName)) missingOrganizationFields.Add("primary contact");
+
+            if (missingOrganizationFields.Count > 0)
+            {
+                throw Block(
+                    $"Complete the organization profile before submitting a request. Missing: {string.Join(", ", missingOrganizationFields)}.",
+                    "RP-SUBMISSION-ORG-PROFILE-INCOMPLETE");
+            }
         }
 
         RequestStatus[] activeStatuses =
@@ -101,7 +172,7 @@ public sealed class RequestSubmissionPolicy(
             .AsNoTracking()
             .CountAsync(
                 item =>
-                    item.Id != requestId &&
+                    (!requestId.HasValue || item.Id != requestId.Value) &&
                     (item.SubmittedByUserId == userId || item.CreatedByUserId == userId) &&
                     activeStatuses.Contains(item.Status),
                 cancellationToken);
@@ -118,7 +189,7 @@ public sealed class RequestSubmissionPolicy(
             .AsNoTracking()
             .CountAsync(
                 item =>
-                    item.Id != requestId &&
+                    (!requestId.HasValue || item.Id != requestId.Value) &&
                     item.SubmittedByUserId == userId &&
                     item.SubmittedUtc >= dayCutoff,
                 cancellationToken);
@@ -135,7 +206,7 @@ public sealed class RequestSubmissionPolicy(
             .AsNoTracking()
             .CountAsync(
                 item =>
-                    item.Id != requestId &&
+                    (!requestId.HasValue || item.Id != requestId.Value) &&
                     item.SubmittedByUserId == userId &&
                     item.SubmittedUtc >= monthCutoff,
                 cancellationToken);
@@ -147,17 +218,36 @@ public sealed class RequestSubmissionPolicy(
                 "RP-SUBMISSION-30D-LIMIT");
         }
 
-        if (policy.DuplicateLookbackDays > 0 && !string.IsNullOrWhiteSpace(request.Summary))
+        int cancelledLast30Days = await dbContext.AssistanceRequests
+            .AsNoTracking()
+            .CountAsync(
+                item =>
+                    (!requestId.HasValue || item.Id != requestId.Value) &&
+                    item.CreatedByUserId == userId &&
+                    item.Status == RequestStatus.Cancelled &&
+                    item.StatusHistory.Any(history =>
+                        history.Status == RequestStatus.Cancelled &&
+                        history.ChangedUtc >= monthCutoff),
+                cancellationToken);
+
+        if (cancelledLast30Days >= policy.MaxCancelledRequestsPer30Days)
+        {
+            throw Block(
+                "Several requests from this account were recently cancelled. New submissions are temporarily limited; please contact Food For The Poor if you still need assistance.",
+                "RP-SUBMISSION-CANCELLATION-LIMIT");
+        }
+
+        if (policy.DuplicateLookbackDays > 0 && !string.IsNullOrWhiteSpace(summary))
         {
             DateTimeOffset duplicateCutoff = now.AddDays(-policy.DuplicateLookbackDays);
-            string normalizedSummary = Normalize(request.Summary);
+            string normalizedSummary = Normalize(summary);
 
             var recentCandidates = await dbContext.AssistanceRequests
                 .AsNoTracking()
                 .Where(item =>
-                    item.Id != requestId &&
-                    item.OrganizationId == request.OrganizationId &&
-                    item.Kind == request.Kind &&
+                    (!requestId.HasValue || item.Id != requestId.Value) &&
+                    item.OrganizationId == organizationId &&
+                    item.Kind == kind &&
                     item.SubmittedUtc >= duplicateCutoff &&
                     item.Status != RequestStatus.Cancelled &&
                     item.Status != RequestStatus.Duplicate)
