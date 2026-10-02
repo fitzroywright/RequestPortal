@@ -25,7 +25,6 @@
                     <p>@Model.Request.Summary</p>
                 </div>
                 <div class="action-row">
-                    <a class="button button-outline" href="#conversation">Conversation</a>
                     <span class="status status-@Model.Request.Status">@RequestStatusPresentation.Label(Model.Request.Status)</span>
                 </div>
             </header>
@@ -33,7 +32,6 @@
             <nav class="request-detail-tabs" aria-label="Request detail sections">
                 <a href="#overview">Overview</a>
                 <a href="#items">Items (@Model.Request.Items.Count)</a>
-                <a href="#conversation">Messages (@Model.MessageThreads.Sum(thread => thread.Messages.Count))</a>
                 <a href="#documents">Files (@Model.Documents.Count)</a>
                 <a href="#history">History (@Model.Request.History.Count)</a>
             </nav>
@@ -44,7 +42,7 @@
                 <span><strong>Next</strong> @RequestStatusPresentation.Next(Model.Request.Status)</span>
             </section>
 
-            <section id="conversation" class="operational-panel request-messages-card">
+            <section id="conversation" class="operational-panel request-messages-card request-messages-always-visible">
                 <div class="panel-titlebar">
                     <div>
                         <strong>Messages about this request</strong>
