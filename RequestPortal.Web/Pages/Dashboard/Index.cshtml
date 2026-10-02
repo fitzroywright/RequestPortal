@@ -3,7 +3,7 @@
 @using RequestPortal.Application.Messages
 @using RequestPortal.Application.Portal
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "Request Workspace";
 
     string Initials(string? name)
     {
@@ -78,6 +78,18 @@
                         <a asp-page="/Messages/New"><span class="dashboard-action-icon">✉</span><span>Send message</span><b>›</b></a>
                         <a asp-page="/Organizations/Index"><span class="dashboard-action-icon">♟</span><span>Organizations</span><b>›</b></a>
                         <a asp-page="/Messages/Inbox"><span class="dashboard-action-icon">▰</span><span>Conversation inbox</span><b>›</b></a>
+                    </nav>
+                </section>
+
+                <section class="dashboard-card">
+                    <div class="dashboard-card-head">
+                        <span class="dashboard-card-icon">↗</span>
+                        <div><strong>Quick Links</strong></div>
+                    </div>
+                    <nav class="dashboard-quick-links">
+                        <a asp-page="/Requests/Create"><span>⊕</span> New request <b>›</b></a>
+                        <a asp-page="/Account/Profile"><span>♟</span> My profile <b>›</b></a>
+                        <a asp-page="/Organizations/Index"><span>♟</span> Organizations <b>›</b></a>
                     </nav>
                 </section>
             </aside>
@@ -238,17 +250,6 @@
                     </div>
                 </section>
 
-                <section class="dashboard-card">
-                    <div class="dashboard-card-head">
-                        <span class="dashboard-card-icon">↗</span>
-                        <div><strong>Quick Links</strong></div>
-                    </div>
-                    <nav class="dashboard-quick-links">
-                        <a asp-page="/Requests/Create"><span>⊕</span> New request <b>›</b></a>
-                        <a asp-page="/Account/Profile"><span>♟</span> My profile <b>›</b></a>
-                        <a asp-page="/Organizations/Index"><span>♟</span> Organizations <b>›</b></a>
-                    </nav>
-                </section>
             </aside>
         </div>
     </div>
