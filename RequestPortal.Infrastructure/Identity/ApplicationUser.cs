@@ -23,6 +23,8 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public string? NationalIdTrn { get; set; }
     public string? MaritalStatus { get; set; }
     public string? HomeAddress { get; set; }
+    public string? HomeAddressLine2 { get; set; }
+    public string? Town { get; set; }
     public string? Parish { get; set; }
     public string? DistrictArea { get; set; }
     public string? AlternativePhoneNumber { get; set; }
@@ -45,7 +47,8 @@ public sealed class ApplicationUser : IdentityUser<Guid>
         if (string.IsNullOrWhiteSpace(Gender)) missing.Add("gender");
         if (string.IsNullOrWhiteSpace(NationalIdTrn)) missing.Add("national ID / TRN");
         if (string.IsNullOrWhiteSpace(MaritalStatus)) missing.Add("marital status");
-        if (string.IsNullOrWhiteSpace(HomeAddress)) missing.Add("home address");
+        if (string.IsNullOrWhiteSpace(HomeAddress)) missing.Add("address line 1");
+        if (string.IsNullOrWhiteSpace(Town)) missing.Add("town");
         if (string.IsNullOrWhiteSpace(Parish)) missing.Add("parish");
         if (string.IsNullOrWhiteSpace(DistrictArea)) missing.Add("district / area");
         if (string.IsNullOrWhiteSpace(EmploymentStatus)) missing.Add("employment status");
