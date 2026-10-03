@@ -261,9 +261,8 @@
                         <div class="workspace-heading">
                             <div>
                                 <h2>Requested goods &amp; services</h2>
-                                <p>Add each requested item or service as a separate row.</p>
+                                <p>Edit directly in the grid. Start typing in the blank row to add another item or service.</p>
                             </div>
-                            <button class="button button-outline button-small" type="button" id="add-item-row">Add row</button>
                         </div>
 
                         <div class="goods-grid-wrap">
@@ -488,11 +487,56 @@
         });
     }
 
-    document.getElementById('add-item-row')?.addEventListener('click', () => {
+    function rowHasUserData(row) {
+        const itemName = row.querySelector('[data-field="ItemName"], input[name$=".ItemName"]')?.value?.trim() || '';
+        const description = row.querySelector('[data-field="Description"], input[name$=".Description"]')?.value?.trim() || '';
+        const notes = row.querySelector('[data-field="Notes"], input[name$=".Notes"]')?.value?.trim() || '';
+        const unit = row.querySelector('[data-field="UnitOfMeasureId"], select[name$=".UnitOfMeasureId"]')?.value || '';
+        const quantity = row.querySelector('[data-field="Quantity"], input[name$=".Quantity"]')?.value || '';
+
+        return itemName.length > 0 ||
+            description.length > 0 ||
+            notes.length > 0 ||
+            unit.length > 0 ||
+            (quantity.length > 0 && quantity !== '1' && quantity !== '1.0' && quantity !== '1.00' && quantity !== '1.000');
+    }
+
+    function appendBlankRow() {
+        if (!rows || !rowTemplate) return;
         const fragment = rowTemplate.content.cloneNode(true);
         rows.appendChild(fragment);
         renumberRows();
-        rows.lastElementChild?.querySelector('input')?.focus();
+    }
+
+    function ensureSpareRow() {
+        if (!rows) return;
+
+        const rowList = Array.from(rows.querySelectorAll('[data-item-row]'));
+        if (rowList.length === 0) {
+            appendBlankRow();
+            return;
+        }
+
+        const lastRow = rowList[rowList.length - 1];
+        if (rowHasUserData(lastRow)) {
+            appendBlankRow();
+        }
+
+        const refreshed = Array.from(rows.querySelectorAll('[data-item-row]'));
+        for (let index = refreshed.length - 2; index >= 0; index--) {
+            if (rowHasUserData(refreshed[index])) break;
+            refreshed[index].remove();
+        }
+
+        renumberRows();
+    }
+
+    rows?.addEventListener('input', event => {
+        if (event.target.closest('input,textarea')) ensureSpareRow();
+    });
+
+    rows?.addEventListener('change', event => {
+        if (event.target.closest('select,input')) ensureSpareRow();
     });
 
     rows?.addEventListener('click', event => {
@@ -505,7 +549,7 @@
             return;
         }
         button.closest('[data-item-row]')?.remove();
-        renumberRows();
+        ensureSpareRow();
     });
 
     document.getElementById('goods-grid')?.addEventListener('keydown', event => {
@@ -524,16 +568,14 @@
         const rowIndex = rowList.indexOf(currentRow);
         const cellIndex = Array.from(currentRow.children).indexOf(currentCell);
 
-        if (rowIndex === rowList.length - 1) {
-            const fragment = rowTemplate.content.cloneNode(true);
-            rows.appendChild(fragment);
-            renumberRows();
-        }
+        ensureSpareRow();
 
         const nextRow = rows.querySelectorAll('[data-item-row]')[rowIndex + 1];
         const nextCell = nextRow?.children[cellIndex];
         nextCell?.querySelector('input,select')?.focus();
     });
+
+    ensureSpareRow();
 
     document.querySelectorAll('.doc-check').forEach(check => {
         const fileInput = document.getElementById(check.dataset.files);
@@ -558,7 +600,9 @@
         document.getElementById('review-summary').textContent = document.getElementById('Input_Summary')?.value || '—';
 
         if (kind === 'GoodsAndServices') {
-            const itemCount = rows?.querySelectorAll('[data-item-row]').length || 0;
+            const itemCount = rows
+                ? Array.from(rows.querySelectorAll('[data-item-row]')).filter(rowHasUserData).length
+                : 0;
             document.getElementById('review-content').textContent = itemCount + (itemCount === 1 ? ' requested item/service' : ' requested items/services');
         } else {
             const text = projectEditor?.innerText.trim() || '';
