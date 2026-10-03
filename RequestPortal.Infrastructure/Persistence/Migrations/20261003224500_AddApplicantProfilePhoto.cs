@@ -1,10 +1,14 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using RequestPortal.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace RequestPortal.Infrastructure.Persistence.Migrations;
 
+[DbContext(typeof(RequestPortalDbContext))]
+[Migration("20261003224500_AddApplicantProfilePhoto")]
 public partial class AddApplicantProfilePhoto : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
