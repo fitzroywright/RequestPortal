@@ -40,6 +40,7 @@ public sealed record OrganizationProfile(
     decimal? AnnualOperatingBudget,
     string? PrimaryFundingSources,
     string? PremisesSituation,
+    string? ReferralSource,
     DateOnly? RegistrationExpiryDate);
 
 public sealed record OrganizationProfileUpdate(
@@ -74,6 +75,7 @@ public sealed record OrganizationProfileUpdate(
     decimal? AnnualOperatingBudget,
     string? PrimaryFundingSources,
     string? PremisesSituation,
+    string? ReferralSource,
     DateOnly? RegistrationExpiryDate);
 
 public interface IOrganizationProfileService
