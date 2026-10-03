@@ -53,7 +53,6 @@ public sealed class ReviewModel : PageModel
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
 
     [BindProperty, StringLength(4000)] public string DecisionReason { get; set; } = string.Empty;
-    [BindProperty, StringLength(4000)] public string RejectionReason { get; set; } = string.Empty;
     [BindProperty, StringLength(4000)] public string DuplicateReason { get; set; } = string.Empty;
 
     public async Task<IActionResult> OnGetAsync(Guid id)
@@ -91,14 +90,6 @@ public sealed class ReviewModel : PageModel
         return File(export.Content, export.ContentType, export.FileName);
     }
 
-    public async Task<IActionResult> OnPostApproveAsync(Guid id)
-    {
-        ApplicationUser staffUser = await GetStaffUserAsync();
-        await workflowService.ApproveRequestAsync(staffUser.Id, id, HttpContext.RequestAborted);
-        TempData["Success"] = "Request approved.";
-        return RedirectToPage("/Staff/Index");
-    }
-
     public async Task<IActionResult> OnPostMoreInformationAsync(Guid id)
     {
         ApplicationUser staffUser = await GetStaffUserAsync();
@@ -110,20 +101,6 @@ public sealed class ReviewModel : PageModel
 
         await workflowService.RequestMoreInformationAsync(staffUser.Id, id, DecisionReason.Trim(), HttpContext.RequestAborted);
         TempData["Success"] = "The organization will see that more information is required.";
-        return RedirectToPage("/Staff/Index");
-    }
-
-    public async Task<IActionResult> OnPostRejectAsync(Guid id)
-    {
-        ApplicationUser staffUser = await GetStaffUserAsync();
-        if (string.IsNullOrWhiteSpace(RejectionReason))
-        {
-            ModelState.AddModelError(nameof(RejectionReason), "A rejection reason is required.");
-            return await LoadPageAsync(staffUser, id);
-        }
-
-        await workflowService.RejectRequestAsync(staffUser.Id, id, RejectionReason.Trim(), HttpContext.RequestAborted);
-        TempData["Success"] = "Request rejected and status history updated.";
         return RedirectToPage("/Staff/Index");
     }
 
