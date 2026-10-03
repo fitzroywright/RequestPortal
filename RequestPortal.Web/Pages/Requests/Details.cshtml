@@ -73,6 +73,10 @@
             <nav class="mock-tabs" aria-label="Request detail sections">
                 <a class="is-active" href="#summary">Overview</a>
                 <a href="#items">Items (@Model.Request.Items.Count)</a>
+                @if (Model.Deliveries.Count > 0)
+                {
+                    <a href="#delivery">Delivery</a>
+                }
                 <a href="#messages">Messages (@requestMessages.Length)</a>
                 <a href="#files">Files (@Model.Documents.Count)</a>
                 <a href="#history">History (@Model.Request.History.Count)</a>
@@ -174,6 +178,170 @@
                             </details>
                         }
                     </section>
+
+                    @if (Model.Deliveries.Count > 0)
+                    {
+                        <section id="delivery" class="mock-panel">
+                            <div class="mock-panel-head">
+                                <div class="mock-panel-title">
+                                    <span class="mock-panel-icon">✓</span>
+                                    <strong>Delivery</strong>
+                                </div>
+                            </div>
+                            <div class="capstone-delivery-list">
+                                @foreach (DeliveryView delivery in Model.Deliveries)
+                                {
+                                    DeliveryLineSnapshot[] lines = DetailsModel.ReadDeliveryLines(delivery.SnapshotJson);
+                                    <article class="capstone-delivery">
+                                        <div class="capstone-delivery-summary">
+                                            <div>
+                                                <strong>@delivery.DocumentReference</strong>
+                                                <span>@(delivery.RecipientConfirmedUtc.HasValue ? "Receipt confirmed" : "Confirmation required")</span>
+                                            </div>
+                                            <small>@delivery.CreatedUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</small>
+                                        </div>
+
+                                        <div class="mock-table-wrap capstone-table-wrap">
+                                            <table class="mock-table">
+                                                <thead><tr><th>Item</th><th>Expected</th><th>Received</th></tr></thead>
+                                                <tbody>
+                                                @if (delivery.RecipientConfirmedUtc.HasValue)
+                                                {
+                                                    foreach (RecipientConfirmedLine line in delivery.ConfirmedLines ?? Array.Empty<RecipientConfirmedLine>())
+                                                    {
+                                                        <tr>
+                                                            <td>@line.Description</td>
+                                                            <td>@line.ExpectedQuantity @(line.UnitOfMeasure ?? "")</td>
+                                                            <td>@line.ReceivedQuantity @(line.UnitOfMeasure ?? "")</td>
+                                                        </tr>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    for (int i = 0; i < lines.Length; i++)
+                                                    {
+                                                        <tr>
+                                                            <td>@lines[i].Description</td>
+                                                            <td>@lines[i].Quantity @(lines[i].UnitOfMeasure ?? "")</td>
+                                                            <td>Awaiting confirmation</td>
+                                                        </tr>
+                                                    }
+                                                }
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        @if (!delivery.RecipientConfirmedUtc.HasValue)
+                                        {
+                                            <form method="post" asp-page-handler="ConfirmReceipt" class="capstone-form">
+                                                <input type="hidden" name="id" value="@Model.Request.Id" />
+                                                <input type="hidden" name="ConfirmationDeliveryId" value="@delivery.Id" />
+                                                <h3>Confirm what you received</h3>
+                                                @for (int i = 0; i < lines.Length; i++)
+                                                {
+                                                    <label class="capstone-quantity-row">
+                                                        <span>@lines[i].Description</span>
+                                                        <input type="number"
+                                                               name="ReceivedQuantities"
+                                                               min="0"
+                                                               max="@lines[i].Quantity"
+                                                               step="0.001"
+                                                               value="@lines[i].Quantity"
+                                                               required />
+                                                        <small>@(lines[i].UnitOfMeasure ?? "unit")</small>
+                                                    </label>
+                                                }
+                                                <div class="capstone-problem-grid">
+                                                    <label>
+                                                        Delivery problem
+                                                        <select name="DeliveryProblemType">
+                                                            <option value="">No additional problem</option>
+                                                            <option value="MissingItem">Missing item</option>
+                                                            <option value="IncorrectItem">Incorrect item</option>
+                                                            <option value="IncorrectQuantity">Incorrect quantity</option>
+                                                            <option value="DamagedItem">Damaged item</option>
+                                                            <option value="Other">Other</option>
+                                                        </select>
+                                                    </label>
+                                                    <label>
+                                                        Details
+                                                        <textarea name="DeliveryProblemDetail" rows="2" maxlength="2000" placeholder="Describe any delivery problem."></textarea>
+                                                    </label>
+                                                </div>
+                                                <button class="mock-blue-button" type="submit">Confirm receipt</button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            @if ((delivery.Discrepancies?.Count ?? 0) > 0)
+                                            {
+                                                <div class="capstone-notice">
+                                                    <strong>Delivery difference reported</strong>
+                                                    <span>Food For The Poor has been notified through the existing request workflow.</span>
+                                                </div>
+                                            }
+
+                                            @if (delivery.ReturnsPermitted)
+                                            {
+                                                <details class="capstone-return">
+                                                    <summary>Request a return</summary>
+                                                    <form method="post" asp-page-handler="InitiateReturn" class="capstone-form">
+                                                        <input type="hidden" name="id" value="@Model.Request.Id" />
+                                                        <input type="hidden" name="ReturnDeliveryId" value="@delivery.Id" />
+                                                        <label>
+                                                            Item
+                                                            <select name="ReturnItemDescription" required>
+                                                                <option value="">Choose item</option>
+                                                                @foreach (RecipientConfirmedLine line in delivery.ConfirmedLines ?? Array.Empty<RecipientConfirmedLine>())
+                                                                {
+                                                                    if (line.ReceivedQuantity > 0)
+                                                                    {
+                                                                        <option value="@line.Description">@line.Description</option>
+                                                                    }
+                                                                }
+                                                            </select>
+                                                        </label>
+                                                        <label>
+                                                            Quantity
+                                                            <input type="number" name="ReturnQuantity" min="0.001" step="0.001" required />
+                                                        </label>
+                                                        <label>
+                                                            Reason
+                                                            <textarea name="ReturnReason" rows="3" maxlength="2000" required></textarea>
+                                                        </label>
+                                                        <button class="mock-blue-button" type="submit">Submit return request</button>
+                                                    </form>
+                                                </details>
+                                            }
+                                        }
+
+                                        @{
+                                            DeliveryReturnView[] deliveryReturns = Model.DeliveryReturns
+                                                .Where(item => item.DeliveryId == delivery.Id)
+                                                .ToArray();
+                                        }
+                                        @if (deliveryReturns.Length > 0)
+                                        {
+                                            <div class="capstone-return-status">
+                                                <strong>Return status</strong>
+                                                @foreach (DeliveryReturnView item in deliveryReturns)
+                                                {
+                                                    <div>
+                                                        <span>@item.ItemDescription · @item.Quantity</span>
+                                                        <b>@item.Status</b>
+                                                        @if (!string.IsNullOrWhiteSpace(item.StatusDetail))
+                                                        {
+                                                            <small>@item.StatusDetail</small>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </article>
+                                }
+                            </div>
+                        </section>
+                    }
 
                     <section id="messages" class="mock-panel mock-messages-panel">
                         <div class="mock-panel-head">
@@ -377,6 +545,7 @@
 .mock-table th{padding:11px 15px;text-align:left;background:#eef3f7;color:#1f354b;font-weight:800;border-right:1px solid #dbe2e8}
 .mock-table td{padding:10px 15px;border-top:1px solid #e1e6eb;border-right:1px solid #e1e6eb}.mock-table tbody tr:nth-child(even){background:#fbfcfd}
 .mock-empty{padding:17px 18px;color:#66788a;font-size:13px}.mock-project-body{padding:16px}
+.capstone-delivery-list{display:grid;gap:0}.capstone-delivery{padding:16px 18px;border-bottom:1px solid #e1e6eb}.capstone-delivery:last-child{border-bottom:0}.capstone-delivery-summary{display:flex;justify-content:space-between;gap:14px;align-items:start;margin-bottom:10px}.capstone-delivery-summary div{display:grid;gap:3px}.capstone-delivery-summary span,.capstone-delivery-summary small{color:#63778a;font-size:12px}.capstone-table-wrap{padding:0 0 12px}.capstone-form{display:grid;gap:10px;padding:12px 0}.capstone-form h3{margin:0;color:#172f48;font-size:14px}.capstone-form label{display:grid;gap:4px;color:#334c63;font-size:12px;font-weight:700}.capstone-form input,.capstone-form select,.capstone-form textarea{min-height:34px;border:1px solid #b8c7d5;border-radius:4px;padding:7px 8px;font:inherit}.capstone-quantity-row{grid-template-columns:minmax(180px,1fr) 120px 80px!important;align-items:center}.capstone-quantity-row small{color:#687b8e;font-weight:500}.capstone-problem-grid{display:grid;grid-template-columns:220px 1fr;gap:10px}.capstone-notice{display:grid;gap:3px;margin:8px 0;padding:10px 12px;border:1px solid #efc14f;border-radius:4px;background:#fff8dc;font-size:12px}.capstone-return{margin-top:8px;border-top:1px solid #e1e6eb;padding-top:10px}.capstone-return summary{color:#0f67c7;font-size:12px;font-weight:700;cursor:pointer}.capstone-return-status{display:grid;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid #e1e6eb;font-size:12px}.capstone-return-status>div{display:grid;grid-template-columns:1fr auto;gap:4px 10px}.capstone-return-status small{grid-column:1/-1;color:#687b8e}
 .mock-message-list{padding:0 18px}.mock-message-row{display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;padding:13px 2px;border-bottom:1px solid #e0e6eb}
 .mock-avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font-size:12px;font-weight:800}.mock-avatar.is-requester{background:#0f72d3;color:#fff}.mock-avatar.is-staff{background:#8d969e;color:#fff}
 .mock-message-meta{display:flex;align-items:center;gap:12px;margin-bottom:4px}.mock-message-meta strong{font-size:13px}.mock-message-meta span{font-size:12px;color:#657789}.mock-message-more{margin-left:auto;font-weight:900}
@@ -397,5 +566,5 @@
 .mock-submit-row{display:flex;justify-content:flex-end}.mock-cancel-panel .mock-panel-head{background:#fffafa}.mock-cancel-form{padding:14px 16px 17px}.mock-cancel-form p{margin:0 0 10px;color:#66788a;font-size:12px}
 .proposal-document{margin-top:12px;padding:14px;border:1px solid #e0e6eb;background:#fff;line-height:1.55}.proposal-document table{width:100%;border-collapse:collapse}.proposal-document td,.proposal-document th{border:1px solid #dbe2e8;padding:6px}.proposal-document img{max-width:100%;height:auto}
 @@media(max-width:1050px){.mock-detail-grid{grid-template-columns:1fr}.mock-detail-side{grid-template-columns:repeat(2,minmax(0,1fr))}.mock-summary-content{grid-template-columns:1fr}}
-@@media(max-width:720px){.mock-request-shell{width:calc(100% - 18px)}.mock-request-header{align-items:flex-start;flex-direction:column}.mock-tabs{overflow-x:auto}.mock-detail-side{grid-template-columns:1fr}.mock-summary-list>div,.mock-summary-description dl>div,.mock-side-list>div,.mock-related-list>div{grid-template-columns:1fr}.mock-form-row{grid-template-columns:1fr}}
+@@media(max-width:720px){.capstone-quantity-row{grid-template-columns:1fr!important}.capstone-problem-grid{grid-template-columns:1fr}.mock-request-shell{width:calc(100% - 18px)}.mock-request-header{align-items:flex-start;flex-direction:column}.mock-tabs{overflow-x:auto}.mock-detail-side{grid-template-columns:1fr}.mock-summary-list>div,.mock-summary-description dl>div,.mock-side-list>div,.mock-related-list>div{grid-template-columns:1fr}.mock-form-row{grid-template-columns:1fr}}
 </style>

@@ -24,7 +24,9 @@ public sealed class DeliveryRecord
         string recipientName,
         string? deliveryPerson,
         DateTimeOffset createdUtc,
-        DateTimeOffset? accessExpiresUtc = null)
+        DateTimeOffset? accessExpiresUtc = null,
+        string? ffpDeliveryOrderId = null,
+        bool returnsPermitted = false)
     {
         if (id == Guid.Empty) throw new ArgumentException("Delivery id is required.", nameof(id));
         if (requestId == Guid.Empty) throw new ArgumentException("Request id is required.", nameof(requestId));
@@ -42,6 +44,8 @@ public sealed class DeliveryRecord
         AccessTokenHash = accessTokenHash;
         RecipientName = recipientName.Trim();
         DeliveryPerson = Normalize(deliveryPerson);
+        FfpDeliveryOrderId = Normalize(ffpDeliveryOrderId) ?? DocumentReference;
+        ReturnsPermitted = returnsPermitted;
         Status = DeliveryStatus.Ready;
         CreatedUtc = createdUtc;
         AccessExpiresUtc = accessExpiresUtc ?? createdUtc.AddDays(30);
@@ -56,6 +60,8 @@ public sealed class DeliveryRecord
     public string AccessTokenHash { get; private set; } = string.Empty;
     public string RecipientName { get; private set; } = string.Empty;
     public string? DeliveryPerson { get; private set; }
+    public string FfpDeliveryOrderId { get; private set; } = string.Empty;
+    public bool ReturnsPermitted { get; private set; }
     public DeliveryStatus Status { get; private set; }
     public string? AcknowledgedBy { get; private set; }
     public DateTimeOffset CreatedUtc { get; private set; }
@@ -65,6 +71,12 @@ public sealed class DeliveryRecord
     public string? SignatureData { get; private set; }
     public string? Notes { get; private set; }
     public DateTimeOffset? SyncedToFfpManagerUtc { get; private set; }
+
+    public Guid? ConfirmedByUserId { get; private set; }
+    public DateTimeOffset? RecipientConfirmedUtc { get; private set; }
+    public string? RecipientConfirmationJson { get; private set; }
+    public string? RecipientDiscrepancyJson { get; private set; }
+    public DateTimeOffset? RecipientConfirmationSyncedUtc { get; private set; }
 
     public bool IsAccessActive(DateTimeOffset now) => now < AccessExpiresUtc;
 
@@ -97,6 +109,38 @@ public sealed class DeliveryRecord
         SignatureData = Normalize(signatureData);
         EvidenceDocumentId = evidenceDocumentId;
         Notes = Normalize(notes);
+    }
+
+    public void ConfirmRecipientReceipt(
+        Guid userId,
+        DateTimeOffset confirmedUtc,
+        string confirmationJson,
+        string? discrepancyJson)
+    {
+        if (userId == Guid.Empty) throw new ArgumentException("Recipient user is required.", nameof(userId));
+        if (RecipientConfirmedUtc.HasValue)
+            throw new InvalidOperationException("Receipt has already been confirmed for this delivery.");
+        if (string.IsNullOrWhiteSpace(confirmationJson))
+            throw new ArgumentException("Recipient confirmation details are required.", nameof(confirmationJson));
+
+        ConfirmedByUserId = userId;
+        RecipientConfirmedUtc = confirmedUtc;
+        RecipientConfirmationJson = confirmationJson;
+        RecipientDiscrepancyJson = Normalize(discrepancyJson);
+        RecipientConfirmationSyncedUtc = null;
+    }
+
+    public void MarkRecipientConfirmationSynced(DateTimeOffset syncedUtc)
+    {
+        if (!RecipientConfirmedUtc.HasValue)
+            throw new InvalidOperationException("A recipient confirmation must exist before it can be marked synchronized.");
+
+        RecipientConfirmationSyncedUtc = syncedUtc;
+    }
+
+    public void UpdateReturnPermission(bool permitted)
+    {
+        ReturnsPermitted = permitted;
     }
 
     public void MarkSynced(DateTimeOffset syncedUtc)
