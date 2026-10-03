@@ -3,17 +3,18 @@
 @using RequestPortal.Application.Messages
 @using RequestPortal.Domain.Messages
 @{
-    ViewData["Title"] = "New Message";
+    bool isStaffRequestMessage = Model.IsStaff && Model.RequestId.HasValue;
+    ViewData["Title"] = isStaffRequestMessage ? "Message Representative" : "New Message";
 }
 
 <section class="section message-compose-page">
     <div class="shell message-compose-shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">Messages</div>
-            <h1>New message</h1>
+            <h1>@(isStaffRequestMessage ? "Message representative" : "New message")</h1>
             @if (Model.IsStaff)
             {
-                <p>Send a message from the shared FFP Staff mailbox.</p>
+                <p>@(isStaffRequestMessage ? "Send a message about this request from the shared FFP Staff mailbox." : "Send a message from the shared FFP Staff mailbox.")</p>
             }
             else
             {
@@ -130,62 +131,179 @@
         }
         else
         {
-            <form method="get" class="card" style="margin-bottom:20px">
-                <label for="organizationId">Organization</label>
-                <select id="organizationId" name="OrganizationId" onchange="this.form.submit()">
-                    <option value="">Choose organization</option>
-                    @foreach (var organization in Model.Organizations)
-                    {
-                        <option value="@organization.Id"
-                                selected="@(Model.OrganizationId == organization.Id ? "selected" : null)">
-                            @organization.Name
-                        </option>
-                    }
-                </select>
+            <div class="staff-compose-workspace">
                 @if (Model.RequestId.HasValue)
                 {
-                    <input type="hidden" name="RequestId" value="@Model.RequestId" />
+                    <div class="staff-compose-context">
+                        <div>
+                            <span class="staff-compose-context-label">Request</span>
+                            <strong>@(Model.RequestReference ?? "Linked request")</strong>
+                        </div>
+                        <div>
+                            <span class="staff-compose-context-label">Organization</span>
+                            <strong>@(Model.RequestOrganizationName ?? Model.Organizations.FirstOrDefault(item => item.Id == Model.OrganizationId)?.Name ?? "Organization")</strong>
+                        </div>
+                        <a class="button button-small button-outline"
+                           asp-page="/Staff/Review"
+                           asp-route-id="@Model.RequestId">Back to request</a>
+                    </div>
                 }
-            </form>
+                else
+                {
+                    <form method="get" class="staff-compose-context staff-compose-context-select">
+                        <div class="staff-compose-organization">
+                            <label for="organizationId">Organization</label>
+                            <select id="organizationId" name="OrganizationId" onchange="this.form.submit()">
+                                <option value="">Choose organization</option>
+                                @foreach (var organization in Model.Organizations)
+                                {
+                                    <option value="@organization.Id"
+                                            selected="@(Model.OrganizationId == organization.Id ? "selected" : null)">
+                                        @organization.Name
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    </form>
+                }
 
-            @if (Model.OrganizationId.HasValue)
-            {
-                <form method="post" class="card">
-                    <input type="hidden" asp-for="OrganizationId" />
-                    <input type="hidden" asp-for="RequestId" />
-                    <div asp-validation-summary="All" class="validation message-compose-validation"></div>
+                @if (Model.OrganizationId.HasValue)
+                {
+                    <form method="post" class="staff-compose-card">
+                        <input type="hidden" asp-for="OrganizationId" />
+                        <input type="hidden" asp-for="RequestId" />
+                        <div asp-validation-summary="All" class="validation message-compose-validation"></div>
 
-                    <label asp-for="Audience">Audience</label>
-                    <select asp-for="Audience">
-                        <option value="@MessageAudience.Individual">Individual</option>
-                        <option value="@MessageAudience.Organization">Organization</option>
-                        <option value="@MessageAudience.OrganizationManager">Organization Manager</option>
-                        <option value="@MessageAudience.FfpInternal">FFP Internal</option>
-                    </select>
-                    <span asp-validation-for="Audience" class="validation"></span>
+                        <div class="staff-compose-section">
+                            <div class="staff-compose-section-title">
+                                <strong>Recipients</strong>
+                                <span>Choose who should receive this message.</span>
+                            </div>
+                            <div class="staff-compose-recipient-grid">
+                                <div class="field">
+                                    <label asp-for="Audience">Audience</label>
+                                    <select asp-for="Audience">
+                                        <option value="@MessageAudience.Individual">Individual representative</option>
+                                        <option value="@MessageAudience.Organization">Organization</option>
+                                        <option value="@MessageAudience.OrganizationManager">Organization Manager</option>
+                                        <option value="@MessageAudience.FfpInternal">FFP Internal</option>
+                                    </select>
+                                    <span asp-validation-for="Audience" class="validation"></span>
+                                </div>
 
-                    <label asp-for="RecipientUserId">Recipient</label>
-                    <select asp-for="RecipientUserId">
-                        <option value="">Choose representative</option>
-                        @foreach (MessageRecipientOption recipient in Model.Recipients)
-                        {
-                            <option value="@recipient.UserId">
-                                @recipient.DisplayName
-                            </option>
-                        }
-                    </select>
-                    <span asp-validation-for="RecipientUserId" class="validation"></span>
+                                <div class="field">
+                                    <label asp-for="RecipientUserId">Representative</label>
+                                    <select asp-for="RecipientUserId">
+                                        <option value="">Choose representative</option>
+                                        @foreach (MessageRecipientOption recipient in Model.Recipients)
+                                        {
+                                            <option value="@recipient.UserId">@recipient.DisplayName</option>
+                                        }
+                                    </select>
+                                    <span asp-validation-for="RecipientUserId" class="validation"></span>
+                                    <small>Required when the audience is an individual representative.</small>
+                                </div>
+                            </div>
+                        </div>
 
-                    <label asp-for="Subject">Subject</label>
-                    <input asp-for="Subject" maxlength="300" />
+                        <div class="staff-compose-section">
+                            <div class="field">
+                                <label asp-for="Subject">Subject</label>
+                                <input asp-for="Subject" maxlength="300" placeholder="Message subject" />
+                            </div>
 
-                    <label asp-for="Body">Message</label>
-                    <textarea asp-for="Body" rows="8" maxlength="10000"></textarea>
-                    <span asp-validation-for="Body" class="validation"></span>
+                            <div class="field staff-compose-message-field">
+                                <label asp-for="Body">Message</label>
+                                <textarea asp-for="Body"
+                                          rows="10"
+                                          maxlength="10000"
+                                          placeholder="Write your message to the representative..."></textarea>
+                                <span asp-validation-for="Body" class="validation"></span>
+                            </div>
+                        </div>
 
-                    <button class="button" type="submit">Send message</button>
-                </form>
-            }
+                        <div class="staff-compose-footer">
+                            @if (Model.RequestId.HasValue)
+                            {
+                                <details class="message-attachment-menu">
+                                    <summary class="button button-small button-outline" title="Link a request document">📎 Attach document</summary>
+                                    <div class="message-attachment-picker">
+                                        @if (Model.AvailableAttachments.Any(item => !item.IsArchived))
+                                        {
+                                            <strong>Link request documents</strong>
+                                            @foreach (var document in Model.AvailableAttachments.Where(item => !item.IsArchived))
+                                            {
+                                                <label class="check-row">
+                                                    <input type="checkbox" name="AttachmentDocumentIds" value="@document.Id" />
+                                                    <span>@document.OriginalFileName</span>
+                                                </label>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="muted">No request documents are available to link.</span>
+                                        }
+                                    </div>
+                                </details>
+                            }
+
+                            <div class="staff-compose-send">
+                                <a class="button button-outline"
+                                   asp-page="@(Model.RequestId.HasValue ? "/Staff/Review" : "/Messages/Inbox")"
+                                   asp-route-id="@Model.RequestId">Cancel</a>
+                                <button class="button" type="submit">Send message</button>
+                            </div>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <div class="card">
+                        <strong>Choose an organization first.</strong>
+                        <p class="muted">Select the organization whose representative you want to message.</p>
+                    </div>
+                }
+            </div>
         }
     </div>
 </section>
+
+
+<style>
+.message-compose-page{padding:22px 0 64px}
+.message-compose-page .message-compose-shell{width:min(1180px,calc(100% - 28px))}
+.staff-compose-workspace{display:grid;gap:10px}
+.staff-compose-context{display:grid;grid-template-columns:minmax(180px,.7fr) minmax(260px,1.3fr) auto;gap:12px;align-items:end;padding:10px 12px;border:1px solid #cfd7df;border-radius:6px;background:#f7f9fb}
+.staff-compose-context>div{display:grid;gap:2px;min-width:0}
+.staff-compose-context-label,.staff-compose-context label{color:#667384;font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.staff-compose-context strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.staff-compose-context-select{grid-template-columns:minmax(320px,560px)}
+.staff-compose-organization{display:grid;gap:5px}
+.staff-compose-organization select,.staff-compose-card input,.staff-compose-card select,.staff-compose-card textarea{width:100%;border:1px solid #bfc9d2;border-radius:5px;background:#fff}
+.staff-compose-organization select,.staff-compose-card input,.staff-compose-card select{min-height:40px;padding:7px 10px}
+.staff-compose-card{border:1px solid #cfd7df;border-radius:7px;background:#fff;overflow:visible}
+.staff-compose-section{display:grid;gap:14px;padding:16px;border-bottom:1px solid #e3e8ed}
+.staff-compose-section-title{display:flex;align-items:baseline;gap:10px}
+.staff-compose-section-title strong{font-size:.95rem}
+.staff-compose-section-title span{color:#667384;font-size:.82rem}
+.staff-compose-recipient-grid{display:grid;grid-template-columns:minmax(220px,.7fr) minmax(320px,1.3fr);gap:12px}
+.staff-compose-card .field{gap:5px}
+.staff-compose-card .field label{font-size:.8rem}
+.staff-compose-card .field small{color:#667384;font-size:.75rem}
+.staff-compose-card textarea{min-height:220px;padding:10px 12px;resize:vertical}
+.staff-compose-message-field{margin-top:2px}
+.staff-compose-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:#f7f9fb}
+.staff-compose-send{display:flex;gap:8px;margin-left:auto}
+.staff-compose-footer .button{min-height:38px;border-radius:5px}
+.staff-compose-footer .message-attachment-menu{position:relative}
+.staff-compose-footer .message-attachment-menu>summary{list-style:none}
+.staff-compose-footer .message-attachment-menu>summary::-webkit-details-marker{display:none}
+.staff-compose-footer .message-attachment-picker{left:0;right:auto;bottom:calc(100% + 6px);top:auto;min-width:320px;max-width:520px}
+@media(max-width:760px){
+    .staff-compose-context,.staff-compose-recipient-grid{grid-template-columns:1fr}
+    .staff-compose-context>a{justify-self:start}
+    .staff-compose-footer{align-items:stretch;flex-direction:column}
+    .staff-compose-send{width:100%;margin-left:0}
+    .staff-compose-send .button{flex:1}
+}
+</style>
