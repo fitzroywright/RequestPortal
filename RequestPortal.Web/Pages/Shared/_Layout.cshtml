@@ -35,6 +35,10 @@
     string[] profileParts = profileName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
     string profileFirstName = profileParts.Length > 0 ? profileParts[0] : "Account";
     string profileInitials = profileFirstName[..Math.Min(2, profileFirstName.Length)].ToUpperInvariant();
+    string? applicantAvatarUrl =
+        !isFfpStaff && !isExternalReviewer && layoutUser is not null
+            ? $"/api/users/{layoutUser.Id:D}/avatar?v={layoutUser.ProfilePhotoUpdatedUtc?.ToUnixTimeSeconds() ?? 0}"
+            : null;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -118,11 +122,25 @@
                                     aria-controls="profileMenuPanel"
                                     data-profile-menu-trigger>
                                 <span class="profile-menu-name">@profileFirstName</span>
-                                <span class="profile-avatar profile-avatar-studio" aria-hidden="true">@profileInitials</span>
+                                @if (!string.IsNullOrWhiteSpace(applicantAvatarUrl))
+                                {
+                                    <img class="profile-avatar profile-avatar-studio profile-avatar-image" src="@applicantAvatarUrl" alt="" />
+                                }
+                                else
+                                {
+                                    <span class="profile-avatar profile-avatar-studio" aria-hidden="true">@profileInitials</span>
+                                }
                             </button>
                             <div id="profileMenuPanel" class="profile-menu-panel" hidden data-profile-menu-panel>
                                 <div class="profile-menu-header">
-                                    <span class="profile-avatar profile-avatar-large profile-avatar-studio" aria-hidden="true">@profileInitials</span>
+                                    @if (!string.IsNullOrWhiteSpace(applicantAvatarUrl))
+                                    {
+                                        <img class="profile-avatar profile-avatar-large profile-avatar-studio profile-avatar-image" src="@applicantAvatarUrl" alt="" />
+                                    }
+                                    else
+                                    {
+                                        <span class="profile-avatar profile-avatar-large profile-avatar-studio" aria-hidden="true">@profileInitials</span>
+                                    }
                                     <div>
                                         <strong>@profileFirstName</strong>
                                         <small>@(isFfpStaff ? "FFP Staff" : "Applicant / Representative")</small>
