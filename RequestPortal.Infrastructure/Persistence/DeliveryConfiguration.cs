@@ -42,6 +42,7 @@ public sealed class DeliveryReturnRequestConfiguration : IEntityTypeConfiguratio
     {
         builder.ToTable("delivery_returns");
         builder.HasKey(item => item.Id);
+        builder.Property(item => item.FfpDeliveryItemId).HasMaxLength(160);
         builder.Property(item => item.ItemDescription).HasMaxLength(500).IsRequired();
         builder.Property(item => item.Quantity).HasPrecision(18, 3);
         builder.Property(item => item.Reason).HasMaxLength(2000).IsRequired();
