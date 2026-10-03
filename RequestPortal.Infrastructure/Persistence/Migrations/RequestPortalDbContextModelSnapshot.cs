@@ -51,6 +51,21 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetRoles", (string)null);
                 });
 
+            modelBuilder.Entity("RequestPortal.Domain.Delivery.DeliveryReturnRequest", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Delivery.DeliveryRecord", null)
+                        .WithMany()
+                        .HasForeignKey("DeliveryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RequestPortal.Domain.Requests.AssistanceRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RequestPortal.Domain.Messages.MessageAttachment", b =>
                 {
                     b.Property<Guid>("MessageId")
@@ -412,6 +427,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("DeliveryPerson")
                         .HasMaxLength(240)
                         .HasColumnType("character varying(240)");
@@ -429,9 +447,26 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("EvidenceDocumentId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("FfpDeliveryOrderId")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("RecipientConfirmationSyncedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RecipientConfirmationJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset?>("RecipientConfirmedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RecipientDiscrepancyJson")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("RecipientName")
                         .IsRequired()
@@ -440,6 +475,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("RequestId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("ReturnsPermitted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("SignatureData")
                         .HasColumnType("text");
@@ -458,11 +496,82 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("DocumentReference");
 
+                    b.HasIndex("RecipientConfirmationSyncedUtc");
+
                     b.HasIndex("RequestId");
+
+                    b.HasIndex("RequestId", "FfpDeliveryOrderId")
+                        .IsUnique();
 
                     b.HasIndex("Status", "SyncedToFfpManagerUtc");
 
                     b.ToTable("deliveries", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Delivery.DeliveryReturnRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FfpDeliveryItemId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("FfpReturnId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("ItemDescription")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RequestedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("StatusDetail")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("StatusUpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("SyncedToFfpManagerUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeliveryId");
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex("SyncedToFfpManagerUtc");
+
+                    b.ToTable("delivery_returns", (string)null);
                 });
 
             modelBuilder.Entity("RequestPortal.Domain.Fulfilment.Fulfilment", b =>
