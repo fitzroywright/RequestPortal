@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +17,6 @@ public sealed class ReviewModel : PageModel
 {
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IPortalWorkflowService workflowService;
-    private readonly IRequestLifecycleService lifecycleService;
     private readonly IDocumentService documentService;
     private readonly IProjectProposalService projectProposalService;
     private readonly IProjectPlanningService projectPlanningService;
@@ -28,7 +26,6 @@ public sealed class ReviewModel : PageModel
     public ReviewModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
-        IRequestLifecycleService lifecycleService,
         IDocumentService documentService,
         IProjectProposalService projectProposalService,
         IProjectPlanningService projectPlanningService,
@@ -37,7 +34,6 @@ public sealed class ReviewModel : PageModel
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
-        this.lifecycleService = lifecycleService;
         this.documentService = documentService;
         this.projectProposalService = projectProposalService;
         this.projectPlanningService = projectPlanningService;
@@ -51,9 +47,6 @@ public sealed class ReviewModel : PageModel
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
     public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
-
-    [BindProperty, StringLength(4000)] public string DecisionReason { get; set; } = string.Empty;
-    [BindProperty, StringLength(4000)] public string DuplicateReason { get; set; } = string.Empty;
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
@@ -88,34 +81,6 @@ public sealed class ReviewModel : PageModel
         ProjectProposalExport export = await projectProposalService.ExportPdfAsync(
             staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
         return File(export.Content, export.ContentType, export.FileName);
-    }
-
-    public async Task<IActionResult> OnPostMoreInformationAsync(Guid id)
-    {
-        ApplicationUser staffUser = await GetStaffUserAsync();
-        if (string.IsNullOrWhiteSpace(DecisionReason))
-        {
-            ModelState.AddModelError(nameof(DecisionReason), "Explain what additional information is required.");
-            return await LoadPageAsync(staffUser, id);
-        }
-
-        await workflowService.RequestMoreInformationAsync(staffUser.Id, id, DecisionReason.Trim(), HttpContext.RequestAborted);
-        TempData["Success"] = "The organization will see that more information is required.";
-        return RedirectToPage("/Staff/Index");
-    }
-
-    public async Task<IActionResult> OnPostDuplicateAsync(Guid id)
-    {
-        ApplicationUser staffUser = await GetStaffUserAsync();
-        if (string.IsNullOrWhiteSpace(DuplicateReason))
-        {
-            ModelState.AddModelError(nameof(DuplicateReason), "Explain which request this duplicates or why it is considered a duplicate.");
-            return await LoadPageAsync(staffUser, id);
-        }
-
-        await lifecycleService.MarkDuplicateAsync(staffUser.Id, id, DuplicateReason.Trim(), HttpContext.RequestAborted);
-        TempData["Success"] = "Request marked as duplicate.";
-        return RedirectToPage("/Staff/Index");
     }
 
     public string UnitName(Guid unitId)
