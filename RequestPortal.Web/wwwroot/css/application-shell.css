@@ -51,8 +51,8 @@ body.authenticated-app{
     width:36px;
     height:36px;
     object-fit:contain;
-    border-radius:3px;
-    background:#fff;
+    border-radius:0;
+    background:transparent;
 }
 
 .authenticated-app .brand-copy strong{
