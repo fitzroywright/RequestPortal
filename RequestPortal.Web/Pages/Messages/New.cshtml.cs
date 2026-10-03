@@ -180,7 +180,7 @@ public sealed class NewModel(
 
             if (RequestId.HasValue)
             {
-                RequestDetail? request = await workflowService.GetRequestAsync(
+                var request = await workflowService.GetRequestAsync(
                     userId,
                     RequestId.Value,
                     isStaff: true,
