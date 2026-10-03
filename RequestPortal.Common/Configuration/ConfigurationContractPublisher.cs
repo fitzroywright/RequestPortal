@@ -292,6 +292,7 @@ public sealed class ConfigurationContractPublisher(
                     "messaging-queue" => State(HasValue(configuration, "Messaging:DurableQueuePath"), required, "RP-PROD-MESSAGING-001: Durable messaging queue storage must be configured."),
                     "site-id" => State(!string.IsNullOrWhiteSpace(siteId), required, "RP-PROD-SITE-001: Site:Id should identify this deployment."),
                     "public-url" => State(HasValue(configuration, "Aegis:PublicUrl"), required, "RP-PROD-PUBLIC-URL-001: Aegis:PublicUrl must identify the externally reachable Request Portal endpoint."),
+                    "capstone-enabled" => OptionalFeatureState(configuration.GetValue("Capstone:Enabled", false)),
                     _ => (false, "Unknown", "No runtime commissioning evaluator is defined for this requirement.")
                 };
                 if (id == "storage-sharepoint-client-secret")
