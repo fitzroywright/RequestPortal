@@ -73,7 +73,7 @@
             <nav class="mock-tabs" aria-label="Request detail sections">
                 <a class="is-active" href="#summary">Overview</a>
                 <a href="#items">Items (@Model.Request.Items.Count)</a>
-                @if (Model.CapstoneEnabled && Model.Deliveries.Count > 0)
+                @if (Model.Deliveries.Count > 0)
                 {
                     <a href="#delivery">Delivery</a>
                 }
@@ -179,7 +179,7 @@
                         }
                     </section>
 
-                    @if (Model.CapstoneEnabled && Model.Deliveries.Count > 0)
+                    @if (Model.Deliveries.Count > 0)
                     {
                         <section id="delivery" class="mock-panel">
                             <div class="mock-panel-head">
