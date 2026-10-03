@@ -375,6 +375,7 @@ public sealed class PortalMessageService : IPortalMessageService
 
                 return new MessageDetailView(
                     row.Message.Id,
+                    row.Message.SenderUserId,
                     senderName,
                     senderKind,
                     senderEmail,
@@ -1742,6 +1743,7 @@ public sealed class PortalMessageService : IPortalMessageService
 
         return new MailboxMessageView(
             message.Id,
+            message.SenderUserId,
             thread.Id,
             thread.Subject,
             senderName,
