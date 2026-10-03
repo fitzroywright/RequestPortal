@@ -513,3 +513,9 @@ body:has(.operational-page) .site-footer {
         height: auto;
     }
 }
+
+
+/* Applicant avatars in mailbox surfaces */
+.outlook-sender{grid-template-columns:30px minmax(0,1fr);align-items:center;column-gap:8px}
+.outlook-sender-copy{display:grid;min-width:0}
+.message-list-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid #cfd7df;background:#e7edf2}
