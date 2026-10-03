@@ -147,7 +147,10 @@
                     }
                 </nav>
             }
-            <a class="button button-small donate-button" href="https://www.foodforthepoorja.org/hurricane-melissa-relief/" target="_blank" rel="noopener noreferrer">Donate</a>
+            @if (isOpeningPage)
+            {
+                <a class="button button-small donate-button" href="https://www.foodforthepoorja.org/hurricane-melissa-relief/" target="_blank" rel="noopener noreferrer">Donate</a>
+            }
         </div>
     </header>
 
