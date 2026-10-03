@@ -4,97 +4,247 @@
 @{
     ViewData["Title"] = "External Reviewers";
 }
-<section class="section"><div class="shell">
-<div class="section-heading">
-    <div class="eyebrow" style="color:#b45b09">FFP internal</div>
-    <h1>External Reviewers</h1>
-    <p>Create short-lived, passwordless, read-only access for authorized outside reviewers. There is no public reviewer registration.</p>
-</div>
 
-<section class="card" style="margin-bottom:18px">
-    <h2>Invite reviewer</h2>
-    <form method="post" asp-page-handler="Invite">
-        <div asp-validation-summary="ModelOnly" class="validation"></div>
-        <div class="form-grid">
-            <div class="form-group"><label asp-for="DisplayName">Name</label><input asp-for="DisplayName" required /></div>
-            <div class="form-group"><label asp-for="Email">Email</label><input asp-for="Email" type="email" required /></div>
-            <div class="form-group"><label asp-for="ExpiresInHours">Expires in hours</label><input asp-for="ExpiresInHours" type="number" min="1" max="168" required /></div>
-            <div class="form-group">
-                <label asp-for="Scope">Access scope</label>
-                <select asp-for="Scope" id="reviewerScope">
-                    <option value="@ExternalReviewerScopes.ManagementDashboard">All aggregate management data</option>
-                    <option value="@ExternalReviewerScopes.Organization">One organization</option>
-                    <option value="@ExternalReviewerScopes.Request">One request</option>
-                    <option value="@ExternalReviewerScopes.DateRange">Date range</option>
-                </select>
+<section class="operational-page reviewer-page">
+    <div class="shell">
+        <header class="operational-titlebar">
+            <div>
+                <div class="eyebrow request-eyebrow">FFP internal</div>
+                <h1>External Reviewers</h1>
+                <p>Create temporary, read-only access for authorized outside reviewers.</p>
             </div>
-            <div class="form-group" id="organizationScope">
-                <label asp-for="OrganizationId">Organization</label>
-                <select asp-for="OrganizationId">
-                    <option value="">Select organization</option>
-                    @foreach (RequestPortal.Web.Pages.Staff.ReviewerOrganizationOption item in Model.Organizations)
-                    {
-                        <option value="@item.Id">@item.Name</option>
-                    }
-                </select>
-                <span asp-validation-for="OrganizationId" class="validation"></span>
-            </div>
-            <div class="form-group" id="requestScope">
-                <label asp-for="RequestId">Request</label>
-                <select asp-for="RequestId">
-                    <option value="">Select request</option>
-                    @foreach (RequestPortal.Web.Pages.Staff.ReviewerRequestOption item in Model.Requests)
-                    {
-                        <option value="@item.Id">@item.Reference — @item.OrganizationName</option>
-                    }
-                </select>
-                <span asp-validation-for="RequestId" class="validation"></span>
-            </div>
-            <div class="form-group" id="fromScope"><label asp-for="FromDate">From date</label><input asp-for="FromDate" type="date" /></div>
-            <div class="form-group" id="toScope"><label asp-for="ToDate">To date</label><input asp-for="ToDate" type="date" /></div>
-        </div>
-        <p class="muted">External review is always read-only. Applicant contact information, messaging, approvals and administration remain unavailable.</p>
-        <button class="button" type="submit">Send secure invitation</button>
-    </form>
-</section>
+        </header>
 
-<section class="card">
-    <h2>Invitations</h2>
-    <div class="table-wrap"><table>
-        <thead><tr><th>Reviewer</th><th>Scope</th><th>Expires</th><th>Last access</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-        @foreach (ExternalReviewerInvitationView item in Model.Invitations)
-        {
-            string status = item.RevokedUtc.HasValue ? "Revoked" : item.ExpiresUtc <= DateTimeOffset.UtcNow ? "Expired" : item.RedeemedUtc.HasValue ? "Active" : "Invited";
-            <tr>
-                <td><strong>@item.DisplayName</strong><br/><span class="muted">@item.Email</span><br/><small>Invited by @item.InvitedByUserId</small></td>
-                <td>
-                    <strong>@item.Scope</strong>
-                    @if (item.OrganizationId.HasValue) { <div class="muted">Organization: @item.OrganizationId</div> }
-                    @if (item.RequestId.HasValue) { <div class="muted">Request: @item.RequestId</div> }
-                    @if (item.FromUtc.HasValue || item.ToUtc.HasValue)
-                    {
-                        <div class="muted">@item.FromUtc?.ToLocalTime().ToString("d") — @item.ToUtc?.ToLocalTime().ToString("d")</div>
-                    }
-                </td>
-                <td>@item.ExpiresUtc.ToLocalTime().ToString("g")</td>
-                <td>@(item.LastAccessUtc?.ToLocalTime().ToString("g") ?? "—")</td>
-                <td>@status</td>
-                <td>
-                    <div class="action-row">
-                        @if (!item.RevokedUtc.HasValue && item.ExpiresUtc > DateTimeOffset.UtcNow)
-                        {
-                            <form method="post" asp-page-handler="Revoke"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-outline" type="submit">Revoke</button></form>
-                        }
-                        <form method="post" asp-page-handler="Reissue"><input type="hidden" name="invitationId" value="@item.Id"/><button class="button button-small button-outline" type="submit">Reissue 24h link</button></form>
+        <section class="reviewer-invite-panel">
+            <div class="reviewer-panel-titlebar">
+                <div>
+                    <strong>Invite Reviewer</strong>
+                    <small>Passwordless, time-limited access. No public reviewer registration.</small>
+                </div>
+            </div>
+
+            <form method="post" asp-page-handler="Invite" class="reviewer-invite-form">
+                <div asp-validation-summary="ModelOnly" class="validation reviewer-validation"></div>
+
+                <div class="reviewer-form-section">
+                    <div class="reviewer-section-label">
+                        <strong>Reviewer</strong>
+                        <span>Who should receive the secure invitation?</span>
                     </div>
-                </td>
-            </tr>
-        }
-        </tbody>
-    </table></div>
+                    <div class="reviewer-grid reviewer-grid-reviewer">
+                        <div class="field">
+                            <label asp-for="DisplayName">Name</label>
+                            <input asp-for="DisplayName" required />
+                        </div>
+                        <div class="field">
+                            <label asp-for="Email">Email</label>
+                            <input asp-for="Email" type="email" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reviewer-form-section">
+                    <div class="reviewer-section-label">
+                        <strong>Access</strong>
+                        <span>Choose exactly what this reviewer may see.</span>
+                    </div>
+
+                    <div class="reviewer-grid reviewer-grid-access">
+                        <div class="field">
+                            <label asp-for="Scope">Scope</label>
+                            <select asp-for="Scope" id="reviewerScope">
+                                <option value="@ExternalReviewerScopes.ManagementDashboard">All aggregate management data</option>
+                                <option value="@ExternalReviewerScopes.Organization">One organization</option>
+                                <option value="@ExternalReviewerScopes.Request">One request</option>
+                                <option value="@ExternalReviewerScopes.DateRange">Date range</option>
+                            </select>
+                        </div>
+
+                        <div class="field" id="organizationScope">
+                            <label asp-for="OrganizationId">Organization</label>
+                            <select asp-for="OrganizationId">
+                                <option value="">Select organization</option>
+                                @foreach (RequestPortal.Web.Pages.Staff.ReviewerOrganizationOption item in Model.Organizations)
+                                {
+                                    <option value="@item.Id">@item.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="OrganizationId" class="validation"></span>
+                        </div>
+
+                        <div class="field reviewer-wide" id="requestScope">
+                            <label asp-for="RequestId">Request</label>
+                            <select asp-for="RequestId">
+                                <option value="">Select request</option>
+                                @foreach (RequestPortal.Web.Pages.Staff.ReviewerRequestOption item in Model.Requests)
+                                {
+                                    <option value="@item.Id">@item.Reference — @item.OrganizationName</option>
+                                }
+                            </select>
+                            <span asp-validation-for="RequestId" class="validation"></span>
+                        </div>
+
+                        <div class="field" id="fromScope">
+                            <label asp-for="FromDate">From</label>
+                            <input asp-for="FromDate" type="date" />
+                        </div>
+
+                        <div class="field" id="toScope">
+                            <label asp-for="ToDate">To</label>
+                            <input asp-for="ToDate" type="date" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reviewer-form-section reviewer-expiry-section">
+                    <div class="reviewer-section-label">
+                        <strong>Expiry</strong>
+                        <span>How long should the invitation remain valid?</span>
+                    </div>
+                    <div class="field reviewer-expiry-field">
+                        <label asp-for="ExpiresInHours">Expires in hours</label>
+                        <input asp-for="ExpiresInHours" type="number" min="1" max="168" required />
+                        <small>Maximum 168 hours (7 days).</small>
+                    </div>
+                </div>
+
+                <div class="reviewer-form-footer">
+                    <span>Read-only access only. Messaging, applicant contact details, approvals and administration are not exposed.</span>
+                    <button class="button" type="submit">Send secure invitation</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="reviewer-list-panel">
+            <div class="reviewer-panel-titlebar">
+                <div>
+                    <strong>Invitations</strong>
+                    <small>@Model.InvitationRows.Count invitation(s)</small>
+                </div>
+            </div>
+
+            @if (Model.InvitationRows.Count == 0)
+            {
+                <div class="workspace-empty">
+                    <strong>No reviewer invitations yet.</strong>
+                </div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="reviewer-table">
+                        <thead>
+                            <tr>
+                                <th>Reviewer</th>
+                                <th>Scope</th>
+                                <th>Issued By</th>
+                                <th>Expires</th>
+                                <th>Last Access</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (RequestPortal.Web.Pages.Staff.ReviewerInvitationRow row in Model.InvitationRows)
+                        {
+                            ExternalReviewerInvitationView item = row.Invitation;
+                            string status = item.RevokedUtc.HasValue
+                                ? "Revoked"
+                                : item.ExpiresUtc <= DateTimeOffset.UtcNow
+                                    ? "Expired"
+                                    : item.RedeemedUtc.HasValue
+                                        ? "Active"
+                                        : "Invited";
+
+                            <tr>
+                                <td>
+                                    <strong>@item.DisplayName</strong>
+                                    <small>@item.Email</small>
+                                </td>
+                                <td>
+                                    <strong>@row.ScopeLabel</strong>
+                                    @if (item.RequestId.HasValue && Model.Requests.FirstOrDefault(request => request.Id == item.RequestId.Value) is { } request)
+                                    {
+                                        <small>@request.Reference</small>
+                                    }
+                                    @if (item.FromUtc.HasValue || item.ToUtc.HasValue)
+                                    {
+                                        <small>
+                                            @(item.FromUtc?.ToLocalTime().ToString("d") ?? "Beginning")
+                                            —
+                                            @(item.ToUtc?.ToLocalTime().ToString("d") ?? "No end date")
+                                        </small>
+                                    }
+                                </td>
+                                <td>@row.IssuedByName</td>
+                                <td>@item.ExpiresUtc.ToLocalTime().ToString("g")</td>
+                                <td>@(item.LastAccessUtc?.ToLocalTime().ToString("g") ?? "—")</td>
+                                <td>
+                                    <span class="status reviewer-status reviewer-status-@status.ToLowerInvariant()">@status</span>
+                                </td>
+                                <td class="reviewer-actions-cell">
+                                    <div class="reviewer-row-actions">
+                                        @if (!item.RevokedUtc.HasValue && item.ExpiresUtc > DateTimeOffset.UtcNow)
+                                        {
+                                            <form method="post" asp-page-handler="Revoke">
+                                                <input type="hidden" name="invitationId" value="@item.Id" />
+                                                <button class="button button-small button-outline" type="submit">Revoke</button>
+                                            </form>
+                                        }
+                                        <form method="post" asp-page-handler="Reissue">
+                                            <input type="hidden" name="invitationId" value="@item.Id" />
+                                            <button class="button button-small button-outline" type="submit">Reissue 24h</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
 </section>
-</div></section>
+
+<style>
+.reviewer-page .shell{width:min(1320px,calc(100% - 28px))}
+.reviewer-invite-panel,.reviewer-list-panel{border:1px solid #cfd7df;border-radius:7px;background:#fff;overflow:hidden}
+.reviewer-list-panel{margin-top:12px}
+.reviewer-panel-titlebar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;border-bottom:1px solid #d8e0e7;background:#f7f9fb}
+.reviewer-panel-titlebar strong,.reviewer-panel-titlebar small{display:block}
+.reviewer-panel-titlebar small{margin-top:2px;color:#667384}
+.reviewer-invite-form{display:grid}
+.reviewer-form-section{display:grid;grid-template-columns:180px minmax(0,1fr);gap:18px;padding:14px;border-bottom:1px solid #e3e8ed}
+.reviewer-section-label strong,.reviewer-section-label span{display:block}
+.reviewer-section-label span{margin-top:3px;color:#667384;font-size:.79rem;line-height:1.35}
+.reviewer-grid{display:grid;gap:10px}
+.reviewer-grid-reviewer{grid-template-columns:minmax(220px,.8fr) minmax(300px,1.2fr)}
+.reviewer-grid-access{grid-template-columns:repeat(2,minmax(220px,1fr))}
+.reviewer-wide{grid-column:1/-1}
+.reviewer-expiry-section{align-items:start}
+.reviewer-expiry-field{max-width:220px}
+.reviewer-expiry-field small{color:#667384;font-size:.75rem}
+.reviewer-form-footer{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:10px 14px;background:#f7f9fb}
+.reviewer-form-footer>span{color:#667384;font-size:.78rem}
+.reviewer-validation:empty{display:none}
+.reviewer-table td>small{display:block;margin-top:2px;color:#667384}
+.reviewer-table td{vertical-align:middle}
+.reviewer-row-actions{display:flex;justify-content:flex-end;gap:6px;white-space:nowrap}
+.reviewer-row-actions form{margin:0}
+.reviewer-actions-cell{text-align:right}
+.reviewer-status{min-width:62px;justify-content:center}
+.reviewer-status-active{background:#e8f7ef;color:#18794e}
+.reviewer-status-invited{background:#eef4fb;color:#245b8a}
+.reviewer-status-expired,.reviewer-status-revoked{background:#f2f3f5;color:#596675}
+@media(max-width:850px){
+    .reviewer-form-section{grid-template-columns:1fr}
+    .reviewer-grid-reviewer,.reviewer-grid-access{grid-template-columns:1fr}
+    .reviewer-wide{grid-column:auto}
+    .reviewer-form-footer{align-items:stretch;flex-direction:column}
+    .reviewer-form-footer .button{align-self:flex-end}
+}
+</style>
 
 <script>
 (() => {
@@ -103,14 +253,17 @@
     const req = document.getElementById('requestScope');
     const from = document.getElementById('fromScope');
     const to = document.getElementById('toScope');
+
     function update() {
         const value = scope?.value || '';
-        org.style.display = value === '@ExternalReviewerScopes.Organization' ? '' : 'none';
-        req.style.display = value === '@ExternalReviewerScopes.Request' ? '' : 'none';
+        if (org) org.hidden = value !== '@ExternalReviewerScopes.Organization';
+        if (req) req.hidden = value !== '@ExternalReviewerScopes.Request';
+
         const dates = value === '@ExternalReviewerScopes.DateRange';
-        from.style.display = dates ? '' : 'none';
-        to.style.display = dates ? '' : 'none';
+        if (from) from.hidden = !dates;
+        if (to) to.hidden = !dates;
     }
+
     scope?.addEventListener('change', update);
     update();
 })();
