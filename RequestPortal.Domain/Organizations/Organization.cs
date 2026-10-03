@@ -70,6 +70,7 @@ public sealed class Organization
     public decimal? AnnualOperatingBudget { get; private set; }
     public string? PrimaryFundingSources { get; private set; }
     public string? PremisesSituation { get; private set; }
+    public string? ReferralSource { get; private set; }
     public DateOnly? RegistrationExpiryDate { get; private set; }
 
     public string? ApprovalNotes { get; private set; }
@@ -145,6 +146,7 @@ public sealed class Organization
             null,
             null,
             null,
+            null,
             registrationExpiryDate);
     }
 
@@ -180,6 +182,7 @@ public sealed class Organization
         decimal? annualOperatingBudget,
         string? primaryFundingSources,
         string? premisesSituation,
+        string? referralSource,
         DateOnly? registrationExpiryDate)
     {
         RegistrationNumber = Normalize(registrationNumber);
@@ -213,6 +216,7 @@ public sealed class Organization
         AnnualOperatingBudget = annualOperatingBudget;
         PrimaryFundingSources = Normalize(primaryFundingSources);
         PremisesSituation = Normalize(premisesSituation);
+        ReferralSource = Normalize(referralSource);
         RegistrationExpiryDate = registrationExpiryDate;
     }
 
