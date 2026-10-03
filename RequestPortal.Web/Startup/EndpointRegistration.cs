@@ -19,6 +19,7 @@ internal static class EndpointRegistration
 
         app.MapFfpManagerIntegrationEndpoints();
         app.MapDeliveryEndpoints();
+        app.MapProfileAvatar();
     }
 
     private static void MapUnreadCount(WebApplication app)
