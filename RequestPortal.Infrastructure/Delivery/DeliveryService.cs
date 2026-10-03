@@ -251,6 +251,7 @@ public sealed class DeliveryService : IDeliveryService
             DeliveryLineSnapshot line = expected[i];
             if (!string.Equals(confirmed.Description, line.Description, StringComparison.Ordinal) ||
                 confirmed.ExpectedQuantity != line.Quantity ||
+                (!string.IsNullOrWhiteSpace(line.FfpDeliveryItemId) && confirmed.FfpDeliveryItemId != line.FfpDeliveryItemId) ||
                 confirmed.ReceivedQuantity < 0 ||
                 confirmed.ReceivedQuantity > line.Quantity)
                 throw new InvalidOperationException("The receipt confirmation does not match the delivery snapshot.");
@@ -340,6 +341,7 @@ public sealed class DeliveryService : IDeliveryService
             Guid.NewGuid(),
             requestId,
             deliveryId,
+            confirmedLine.FfpDeliveryItemId,
             itemDescription,
             quantity,
             reason,
@@ -400,6 +402,7 @@ public sealed class DeliveryService : IDeliveryService
                 item.RequestId,
                 item.DeliveryId,
                 delivery.FfpDeliveryOrderId,
+                item.FfpDeliveryItemId,
                 item.ItemDescription,
                 item.Quantity,
                 item.Reason,
@@ -491,7 +494,8 @@ public sealed class DeliveryService : IDeliveryService
             .Select(line => new DeliveryLineSnapshot(
                 line.TryGetProperty("Description", out JsonElement description) ? description.GetString() ?? string.Empty : string.Empty,
                 line.TryGetProperty("Quantity", out JsonElement quantity) && quantity.TryGetDecimal(out decimal value) ? value : 0m,
-                line.TryGetProperty("UnitOfMeasure", out JsonElement unit) ? unit.GetString() : null))
+                line.TryGetProperty("UnitOfMeasure", out JsonElement unit) ? unit.GetString() : null,
+                line.TryGetProperty("FfpDeliveryItemId", out JsonElement itemId) ? itemId.GetString() : null))
             .ToArray();
     }
 
