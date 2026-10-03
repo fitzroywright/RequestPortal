@@ -10,6 +10,7 @@ public sealed class DeliveryReturnRequest
         Guid id,
         Guid requestId,
         Guid deliveryId,
+        string? ffpDeliveryItemId,
         string itemDescription,
         decimal quantity,
         string reason,
@@ -27,6 +28,7 @@ public sealed class DeliveryReturnRequest
         Id = id;
         RequestId = requestId;
         DeliveryId = deliveryId;
+        FfpDeliveryItemId = Normalize(ffpDeliveryItemId);
         ItemDescription = itemDescription.Trim();
         Quantity = quantity;
         Reason = reason.Trim();
@@ -38,6 +40,7 @@ public sealed class DeliveryReturnRequest
     public Guid Id { get; private set; }
     public Guid RequestId { get; private set; }
     public Guid DeliveryId { get; private set; }
+    public string? FfpDeliveryItemId { get; private set; }
     public string ItemDescription { get; private set; } = string.Empty;
     public decimal Quantity { get; private set; }
     public string Reason { get; private set; } = string.Empty;
