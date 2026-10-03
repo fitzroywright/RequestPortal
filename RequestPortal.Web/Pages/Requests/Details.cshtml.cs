@@ -239,7 +239,8 @@ public sealed class DetailsModel : PageModel
                 line.Description,
                 line.Quantity,
                 received,
-                line.UnitOfMeasure));
+                line.UnitOfMeasure,
+                line.FfpDeliveryItemId));
 
             if (received != line.Quantity)
             {
@@ -733,6 +734,9 @@ public sealed class DetailsModel : PageModel
                     : 0m,
                 line.TryGetProperty("UnitOfMeasure", out JsonElement unit)
                     ? unit.GetString()
+                    : null,
+                line.TryGetProperty("FfpDeliveryItemId", out JsonElement itemId)
+                    ? itemId.GetString()
                     : null))
             .ToArray();
     }
