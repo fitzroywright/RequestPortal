@@ -85,9 +85,6 @@ internal static class AuthorizationServiceRegistration
             options.Conventions.AuthorizeFolder(
                 "/Staff"
                 , PortalPolicies.FfpStaff);
-            options.Conventions.AuthorizePage(
-                "/Staff/Reviewers"
-                , PortalPolicies.ManagementDashboard);
             options.Conventions.AuthorizeFolder(
                 "/Management"
                 , PortalPolicies.ManagementDashboard);
