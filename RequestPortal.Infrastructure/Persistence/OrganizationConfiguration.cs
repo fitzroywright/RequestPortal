@@ -37,6 +37,7 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
         builder.Property(organization => organization.PopulationGroupsServed).HasMaxLength(2000);
         builder.Property(organization => organization.PrimaryFundingSources).HasMaxLength(2000);
         builder.Property(organization => organization.PremisesSituation).HasMaxLength(500);
+        builder.Property(organization => organization.ReferralSource).HasMaxLength(150);
         builder.Property(organization => organization.AnnualOperatingBudget).HasPrecision(18, 2);
         builder.Property(organization => organization.ApprovalNotes).HasMaxLength(4000);
         builder.Property(organization => organization.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
