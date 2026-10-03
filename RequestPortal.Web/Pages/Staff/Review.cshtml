@@ -133,15 +133,6 @@
                             </tbody></table></div>
                         }
                     </section>
-
-                    @if (Model.Request.Status == "Submitted")
-                    {
-                        <section class="card" style="margin-top:1.5rem">
-                            <h2>Request actions</h2>
-                            <form method="post" asp-page-handler="MoreInformation" class="form-grid" style="margin-top:22px"><input type="hidden" name="id" value="@Model.Request.Id" /><div class="field"><label asp-for="DecisionReason">Request more information</label><textarea asp-for="DecisionReason" placeholder="Explain exactly what the organization should provide."></textarea><span asp-validation-for="DecisionReason" class="validation"></span></div><button class="button button-outline" type="submit">Request more information</button></form>
-                            <form method="post" asp-page-handler="Duplicate" class="form-grid" style="margin-top:22px"><input type="hidden" name="id" value="@Model.Request.Id" /><div class="field"><label asp-for="DuplicateReason">Duplicate reason/reference</label><textarea asp-for="DuplicateReason" placeholder="Identify the existing request or explain why this is a duplicate."></textarea><span asp-validation-for="DuplicateReason" class="validation"></span></div><button class="button button-outline" type="submit">Mark as duplicate</button></form>
-                        </section>
-                    }
                 </div>
 
                 <aside class="card"><h2>Status history</h2><div class="timeline">
