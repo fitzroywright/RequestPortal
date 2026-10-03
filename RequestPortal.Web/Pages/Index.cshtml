@@ -2,6 +2,14 @@
 @model RequestPortal.Web.Pages.IndexModel
 @{
     ViewData["Title"] = "Request Portal";
+
+    bool isFfpStaff =
+        User.HasClaim(
+            RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim,
+            RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue);
+
+    bool isExternalReviewer =
+        User.HasClaim("requestportal.external-review", "true");
 }
 
 <section class="public-home">
@@ -30,8 +38,22 @@
                 <aside class="public-signedin-card">
                     <span class="public-signedin-label">Welcome back</span>
                     <h2>@Model.FirstName</h2>
-                    <p>Continue to your request workspace to review requests, messages and organization activity.</p>
-                    <a class="public-primary-action public-card-action" asp-page="/Dashboard/Index">Open Request Workspace <span aria-hidden="true">→</span></a>
+
+                    @if (isFfpStaff)
+                    {
+                        <p>Continue to the FFP staff workspace to review requests, organizations, messages and operational work.</p>
+                        <a class="public-primary-action public-card-action" asp-page="/Staff/Index">Open Requests <span aria-hidden="true">→</span></a>
+                    }
+                    else if (isExternalReviewer)
+                    {
+                        <p>Continue to your secure, read-only external review workspace.</p>
+                        <a class="public-primary-action public-card-action" asp-page="/ExternalReview/Index">Open External Review <span aria-hidden="true">→</span></a>
+                    }
+                    else
+                    {
+                        <p>Continue to your request workspace to review requests, messages and organization activity.</p>
+                        <a class="public-primary-action public-card-action" asp-page="/Dashboard/Index">Open Request Workspace <span aria-hidden="true">→</span></a>
+                    }
                 </aside>
             }
             else
