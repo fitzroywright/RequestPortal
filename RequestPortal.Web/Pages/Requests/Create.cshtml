@@ -111,7 +111,12 @@
                     </section>
 
                     <section class="request-mini-card request-summary-card">
-                        <div class="request-mini-card-title">Request Summary</div>
+                        <div class="request-mini-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                            <span>Request Summary</span>
+                            <a id="edit-profile-link"
+                               class="request-profile-link"
+                               href="#">Edit profile</a>
+                        </div>
                         <div class="request-mini-card-body request-summary-grid">
                             <div class="requester-field requester-org">
                                 <span class="requester-label">Requesting as</span>
@@ -134,13 +139,6 @@
                                 <label asp-for="Input.Priority">Priority</label>
                                 <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
                             </div>
-                            <div class="requester-field">
-                                <span class="requester-label">Submitted by</span>
-                                <strong>@Model.SubmittedByName</strong>
-                            </div>
-                            <a id="edit-profile-link"
-                               class="request-profile-link"
-                               href="#">Review / edit profile</a>
 
                             <div class="field request-summary-field">
                                 <label asp-for="Input.Summary">Request summary</label>
