@@ -60,6 +60,7 @@ public sealed class ProfileModel : PageModel
     public string RegisteredIdentity { get; private set; } = string.Empty;
     public bool IndividualProfileUpdateRequired { get; private set; }
     public bool HasProfilePhoto { get; private set; }
+    public Guid UserId { get; private set; }
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
@@ -364,6 +365,7 @@ public sealed class ProfileModel : PageModel
             };
         }
 
+        UserId = user.Id;
         HasProfilePhoto = !string.IsNullOrWhiteSpace(user.ProfilePhotoStorageKey);
 
         RegisteredIdentity =
