@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Common.Storage;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -9,6 +10,7 @@ using RequestPortal.Application.Notifications;
 using RequestPortal.Application.Organizations;
 using RequestPortal.Application.Portal;
 using RequestPortal.Domain.Notifications;
+using RequestPortal.Infrastructure.Documents;
 using RequestPortal.Infrastructure.Identity;
 
 namespace RequestPortal.Web.Pages.Account;
@@ -22,6 +24,9 @@ public sealed class ProfileModel : PageModel
     private readonly INotificationPreferenceService notificationPreferenceService;
     private readonly IOrganizationInvitationService invitationService;
     private readonly IConfiguration configuration;
+    private readonly IFileStorage fileStorage;
+    private readonly IDocumentUploadSecurity uploadSecurity;
+    private readonly IMalwareScanner malwareScanner;
 
     public ProfileModel(
         UserManager<ApplicationUser> userManager,
@@ -29,7 +34,10 @@ public sealed class ProfileModel : PageModel
         ICountryPolicyService countryPolicyService,
         INotificationPreferenceService notificationPreferenceService,
         IOrganizationInvitationService invitationService,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IFileStorage fileStorage,
+        IDocumentUploadSecurity uploadSecurity,
+        IMalwareScanner malwareScanner)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -37,6 +45,9 @@ public sealed class ProfileModel : PageModel
         this.notificationPreferenceService = notificationPreferenceService;
         this.invitationService = invitationService;
         this.configuration = configuration;
+        this.fileStorage = fileStorage;
+        this.uploadSecurity = uploadSecurity;
+        this.malwareScanner = malwareScanner;
     }
 
     public IReadOnlyList<OrganizationSummary> Organizations { get; private set; } = Array.Empty<OrganizationSummary>();
@@ -48,6 +59,7 @@ public sealed class ProfileModel : PageModel
     public bool WhatsAppAvailable { get; private set; }
     public string RegisteredIdentity { get; private set; } = string.Empty;
     public bool IndividualProfileUpdateRequired { get; private set; }
+    public bool HasProfilePhoto { get; private set; }
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
@@ -63,6 +75,9 @@ public sealed class ProfileModel : PageModel
 
     [BindProperty]
     public RegistrationInput Registration { get; set; } = new();
+
+    [BindProperty]
+    public IFormFile? ProfilePhoto { get; set; }
 
     public async Task OnGetAsync()
     {
@@ -126,6 +141,118 @@ public sealed class ProfileModel : PageModel
             return LocalRedirect(ReturnUrl);
         }
 
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostPhotoAsync()
+    {
+        ApplicationUser user = await GetUserAsync();
+
+        if (ProfilePhoto is null || ProfilePhoto.Length == 0)
+        {
+            ModelState.AddModelError(nameof(ProfilePhoto), "Choose a PNG or JPEG photo.");
+            await LoadAsync(user, preserveInput: true);
+            return Page();
+        }
+
+        if (ProfilePhoto.Length > 5L * 1024L * 1024L)
+        {
+            ModelState.AddModelError(nameof(ProfilePhoto), "Profile photos must be 5 MB or smaller.");
+            await LoadAsync(user, preserveInput: true);
+            return Page();
+        }
+
+        string extension = Path.GetExtension(ProfilePhoto.FileName);
+        if (!extension.Equals(".png", StringComparison.OrdinalIgnoreCase) &&
+            !extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) &&
+            !extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError(nameof(ProfilePhoto), "Profile photos must be PNG or JPEG.");
+            await LoadAsync(user, preserveInput: true);
+            return Page();
+        }
+
+        await using Stream content = ProfilePhoto.OpenReadStream();
+        await uploadSecurity.ValidateAsync(
+            ProfilePhoto.FileName,
+            ProfilePhoto.ContentType,
+            ProfilePhoto.Length,
+            content,
+            HttpContext.RequestAborted);
+        await malwareScanner.ScanAsync(
+            content,
+            HttpContext.RequestAborted);
+
+        string safeName = Path.GetFileName(ProfilePhoto.FileName);
+        string storageKey =
+            $"requestportal/profile-photos/{user.Id:N}/{Guid.NewGuid():N}-{safeName}";
+        string? previousKey = user.ProfilePhotoStorageKey;
+
+        StoredFile stored = await fileStorage.StoreAsync(
+            new StorageWriteRequest(
+                storageKey,
+                content,
+                ProfilePhoto.ContentType,
+                safeName,
+                user.Id.ToString("D"),
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Application"] = "RequestPortal",
+                    ["OwnerType"] = "ApplicantProfile",
+                    ["UserId"] = user.Id.ToString("D")
+                }),
+            HttpContext.RequestAborted);
+
+        user.ProfilePhotoStorageKey = stored.StorageKey;
+        user.ProfilePhotoContentType = stored.ContentType;
+        user.ProfilePhotoUpdatedUtc = DateTimeOffset.UtcNow;
+
+        IdentityResult result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            await fileStorage.DeleteAsync(stored.StorageKey, HttpContext.RequestAborted);
+            foreach (IdentityError error in result.Errors)
+                ModelState.AddModelError(string.Empty, error.Description);
+
+            await LoadAsync(user, preserveInput: true);
+            return Page();
+        }
+
+        if (!string.IsNullOrWhiteSpace(previousKey) &&
+            !string.Equals(previousKey, stored.StorageKey, StringComparison.Ordinal))
+        {
+            await fileStorage.DeleteAsync(previousKey, HttpContext.RequestAborted);
+        }
+
+        TempData["Success"] = "Profile photo updated.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRemovePhotoAsync()
+    {
+        ApplicationUser user = await GetUserAsync();
+        string? previousKey = user.ProfilePhotoStorageKey;
+
+        user.ProfilePhotoStorageKey = null;
+        user.ProfilePhotoContentType = null;
+        user.ProfilePhotoUpdatedUtc = null;
+
+        IdentityResult result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            foreach (IdentityError error in result.Errors)
+                ModelState.AddModelError(string.Empty, error.Description);
+
+            await LoadAsync(user, preserveInput: true);
+            return Page();
+        }
+
+        if (!string.IsNullOrWhiteSpace(previousKey))
+        {
+            await fileStorage.DeleteAsync(previousKey, HttpContext.RequestAborted);
+        }
+
+        TempData["Success"] = "Profile photo removed.";
         return RedirectToPage();
     }
 
@@ -236,6 +363,8 @@ public sealed class ProfileModel : PageModel
                 ReferralSource = user.ReferralSource ?? string.Empty
             };
         }
+
+        HasProfilePhoto = !string.IsNullOrWhiteSpace(user.ProfilePhotoStorageKey);
 
         RegisteredIdentity =
             user.UserName
