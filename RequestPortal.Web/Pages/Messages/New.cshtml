@@ -46,7 +46,7 @@
                     <input type="hidden" asp-for="OrganizationId" />
                     <input type="hidden" asp-for="RequestId" />
                     <input type="hidden" asp-for="Subject" />
-                    <div asp-validation-summary="ModelOnly" class="validation"></div>
+                    <div asp-validation-summary="All" class="validation message-compose-validation"></div>
 
                     <div class="message-destination-bar" role="radiogroup" aria-label="Send message to">
                         <label class="message-destination-option">
@@ -106,7 +106,7 @@
                                 }
                             </details>
 
-                            <button class="button" type="submit">Send</button>
+                            <button class="button" type="submit">Send message</button>
                         </div>
                     </div>
 
@@ -153,7 +153,7 @@
                 <form method="post" class="card">
                     <input type="hidden" asp-for="OrganizationId" />
                     <input type="hidden" asp-for="RequestId" />
-                    <div asp-validation-summary="ModelOnly" class="validation"></div>
+                    <div asp-validation-summary="All" class="validation message-compose-validation"></div>
 
                     <label asp-for="Audience">Audience</label>
                     <select asp-for="Audience">
@@ -162,6 +162,7 @@
                         <option value="@MessageAudience.OrganizationManager">Organization Manager</option>
                         <option value="@MessageAudience.FfpInternal">FFP Internal</option>
                     </select>
+                    <span asp-validation-for="Audience" class="validation"></span>
 
                     <label asp-for="RecipientUserId">Recipient</label>
                     <select asp-for="RecipientUserId">
@@ -173,6 +174,7 @@
                             </option>
                         }
                     </select>
+                    <span asp-validation-for="RecipientUserId" class="validation"></span>
 
                     <label asp-for="Subject">Subject</label>
                     <input asp-for="Subject" maxlength="300" />
@@ -181,7 +183,7 @@
                     <textarea asp-for="Body" rows="8" maxlength="10000"></textarea>
                     <span asp-validation-for="Body" class="validation"></span>
 
-                    <button class="button" type="submit">Send</button>
+                    <button class="button" type="submit">Send message</button>
                 </form>
             }
         }
