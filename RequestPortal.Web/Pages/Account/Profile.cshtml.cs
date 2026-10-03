@@ -93,7 +93,7 @@ public sealed class ProfileModel : PageModel
 
         if (!ModelState.IsValid)
         {
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
@@ -132,7 +132,7 @@ public sealed class ProfileModel : PageModel
             foreach (IdentityError error in result.Errors)
                 ModelState.AddModelError(string.Empty, error.Description);
 
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
@@ -148,18 +148,19 @@ public sealed class ProfileModel : PageModel
     public async Task<IActionResult> OnPostPhotoAsync()
     {
         ApplicationUser user = await GetUserAsync();
+        KeepValidationFor(nameof(ProfilePhoto));
 
         if (ProfilePhoto is null || ProfilePhoto.Length == 0)
         {
             ModelState.AddModelError(nameof(ProfilePhoto), "Choose a PNG or JPEG photo.");
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
         if (ProfilePhoto.Length > 5L * 1024L * 1024L)
         {
             ModelState.AddModelError(nameof(ProfilePhoto), "Profile photos must be 5 MB or smaller.");
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
@@ -169,7 +170,7 @@ public sealed class ProfileModel : PageModel
             !extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))
         {
             ModelState.AddModelError(nameof(ProfilePhoto), "Profile photos must be PNG or JPEG.");
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
@@ -215,7 +216,7 @@ public sealed class ProfileModel : PageModel
             foreach (IdentityError error in result.Errors)
                 ModelState.AddModelError(string.Empty, error.Description);
 
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
@@ -244,7 +245,7 @@ public sealed class ProfileModel : PageModel
             foreach (IdentityError error in result.Errors)
                 ModelState.AddModelError(string.Empty, error.Description);
 
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
@@ -269,7 +270,7 @@ public sealed class ProfileModel : PageModel
 
         if (!ModelState.IsValid)
         {
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
@@ -307,7 +308,7 @@ public sealed class ProfileModel : PageModel
 
         if (!ModelState.IsValid)
         {
-            await LoadAsync(user, preserveInput: true);
+            await LoadAsync(user);
             return Page();
         }
 
