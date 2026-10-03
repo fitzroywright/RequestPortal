@@ -38,6 +38,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<CountryConfiguration> CountryConfigurations => Set<CountryConfiguration>();
     public DbSet<StoredDocument> Documents => Set<StoredDocument>();
     public DbSet<DeliveryRecord> Deliveries => Set<DeliveryRecord>();
+    public DbSet<DeliveryReturnRequest> DeliveryReturns => Set<DeliveryReturnRequest>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RequestFulfilment> Fulfilments => Set<RequestFulfilment>();
     public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
