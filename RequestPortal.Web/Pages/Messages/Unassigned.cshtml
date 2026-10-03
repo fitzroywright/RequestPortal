@@ -49,12 +49,9 @@
        : Url.Page("/Messages/Thread", new { id = message.ThreadId }))">
                             <span class="outlook-message-state">@(message.ReadUtc is null ? "●" : "○")</span>
                             <span class="outlook-sender">
-                                @if (message.SenderKind == "Representative")
-                                {
-                                    <img class="message-list-avatar"
-                                         src="@(message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
-                                         alt="" />
-                                }
+                                <img class="message-list-avatar"
+                                     src="@(message.SenderKind == "Representative" && message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
+                                     alt="" />
                                 <span class="outlook-sender-copy">
                                     <strong>@message.SenderName</strong>
                                     <small>@message.SenderKind</small>
