@@ -28,6 +28,28 @@
                     <strong>Personal &amp; contact</strong>
                     <small>Your Request Portal identity</small>
                 </div>
+
+                <div class="profile-photo-row">
+                    <img class="profile-photo-preview"
+                         src="/api/users/@Model.UserId/avatar?v=@DateTimeOffset.UtcNow.ToUnixTimeSeconds()"
+                         alt="Profile photo" />
+                    <div class="profile-photo-copy">
+                        <strong>Profile photo</strong>
+                        <small>Optional. PNG or JPEG, up to 5 MB.</small>
+                        <form method="post" asp-page-handler="Photo" enctype="multipart/form-data" class="profile-photo-actions">
+                            <input asp-for="ProfilePhoto" type="file" accept="image/png,image/jpeg" />
+                            <button class="button button-small" type="submit">Upload photo</button>
+                        </form>
+                        <span asp-validation-for="ProfilePhoto" class="validation"></span>
+                        @if (Model.HasProfilePhoto)
+                        {
+                            <form method="post" asp-page-handler="RemovePhoto" class="profile-photo-remove">
+                                <button class="button button-small button-outline" type="submit">Remove photo</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+
                 <form method="post" asp-page-handler="Profile" class="profile-compact-form individual-intake-form">
                     <input type="hidden" asp-for="ReturnUrl" />
 
@@ -429,3 +451,15 @@
     refreshAge();
 })();
 </script>
+
+
+<style>
+.profile-photo-row{display:grid;grid-template-columns:88px minmax(0,1fr);gap:14px;align-items:start;padding:14px;border-bottom:1px solid #e1e6ea;background:#fbfcfd}
+.profile-photo-preview{width:88px;height:88px;border-radius:50%;object-fit:cover;border:1px solid #cfd7df;background:#e7edf2}
+.profile-photo-copy{display:grid;gap:5px;min-width:0}
+.profile-photo-copy>small{color:#667384}
+.profile-photo-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
+.profile-photo-actions input[type=file]{max-width:360px}
+.profile-photo-remove{margin-top:2px}
+@media(max-width:620px){.profile-photo-row{grid-template-columns:68px minmax(0,1fr)}.profile-photo-preview{width:68px;height:68px}.profile-photo-actions{align-items:stretch;flex-direction:column}.profile-photo-actions .button{align-self:start}}
+</style>
