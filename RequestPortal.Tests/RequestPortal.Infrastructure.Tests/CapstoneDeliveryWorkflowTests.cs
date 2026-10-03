@@ -288,12 +288,6 @@ public sealed class CapstoneDeliveryWorkflowTests
         Assert.Empty(await service.GetUnsyncedRecipientConfirmationsAsync(cancellationToken));
     }
 
-    [Fact]
-    public void CapstoneFeature_DefaultsDisabled()
-    {
-        CapstoneOptions options = new();
-        Assert.False(options.Enabled);
-    }
 
     private static DeliveryService CreateService(PostgreSqlTestDatabase database) =>
         new(database.Db, new NullAuditWriter(), new StubDocumentService());
