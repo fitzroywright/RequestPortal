@@ -1,6 +1,7 @@
 @page "{id:guid}"
 @model RequestPortal.Web.Pages.Requests.DetailsModel
 @using RequestPortal.Application.Documents
+@using RequestPortal.Application.Delivery
 @using RequestPortal.Application.ReferenceData
 @using RequestPortal.Application.Requests
 @using RequestPortal.Domain.Documents
@@ -191,7 +192,7 @@
                             <div class="capstone-delivery-list">
                                 @foreach (DeliveryView delivery in Model.Deliveries)
                                 {
-                                    DeliveryLineSnapshot[] lines = DetailsModel.ReadDeliveryLines(delivery.SnapshotJson);
+                                    DeliveryLineSnapshot[] lines = RequestPortal.Web.Pages.Requests.DetailsModel.ReadDeliveryLines(delivery.SnapshotJson);
                                     <article class="capstone-delivery">
                                         <div class="capstone-delivery-summary">
                                             <div>
