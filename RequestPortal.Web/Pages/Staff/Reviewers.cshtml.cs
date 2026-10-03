@@ -9,6 +9,10 @@ namespace RequestPortal.Web.Pages.Staff;
 
 public sealed record ReviewerOrganizationOption(Guid Id, string Name);
 public sealed record ReviewerRequestOption(Guid Id, Guid OrganizationId, string Reference, string OrganizationName);
+public sealed record ReviewerInvitationRow(
+    ExternalReviewerInvitationView Invitation,
+    string ScopeLabel,
+    string IssuedByName);
 
 public sealed class ReviewersModel : PageModel
 {
@@ -29,6 +33,8 @@ public sealed class ReviewersModel : PageModel
         Array.Empty<ReviewerOrganizationOption>();
     public IReadOnlyList<ReviewerRequestOption> Requests { get; private set; } =
         Array.Empty<ReviewerRequestOption>();
+    public IReadOnlyList<ReviewerInvitationRow> InvitationRows { get; private set; } =
+        Array.Empty<ReviewerInvitationRow>();
 
     [BindProperty]
     public string Email { get; set; } = string.Empty;
@@ -141,6 +147,63 @@ public sealed class ReviewersModel : PageModel
                 organization.Name))
             .Take(250)
             .ToListAsync(HttpContext.RequestAborted);
+
+        Dictionary<Guid, string> organizationNames =
+            Organizations.ToDictionary(item => item.Id, item => item.Name);
+        Dictionary<Guid, ReviewerRequestOption> requestOptions =
+            Requests.ToDictionary(item => item.Id);
+
+        Guid[] issuerIds = Invitations
+            .Select(item => item.InvitedByUserId)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        Dictionary<Guid, string> issuerNames = await dbContext.Users
+            .AsNoTracking()
+            .Where(user => issuerIds.Contains(user.Id))
+            .ToDictionaryAsync(
+                user => user.Id,
+                user => string.IsNullOrWhiteSpace(user.DisplayName)
+                    ? (user.Email ?? "FFP Staff")
+                    : user.DisplayName,
+                HttpContext.RequestAborted);
+
+        InvitationRows = Invitations
+            .Select(item => new ReviewerInvitationRow(
+                item,
+                BuildScopeLabel(item, organizationNames, requestOptions),
+                issuerNames.TryGetValue(item.InvitedByUserId, out string? issuerName)
+                    ? issuerName
+                    : "FFP Staff"))
+            .ToArray();
+    }
+
+    private static string BuildScopeLabel(
+        ExternalReviewerInvitationView invitation,
+        IReadOnlyDictionary<Guid, string> organizationNames,
+        IReadOnlyDictionary<Guid, ReviewerRequestOption> requestOptions)
+    {
+        if (invitation.OrganizationId.HasValue &&
+            organizationNames.TryGetValue(invitation.OrganizationId.Value, out string? organizationName))
+        {
+            return organizationName;
+        }
+
+        if (invitation.RequestId.HasValue &&
+            requestOptions.TryGetValue(invitation.RequestId.Value, out ReviewerRequestOption? request))
+        {
+            return $"{request.OrganizationName} · {request.Reference}";
+        }
+
+        return invitation.Scope switch
+        {
+            ExternalReviewerScopes.ManagementDashboard => "All aggregate management data",
+            ExternalReviewerScopes.DateRange => "Date range",
+            ExternalReviewerScopes.Organization => "Organization",
+            ExternalReviewerScopes.Request => "Request",
+            _ => invitation.Scope
+        };
     }
 
     private Guid GetActorId()
