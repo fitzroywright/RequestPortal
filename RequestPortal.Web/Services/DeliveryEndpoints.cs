@@ -18,15 +18,15 @@ public static class DeliveryEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
-            {
                 return Results.Unauthorized();
-            }
 
             string publicBaseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
             CreateDeliveryResult result = await service.CreateAsync(
                 command with { PublicBaseUrl = publicBaseUrl },
                 cancellationToken);
-            string url = $"/Delivery/{result.DeliveryId:D}?token={Uri.EscapeDataString(result.AccessToken)}";
+            string url = string.IsNullOrWhiteSpace(result.AccessToken)
+                ? string.Empty
+                : $"/Delivery/{result.DeliveryId:D}?token={Uri.EscapeDataString(result.AccessToken)}";
             return Results.Ok(new
             {
                 deliveryId = result.DeliveryId,
@@ -43,9 +43,7 @@ public static class DeliveryEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
-            {
                 return Results.Unauthorized();
-            }
 
             IReadOnlyList<DeliveryConfirmation> confirmations =
                 await service.GetUnsyncedConfirmationsAsync(cancellationToken);
@@ -60,14 +58,107 @@ public static class DeliveryEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
-            {
                 return Results.Unauthorized();
-            }
 
             await service.MarkSyncedAsync(deliveryId, cancellationToken);
             return Results.NoContent();
         }).AllowAnonymous();
 
+        group.MapGet("/recipient-confirmations", async (
+            HttpRequest request,
+            IDeliveryService service,
+            IConfiguration configuration,
+            IOptions<FfpManagerBridgeOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            if (!configuration.GetValue("Capstone:Enabled", false))
+                return Results.NotFound();
+            if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
+                return Results.Unauthorized();
+
+            IReadOnlyList<RecipientReceiptConfirmation> confirmations =
+                await service.GetUnsyncedRecipientConfirmationsAsync(cancellationToken);
+            return Results.Ok(confirmations);
+        }).AllowAnonymous();
+
+        group.MapPost("/{deliveryId:guid}/recipient-confirmation-synced", async (
+            Guid deliveryId,
+            HttpRequest request,
+            IDeliveryService service,
+            IConfiguration configuration,
+            IOptions<FfpManagerBridgeOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            if (!configuration.GetValue("Capstone:Enabled", false))
+                return Results.NotFound();
+            if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
+                return Results.Unauthorized();
+
+            await service.MarkRecipientConfirmationSyncedAsync(deliveryId, cancellationToken);
+            return Results.NoContent();
+        }).AllowAnonymous();
+
+        group.MapGet("/returns", async (
+            HttpRequest request,
+            IDeliveryService service,
+            IConfiguration configuration,
+            IOptions<FfpManagerBridgeOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            if (!configuration.GetValue("Capstone:Enabled", false))
+                return Results.NotFound();
+            if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
+                return Results.Unauthorized();
+
+            IReadOnlyList<DeliveryReturnSync> returns =
+                await service.GetUnsyncedReturnsAsync(cancellationToken);
+            return Results.Ok(returns);
+        }).AllowAnonymous();
+
+        group.MapPost("/returns/{returnId:guid}/synced", async (
+            Guid returnId,
+            ReturnSyncAcknowledgement acknowledgement,
+            HttpRequest request,
+            IDeliveryService service,
+            IConfiguration configuration,
+            IOptions<FfpManagerBridgeOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            if (!configuration.GetValue("Capstone:Enabled", false))
+                return Results.NotFound();
+            if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
+                return Results.Unauthorized();
+
+            await service.MarkReturnSyncedAsync(returnId, acknowledgement.FfpReturnId, cancellationToken);
+            return Results.NoContent();
+        }).AllowAnonymous();
+
+        group.MapPost("/returns/{returnId:guid}/status", async (
+            Guid returnId,
+            ReturnStatusUpdate update,
+            HttpRequest request,
+            IDeliveryService service,
+            IConfiguration configuration,
+            IOptions<FfpManagerBridgeOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            if (!configuration.GetValue("Capstone:Enabled", false))
+                return Results.NotFound();
+            if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
+                return Results.Unauthorized();
+
+            await service.ApplyReturnStatusAsync(
+                returnId,
+                update.Status,
+                update.Detail,
+                update.ChangedUtc,
+                cancellationToken);
+            return Results.NoContent();
+        }).AllowAnonymous();
+
         return endpoints;
     }
+
+    public sealed record ReturnSyncAcknowledgement(string? FfpReturnId);
+    public sealed record ReturnStatusUpdate(string Status, string? Detail, DateTimeOffset ChangedUtc);
 }
