@@ -11,6 +11,9 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public string? DirectoryUserName { get; set; }
     public DateTimeOffset CreatedUtc { get; set; }
     public DateTimeOffset? LastSignInUtc { get; set; }
+    public string? ProfilePhotoStorageKey { get; set; }
+    public string? ProfilePhotoContentType { get; set; }
+    public DateTimeOffset? ProfilePhotoUpdatedUtc { get; set; }
 
     // A representative account returns to individual mode when its final approved
     // organization membership ends. The profile must then be completed before
