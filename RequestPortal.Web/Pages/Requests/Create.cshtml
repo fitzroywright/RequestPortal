@@ -128,6 +128,10 @@
                                 </select>
                                 <span asp-validation-for="Input.OrganizationId" class="validation"></span>
                             </div>
+                            <div class="field request-priority-field">
+                                <label asp-for="Input.Priority">Priority</label>
+                                <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
+                            </div>
                             <div class="requester-field">
                                 <span class="requester-label">Submitted by</span>
                                 <strong>@Model.SubmittedByName</strong>
@@ -140,11 +144,6 @@
                                 <label asp-for="Input.Summary">Request summary</label>
                                 <input asp-for="Input.Summary" placeholder="A short title or one-line summary of the need" />
                                 <span asp-validation-for="Input.Summary" class="validation"></span>
-                            </div>
-
-                            <div class="field request-priority-field">
-                                <label asp-for="Input.Priority">Priority</label>
-                                <select asp-for="Input.Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select>
                             </div>
                         </div>
                     </section>
