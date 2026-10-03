@@ -73,6 +73,10 @@
             <nav class="mock-tabs" aria-label="Request detail sections">
                 <a class="is-active" href="#summary">Overview</a>
                 <a href="#items">Items (@Model.Request.Items.Count)</a>
+                @if (Model.CapstoneEnabled && Model.Deliveries.Count > 0)
+                {
+                    <a href="#delivery">Delivery</a>
+                }
                 <a href="#messages">Messages (@requestMessages.Length)</a>
                 <a href="#files">Files (@Model.Documents.Count)</a>
                 <a href="#history">History (@Model.Request.History.Count)</a>
