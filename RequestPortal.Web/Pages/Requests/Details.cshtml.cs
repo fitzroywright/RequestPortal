@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -39,6 +40,7 @@ public sealed class DetailsModel : PageModel
     private readonly IDeliveryService deliveryService;
     private readonly RequestPortalDbContext dbContext;
     private readonly IPortalMessageService messageService;
+    private readonly IConfiguration configuration;
 
     public DetailsModel(
         UserManager<ApplicationUser> userManager,
@@ -51,7 +53,8 @@ public sealed class DetailsModel : PageModel
         IExternalApplicationIntegrationService ffpManagerIntegrationService,
         IDeliveryService deliveryService,
         RequestPortalDbContext dbContext,
-        IPortalMessageService messageService)
+        IPortalMessageService messageService,
+        IConfiguration configuration)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -64,6 +67,7 @@ public sealed class DetailsModel : PageModel
         this.deliveryService = deliveryService;
         this.dbContext = dbContext;
         this.messageService = messageService;
+        this.configuration = configuration;
     }
 
     public new RequestDetail? Request { get; private set; }
@@ -71,6 +75,8 @@ public sealed class DetailsModel : PageModel
     public ProjectPlanningDetail? ProjectPlanning { get; private set; }
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
     public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
+    public IReadOnlyList<DeliveryReturnView> DeliveryReturns { get; private set; } = Array.Empty<DeliveryReturnView>();
+    public bool CapstoneEnabled { get; private set; }
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
     public IReadOnlyList<MessageThreadView> MessageThreads { get; private set; } = Array.Empty<MessageThreadView>();
     public bool DocumentsUnavailable { get; private set; }
@@ -167,6 +173,147 @@ public sealed class DetailsModel : PageModel
 
     [BindProperty]
     public InformationResponseInput InformationResponse { get; set; } = new();
+
+    [BindProperty]
+    public Guid ConfirmationDeliveryId { get; set; }
+
+    [BindProperty]
+    public List<decimal> ReceivedQuantities { get; set; } = new();
+
+    [BindProperty]
+    [StringLength(64)]
+    public string? DeliveryProblemType { get; set; }
+
+    [BindProperty]
+    [StringLength(2000)]
+    public string? DeliveryProblemDetail { get; set; }
+
+    [BindProperty]
+    public Guid ReturnDeliveryId { get; set; }
+
+    [BindProperty]
+    [StringLength(500)]
+    public string ReturnItemDescription { get; set; } = string.Empty;
+
+    [BindProperty]
+    [Range(typeof(decimal), "0.001", "999999999999")]
+    public decimal ReturnQuantity { get; set; }
+
+    [BindProperty]
+    [StringLength(2000, MinimumLength = 2)]
+    public string ReturnReason { get; set; } = string.Empty;
+
+
+    public async Task<IActionResult> OnPostConfirmReceiptAsync(Guid id)
+    {
+        if (!configuration.GetValue("Capstone:Enabled", false))
+            return NotFound();
+
+        ApplicationUser user = await GetUserAsync();
+        IReadOnlyList<DeliveryView> deliveries =
+            await deliveryService.GetForRecipientRequestAsync(user.Id, id, HttpContext.RequestAborted);
+        DeliveryView? delivery = deliveries.SingleOrDefault(item => item.Id == ConfirmationDeliveryId);
+        if (delivery is null)
+            return NotFound();
+
+        DeliveryLineSnapshot[] expected = ReadDeliveryLines(delivery.SnapshotJson);
+        if (ReceivedQuantities.Count != expected.Length)
+        {
+            ModelState.AddModelError(string.Empty, "Review every delivered item before confirming receipt.");
+            return await LoadPageAsync(user, id);
+        }
+
+        List<RecipientConfirmedLine> confirmed = new();
+        List<DeliveryDiscrepancy> discrepancies = new();
+        for (int i = 0; i < expected.Length; i++)
+        {
+            decimal received = ReceivedQuantities[i];
+            DeliveryLineSnapshot line = expected[i];
+            if (received < 0 || received > line.Quantity)
+            {
+                ModelState.AddModelError(string.Empty, $"Received quantity for {line.Description} must be between 0 and {line.Quantity}.");
+                return await LoadPageAsync(user, id);
+            }
+
+            confirmed.Add(new RecipientConfirmedLine(
+                line.Description,
+                line.Quantity,
+                received,
+                line.UnitOfMeasure));
+
+            if (received != line.Quantity)
+            {
+                discrepancies.Add(new DeliveryDiscrepancy(
+                    "IncorrectQuantity",
+                    line.Description,
+                    line.Quantity,
+                    received,
+                    null));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(DeliveryProblemType) ||
+            !string.IsNullOrWhiteSpace(DeliveryProblemDetail))
+        {
+            discrepancies.Add(new DeliveryDiscrepancy(
+                string.IsNullOrWhiteSpace(DeliveryProblemType) ? "Other" : DeliveryProblemType.Trim(),
+                null,
+                null,
+                null,
+                DeliveryProblemDetail));
+        }
+
+        try
+        {
+            await deliveryService.ConfirmReceiptAsync(
+                user.Id,
+                id,
+                delivery.Id,
+                confirmed,
+                discrepancies,
+                HttpContext.RequestAborted);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(string.Empty, exception.Message);
+            return await LoadPageAsync(user, id);
+        }
+
+        TempData["Success"] = discrepancies.Count == 0
+            ? "Receipt confirmed. Food For The Poor will receive your confirmation."
+            : "Receipt confirmation and delivery discrepancy recorded for Food For The Poor.";
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostInitiateReturnAsync(Guid id)
+    {
+        if (!configuration.GetValue("Capstone:Enabled", false))
+            return NotFound();
+
+        ApplicationUser user = await GetUserAsync();
+        if (!ModelState.IsValid)
+            return await LoadPageAsync(user, id);
+
+        try
+        {
+            await deliveryService.InitiateReturnAsync(
+                user.Id,
+                id,
+                ReturnDeliveryId,
+                ReturnItemDescription,
+                ReturnQuantity,
+                ReturnReason,
+                HttpContext.RequestAborted);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(string.Empty, exception.Message);
+            return await LoadPageAsync(user, id);
+        }
+
+        TempData["Success"] = "Return request sent to Food For The Poor for processing.";
+        return RedirectToPage(new { id });
+    }
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
@@ -541,7 +688,23 @@ public sealed class DetailsModel : PageModel
             id,
             isStaff: false,
             HttpContext.RequestAborted);
-        Deliveries = await deliveryService.GetForRequestAsync(id, HttpContext.RequestAborted);
+        CapstoneEnabled = configuration.GetValue("Capstone:Enabled", false);
+        if (CapstoneEnabled)
+        {
+            Deliveries = await deliveryService.GetForRecipientRequestAsync(
+                user.Id,
+                id,
+                HttpContext.RequestAborted);
+            DeliveryReturns = await deliveryService.GetReturnsForRequestAsync(
+                user.Id,
+                id,
+                HttpContext.RequestAborted);
+        }
+        else
+        {
+            Deliveries = Array.Empty<DeliveryView>();
+            DeliveryReturns = Array.Empty<DeliveryReturnView>();
+        }
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
 
         if (Item.UnitOfMeasureId == Guid.Empty && UnitsOfMeasure.Count > 0)
@@ -550,6 +713,28 @@ public sealed class DetailsModel : PageModel
         }
 
         return Page();
+    }
+
+    public static DeliveryLineSnapshot[] ReadDeliveryLines(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("Lines", out JsonElement lines) ||
+            lines.ValueKind != JsonValueKind.Array)
+            return Array.Empty<DeliveryLineSnapshot>();
+
+        return lines.EnumerateArray()
+            .Select(line => new DeliveryLineSnapshot(
+                line.TryGetProperty("Description", out JsonElement description)
+                    ? description.GetString() ?? string.Empty
+                    : string.Empty,
+                line.TryGetProperty("Quantity", out JsonElement quantity) &&
+                quantity.TryGetDecimal(out decimal value)
+                    ? value
+                    : 0m,
+                line.TryGetProperty("UnitOfMeasure", out JsonElement unit)
+                    ? unit.GetString()
+                    : null))
+            .ToArray();
     }
 
     private bool IsExternalReviewer()
