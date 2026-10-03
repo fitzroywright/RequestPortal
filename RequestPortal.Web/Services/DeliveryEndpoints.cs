@@ -67,12 +67,9 @@ public static class DeliveryEndpoints
         group.MapGet("/recipient-confirmations", async (
             HttpRequest request,
             IDeliveryService service,
-            IConfiguration configuration,
             IOptions<FfpManagerBridgeOptions> options,
             CancellationToken cancellationToken) =>
         {
-            if (!configuration.GetValue("Capstone:Enabled", false))
-                return Results.NotFound();
             if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
                 return Results.Unauthorized();
 
@@ -85,12 +82,9 @@ public static class DeliveryEndpoints
             Guid deliveryId,
             HttpRequest request,
             IDeliveryService service,
-            IConfiguration configuration,
             IOptions<FfpManagerBridgeOptions> options,
             CancellationToken cancellationToken) =>
         {
-            if (!configuration.GetValue("Capstone:Enabled", false))
-                return Results.NotFound();
             if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
                 return Results.Unauthorized();
 
@@ -101,12 +95,9 @@ public static class DeliveryEndpoints
         group.MapGet("/returns", async (
             HttpRequest request,
             IDeliveryService service,
-            IConfiguration configuration,
             IOptions<FfpManagerBridgeOptions> options,
             CancellationToken cancellationToken) =>
         {
-            if (!configuration.GetValue("Capstone:Enabled", false))
-                return Results.NotFound();
             if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
                 return Results.Unauthorized();
 
@@ -120,12 +111,9 @@ public static class DeliveryEndpoints
             ReturnSyncAcknowledgement acknowledgement,
             HttpRequest request,
             IDeliveryService service,
-            IConfiguration configuration,
             IOptions<FfpManagerBridgeOptions> options,
             CancellationToken cancellationToken) =>
         {
-            if (!configuration.GetValue("Capstone:Enabled", false))
-                return Results.NotFound();
             if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
                 return Results.Unauthorized();
 
@@ -138,12 +126,9 @@ public static class DeliveryEndpoints
             ReturnStatusUpdate update,
             HttpRequest request,
             IDeliveryService service,
-            IConfiguration configuration,
             IOptions<FfpManagerBridgeOptions> options,
             CancellationToken cancellationToken) =>
         {
-            if (!configuration.GetValue("Capstone:Enabled", false))
-                return Results.NotFound();
             if (!FfpManagerEndpointAuthorization.IsAuthorized(request, options.Value.SharedSecret))
                 return Results.Unauthorized();
 
