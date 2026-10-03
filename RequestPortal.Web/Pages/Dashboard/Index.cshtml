@@ -219,7 +219,16 @@
                             @foreach (MailboxMessageView message in Model.RecentMessages)
                             {
                                 <a class="dashboard-message-row" asp-page="/Messages/Thread" asp-route-id="@message.ThreadId">
-                                    <span class="dashboard-message-avatar @(message.SenderKind == "Staff" ? "staff" : "requester")">@Initials(message.SenderName)</span>
+                                    @if (message.SenderKind == "Representative")
+                                    {
+                                        <img class="dashboard-message-avatar dashboard-message-avatar-image"
+                                             src="@(message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
+                                             alt="" />
+                                    }
+                                    else
+                                    {
+                                        <span class="dashboard-message-avatar staff">@Initials(message.SenderName)</span>
+                                    }
                                     <span class="dashboard-message-copy">
                                         <span class="dashboard-message-meta">
                                             <strong>@message.SenderName</strong>
@@ -292,3 +301,8 @@
 })();
 </script>
 }
+
+
+<style>
+.dashboard-message-avatar-image{object-fit:cover;border:1px solid #cfd7df;background:#e7edf2}
+</style>
