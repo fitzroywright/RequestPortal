@@ -71,83 +71,86 @@
                     </span>
                 }
             </a>
-            <nav class="main-nav @(useApplicationShell ? "app-main-nav" : null)">
+            @if (!isOpeningPage)
+            {
+                <nav class="main-nav @(useApplicationShell ? "app-main-nav" : null)">
 
-                @if (isAuthenticated)
-                {
-                    if (isExternalReviewer)
+                    @if (isAuthenticated)
                     {
-                        <a asp-page="/ExternalReview/Index">External Review</a>
-                        <form method="post" asp-page="/ExternalReview/Index" asp-page-handler="SignOut" class="nav-form">
-                            <button type="submit" class="nav-link-button">End review session</button>
-                        </form>
-                    }
-                    else if (isFfpStaff)
-                    {
-                        <a asp-page="/Staff/Operations">Requests</a>
-                        <a asp-page="/Staff/Organizations">Organizations</a>
-                        <a asp-page="/Staff/Reports">Reports</a>
-                        @if (canViewManagement)
+                        if (isExternalReviewer)
                         {
-                            <a asp-page="/Management/Index">Management</a>
+                            <a asp-page="/ExternalReview/Index">External Review</a>
+                            <form method="post" asp-page="/ExternalReview/Index" asp-page-handler="SignOut" class="nav-form">
+                                <button type="submit" class="nav-link-button">End review session</button>
+                            </form>
                         }
-                        <a asp-page="/Staff/Reviewers">Reviewers</a>
+                        else if (isFfpStaff)
+                        {
+                            <a asp-page="/Staff/Operations">Requests</a>
+                            <a asp-page="/Staff/Organizations">Organizations</a>
+                            <a asp-page="/Staff/Reports">Reports</a>
+                            @if (canViewManagement)
+                            {
+                                <a asp-page="/Management/Index">Management</a>
+                            }
+                            <a asp-page="/Staff/Reviewers">Reviewers</a>
+                        }
+                        else
+                        {
+                            <a asp-page="/Dashboard/Index" class="@(string.Equals(currentPage, "/Dashboard/Index", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">◆</span>Request Workspace</a>
+                            <a asp-page="/Requests/Index" class="@(string.Equals(currentPage, "/Requests/Index", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">▤</span>My Requests</a>
+                            <a asp-page="/Requests/Create" class="@(string.Equals(currentPage, "/Requests/Create", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">✚</span>New Request</a>
+                            <a asp-page="/Account/Profile" class="@(string.Equals(currentPage, "/Account/Profile", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">●</span>My Profile</a>
+                            <a asp-page="/Organizations/Index" class="@(string.Equals(currentPage, "/Organizations/Index", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">♟</span>Organizations</a>
+                        }
+
+                        <a asp-page="/Messages/Inbox"
+                           class="app-message-link messages-nav-link"
+                           aria-label="Messages"
+                           title="Messages">
+                            <span class="app-message-icon" aria-hidden="true">✉</span>
+                            <span id="messageUnreadBadge" class="message-badge" hidden>0</span>
+                        </a>
+                        <div class="profile-menu">
+                            <button type="button"
+                                    class="profile-menu-trigger profile-menu-studio"
+                                    aria-expanded="false"
+                                    aria-controls="profileMenuPanel"
+                                    data-profile-menu-trigger>
+                                <span class="profile-menu-name">@profileFirstName</span>
+                                <span class="profile-avatar profile-avatar-studio" aria-hidden="true">@profileInitials</span>
+                            </button>
+                            <div id="profileMenuPanel" class="profile-menu-panel" hidden data-profile-menu-panel>
+                                <div class="profile-menu-header">
+                                    <span class="profile-avatar profile-avatar-large profile-avatar-studio" aria-hidden="true">@profileInitials</span>
+                                    <div>
+                                        <strong>@profileFirstName</strong>
+                                        <small>@(isFfpStaff ? "FFP Staff" : "Applicant / Representative")</small>
+                                    </div>
+                                </div>
+                                @if (!isFfpStaff && !isExternalReviewer)
+                                {
+                                    <div class="profile-menu-section">
+                                        <a asp-page="/Account/Profile">My profile</a>
+                                    </div>
+                                }
+                                <div class="profile-menu-section">
+                                    <form method="post" asp-page="/Account/Logout" class="profile-menu-signout">
+                                        <button type="submit">Sign out</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     }
                     else
                     {
-                        <a asp-page="/Dashboard/Index" class="@(string.Equals(currentPage, "/Dashboard/Index", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">◆</span>Request Workspace</a>
-                        <a asp-page="/Requests/Index" class="@(string.Equals(currentPage, "/Requests/Index", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">▤</span>My Requests</a>
-                        <a asp-page="/Requests/Create" class="@(string.Equals(currentPage, "/Requests/Create", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">✚</span>New Request</a>
-                        <a asp-page="/Account/Profile" class="@(string.Equals(currentPage, "/Account/Profile", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">●</span>My Profile</a>
-                        <a asp-page="/Organizations/Index" class="@(string.Equals(currentPage, "/Organizations/Index", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)"><span class="app-nav-icon" aria-hidden="true">♟</span>Organizations</a>
                     }
-
-                    <a asp-page="/Messages/Inbox"
-                       class="app-message-link messages-nav-link"
-                       aria-label="Messages"
-                       title="Messages">
-                        <span class="app-message-icon" aria-hidden="true">✉</span>
-                        <span id="messageUnreadBadge" class="message-badge" hidden>0</span>
-                    </a>
-                    <div class="profile-menu">
-                        <button type="button"
-                                class="profile-menu-trigger profile-menu-studio"
-                                aria-expanded="false"
-                                aria-controls="profileMenuPanel"
-                                data-profile-menu-trigger>
-                            <span class="profile-menu-name">@profileFirstName</span>
-                            <span class="profile-avatar profile-avatar-studio" aria-hidden="true">@profileInitials</span>
-                        </button>
-                        <div id="profileMenuPanel" class="profile-menu-panel" hidden data-profile-menu-panel>
-                            <div class="profile-menu-header">
-                                <span class="profile-avatar profile-avatar-large profile-avatar-studio" aria-hidden="true">@profileInitials</span>
-                                <div>
-                                    <strong>@profileFirstName</strong>
-                                    <small>@(isFfpStaff ? "FFP Staff" : "Applicant / Representative")</small>
-                                </div>
-                            </div>
-                            @if (!isFfpStaff && !isExternalReviewer)
-                            {
-                                <div class="profile-menu-section">
-                                    <a asp-page="/Account/Profile">My profile</a>
-                                </div>
-                            }
-                            <div class="profile-menu-section">
-                                <form method="post" asp-page="/Account/Logout" class="profile-menu-signout">
-                                    <button type="submit">Sign out</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                }
-                @if (!useApplicationShell && !isFfpStaff && !isExternalReviewer)
-                {
-                    <a class="button button-small donate-button" href="https://www.foodforthepoorja.org/hurricane-melissa-relief/" target="_blank" rel="noopener noreferrer">Donate</a>
-                }
-            </nav>
+                    @if (!useApplicationShell && !isFfpStaff && !isExternalReviewer)
+                    {
+                        <a class="button button-small donate-button" href="https://www.foodforthepoorja.org/hurricane-melissa-relief/" target="_blank" rel="noopener noreferrer">Donate</a>
+                    }
+                </nav>
+            }
         </div>
     </header>
 
