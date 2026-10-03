@@ -77,8 +77,16 @@
                                 @(message.ReadUtc is null ? "●" : "○")
                             </span>
                             <span class="outlook-sender">
-                                <strong>@message.SenderName</strong>
-                                <small>@message.SenderKind</small>
+                                @if (message.SenderKind == "Representative")
+                                {
+                                    <img class="message-list-avatar"
+                                         src="@(message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
+                                         alt="" />
+                                }
+                                <span class="outlook-sender-copy">
+                                    <strong>@message.SenderName</strong>
+                                    <small>@message.SenderKind</small>
+                                </span>
                             </span>
                             <span class="outlook-subject">
                                 <strong>@message.Subject</strong>
@@ -99,3 +107,10 @@
         </div>
     </div>
 </section>
+
+
+<style>
+.outlook-sender{grid-template-columns:30px minmax(0,1fr);align-items:center;column-gap:8px}
+.outlook-sender-copy{display:grid;min-width:0}
+.message-list-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid #cfd7df;background:#e7edf2}
+</style>
