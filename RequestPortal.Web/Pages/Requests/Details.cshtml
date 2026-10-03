@@ -74,7 +74,7 @@
             <nav class="mock-tabs" aria-label="Request detail sections">
                 <a class="is-active" href="#summary">Overview</a>
                 <a href="#items">Items (@Model.Request.Items.Count)</a>
-                @if (Model.Deliveries.Count > 0)
+                @if (Model.Request.Status is "Approved" or "PendingFulfilment" or "Fulfilled" or "Closed" || Model.Deliveries.Count > 0)
                 {
                     <a href="#delivery">Delivery</a>
                 }
@@ -180,7 +180,7 @@
                         }
                     </section>
 
-                    @if (Model.Deliveries.Count > 0)
+                    @if (Model.Request.Status is "Approved" or "PendingFulfilment" or "Fulfilled" or "Closed" || Model.Deliveries.Count > 0)
                     {
                         <section id="delivery" class="mock-panel">
                             <div class="mock-panel-head">
@@ -190,6 +190,10 @@
                                 </div>
                             </div>
                             <div class="capstone-delivery-list">
+                                @if (Model.Deliveries.Count == 0)
+                                {
+                                    <div class="mock-empty">No delivery has been recorded yet. Delivery information will appear here when Food For The Poor prepares the assistance for delivery.</div>
+                                }
                                 @foreach (DeliveryView delivery in Model.Deliveries)
                                 {
                                     DeliveryLineSnapshot[] lines = RequestPortal.Web.Pages.Requests.DetailsModel.ReadDeliveryLines(delivery.SnapshotJson);
