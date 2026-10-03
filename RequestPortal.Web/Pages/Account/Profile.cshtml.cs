@@ -93,7 +93,7 @@ public sealed class ProfileModel : PageModel
 
         if (!ModelState.IsValid)
         {
-            await LoadAsync(user);
+            await LoadAsync(user, preserveInput: true);
             return Page();
         }
 
@@ -132,7 +132,7 @@ public sealed class ProfileModel : PageModel
             foreach (IdentityError error in result.Errors)
                 ModelState.AddModelError(string.Empty, error.Description);
 
-            await LoadAsync(user);
+            await LoadAsync(user, preserveInput: true);
             return Page();
         }
 
@@ -270,7 +270,7 @@ public sealed class ProfileModel : PageModel
 
         if (!ModelState.IsValid)
         {
-            await LoadAsync(user);
+            await LoadAsync(user, preserveInput: true);
             return Page();
         }
 
@@ -308,7 +308,7 @@ public sealed class ProfileModel : PageModel
 
         if (!ModelState.IsValid)
         {
-            await LoadAsync(user);
+            await LoadAsync(user, preserveInput: true);
             return Page();
         }
 
