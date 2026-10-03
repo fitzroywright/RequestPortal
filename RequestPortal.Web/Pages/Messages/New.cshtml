@@ -23,10 +23,10 @@
 
         @if (!Model.IsStaff)
         {
-            @if (Model.Organizations.Count > 1 && !Model.RequestId.HasValue)
+            @if (Model.Organizations.Count > 0 && !Model.RequestId.HasValue)
             {
                 <form method="get" class="message-compose-context">
-                    <label for="organizationId">Organization</label>
+                    <label for="organizationId">From</label>
                     <select id="organizationId" name="OrganizationId" onchange="this.form.submit()">
                         <option value="">Choose organization</option>
                         @foreach (var organization in Model.Organizations)
