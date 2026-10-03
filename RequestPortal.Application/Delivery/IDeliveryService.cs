@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace RequestPortal.Application.Delivery;
 
-public sealed record DeliveryLineSnapshot(string Description, decimal Quantity, string? UnitOfMeasure);
-public sealed record RecipientConfirmedLine(string Description, decimal ExpectedQuantity, decimal ReceivedQuantity, string? UnitOfMeasure);
+public sealed record DeliveryLineSnapshot(string Description, decimal Quantity, string? UnitOfMeasure, string? FfpDeliveryItemId = null);
+public sealed record RecipientConfirmedLine(string Description, decimal ExpectedQuantity, decimal ReceivedQuantity, string? UnitOfMeasure, string? FfpDeliveryItemId = null);
 public sealed record DeliveryDiscrepancy(string Type, string? ItemDescription, decimal? ExpectedQuantity, decimal? ReceivedQuantity, string? Detail);
 
 public sealed record CreateDeliveryCommand(
@@ -89,6 +89,7 @@ public sealed record DeliveryReturnSync(
     Guid RequestId,
     Guid DeliveryId,
     string FfpDeliveryOrderId,
+    string? FfpDeliveryItemId,
     string ItemDescription,
     decimal Quantity,
     string Reason,
