@@ -21,6 +21,10 @@ internal static class ProductionCommissioning
             configuration["Notifications:WhatsAppAccessTokenSecretName"]?.Trim()
             ?? "messaging/whatsapp/access-token";
 
+        string messagingGraphSecretName =
+            configuration["Messaging:MicrosoftGraph:ClientSecretName"]?.Trim()
+            ?? "messaging/msgraph/client-secret";
+
         return new RuntimeSecrets(
             await provider.GetAsync("ConnectionStrings:RequestPortal"),
             await provider.GetAsync("Authentication:Google:ClientSecret"),
@@ -31,7 +35,8 @@ internal static class ProductionCommissioning
             await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
             await provider.GetAsync(integrationSharedSecretName),
             await provider.GetAsync(storageSecretName),
-            await provider.GetAsync(whatsAppSecretName));
+            await provider.GetAsync(whatsAppSecretName),
+            await provider.GetAsync(messagingGraphSecretName));
     }
 
     public static IReadOnlyList<ProductionConfigurationFailure> Validate(
@@ -51,7 +56,7 @@ internal static class ProductionCommissioning
         string keyPath = configuration["Security:DataProtectionKeysPath"] ?? string.Empty;
         string allowedHosts = configuration["AllowedHosts"] ?? string.Empty;
         bool malwareScanningEnabled = configuration.GetValue("Uploads:MalwareScanning:Enabled", false);
-        bool notificationsEnabled = configuration.GetValue("Notifications:Enabled", false);
+        bool graphEmailEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
         bool whatsAppEnabled = configuration.GetValue("Notifications:WhatsAppEnabled", false);
         string whatsAppPhoneNumberId = configuration["Notifications:WhatsAppPhoneNumberId"] ?? string.Empty;
         string whatsAppGraphApiVersion = configuration["Notifications:WhatsAppGraphApiVersion"] ?? string.Empty;
@@ -122,11 +127,13 @@ internal static class ProductionCommissioning
         AddIf(whatsAppEnabled && (string.IsNullOrWhiteSpace(whatsAppPhoneNumberId) || string.IsNullOrWhiteSpace(whatsAppGraphApiVersion) || string.IsNullOrWhiteSpace(secrets.WhatsAppAccessToken)),
             "RP-PROD-WHATSAPP-001",
             "WhatsApp requires GraphApiVersion, PhoneNumberId and a Common.Secrets-backed access token.");
-        AddIf(!notificationsEnabled ||
-              string.IsNullOrWhiteSpace(configuration["Notifications:SmtpHost"]) ||
-              string.IsNullOrWhiteSpace(configuration["Notifications:FromAddress"]),
-            "RP-PROD-SMTP-001",
-            "SMTP notifications must be commissioned for production.");
+        AddIf(!graphEmailEnabled ||
+              string.IsNullOrWhiteSpace(configuration["Messaging:MicrosoftGraph:TenantId"]) ||
+              string.IsNullOrWhiteSpace(configuration["Messaging:MicrosoftGraph:ClientId"]) ||
+              string.IsNullOrWhiteSpace(configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]) ||
+              string.IsNullOrWhiteSpace(secrets.MessagingMicrosoftGraphClientSecret),
+            "RP-PROD-MESSAGING-MS365-001",
+            "Common.Messaging Microsoft 365 email requires TenantId, ClientId, SenderUpn and a Common.Secrets-backed client secret.");
         AddIf(string.IsNullOrWhiteSpace(configuration["Messaging:DurableQueuePath"]),
             "RP-PROD-MESSAGING-001",
             "Common.Messaging durable queue path must be configured in production.");
@@ -175,7 +182,8 @@ internal sealed record RuntimeSecrets(
     string? StaffOidcClientSecret,
     string? FfpManagerSharedSecret,
     string? StorageSharePointClientSecret,
-    string? WhatsAppAccessToken);
+    string? WhatsAppAccessToken,
+    string? MessagingMicrosoftGraphClientSecret);
 
 internal sealed record ProductionConfigurationFailure(
     string Code,
