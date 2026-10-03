@@ -40,7 +40,6 @@ public sealed class DetailsModel : PageModel
     private readonly IDeliveryService deliveryService;
     private readonly RequestPortalDbContext dbContext;
     private readonly IPortalMessageService messageService;
-    private readonly IConfiguration configuration;
 
     public DetailsModel(
         UserManager<ApplicationUser> userManager,
@@ -53,8 +52,7 @@ public sealed class DetailsModel : PageModel
         IExternalApplicationIntegrationService ffpManagerIntegrationService,
         IDeliveryService deliveryService,
         RequestPortalDbContext dbContext,
-        IPortalMessageService messageService,
-        IConfiguration configuration)
+        IPortalMessageService messageService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -67,7 +65,6 @@ public sealed class DetailsModel : PageModel
         this.deliveryService = deliveryService;
         this.dbContext = dbContext;
         this.messageService = messageService;
-        this.configuration = configuration;
     }
 
     public new RequestDetail? Request { get; private set; }
@@ -76,7 +73,6 @@ public sealed class DetailsModel : PageModel
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
     public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
     public IReadOnlyList<DeliveryReturnView> DeliveryReturns { get; private set; } = Array.Empty<DeliveryReturnView>();
-    public bool CapstoneEnabled { get; private set; }
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
     public IReadOnlyList<MessageThreadView> MessageThreads { get; private set; } = Array.Empty<MessageThreadView>();
     public bool DocumentsUnavailable { get; private set; }
@@ -206,9 +202,6 @@ public sealed class DetailsModel : PageModel
 
     public async Task<IActionResult> OnPostConfirmReceiptAsync(Guid id)
     {
-        if (!configuration.GetValue("Capstone:Enabled", false))
-            return NotFound();
-
         ApplicationUser user = await GetUserAsync();
         IReadOnlyList<DeliveryView> deliveries =
             await deliveryService.GetForRecipientRequestAsync(user.Id, id, HttpContext.RequestAborted);
@@ -288,9 +281,6 @@ public sealed class DetailsModel : PageModel
 
     public async Task<IActionResult> OnPostInitiateReturnAsync(Guid id)
     {
-        if (!configuration.GetValue("Capstone:Enabled", false))
-            return NotFound();
-
         ApplicationUser user = await GetUserAsync();
         if (!ModelState.IsValid)
             return await LoadPageAsync(user, id);
@@ -689,23 +679,14 @@ public sealed class DetailsModel : PageModel
             id,
             isStaff: false,
             HttpContext.RequestAborted);
-        CapstoneEnabled = configuration.GetValue("Capstone:Enabled", false);
-        if (CapstoneEnabled)
-        {
-            Deliveries = await deliveryService.GetForRecipientRequestAsync(
-                user.Id,
-                id,
-                HttpContext.RequestAborted);
-            DeliveryReturns = await deliveryService.GetReturnsForRequestAsync(
-                user.Id,
-                id,
-                HttpContext.RequestAborted);
-        }
-        else
-        {
-            Deliveries = Array.Empty<DeliveryView>();
-            DeliveryReturns = Array.Empty<DeliveryReturnView>();
-        }
+        Deliveries = await deliveryService.GetForRecipientRequestAsync(
+            user.Id,
+            id,
+            HttpContext.RequestAborted);
+        DeliveryReturns = await deliveryService.GetReturnsForRequestAsync(
+            user.Id,
+            id,
+            HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
 
         if (Item.UnitOfMeasureId == Guid.Empty && UnitsOfMeasure.Count > 0)
