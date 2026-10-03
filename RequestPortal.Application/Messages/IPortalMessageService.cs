@@ -4,6 +4,7 @@ namespace RequestPortal.Application.Messages;
 
 public sealed record MailboxMessageView(
     Guid MessageId,
+    Guid? SenderUserId,
     Guid ThreadId,
     string Subject,
     string SenderName,
@@ -41,6 +42,7 @@ public sealed record MessageAttachmentView(
 
 public sealed record MessageDetailView(
     Guid MessageId,
+    Guid? SenderUserId,
     string SenderName,
     string SenderKind,
     string? SenderEmail,
