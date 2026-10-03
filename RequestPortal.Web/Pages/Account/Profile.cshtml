@@ -208,6 +208,26 @@
                                 </select>
                                 <span asp-validation-for="ProfileInput.HousingSituation" class="validation"></span>
                             </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.ReferralSource">Referral source</label>
+                                <select asp-for="ProfileInput.ReferralSource">
+                                    <option value="">Select referral source</option>
+                                    <option>Food For The Poor staff</option>
+                                    <option>Government agency</option>
+                                    <option>Church / Faith-based organization</option>
+                                    <option>Community organization</option>
+                                    <option>School / Educational institution</option>
+                                    <option>Health facility</option>
+                                    <option>NGO / Charity</option>
+                                    <option>Family / Friend</option>
+                                    <option>Previous applicant / beneficiary</option>
+                                    <option>Social media</option>
+                                    <option>Food For The Poor website</option>
+                                    <option>Walk-in</option>
+                                    <option>Other</option>
+                                </select>
+                                <span asp-validation-for="ProfileInput.ReferralSource" class="validation"></span>
+                            </div>
                         </div>
                         <div class="field">
                             <label asp-for="ProfileInput.HouseholdLivingSituation">Household / living situation</label>

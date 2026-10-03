@@ -21,6 +21,7 @@ public sealed class IndividualProfileCompletenessTests
         Assert.Contains("date of birth", user.GetMissingIndividualProfileFields());
         Assert.Contains("national ID / TRN", user.GetMissingIndividualProfileFields());
         Assert.Contains("housing situation", user.GetMissingIndividualProfileFields());
+        Assert.Contains("referral source", user.GetMissingIndividualProfileFields());
     }
 
     [Fact]
@@ -46,7 +47,8 @@ public sealed class IndividualProfileCompletenessTests
             NumberOfDependants = 2,
             ChildrenUnder18 = 2,
             HousingSituation = "Rent",
-            HouseholdLivingSituation = "Four-person household in rented accommodation."
+            HouseholdLivingSituation = "Four-person household in rented accommodation.",
+            ReferralSource = "Community organization"
         };
 
         Assert.True(user.IsIndividualProfileComplete);

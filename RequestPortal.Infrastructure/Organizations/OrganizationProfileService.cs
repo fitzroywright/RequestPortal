@@ -78,6 +78,7 @@ public sealed class OrganizationProfileService : IOrganizationProfileService
             organization.AnnualOperatingBudget,
             organization.PrimaryFundingSources,
             organization.PremisesSituation,
+            organization.ReferralSource,
             organization.RegistrationExpiryDate);
     }
 
@@ -128,6 +129,7 @@ public sealed class OrganizationProfileService : IOrganizationProfileService
             update.AnnualOperatingBudget,
             update.PrimaryFundingSources,
             update.PremisesSituation,
+            update.ReferralSource,
             update.RegistrationExpiryDate);
 
         await dbContext.SaveChangesAsync(cancellationToken);

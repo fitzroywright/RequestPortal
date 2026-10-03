@@ -81,6 +81,7 @@ public sealed class ProfileModel : PageModel
             AnnualOperatingBudget = Organization.AnnualOperatingBudget,
             PrimaryFundingSources = Organization.PrimaryFundingSources,
             PremisesSituation = Organization.PremisesSituation,
+            ReferralSource = Organization.ReferralSource,
             RegistrationExpiryDate = Organization.RegistrationExpiryDate
         };
 
@@ -132,6 +133,7 @@ public sealed class ProfileModel : PageModel
                 Input.AnnualOperatingBudget,
                 Input.PrimaryFundingSources,
                 Input.PremisesSituation,
+                Input.ReferralSource,
                 Input.RegistrationExpiryDate),
             HttpContext.RequestAborted);
 
@@ -267,6 +269,9 @@ public sealed class ProfileModel : PageModel
 
         [StringLength(500)]
         public string? PremisesSituation { get; set; }
+
+        [Required, StringLength(150)]
+        public string? ReferralSource { get; set; }
 
         public DateOnly? RegistrationExpiryDate { get; set; }
     }

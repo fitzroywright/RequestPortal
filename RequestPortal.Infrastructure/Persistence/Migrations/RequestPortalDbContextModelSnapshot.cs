@@ -739,6 +739,10 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ReferralSource")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.Property<bool?>("PreviouslyReceivedFfpAssistance")
                         .HasColumnType("boolean");
 
@@ -1502,6 +1506,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("Parish")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReferralSource")
                         .HasColumnType("text");
 
                     b.Property<string>("Town")

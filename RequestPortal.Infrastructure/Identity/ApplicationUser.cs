@@ -36,6 +36,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public int? ChildrenUnder18 { get; set; }
     public string? HousingSituation { get; set; }
     public string? HouseholdLivingSituation { get; set; }
+    public string? ReferralSource { get; set; }
 
     public IReadOnlyList<string> GetMissingIndividualProfileFields()
     {
@@ -58,6 +59,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
         if (!ChildrenUnder18.HasValue) missing.Add("children under 18");
         if (string.IsNullOrWhiteSpace(HousingSituation)) missing.Add("housing situation");
         if (string.IsNullOrWhiteSpace(HouseholdLivingSituation)) missing.Add("household / living situation");
+        if (string.IsNullOrWhiteSpace(ReferralSource)) missing.Add("referral source");
         return missing;
     }
 
