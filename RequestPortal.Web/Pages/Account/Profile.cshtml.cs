@@ -104,6 +104,7 @@ public sealed class ProfileModel : PageModel
         user.ChildrenUnder18 = ProfileInput.ChildrenUnder18;
         user.HousingSituation = ProfileInput.HousingSituation.Trim();
         user.HouseholdLivingSituation = ProfileInput.HouseholdLivingSituation.Trim();
+        user.ReferralSource = ProfileInput.ReferralSource.Trim();
         user.IndividualProfileUpdateRequired = !user.IsIndividualProfileComplete;
         user.IndividualProfileUpdateRequiredUtc = user.IndividualProfileUpdateRequired
             ? DateTimeOffset.UtcNow
@@ -231,7 +232,8 @@ public sealed class ProfileModel : PageModel
                 NumberOfDependants = user.NumberOfDependants,
                 ChildrenUnder18 = user.ChildrenUnder18,
                 HousingSituation = user.HousingSituation ?? string.Empty,
-                HouseholdLivingSituation = user.HouseholdLivingSituation ?? string.Empty
+                HouseholdLivingSituation = user.HouseholdLivingSituation ?? string.Empty,
+                ReferralSource = user.ReferralSource ?? string.Empty
             };
         }
 
@@ -361,6 +363,9 @@ public sealed class ProfileModel : PageModel
 
         [Required, StringLength(4000, MinimumLength = 5)]
         public string HouseholdLivingSituation { get; set; } = string.Empty;
+
+        [Required, StringLength(150)]
+        public string ReferralSource { get; set; } = string.Empty;
     }
 
     public sealed class PreferenceInput
