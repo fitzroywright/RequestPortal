@@ -465,6 +465,15 @@
       "secretName": "FfpManagerIntegration:SharedSecret",
       "isConfigured": false,
       "sensitive": true
+    },
+    {
+      "id": "capstone-enabled",
+      "displayName": "Capstone delivery confirmation workflow",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Controls recipient delivery confirmation, discrepancy reporting, and return initiation after FFP Manager delivery synchronization.",
+      "configurationKey": "Capstone:Enabled",
+      "isConfigured": false
     }
   ],
   "runbookReference": "docs/RUNBOOK.md",
