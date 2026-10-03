@@ -67,6 +67,12 @@
                 {
                     <article class="message-bubble @(message.IsMine ? "message-mine" : null)">
                         <div class="message-meta">
+                            @if (message.SenderKind == "Representative")
+                            {
+                                <img class="message-thread-avatar"
+                                     src="@(message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
+                                     alt="" />
+                            }
                             <strong>@message.SenderName</strong>
                             @if (message.SenderKind == "FFP Staff")
                             {
@@ -138,3 +144,9 @@
         }
     </div>
 </section>
+
+
+<style>
+.message-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.message-thread-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid #cfd7df;background:#e7edf2}
+</style>
