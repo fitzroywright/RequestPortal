@@ -68,6 +68,7 @@ public partial class AddCapstoneDeliveryWorkflow : Migration
                 Id = table.Column<Guid>(type: "uuid", nullable: false),
                 RequestId = table.Column<Guid>(type: "uuid", nullable: false),
                 DeliveryId = table.Column<Guid>(type: "uuid", nullable: false),
+                FfpDeliveryItemId = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: true),
                 ItemDescription = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                 Quantity = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: false),
                 Reason = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
