@@ -54,6 +54,8 @@ public sealed class NewModel(
 
     public string? RequestReference { get; private set; }
 
+    public string? RequestOrganizationName { get; private set; }
+
     [BindProperty]
     [Required]
     [StringLength(10000)]
@@ -175,6 +177,22 @@ public sealed class NewModel(
             Organizations = organizations
                 .Select(item => new OrganizationOption(item.Id, item.Name))
                 .ToArray();
+
+            if (RequestId.HasValue)
+            {
+                RequestDetail? request = await workflowService.GetRequestAsync(
+                    userId,
+                    RequestId.Value,
+                    isStaff: true,
+                    HttpContext.RequestAborted);
+
+                if (request is not null)
+                {
+                    OrganizationId = request.OrganizationId;
+                    RequestReference = request.PublicReference;
+                    RequestOrganizationName = request.OrganizationName;
+                }
+            }
         }
         else
         {
