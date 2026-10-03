@@ -1617,6 +1617,15 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<string>("Parish")
                         .HasColumnType("text");
 
+                    b.Property<string>("ProfilePhotoContentType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProfilePhotoStorageKey")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("ProfilePhotoUpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ReferralSource")
                         .HasColumnType("text");
 
