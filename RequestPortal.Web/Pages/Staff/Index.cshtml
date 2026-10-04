@@ -19,7 +19,6 @@
                     <input name="requestCode" maxlength="40" placeholder="Request code" aria-label="Request code" />
                     <button class="button button-small" type="submit">Find request</button>
                 </form>
-                <a class="button" asp-page="/Staff/Operations">Action queues</a>
                 <a class="button button-secondary" asp-page="/Staff/Organizations">Organizations</a>
                 <a class="button button-secondary" asp-page="/Staff/Reports">Reports</a>
                 <a class="button button-secondary" asp-page="/Staff/Reviewers">Invite Reviewer</a>
@@ -36,11 +35,11 @@
                 </div>
 
                 <div class="status-list" role="list">
-                    <a class="status-row" asp-page="/Staff/Operations">
+                    <a class="status-row" asp-page="/Staff/Index">
                         <span>Requests awaiting review</span>
                         <strong>@Model.Operations.OpenReviewRequests.Count</strong>
                     </a>
-                    <a class="status-row" asp-page="/Staff/Operations">
+                    <a class="status-row" asp-page="/Staff/Index">
                         <span>More information</span>
                         <strong>@Model.Operations.ActionRequiredRequests.Count</strong>
                     </a>
@@ -48,15 +47,15 @@
                         <span>Organizations pending</span>
                         <strong>@Model.Operations.PendingOrganizations.Count</strong>
                     </a>
-                    <a class="status-row" asp-page="/Staff/Operations">
+                    <a class="status-row" asp-page="/Staff/Organizations">
                         <span>Documents awaiting verification</span>
                         <strong>@Model.Operations.DocumentsAwaitingVerification.Count</strong>
                     </a>
-                    <a class="status-row" asp-page="/Staff/Operations">
+                    <a class="status-row" asp-page="/Staff/Organizations">
                         <span>Reverification</span>
                         <strong>@Model.Operations.ReverificationOrganizations.Count</strong>
                     </a>
-                    <a class="status-row" asp-page="/Staff/Operations">
+                    <a class="status-row" asp-page="/Staff/Integrations">
                         <span>Dead letters</span>
                         <strong>@Model.Operations.DeadLetters.Count</strong>
                     </a>
@@ -70,7 +69,6 @@
                     <strong>Actions</strong>
                 </div>
                 <nav class="actions-list" aria-label="Requests actions">
-                    <a asp-page="/Staff/Operations">Action &amp; aging queues <span>›</span></a>
                     <a asp-page="/Staff/Organizations">Organizations <span>›</span></a>
                     <a asp-page="/Staff/Fulfilment">Fulfilment <span>›</span></a>
                     <a asp-page="/Staff/Reports">Reports &amp; search <span>›</span></a>
@@ -88,7 +86,7 @@
                         <strong>Requests Awaiting Review</strong>
                         <small>@Model.SubmittedRequests.Count submitted requests in the current queue</small>
                     </div>
-                    <a asp-page="/Staff/Operations">View queue</a>
+                    <a asp-page="/Staff/Index">View queue</a>
                 </div>
 
                 @if (Model.SubmittedRequests.Count == 0)
@@ -136,7 +134,7 @@
                     @if (Model.SubmittedRequests.Count > 12)
                     {
                         <div class="workspace-panel-footer">
-                            <a asp-page="/Staff/Operations"><strong>View all submitted requests →</strong></a>
+                            <a asp-page="/Staff/Index"><strong>View all submitted requests →</strong></a>
                         </div>
                     }
                 }
@@ -183,11 +181,11 @@
                     </div>
                 </div>
                 <div class="attention-list">
-                    <a asp-page="/Staff/Operations">
+                    <a asp-page="/Staff/Organizations">
                         <strong>Documents</strong>
                         <span>@Model.Operations.DocumentsAwaitingVerification.Count awaiting verification</span>
                     </a>
-                    <a asp-page="/Staff/Operations">
+                    <a asp-page="/Staff/Organizations">
                         <strong>Reverification</strong>
                         <span>@Model.Operations.ReverificationOrganizations.Count organizations</span>
                     </a>
