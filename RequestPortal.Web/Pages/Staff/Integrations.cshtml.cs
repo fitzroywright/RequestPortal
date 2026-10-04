@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using RequestPortal.Application.Administration;
 using RequestPortal.Application.Integration;
 using RequestPortal.Infrastructure.Identity;
 using Common.Storage;
@@ -17,21 +18,32 @@ public sealed class IntegrationsModel : PageModel
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IFileStorage storage;
     private readonly IDiagnosticOperationsRouter diagnostics;
+    private readonly IStaffOperationsService staffOperationsService;
 
-    public IntegrationsModel(IIntegrationStatusService integrationStatusService, UserManager<ApplicationUser> userManager,
-        IFileStorage storage, IDiagnosticOperationsRouter diagnostics)
+    public IntegrationsModel(
+        IIntegrationStatusService integrationStatusService,
+        UserManager<ApplicationUser> userManager,
+        IFileStorage storage,
+        IDiagnosticOperationsRouter diagnostics,
+        IStaffOperationsService staffOperationsService)
     {
         this.integrationStatusService = integrationStatusService;
         this.userManager = userManager;
         this.storage = storage;
         this.diagnostics = diagnostics;
+        this.staffOperationsService = staffOperationsService;
     }
 
     public IReadOnlyList<IntegrationStatusSummary> Items { get; private set; } = Array.Empty<IntegrationStatusSummary>();
+    public IReadOnlyList<DeadLetterWorkItem> DeadLetters { get; private set; } = Array.Empty<DeadLetterWorkItem>();
+    public IReadOnlyList<NotificationDeliveryWorkItem> FailedNotificationDeliveries { get; private set; } = Array.Empty<NotificationDeliveryWorkItem>();
 
     public async Task OnGetAsync()
     {
         Items = await integrationStatusService.GetAllAsync(HttpContext.RequestAborted);
+        StaffOperationsSnapshot snapshot = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
+        DeadLetters = snapshot.DeadLetters;
+        FailedNotificationDeliveries = snapshot.FailedNotificationDeliveries;
     }
 
     public async Task<IActionResult> OnPostTestSharePointAsync()
@@ -113,6 +125,25 @@ public sealed class IntegrationsModel : PageModel
             ApplicationUser staffUser = await GetStaffUserAsync();
             await integrationStatusService.ReconcileAsync(staffUser.Id, linkId, HttpContext.RequestAborted);
             TempData["Success"] = "Integration reconciled with the external system.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            TempData["Error"] = exception.Message;
+        }
+
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostReplayDeadLetterAsync(Guid messageId)
+    {
+        try
+        {
+            ApplicationUser staffUser = await GetStaffUserAsync();
+            await staffOperationsService.ReplayDeadLetterAsync(
+                staffUser.Id,
+                messageId,
+                HttpContext.RequestAborted);
+            TempData["Success"] = "Dead-letter message queued for safe replay.";
         }
         catch (InvalidOperationException exception)
         {
