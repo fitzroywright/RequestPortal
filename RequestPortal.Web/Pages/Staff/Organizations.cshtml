@@ -50,3 +50,88 @@
         </div>
     </div>
 </section>
+
+
+<section class="section section-muted">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Registration renewal &amp; reverification</h2>
+            <p>Organizations approaching registration expiry or already overdue.</p>
+        </div>
+        @if (Model.ReverificationOrganizations.Count == 0)
+        {
+            <div class="card"><p>No organizations currently require registration renewal review.</p></div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Organization</th>
+                            <th>Country</th>
+                            <th>Status</th>
+                            <th>Expiry</th>
+                            <th>Timing</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (RequestPortal.Application.Administration.OrganizationReverificationWorkItem item in Model.ReverificationOrganizations)
+                    {
+                        <tr class="staff-select-row" data-row-href="/Staff/Organization/@item.OrganizationId" role="link" tabindex="0">
+                            <td>@item.OrganizationName</td>
+                            <td>@item.CountryCode</td>
+                            <td>@item.Status</td>
+                            <td>@item.ExpiryDate.ToString("yyyy-MM-dd")</td>
+                            <td>@(item.DaysUntilExpiry < 0 ? $"Expired {-item.DaysUntilExpiry} day(s) ago" : $"{item.DaysUntilExpiry} day(s) remaining")</td>
+                            <td><a asp-page="/Staff/Organization" asp-route-id="@item.OrganizationId">Review</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Documents awaiting verification</h2>
+            <p>Organization documents that still need staff verification.</p>
+        </div>
+        @if (Model.DocumentsAwaitingVerification.Count == 0)
+        {
+            <div class="card"><p>No documents are waiting for verification.</p></div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Organization</th>
+                            <th>Type</th>
+                            <th>File</th>
+                            <th>Age</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (RequestPortal.Application.Administration.DocumentWorkItem item in Model.DocumentsAwaitingVerification)
+                    {
+                        <tr class="staff-select-row" data-row-href="/Staff/Organization/@item.OrganizationId" role="link" tabindex="0">
+                            <td>@item.OrganizationName</td>
+                            <td>@item.DocumentType</td>
+                            <td>@item.OriginalFileName</td>
+                            <td>@item.AgeDays day(s)</td>
+                            <td><a asp-page="/Staff/Organization" asp-route-id="@item.OrganizationId">Open organization</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
