@@ -16,3 +16,93 @@
 @foreach(IntegrationStatusSummary item in Model.Items){<tr><td>@item.PublicReference</td><td>@item.OrganizationName</td><td>@item.SystemName</td><td>@item.Status</td><td>@(item.ExternalReference ?? "—")</td><td>@(item.LastAttemptUtc?.ToString("u") ?? "—")</td><td>@(item.LastError ?? "—")</td><td><div class="action-row">@if(item.Status==SynchronizationStatus.Failed || string.IsNullOrWhiteSpace(item.ExternalReference)){<form method="post" asp-page-handler="Retry"><input type="hidden" name="linkId" value="@item.LinkId"/><button class="button button-small" type="submit">Retry</button></form>}@if(!string.IsNullOrWhiteSpace(item.ExternalReference)){<form method="post" asp-page-handler="Reconcile"><input type="hidden" name="linkId" value="@item.LinkId"/><button class="button button-small button-outline" type="submit">Reconcile now</button></form>}</div></td></tr>}
 </tbody></table></div>}
 </section></div></section>
+
+
+<section class="section section-muted">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Dead-letter messages</h2>
+            <p>Messages appear here only after automatic retries are exhausted. Manual replay is audited and resets the retry budget.</p>
+        </div>
+        @if (Model.DeadLetters.Count == 0)
+        {
+            <div class="card"><p>No dead-letter messages.</p></div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Occurred</th>
+                            <th>Message type</th>
+                            <th>Attempts</th>
+                            <th>Last error</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (RequestPortal.Application.Administration.DeadLetterWorkItem item in Model.DeadLetters)
+                    {
+                        <tr>
+                            <td>@item.OccurredUtc.ToString("u")</td>
+                            <td>@item.MessageType</td>
+                            <td>@item.AttemptCount</td>
+                            <td>@item.LastError</td>
+                            <td>
+                                <form method="post" asp-page-handler="ReplayDeadLetter">
+                                    <input type="hidden" name="messageId" value="@item.MessageId" />
+                                    <button class="button button-small" type="submit">Replay</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="section">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Failed notification deliveries</h2>
+            <p>Recent failed and terminal outbound notification attempts.</p>
+        </div>
+        @if (Model.FailedNotificationDeliveries.Count == 0)
+        {
+            <div class="card"><p>No failed notification deliveries.</p></div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Created</th>
+                            <th>Channel</th>
+                            <th>Destination</th>
+                            <th>Subject</th>
+                            <th>Status</th>
+                            <th>Last error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (RequestPortal.Application.Administration.NotificationDeliveryWorkItem item in Model.FailedNotificationDeliveries)
+                    {
+                        <tr>
+                            <td>@item.CreatedUtc.ToString("u")</td>
+                            <td>@item.Channel</td>
+                            <td>@item.Destination</td>
+                            <td>@item.Subject</td>
+                            <td>@item.Status</td>
+                            <td>@item.LastError</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
