@@ -198,3 +198,45 @@
         </div>
     </div>
 </section>
+
+
+<section class="section section-muted">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Waiting on requester action</h2>
+            <p>Requests that currently require additional information from the applicant remain visible here for follow-up.</p>
+        </div>
+        @if (Model.Operations.ActionRequiredRequests.Count == 0)
+        {
+            <div class="card"><p>No requests are currently waiting on additional information.</p></div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Organization</th>
+                            <th>Status</th>
+                            <th>Age</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (RequestWorkItem item in Model.Operations.ActionRequiredRequests)
+                    {
+                        <tr class="staff-select-row" data-row-href="/Staff/Review/@item.RequestId" role="link" tabindex="0">
+                            <td><strong>@item.PublicReference</strong></td>
+                            <td>@item.OrganizationName</td>
+                            <td>@item.Status</td>
+                            <td>@item.AgeDays day(s)</td>
+                            <td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
