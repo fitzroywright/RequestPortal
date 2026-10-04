@@ -1,52 +1,17 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using RequestPortal.Application.Administration;
-using RequestPortal.Infrastructure.Identity;
 
 namespace RequestPortal.Web.Pages.Staff;
 
 public sealed class OperationsModel : PageModel
 {
-    private readonly IStaffOperationsService staffOperationsService;
-    private readonly UserManager<ApplicationUser> userManager;
-
-    public OperationsModel(IStaffOperationsService staffOperationsService, UserManager<ApplicationUser> userManager)
+    public IActionResult OnGet()
     {
-        this.staffOperationsService = staffOperationsService;
-        this.userManager = userManager;
+        return RedirectToPage("/Staff/Index");
     }
 
-    public StaffOperationsSnapshot Snapshot { get; private set; } = new(
-        Array.Empty<PendingOrganizationWorkItem>(),
-        Array.Empty<OrganizationReverificationWorkItem>(),
-        Array.Empty<RequestWorkItem>(),
-        Array.Empty<RequestWorkItem>(),
-        Array.Empty<DocumentWorkItem>(),
-        Array.Empty<DeadLetterWorkItem>(),
-        Array.Empty<NotificationDeliveryWorkItem>());
-
-    public async Task OnGetAsync()
+    public IActionResult OnPost()
     {
-        Snapshot = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
-    }
-
-    public async Task<IActionResult> OnPostReplayDeadLetterAsync(Guid messageId)
-    {
-        try
-        {
-            ApplicationUser staffUser = await userManager.GetUserAsync(User)
-                ?? throw new InvalidOperationException("Authenticated FFP staff user could not be resolved.");
-            await staffOperationsService.ReplayDeadLetterAsync(staffUser.Id, messageId, HttpContext.RequestAborted);
-            TempData["Success"] = "Dead-letter message queued for safe replay.";
-        }
-        catch (InvalidOperationException exception)
-        {
-            TempData["Error"] = exception.Message;
-        }
-
-        return RedirectToPage();
+        return RedirectToPage("/Staff/Index");
     }
 }
