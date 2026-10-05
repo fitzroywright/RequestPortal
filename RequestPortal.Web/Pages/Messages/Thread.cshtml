@@ -89,8 +89,10 @@
                                     @if (attachment.IsAvailable)
                                     {
                                         <a class="message-attachment"
-                                           asp-page-handler="Attachment"
-                                           asp-route-id="@Model.Thread.ThreadId"
+                                           target="_blank"
+                                           rel="noopener"
+                                           asp-page="/Documents/Preview"
+                                           asp-route-threadId="@Model.Thread.ThreadId"
                                            asp-route-documentId="@attachment.DocumentId">
                                             @attachment.FileName
                                             <small>@($"{Math.Max(1, attachment.SizeBytes / 1024)} KB")</small>
