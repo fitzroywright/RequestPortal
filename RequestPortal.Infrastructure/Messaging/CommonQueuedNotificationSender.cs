@@ -43,6 +43,23 @@ public sealed class CommonQueuedNotificationSender : RequestPortal.Common.Messag
             null,
             usesMobile ? notification.Recipient : null,
             channel);
+        Dictionary<string, string> metadata = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ContentType"] = notification.IsHtml ? "text/html" : "text/plain",
+            ["Transport"] = notification.Transport.ToString()
+        };
+        if (channel == MessageChannel.WhatsApp && !string.IsNullOrWhiteSpace(notification.WhatsAppTemplateName))
+        {
+            metadata["WhatsAppTemplateName"] = notification.WhatsAppTemplateName.Trim();
+            metadata["WhatsAppTemplateLanguage"] = string.IsNullOrWhiteSpace(notification.WhatsAppTemplateLanguage)
+                ? "en_US"
+                : notification.WhatsAppTemplateLanguage.Trim();
+            if (notification.WhatsAppTemplateParameters is { Count: > 0 })
+            {
+                metadata["WhatsAppTemplateParameters"] = string.Join("|", notification.WhatsAppTemplateParameters);
+            }
+        }
+
         MessageRequest request = new()
         {
             RecipientIds = [notification.Recipient],
@@ -53,11 +70,7 @@ public sealed class CommonQueuedNotificationSender : RequestPortal.Common.Messag
             CorrelationId = string.IsNullOrWhiteSpace(notification.CorrelationId)
                 ? notificationId.ToString("N")
                 : notification.CorrelationId.Trim(),
-            Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["ContentType"] = notification.IsHtml ? "text/html" : "text/plain",
-                ["Transport"] = notification.Transport.ToString()
-            }
+            Metadata = metadata
         };
         ExternalDeliveryWorkItem workItem = new(
             notificationId,
