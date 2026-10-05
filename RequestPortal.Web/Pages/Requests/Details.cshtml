@@ -382,6 +382,8 @@
                                 <input type="hidden" name="id" value="@Model.Request.Id" />
                                 @if (replyThread is not null){<input type="hidden" name="ReplyThreadId" value="@replyThread.ThreadId" />}
                                 <textarea name="Reply" rows="3" maxlength="10000" required placeholder="@(startingNewMessage ? "Type a new message..." : "Type your reply...")">@Model.Reply</textarea>
+                                <span asp-validation-for="Reply" class="validation"></span>
+                                <div asp-validation-summary="ModelOnly" class="validation"></div>
                                 <div class="mock-composer-actions">
                                     <label class="mock-attach-button">📎 Attach<input name="ReplyAttachment" type="file" /></label>
                                     <button class="mock-blue-button" type="submit">Send</button>
