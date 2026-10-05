@@ -5,6 +5,14 @@ using RequestPortal.Domain.Requests;
 
 namespace RequestPortal.Application.Requests;
 
+public sealed record EditableRequestItem(
+    Guid Id,
+    string ItemName,
+    string Description,
+    decimal Quantity,
+    Guid UnitOfMeasureId,
+    string? Notes);
+
 public sealed record EditableRequestDraft(
     Guid Id,
     string PublicReference,
@@ -16,7 +24,8 @@ public sealed record EditableRequestDraft(
     string? ProgramCategory,
     RequestPriority Priority,
     string? Location,
-    string? Circumstances);
+    string? Circumstances,
+    IReadOnlyList<EditableRequestItem> Items);
 
 public interface IRequestDraftService
 {
@@ -36,6 +45,7 @@ public interface IRequestDraftService
         RequestPriority priority,
         string? location,
         string? circumstances,
+        IReadOnlyList<EditableRequestItem> items,
         CancellationToken cancellationToken = default);
 
     Task SetDetailsAsync(
