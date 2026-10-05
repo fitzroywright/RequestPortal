@@ -368,7 +368,7 @@
                                             <p>@item.Message.Body</p>
                                             @foreach (var attachment in item.Message.Attachments)
                                             {
-                                                <a class="mock-attachment-link" target="_blank" rel="noopener" asp-page="/Messages/Thread" asp-page-handler="Attachment" asp-route-id="@item.Thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
+                                                <a class="mock-attachment-link" target="_blank" rel="noopener" asp-page="/Documents/Preview" asp-route-threadId="@item.Thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
                                             }
                                         </div>
                                     </article>
@@ -494,7 +494,7 @@
                             {
                                 @foreach (DocumentSummary document in Model.Documents)
                                 {
-                                    <div class="mock-file-row"><span class="mock-file-icon">▧</span><a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@document.Id">@document.OriginalFileName</a><time>@document.UploadedUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</time></div>
+                                    <div class="mock-file-row"><span class="mock-file-icon">▧</span><a target="_blank" rel="noopener" asp-page="/Documents/Preview" asp-route-requestId="@Model.Request.Id" asp-route-documentId="@document.Id">@document.OriginalFileName</a><time>@document.UploadedUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</time></div>
                                 }
                             }
                         </div>
