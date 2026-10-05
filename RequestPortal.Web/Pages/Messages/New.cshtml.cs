@@ -40,7 +40,7 @@ public sealed class NewModel(
     public bool ToFfpStaff { get; set; }
 
     [BindProperty]
-    public string Destination { get; set; } = "ffp";
+    public string? Destination { get; set; }
 
     [BindProperty]
     public MessageAudience Audience { get; set; } = MessageAudience.Individual;
@@ -64,6 +64,11 @@ public sealed class NewModel(
     public async Task OnGetAsync()
     {
         await LoadAsync();
+
+        if (!IsStaff && string.IsNullOrWhiteSpace(Destination))
+        {
+            Destination = "ffp";
+        }
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -84,6 +89,11 @@ public sealed class NewModel(
         if (IsStaff && RecipientUserId.HasValue && RecipientUserId.Value == userId)
         {
             ModelState.AddModelError(nameof(RecipientUserId), "You cannot send a message to yourself.");
+        }
+
+        if (!IsStaff && string.IsNullOrWhiteSpace(Destination))
+        {
+            Destination = "ffp";
         }
 
         if (!IsStaff &&
