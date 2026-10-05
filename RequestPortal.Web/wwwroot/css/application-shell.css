@@ -2831,7 +2831,10 @@ body.authenticated-app{
     align-content:start;
 }
 .authenticated-app .classification-grid{
-    grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.authenticated-app .classification-grid .request-subcategory-field{
+    grid-column:1/-1;
 }
 .authenticated-app .classification-grid select,
 .authenticated-app .classification-grid input,
