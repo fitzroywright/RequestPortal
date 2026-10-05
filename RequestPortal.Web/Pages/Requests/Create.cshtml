@@ -36,6 +36,16 @@
                         <div class="request-mini-card-title">Request Classification</div>
                         <div class="request-mini-card-body classification-grid">
                             <div class="field">
+                                <label asp-for="Input.ProgramCategory">Program</label>
+                                <select asp-for="Input.ProgramCategory">
+                                    <option value="">Select program</option>
+                                    @foreach (ProgramClassificationOption program in Model.Programs)
+                                    {
+                                        <option value="@program.Name">@program.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="field">
                                 <label asp-for="Input.Category">Category</label>
                                 <select asp-for="Input.Category">
                                     <option value="">Select category</option>
@@ -49,22 +59,13 @@
                                 <label asp-for="Input.Subcategory">Subcategory</label>
                                 <input asp-for="Input.Subcategory" />
                             </div>
-                            <div class="field">
-                                <label asp-for="Input.ProgramCategory">Program</label>
-                                <select asp-for="Input.ProgramCategory">
-                                    <option value="">Select program</option>
-                                    @foreach (ProgramClassificationOption program in Model.Programs)
-                                    {
-                                        <option value="@program.Name">@program.Name</option>
-                                    }
-                                </select>
-                            </div>
                         </div>
                     </section>
 
                     <section class="request-mini-card request-address-card">
                         <div class="request-mini-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
                             <span>Request Location</span>
+                            <button class="button button-outline button-small" type="button" id="use-location">Use device location</button>
                         </div>
                         <div class="request-mini-card-body address-grid">
                             <div class="field request-address-field">
@@ -102,7 +103,6 @@
                             </div>
                         </div>
                         <footer class="request-mini-card-footer">
-                            <button class="button button-outline button-small" type="button" id="use-location">Use device location</button>
                             <input asp-for="Input.Location" type="hidden" />
                             <input asp-for="Input.Latitude" type="hidden" />
                             <input asp-for="Input.Longitude" type="hidden" />
