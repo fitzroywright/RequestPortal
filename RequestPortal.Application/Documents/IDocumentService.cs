@@ -18,7 +18,8 @@ public sealed record DocumentSummary(
     DocumentRetentionClass RetentionClass,
     DateTimeOffset? RetainUntilUtc,
     bool IsArchived,
-    string? VerificationNotes);
+    string? VerificationNotes,
+    bool CanRemove = false);
 
 public sealed record DocumentDownload(Stream Content, string ContentType, string FileName);
 
@@ -101,6 +102,12 @@ public interface IDocumentService
 
     Task ArchiveAsync(
         Guid staffUserId,
+        Guid documentId,
+        CancellationToken cancellationToken = default);
+
+    Task RemoveRequestDocumentAsync(
+        Guid userId,
+        Guid requestId,
         Guid documentId,
         CancellationToken cancellationToken = default);
 }
