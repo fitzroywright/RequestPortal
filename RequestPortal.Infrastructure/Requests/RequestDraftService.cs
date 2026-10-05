@@ -11,6 +11,80 @@ namespace RequestPortal.Infrastructure.Requests;
 
 public sealed class RequestDraftService : IRequestDraftService
 {
+    public async Task<EditableRequestDraft?> GetEditableAsync(
+        Guid userId,
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        AssistanceRequest? request = await dbContext.AssistanceRequests
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == requestId, cancellationToken);
+
+        if (request is null)
+        {
+            return null;
+        }
+
+        bool allowed = await organizationAccessService.IsApprovedMemberAsync(userId, request.OrganizationId, cancellationToken);
+        if (!allowed)
+        {
+            throw new UnauthorizedAccessException("The current user cannot edit this request.");
+        }
+
+        if (request.Status is not (RequestStatus.Draft or RequestStatus.MoreInformationRequired))
+        {
+            throw new InvalidOperationException("This request can no longer be edited.");
+        }
+
+        return new EditableRequestDraft(
+            request.Id,
+            request.PublicReference,
+            request.Status,
+            request.Kind,
+            request.Summary ?? string.Empty,
+            request.Category,
+            request.Subcategory,
+            request.ProgramCategory,
+            request.Priority,
+            request.Location,
+            request.Circumstances);
+    }
+
+    public async Task UpdateAsync(
+        Guid userId,
+        Guid requestId,
+        RequestKind kind,
+        string summary,
+        string? category,
+        string? subcategory,
+        string? programCategory,
+        RequestPriority priority,
+        string? location,
+        string? circumstances,
+        CancellationToken cancellationToken = default)
+    {
+        AssistanceRequest request = await dbContext.AssistanceRequests
+            .SingleAsync(item => item.Id == requestId, cancellationToken);
+
+        bool allowed = await organizationAccessService.IsApprovedMemberAsync(userId, request.OrganizationId, cancellationToken);
+        if (!allowed)
+        {
+            throw new UnauthorizedAccessException("The current user cannot edit this request.");
+        }
+
+        request.UpdateEditableDetails(
+            kind,
+            summary,
+            category,
+            subcategory,
+            programCategory,
+            priority,
+            location,
+            circumstances);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private readonly RequestPortalDbContext dbContext;
     private readonly IOrganizationAccessService organizationAccessService;
 
