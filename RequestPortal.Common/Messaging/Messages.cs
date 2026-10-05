@@ -29,7 +29,10 @@ public sealed record NotificationEnvelope(
     string Body,
     bool IsHtml = false,
     NotificationTransport Transport = NotificationTransport.Email,
-    string? CorrelationId = null);
+    string? CorrelationId = null,
+    string? WhatsAppTemplateName = null,
+    string? WhatsAppTemplateLanguage = null,
+    IReadOnlyList<string>? WhatsAppTemplateParameters = null);
 
 public interface INotificationSender
 {
