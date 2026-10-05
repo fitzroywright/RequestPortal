@@ -101,6 +101,41 @@ public sealed class AssistanceRequest
         Circumstances = Normalize(circumstances);
     }
 
+    public void UpdateEditableDetails(
+        RequestKind kind,
+        string summary,
+        string? category,
+        string? subcategory,
+        string? programCategory,
+        RequestPriority priority,
+        string? location,
+        string? circumstances)
+    {
+        if (Status is not (RequestStatus.Draft or RequestStatus.MoreInformationRequired))
+        {
+            throw new InvalidOperationException("This request can no longer be edited.");
+        }
+
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            throw new ArgumentException("Request summary is required.", nameof(summary));
+        }
+
+        if (Status == RequestStatus.MoreInformationRequired && kind != Kind)
+        {
+            throw new InvalidOperationException("Request type cannot be changed after submission.");
+        }
+
+        Kind = kind;
+        Summary = summary.Trim();
+        Category = Normalize(category);
+        Subcategory = Normalize(subcategory);
+        ProgramCategory = Normalize(programCategory);
+        Priority = priority;
+        Location = Normalize(location);
+        Circumstances = Normalize(circumstances);
+    }
+
     public void AddItem(AssistanceRequestItem item)
     {
         EnsureDraft();
