@@ -106,19 +106,38 @@ public sealed class RequestDraftService : IRequestDraftService
                 .Where(item => item.RequestId == requestId)
                 .ToArrayAsync(cancellationToken);
 
-            dbContext.AssistanceRequestItems.RemoveRange(existingItems);
+            Dictionary<Guid, AssistanceRequestItem> existingById = existingItems
+                .ToDictionary(item => item.Id);
+
+            HashSet<Guid> retainedIds = [];
 
             foreach (EditableRequestItem item in items)
             {
-                dbContext.AssistanceRequestItems.Add(new AssistanceRequestItem(
-                    item.Id == Guid.Empty ? Guid.NewGuid() : item.Id,
-                    requestId,
-                    item.ItemName,
-                    item.Description,
-                    item.Quantity,
-                    item.UnitOfMeasureId,
-                    item.Notes));
+                if (item.Id != Guid.Empty && existingById.TryGetValue(item.Id, out AssistanceRequestItem? existing))
+                {
+                    existing.Update(
+                        item.ItemName,
+                        item.Description,
+                        item.Quantity,
+                        item.UnitOfMeasureId,
+                        item.Notes);
+                    retainedIds.Add(existing.Id);
+                }
+                else
+                {
+                    dbContext.AssistanceRequestItems.Add(new AssistanceRequestItem(
+                        Guid.NewGuid(),
+                        requestId,
+                        item.ItemName,
+                        item.Description,
+                        item.Quantity,
+                        item.UnitOfMeasureId,
+                        item.Notes));
+                }
             }
+
+            dbContext.AssistanceRequestItems.RemoveRange(
+                existingItems.Where(item => !retainedIds.Contains(item.Id)));
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
