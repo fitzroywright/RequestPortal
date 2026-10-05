@@ -58,15 +58,12 @@ public sealed class ThreadModel(
             return NotFound();
         }
 
-        return IsInlinePreviewType(download.ContentType)
-            ? File(download.Content, download.ContentType)
-            : File(download.Content, download.ContentType, download.FileName);
-    }
+        string safeFileName = download.FileName.Replace(""", string.Empty, StringComparison.Ordinal);
+        Response.Headers.ContentDisposition =
+            $"inline; filename=\"{safeFileName}\"; filename*=UTF-8''{Uri.EscapeDataString(download.FileName)}";
 
-    private static bool IsInlinePreviewType(string contentType) =>
-        contentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) ||
-        contentType.Equals("image/png", StringComparison.OrdinalIgnoreCase) ||
-        contentType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase);
+        return File(download.Content, download.ContentType);
+    }
 
     public async Task<IActionResult> OnPostAssignAsync(Guid id)
     {
