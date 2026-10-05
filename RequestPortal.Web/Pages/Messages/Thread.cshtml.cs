@@ -58,12 +58,15 @@ public sealed class ThreadModel(
             return NotFound();
         }
 
-        string safeFileName = download.FileName.Replace(((char)34).ToString(), string.Empty, StringComparison.Ordinal);
-        Response.Headers.ContentDisposition =
-            $"inline; filename=\"{safeFileName}\"; filename*=UTF-8''{Uri.EscapeDataString(download.FileName)}";
-
-        return File(download.Content, download.ContentType);
+        return IsBrowserPreviewType(download.ContentType)
+            ? File(download.Content, download.ContentType)
+            : File(download.Content, download.ContentType, download.FileName);
     }
+
+    private static bool IsBrowserPreviewType(string contentType) =>
+        contentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) ||
+        contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
+        contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase);
 
     public async Task<IActionResult> OnPostAssignAsync(Guid id)
     {
