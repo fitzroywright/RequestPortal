@@ -370,22 +370,34 @@ public sealed class DetailsModel : PageModel
             return await LoadPageAsync(user, id);
         }
 
+        if (Document.DocumentType is DocumentType.MessageAttachment or DocumentType.DeliveryEvidence)
+        {
+            ModelState.AddModelError("Document.DocumentType", "Choose a supporting document type. Message attachments must be added from the message composer.");
+            return await LoadPageAsync(user, id);
+        }
+
         try
         {
             await using System.IO.Stream content = Document.File.OpenReadStream();
             await documentService.UploadForRequestAsync(
-            user.Id,
-            id,
-            Document.DocumentType,
-            Document.File.FileName,
-            Document.File.ContentType ?? "application/octet-stream",
-            Document.File.Length,
-            content,
+                user.Id,
+                id,
+                Document.DocumentType,
+                Document.File.FileName,
+                Document.File.ContentType ?? "application/octet-stream",
+                Document.File.Length,
+                content,
                 HttpContext.RequestAborted);
         }
-        catch (Exception exception) when (exception is System.IO.IOException or HttpRequestException)
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError("Document.File", exception.Message);
+            return await LoadPageAsync(user, id);
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or HttpRequestException or global::Common.Storage.StorageException)
         {
             await ReportStorageFailureAsync(exception);
+            ModelState.AddModelError("Document.File", "The file could not be stored. Please retry.");
             return await LoadPageAsync(user, id);
         }
 
