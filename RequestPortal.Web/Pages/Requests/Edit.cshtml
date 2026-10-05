@@ -96,6 +96,26 @@
                 </label>
             </div>
 
+            @if (Model.Input.Kind == RequestKind.Project)
+            {
+                <section class="edit-project-section">
+                    <div class="edit-project-head">
+                        <div>
+                            <h2>Project Proposal & Planning</h2>
+                            <p>Edit the complete project narrative, structured budget, implementation milestones and outcomes, templates, and revision history.</p>
+                        </div>
+                        <a class="edit-project-button"
+                           asp-page="/Requests/Proposal"
+                           asp-route-id="@RouteData.Values["id"]">
+                            Edit Full Project
+                        </a>
+                    </div>
+                    <div class="edit-project-note">
+                        Supporting project documents remain managed from Request Details so they continue to use the same Common.Storage and retention rules.
+                    </div>
+                </section>
+            }
+
             @if (Model.Input.Kind == RequestKind.GoodsAndServices)
             {
                 <section class="edit-items-section">
@@ -173,11 +193,11 @@
 .edit-grid textarea{resize:vertical}.span-two{grid-column:1/-1}
 .edit-grid small{color:#6b7d8e;font-weight:500}
 .validation{color:#b42318;font-size:12px}
-.edit-items-section{margin-top:22px;padding-top:18px;border-top:1px solid #e1e6eb}.edit-items-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}.edit-items-head h2{margin:0 0 3px;font-size:18px}.edit-items-head p{margin:0;color:#6b7d8e;font-size:12px}.edit-add-item{min-height:32px;padding:0 11px;border:1px solid #71a9df;border-radius:4px;background:#fff;color:#0d67c5;font-size:12px;font-weight:700;cursor:pointer}.edit-item-row{display:grid;grid-template-columns:1.1fr 1.4fr 110px 160px 1fr 24px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid #edf1f4}.edit-item-row label{display:grid;gap:4px;color:#334c63;font-size:12px;font-weight:700}.edit-item-row input,.edit-item-row select{box-sizing:border-box;width:100%;min-height:34px;border:1px solid #b8c7d5;border-radius:4px;padding:7px 8px;font:inherit;background:#fff}.edit-remove-item{align-self:end;width:24px;height:34px;border:0;background:transparent;color:#c62828;font-size:15px;font-weight:900;cursor:pointer}.edit-remove-item:hover{color:#8e0000}.edit-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #e1e6eb}
+.edit-project-section,.edit-items-section{margin-top:22px;padding-top:18px;border-top:1px solid #e1e6eb}.edit-project-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.edit-project-head h2{margin:0 0 3px;font-size:18px}.edit-project-head p{margin:0;color:#6b7d8e;font-size:12px;max-width:650px}.edit-project-button{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 12px;border:1px solid #0c5cb5;border-radius:4px;background:#0f6fd4;color:#fff;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}.edit-project-note{margin-top:10px;padding:10px 12px;border:1px solid #dbe4ec;border-radius:4px;background:#f8fafc;color:#5f7183;font-size:12px}.edit-items-section{margin-top:22px;padding-top:18px;border-top:1px solid #e1e6eb}.edit-items-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}.edit-items-head h2{margin:0 0 3px;font-size:18px}.edit-items-head p{margin:0;color:#6b7d8e;font-size:12px}.edit-add-item{min-height:32px;padding:0 11px;border:1px solid #71a9df;border-radius:4px;background:#fff;color:#0d67c5;font-size:12px;font-weight:700;cursor:pointer}.edit-item-row{display:grid;grid-template-columns:1.1fr 1.4fr 110px 160px 1fr 24px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid #edf1f4}.edit-item-row label{display:grid;gap:4px;color:#334c63;font-size:12px;font-weight:700}.edit-item-row input,.edit-item-row select{box-sizing:border-box;width:100%;min-height:34px;border:1px solid #b8c7d5;border-radius:4px;padding:7px 8px;font:inherit;background:#fff}.edit-remove-item{align-self:end;width:24px;height:34px;border:0;background:transparent;color:#c62828;font-size:15px;font-weight:900;cursor:pointer}.edit-remove-item:hover{color:#8e0000}.edit-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #e1e6eb}
 .edit-cancel,.edit-save{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 14px;border-radius:4px;font-size:13px;font-weight:700;text-decoration:none;cursor:pointer}
 .edit-cancel{border:1px solid #b8c7d5;background:#fff;color:#334c63}.edit-save{border:1px solid #0c5cb5;background:#0f6fd4;color:#fff}
 @@media(max-width:1000px){.edit-item-row{grid-template-columns:1fr 1fr 100px 150px}.item-notes{grid-column:1/4}.edit-remove-item{grid-column:4}}
-@@media(max-width:700px){.edit-grid{grid-template-columns:1fr}.span-two{grid-column:auto}.edit-items-head{flex-direction:column}.edit-item-row{grid-template-columns:1fr}.item-description,.item-notes,.edit-remove-item{grid-column:auto}.edit-remove-item{justify-self:end}}
+@@media(max-width:700px){.edit-grid{grid-template-columns:1fr}.span-two{grid-column:auto}.edit-project-head,.edit-items-head{flex-direction:column}.edit-item-row{grid-template-columns:1fr}.item-description,.item-notes,.edit-remove-item{grid-column:auto}.edit-remove-item{justify-self:end}}
 </style>
 
 @if (Model.Input.Kind == RequestKind.GoodsAndServices)
