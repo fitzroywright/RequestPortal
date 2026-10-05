@@ -47,7 +47,19 @@ public sealed class RequestDraftService : IRequestDraftService
             request.ProgramCategory,
             request.Priority,
             request.Location,
-            request.Circumstances);
+            request.Circumstances,
+            await dbContext.AssistanceRequestItems
+                .AsNoTracking()
+                .Where(item => item.RequestId == request.Id)
+                .OrderBy(item => item.ItemName)
+                .Select(item => new EditableRequestItem(
+                    item.Id,
+                    item.ItemName,
+                    item.Description,
+                    item.Quantity,
+                    item.UnitOfMeasureId,
+                    item.Notes))
+                .ToListAsync(cancellationToken));
     }
 
     public async Task UpdateAsync(
@@ -61,6 +73,7 @@ public sealed class RequestDraftService : IRequestDraftService
         RequestPriority priority,
         string? location,
         string? circumstances,
+        IReadOnlyList<EditableRequestItem> items,
         CancellationToken cancellationToken = default)
     {
         AssistanceRequest request = await dbContext.AssistanceRequests
@@ -81,6 +94,32 @@ public sealed class RequestDraftService : IRequestDraftService
             priority,
             location,
             circumstances);
+
+        if (kind == RequestKind.GoodsAndServices)
+        {
+            if (items.Count == 0)
+            {
+                throw new InvalidOperationException("A goods or services request must contain at least one requested item.");
+            }
+
+            AssistanceRequestItem[] existingItems = await dbContext.AssistanceRequestItems
+                .Where(item => item.RequestId == requestId)
+                .ToArrayAsync(cancellationToken);
+
+            dbContext.AssistanceRequestItems.RemoveRange(existingItems);
+
+            foreach (EditableRequestItem item in items)
+            {
+                dbContext.AssistanceRequestItems.Add(new AssistanceRequestItem(
+                    item.Id == Guid.Empty ? Guid.NewGuid() : item.Id,
+                    requestId,
+                    item.ItemName,
+                    item.Description,
+                    item.Quantity,
+                    item.UnitOfMeasureId,
+                    item.Notes));
+            }
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
