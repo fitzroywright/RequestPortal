@@ -105,7 +105,7 @@
                                     <th>Reference</th>
                                     <th>Organization</th>
                                     <th>Summary</th>
-                                    <th>Age</th>
+                                    <th class="staff-age-column">Age</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -121,7 +121,7 @@
                                     </td>
                                     <td>@request.OrganizationName</td>
                                     <td>@request.Summary</td>
-                                    <td>@ageDays d</td>
+                                    <td class="staff-age-column">@ageDays d</td>
                                     <td>
                                         <a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.Id">Review</a>
                                     </td>
@@ -219,7 +219,7 @@
                             <th>Reference</th>
                             <th>Organization</th>
                             <th>Status</th>
-                            <th>Age</th>
+                            <th class="staff-age-column">Age</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -230,7 +230,7 @@
                             <td><strong>@item.PublicReference</strong></td>
                             <td>@item.OrganizationName</td>
                             <td>@item.Status</td>
-                            <td>@item.AgeDays day(s)</td>
+                            <td class="staff-age-column">@item.AgeDays day(s)</td>
                             <td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open</a></td>
                         </tr>
                     }
@@ -240,3 +240,8 @@
         }
     </div>
 </section>
+
+
+<style>
+.staff-age-column{width:96px;min-width:96px;white-space:nowrap}
+</style>
