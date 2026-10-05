@@ -139,10 +139,15 @@ public sealed class DetailsModel : PageModel
                     ReplyAttachment.FileName, ReplyAttachment.ContentType, ReplyAttachment.Length, content,
                     HttpContext.RequestAborted));
             }
-            catch (Exception exception) when (exception is System.IO.IOException or HttpRequestException)
+            catch (InvalidOperationException exception)
+            {
+                ModelState.AddModelError(nameof(ReplyAttachment), exception.Message);
+                return await LoadPageAsync(user, id);
+            }
+            catch (Exception exception) when (exception is System.IO.IOException or HttpRequestException or Common.Storage.StorageException)
             {
                 await ReportStorageFailureAsync(exception);
-                ModelState.AddModelError(nameof(Reply), "The attachment could not be stored. Your reply has not been sent. You can retry or send it without the attachment.");
+                ModelState.AddModelError(nameof(ReplyAttachment), "The attachment could not be stored. Your message has not been sent. You can retry or send it without the attachment.");
                 return await LoadPageAsync(user, id);
             }
         }
