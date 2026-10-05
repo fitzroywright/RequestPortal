@@ -41,3 +41,40 @@ RequestPortal continues to own authorization, malware scanning, retention, docum
 ## Production switching
 
 Changing providers does not copy existing files. Migrate the stored keys first, verify the destination, then change `Storage:Provider` and restart. RequestPortal does not silently fall back to the old target because that would create two competing authoritative stores.
+
+
+## Request Portal logical storage layout
+
+New request-owned documents use request-centric storage keys. The Common.Storage provider remains unaware of Request Portal domain concepts; Request Portal constructs the logical key before calling `IFileStorage`.
+
+```text
+RequestPortal/
+  Requests/
+    {public-request-reference}/
+      Supporting Documents/
+        {document-guid}-{sanitized-original-filename}
+      Message Attachments/
+        {document-guid}-{sanitized-original-filename}
+      Delivery/
+        {document-guid}-{sanitized-original-filename}
+```
+
+The sender type does not determine the storage location. If an attachment belongs to a request, the request owns it whether the sender is an applicant, organization representative, or FFP staff member.
+
+Standalone conversations are intended to use:
+
+```text
+RequestPortal/
+  Conversations/
+    {thread-guid}/
+      Attachments/
+
+  FFP/
+    Conversations/
+      {thread-guid}/
+        Attachments/
+```
+
+The current standalone messaging UI does not upload new binary attachments; it only attaches documents already associated with a request. Therefore those standalone branches are reserved by policy but are not created until a standalone upload workflow is implemented.
+
+Existing documents are not renamed or moved automatically. Their database `StorageKey` remains authoritative and they continue to resolve from their original location. Migration is a separate, explicit operation.
