@@ -81,6 +81,27 @@ public sealed class AssistanceRequestItem
     public decimal Quantity { get; private set; }
 
     public Guid UnitOfMeasureId { get; private set; }
+
+    public void Update(
+        string itemName,
+        string description,
+        decimal quantity,
+        Guid unitOfMeasureId,
+        string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(itemName))
+            throw new ArgumentException("Item or service name is required.", nameof(itemName));
+        if (string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException("Description or specification is required.", nameof(description));
+        if (quantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be greater than zero.");
+
+        ItemName = itemName.Trim();
+        Description = description.Trim();
+        Quantity = quantity;
+        UnitOfMeasureId = unitOfMeasureId;
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+    }
 }
 
 public sealed class RequestStatusHistory
