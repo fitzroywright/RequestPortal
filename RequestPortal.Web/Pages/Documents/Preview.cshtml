@@ -1,0 +1,73 @@
+@page
+@model RequestPortal.Web.Pages.Documents.PreviewModel
+@{
+    string rawUrl = Url.Page("/Documents/Preview", "Raw", new
+    {
+        documentId = Request.Query["documentId"],
+        requestId = Request.Query["requestId"],
+        threadId = Request.Query["threadId"]
+    }) ?? "#";
+
+    string downloadUrl = Url.Page("/Documents/Preview", "Download", new
+    {
+        documentId = Request.Query["documentId"],
+        requestId = Request.Query["requestId"],
+        threadId = Request.Query["threadId"]
+    }) ?? "#";
+}
+
+<section class="document-preview-page">
+    <header class="document-preview-header">
+        <div>
+            <span class="eyebrow">Document preview</span>
+            <h1>@Model.FileName</h1>
+        </div>
+        <a class="button button-outline" href="@downloadUrl">Download original</a>
+    </header>
+
+    @if (Model.IsPdf)
+    {
+        <iframe class="document-preview-frame" src="@rawUrl" title="@Model.FileName"></iframe>
+    }
+    else if (Model.IsImage)
+    {
+        <div class="document-preview-image-wrap">
+            <img class="document-preview-image" src="@rawUrl" alt="@Model.FileName" />
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.HtmlPreview))
+    {
+        <div class="document-preview-office">
+            @Html.Raw(Model.HtmlPreview)
+        </div>
+    }
+    else
+    {
+        <div class="card document-preview-unavailable">
+            <h2>Preview unavailable</h2>
+            <p>This file type cannot be rendered safely in the browser. Use Download original to open it with the application registered on your device.</p>
+        </div>
+    }
+</section>
+
+<style>
+.document-preview-page{width:min(1400px,calc(100% - 32px));margin:20px auto 40px;color:#17324d}
+.document-preview-header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px}
+.document-preview-header h1{margin:2px 0 0;font-size:24px;overflow-wrap:anywhere}
+.document-preview-frame{display:block;width:100%;height:78vh;min-height:640px;border:1px solid #ccd6df;border-radius:8px;background:#fff}
+.document-preview-image-wrap{display:flex;justify-content:center;padding:20px;border:1px solid #d8e0e7;border-radius:8px;background:#fff}
+.document-preview-image{display:block;max-width:100%;height:auto}
+.document-preview-office{padding:28px;border:1px solid #d8e0e7;border-radius:8px;background:#fff;overflow:auto}
+.office-preview{max-width:1100px;margin:0 auto;line-height:1.5}
+.word-preview p{margin:.4rem 0 1rem}
+.preview-table-wrap{overflow:auto;margin:12px 0 24px}
+.preview-table{border-collapse:collapse;width:max-content;min-width:100%;font-size:14px}
+.preview-table td,.preview-table th{border:1px solid #cfd8e1;padding:7px 9px;vertical-align:top;white-space:pre-wrap}
+.sheet-preview{margin-bottom:32px}.sheet-preview h2{font-size:18px;margin:0 0 10px}
+.slide-preview{margin:0 auto 24px;max-width:960px}
+.slide-number{font-size:12px;font-weight:700;color:#687b8d;margin-bottom:5px}
+.slide-canvas{aspect-ratio:16/9;border:1px solid #ccd6df;border-radius:6px;padding:34px;background:#fff;overflow:auto}
+.slide-canvas p{font-size:18px;margin:0 0 12px}
+.document-preview-unavailable{padding:24px}
+@media(max-width:700px){.document-preview-header{align-items:flex-start;flex-direction:column}.document-preview-frame{min-height:500px;height:70vh}.document-preview-office{padding:14px}.slide-canvas{padding:18px}.slide-canvas p{font-size:15px}}
+</style>
