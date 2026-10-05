@@ -22,6 +22,15 @@ public sealed record DocumentSummary(
 
 public sealed record DocumentDownload(Stream Content, string ContentType, string FileName);
 
+public interface IDocumentPreviewRenderer
+{
+    Task<string?> RenderHtmlAsync(
+        string fileName,
+        string contentType,
+        Stream content,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IDocumentService
 {
     Task<Guid> UploadForRequestAsync(
