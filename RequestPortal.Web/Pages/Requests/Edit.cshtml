@@ -96,6 +96,56 @@
                 </label>
             </div>
 
+            @if (Model.Input.Kind == RequestKind.GoodsAndServices)
+            {
+                <section class="edit-items-section">
+                    <div class="edit-items-head">
+                        <div>
+                            <h2>Requested Items</h2>
+                            <p>Edit quantities, descriptions or units, remove items, or add another item.</p>
+                        </div>
+                        <button id="add-item" class="edit-add-item" type="button">+ Add Item</button>
+                    </div>
+
+                    <div asp-validation-for="Items" class="validation"></div>
+
+                    <div id="items-editor">
+                        @for (int i = 0; i < Model.Items.Count; i++)
+                        {
+                            <div class="edit-item-row" data-item-row>
+                                <input type="hidden" name="Items[@i].Id" value="@Model.Items[i].Id" />
+                                <label>
+                                    Item / Service
+                                    <input name="Items[@i].ItemName" value="@Model.Items[i].ItemName" maxlength="250" />
+                                </label>
+                                <label class="item-description">
+                                    Description
+                                    <input name="Items[@i].Description" value="@Model.Items[i].Description" maxlength="2000" />
+                                </label>
+                                <label>
+                                    Quantity
+                                    <input name="Items[@i].Quantity" value="@Model.Items[i].Quantity" type="number" min="0.001" step="0.001" />
+                                </label>
+                                <label>
+                                    Unit
+                                    <select name="Items[@i].UnitOfMeasureId">
+                                        @foreach (var unit in Model.UnitsOfMeasure)
+                                        {
+                                            <option value="@unit.Id" selected="@(unit.Id == Model.Items[i].UnitOfMeasureId)">@unit.Name (@unit.Code)</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="item-notes">
+                                    Notes
+                                    <input name="Items[@i].Notes" value="@Model.Items[i].Notes" maxlength="2000" />
+                                </label>
+                                <button class="edit-remove-item" type="button" data-remove-item title="Remove item" aria-label="Remove item">x</button>
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+
             <div class="edit-actions">
                 <a class="edit-cancel" asp-page="/Requests/Details" asp-route-id="@RouteData.Values["id"]">Cancel</a>
                 <button class="edit-save" type="submit">Save Changes</button>
@@ -116,8 +166,60 @@
 .edit-grid textarea{resize:vertical}.span-two{grid-column:1/-1}
 .edit-grid small{color:#6b7d8e;font-weight:500}
 .validation{color:#b42318;font-size:12px}
-.edit-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #e1e6eb}
+.edit-items-section{margin-top:22px;padding-top:18px;border-top:1px solid #e1e6eb}.edit-items-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}.edit-items-head h2{margin:0 0 3px;font-size:18px}.edit-items-head p{margin:0;color:#6b7d8e;font-size:12px}.edit-add-item{min-height:32px;padding:0 11px;border:1px solid #71a9df;border-radius:4px;background:#fff;color:#0d67c5;font-size:12px;font-weight:700;cursor:pointer}.edit-item-row{display:grid;grid-template-columns:1.1fr 1.4fr 110px 160px 1fr 24px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid #edf1f4}.edit-item-row label{display:grid;gap:4px;color:#334c63;font-size:12px;font-weight:700}.edit-item-row input,.edit-item-row select{box-sizing:border-box;width:100%;min-height:34px;border:1px solid #b8c7d5;border-radius:4px;padding:7px 8px;font:inherit;background:#fff}.edit-remove-item{align-self:end;width:24px;height:34px;border:0;background:transparent;color:#c62828;font-size:15px;font-weight:900;cursor:pointer}.edit-remove-item:hover{color:#8e0000}.edit-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #e1e6eb}
 .edit-cancel,.edit-save{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 14px;border-radius:4px;font-size:13px;font-weight:700;text-decoration:none;cursor:pointer}
 .edit-cancel{border:1px solid #b8c7d5;background:#fff;color:#334c63}.edit-save{border:1px solid #0c5cb5;background:#0f6fd4;color:#fff}
-@@media(max-width:700px){.edit-grid{grid-template-columns:1fr}.span-two{grid-column:auto}}
+@@media(max-width:1000px){.edit-item-row{grid-template-columns:1fr 1fr 100px 150px}.item-notes{grid-column:1/4}.edit-remove-item{grid-column:4}}
+@@media(max-width:700px){.edit-grid{grid-template-columns:1fr}.span-two{grid-column:auto}.edit-items-head{flex-direction:column}.edit-item-row{grid-template-columns:1fr}.item-description,.item-notes,.edit-remove-item{grid-column:auto}.edit-remove-item{justify-self:end}}
 </style>
+
+@if (Model.Input.Kind == RequestKind.GoodsAndServices)
+{
+<script>
+(() => {
+    const container = document.getElementById('items-editor');
+    const add = document.getElementById('add-item');
+    if (!container || !add) return;
+
+    const units = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.UnitsOfMeasure.Select(unit => new { id = unit.Id, text = $"{unit.Name} ({unit.Code})" })));
+
+    function renumber() {
+        container.querySelectorAll('[data-item-row]').forEach((row, index) => {
+            row.querySelectorAll('[name]').forEach(input => {
+                input.name = input.name.replace(/Items\[\d+\]/, `Items[${index}]`);
+            });
+        });
+    }
+
+    container.addEventListener('click', event => {
+        const button = event.target.closest('[data-remove-item]');
+        if (!button) return;
+        const rows = container.querySelectorAll('[data-item-row]');
+        if (rows.length <= 1) {
+            const row = button.closest('[data-item-row]');
+            row.querySelectorAll('input:not([type="hidden"])').forEach(input => input.value = '');
+            return;
+        }
+        button.closest('[data-item-row]').remove();
+        renumber();
+    });
+
+    add.addEventListener('click', () => {
+        const index = container.querySelectorAll('[data-item-row]').length;
+        const row = document.createElement('div');
+        row.className = 'edit-item-row';
+        row.dataset.itemRow = '';
+        const options = units.map(unit => `<option value="${unit.id}">${unit.text}</option>`).join('');
+        row.innerHTML = `
+            <input type="hidden" name="Items[${index}].Id" value="00000000-0000-0000-0000-000000000000" />
+            <label>Item / Service<input name="Items[${index}].ItemName" maxlength="250" /></label>
+            <label class="item-description">Description<input name="Items[${index}].Description" maxlength="2000" /></label>
+            <label>Quantity<input name="Items[${index}].Quantity" value="1" type="number" min="0.001" step="0.001" /></label>
+            <label>Unit<select name="Items[${index}].UnitOfMeasureId">${options}</select></label>
+            <label class="item-notes">Notes<input name="Items[${index}].Notes" maxlength="2000" /></label>
+            <button class="edit-remove-item" type="button" data-remove-item title="Remove item" aria-label="Remove item">x</button>`;
+        container.appendChild(row);
+    });
+})();
+</script>
+}
