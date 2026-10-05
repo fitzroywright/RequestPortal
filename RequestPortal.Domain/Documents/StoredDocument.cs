@@ -22,7 +22,8 @@ public enum DocumentType
     RegistrationMaterial = 9,
     BudgetDocumentation = 10,
     ProjectSchedule = 11,
-    AdditionalSupportingDocuments = 12
+    AdditionalSupportingDocuments = 12,
+    MessageAttachment = 13
 }
 
 public enum DocumentVerificationStatus
