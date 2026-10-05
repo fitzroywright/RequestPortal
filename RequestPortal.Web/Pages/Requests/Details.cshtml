@@ -62,7 +62,7 @@
                 <div class="mock-header-actions">
                     @if (Model.Request.Status == "Draft" || Model.Request.Status == "MoreInformationRequired")
                     {
-                        <a class="mock-action-button mock-action-edit" href="#items">✎&nbsp; Edit Request</a>
+                        <a class="mock-action-button mock-action-edit" asp-page="/Requests/Edit" asp-route-id="@Model.Request.Id">✎&nbsp; Edit Request</a>
                     }
                     @if (Model.Request.Status == "Draft" || Model.Request.Status == "Submitted" || Model.Request.Status == "MoreInformationRequired")
                     {
@@ -90,7 +90,7 @@
                             <div class="mock-panel-title"><span class="mock-panel-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></span><strong>Request Summary</strong></div>
                             @if (Model.Request.Status == "Draft" || Model.Request.Status == "MoreInformationRequired")
                             {
-                                <a class="mock-mini-button" href="#items">Edit</a>
+                                <a class="mock-mini-button" asp-page="/Requests/Edit" asp-route-id="@Model.Request.Id">Edit</a>
                             }
                         </div>
                         <div class="mock-summary-content">
