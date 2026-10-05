@@ -368,7 +368,7 @@
                                             <p>@item.Message.Body</p>
                                             @foreach (var attachment in item.Message.Attachments)
                                             {
-                                                <a class="mock-attachment-link" asp-page="/Messages/Thread" asp-page-handler="Attachment" asp-route-id="@item.Thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
+                                                <a class="mock-attachment-link" target="_blank" rel="noopener" asp-page="/Messages/Thread" asp-page-handler="Attachment" asp-route-id="@item.Thread.ThreadId" asp-route-documentId="@attachment.DocumentId">📎 @attachment.FileName</a>
                                             }
                                         </div>
                                     </article>
