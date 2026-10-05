@@ -163,6 +163,10 @@ internal static class ApplicationServiceRegistration
             , DocumentService>();
 
         builder.Services.AddScoped<
+            IDocumentPreviewRenderer
+            , OpenXmlDocumentPreviewRenderer>();
+
+        builder.Services.AddScoped<
             IDeliveryService
             , DeliveryService>();
 
