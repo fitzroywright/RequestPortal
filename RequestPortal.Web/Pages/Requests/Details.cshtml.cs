@@ -419,13 +419,13 @@ public sealed class DetailsModel : PageModel
         }
         catch (UnauthorizedAccessException exception)
         {
-            ModelState.AddModelError(string.Empty, exception.Message);
-            return await LoadPageAsync(user, id);
+            TempData["Error"] = exception.Message;
+            return RedirectToPage(new { id });
         }
         catch (InvalidOperationException exception)
         {
-            ModelState.AddModelError(string.Empty, exception.Message);
-            return await LoadPageAsync(user, id);
+            TempData["Error"] = exception.Message;
+            return RedirectToPage(new { id });
         }
 
         TempData["Success"] = "File removed.";
