@@ -504,8 +504,20 @@
                                 <summary>Upload file</summary>
                                 <form method="post" enctype="multipart/form-data" asp-page-handler="UploadDocument" class="mock-form-grid">
                                     <input type="hidden" name="id" value="@Model.Request.Id" />
-                                    <label>Document type<select asp-for="Document.DocumentType" asp-items="Html.GetEnumSelectList<DocumentType>()"></select></label>
-                                    <label>File<input asp-for="Document.File" type="file" /></label>
+                                    <label>
+                                        Document type
+                                        <select asp-for="Document.DocumentType">
+                                            @foreach (DocumentType documentType in Enum.GetValues<DocumentType>().Where(value => value is not DocumentType.MessageAttachment and not DocumentType.DeliveryEvidence))
+                                            {
+                                                <option value="@documentType">@documentType</option>
+                                            }
+                                        </select>
+                                    </label>
+                                    <label>
+                                        File
+                                        <input asp-for="Document.File" type="file" />
+                                        <span asp-validation-for="Document.File" class="text-danger"></span>
+                                    </label>
                                     <button class="mock-blue-button" type="submit">Upload</button>
                                 </form>
                             </details>
