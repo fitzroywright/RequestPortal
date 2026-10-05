@@ -147,14 +147,27 @@ public sealed class DetailsModel : PageModel
             }
         }
 
-        if (ReplyThreadId.HasValue)
-            await messageService.ReplyAsync(user.Id, false, ReplyThreadId.Value, Reply,
-                HttpContext.RequestAborted, attachments);
-        else
-            await messageService.SendToSharedStaffAsync(user.Id, request.OrganizationId, id, null,
-                $"Request # {request.PublicReference}", Reply, HttpContext.RequestAborted, attachments);
+        try
+        {
+            if (ReplyThreadId.HasValue)
+                await messageService.ReplyAsync(user.Id, false, ReplyThreadId.Value, Reply,
+                    HttpContext.RequestAborted, attachments);
+            else
+                await messageService.SendToSharedStaffAsync(user.Id, request.OrganizationId, id, null,
+                    $"Request # {request.PublicReference}", Reply, HttpContext.RequestAborted, attachments);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            ModelState.AddModelError(nameof(Reply), exception.Message);
+            return await LoadPageAsync(user, id);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(nameof(Reply), exception.Message);
+            return await LoadPageAsync(user, id);
+        }
 
-        TempData["Success"] = "Reply sent to FFP.";
+        TempData["Success"] = "Message sent to FFP.";
         return RedirectToPage(new { id });
     }
 
