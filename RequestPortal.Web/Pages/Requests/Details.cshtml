@@ -496,18 +496,20 @@
                                 {
                                     <div class="mock-file-row">
                                         <span class="mock-file-icon">▧</span>
-                                        <a target="_blank" rel="noopener" asp-page="/Documents/Preview" asp-route-requestId="@Model.Request.Id" asp-route-documentId="@document.Id">@document.OriginalFileName</a>
+                                        <span class="mock-file-name">
+                                            <a target="_blank" rel="noopener" asp-page="/Documents/Preview" asp-route-requestId="@Model.Request.Id" asp-route-documentId="@document.Id">@document.OriginalFileName</a>
+                                            @if (document.CanRemove)
+                                            {
+                                                <form method="post"
+                                                      asp-page-handler="RemoveDocument"
+                                                      onsubmit="return confirm('Remove this file from the request?');">
+                                                    <input type="hidden" name="id" value="@Model.Request.Id" />
+                                                    <input type="hidden" name="documentId" value="@document.Id" />
+                                                    <button class="mock-file-remove" type="submit" title="Remove file" aria-label="Remove file">x</button>
+                                                </form>
+                                            }
+                                        </span>
                                         <time>@document.UploadedUtc.ToLocalTime().ToString("d MMM yyyy, h:mm tt")</time>
-                                        @if (document.CanRemove)
-                                        {
-                                            <form method="post"
-                                                  asp-page-handler="RemoveDocument"
-                                                  onsubmit="return confirm('Remove this file from the request?');">
-                                                <input type="hidden" name="id" value="@Model.Request.Id" />
-                                                <input type="hidden" name="documentId" value="@document.Id" />
-                                                <button class="mock-file-remove" type="submit" title="Remove file" aria-label="Remove file">x</button>
-                                            </form>
-                                        }
                                     </div>
                                 }
                             }
@@ -596,7 +598,7 @@
 .mock-status-step strong{display:block;color:#40556a;font-size:13px;font-weight:500}.mock-status-step.is-active strong{color:#172f48;font-weight:800}.mock-status-step small{display:block;margin-top:3px;color:#687b8e;font-size:11px}
 .mock-status-footer{margin:0 18px 16px;padding-top:14px;border-top:1px solid #dbe2e8}.mock-status-footer>div{display:grid;grid-template-columns:105px 1fr;gap:10px;margin-bottom:8px}.mock-status-footer span,.mock-status-footer strong{font-size:12px}.mock-status-footer span{color:#5a6d80}.mock-status-footer strong{font-weight:500}
 .mock-side-list,.mock-related-list{padding:15px 17px 12px}.mock-side-list>div,.mock-related-list>div{grid-template-columns:125px minmax(0,1fr);margin-bottom:10px}.mock-related-list>div{grid-template-columns:118px minmax(0,1fr)}
-.mock-files-list{padding:10px 16px 12px}.mock-file-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:7px 0}.mock-file-row a{color:#0f67c7;font-size:12px;text-decoration:underline}.mock-file-row time{color:#6b7d8e;font-size:11px}.mock-file-icon{color:#687d91}.mock-file-remove{border:0;background:transparent;color:#c62828;font:inherit;font-size:14px;font-weight:900;line-height:1;cursor:pointer;padding:2px 4px}.mock-file-remove:hover{color:#8e0000}
+.mock-files-list{padding:10px 16px 12px}.mock-file-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 0}.mock-file-name{display:flex;align-items:center;gap:5px;min-width:0}.mock-file-name form{display:inline-flex;margin:0}.mock-file-row a{color:#0f67c7;font-size:12px;text-decoration:underline}.mock-file-row time{color:#6b7d8e;font-size:11px}.mock-file-icon{color:#687d91}.mock-file-remove{border:0;background:transparent;color:#c62828;font:inherit;font-size:14px;font-weight:900;line-height:1;cursor:pointer;padding:2px 4px}.mock-file-remove:hover{color:#8e0000}
 .mock-upload-details,.mock-edit-details{border-top:1px solid #e1e6eb;padding:10px 16px 14px}.mock-upload-details summary,.mock-edit-details summary{color:#0f67c7;font-size:12px;font-weight:700;cursor:pointer}
 .mock-form-grid{display:grid;gap:9px;margin-top:10px}.mock-form-grid label,.mock-cancel-form label{display:grid;gap:4px;color:#334c63;font-size:12px;font-weight:700}.mock-form-grid input,.mock-form-grid select,.mock-form-grid textarea,.mock-cancel-form textarea{min-height:34px;border:1px solid #b8c7d5;border-radius:4px;padding:7px 8px;font:inherit}.mock-form-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .mock-submit-row{display:flex;justify-content:flex-end}.mock-cancel-panel .mock-panel-head{background:#fffafa}.mock-cancel-form{padding:14px 16px 17px}.mock-cancel-form p{margin:0 0 10px;color:#66788a;font-size:12px}
