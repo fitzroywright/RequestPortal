@@ -1,0 +1,123 @@
+@page "{id:guid}"
+@model RequestPortal.Web.Pages.Requests.EditModel
+@using RequestPortal.Domain.Requests
+@{
+    ViewData["Title"] = "Edit Request";
+    bool kindLocked = Model.Status == RequestStatus.MoreInformationRequired;
+}
+
+<section class="edit-request-page">
+    <div class="edit-request-shell">
+        <header class="edit-request-header">
+            <div>
+                <a class="edit-back" asp-page="/Requests/Details" asp-route-id="@RouteData.Values["id"]">‹ Back to Request Details</a>
+                <h1>Edit Request</h1>
+                <p>@Model.PublicReference</p>
+            </div>
+        </header>
+
+        <form method="post" class="edit-request-card">
+            <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+            <div class="edit-grid">
+                <label>
+                    Request Type
+                    <select asp-for="Input.Kind" disabled="@kindLocked">
+                        @foreach (RequestKind kind in Enum.GetValues<RequestKind>())
+                        {
+                            <option value="@kind">@kind</option>
+                        }
+                    </select>
+                    @if (kindLocked)
+                    {
+                        <input type="hidden" asp-for="Input.Kind" />
+                        <small>Request type cannot be changed after submission.</small>
+                    }
+                    <span asp-validation-for="Input.Kind" class="validation"></span>
+                </label>
+
+                <label>
+                    Priority
+                    <select asp-for="Input.Priority">
+                        @foreach (RequestPriority priority in Enum.GetValues<RequestPriority>())
+                        {
+                            <option value="@priority">@priority</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Input.Priority" class="validation"></span>
+                </label>
+
+                <label>
+                    Program
+                    <select asp-for="Input.ProgramCategory">
+                        <option value="">Select program</option>
+                        @foreach (var program in Model.Programs)
+                        {
+                            <option value="@program.Name">@program.Name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Input.ProgramCategory" class="validation"></span>
+                </label>
+
+                <label>
+                    Category
+                    <select asp-for="Input.Category">
+                        <option value="">Select category</option>
+                        @foreach (var category in Model.Categories)
+                        {
+                            <option value="@category.Name">@category.Name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Input.Category" class="validation"></span>
+                </label>
+
+                <label class="span-two">
+                    SubCategory
+                    <input asp-for="Input.Subcategory" />
+                    <span asp-validation-for="Input.Subcategory" class="validation"></span>
+                </label>
+
+                <label class="span-two">
+                    Summary
+                    <textarea asp-for="Input.Summary" rows="4"></textarea>
+                    <span asp-validation-for="Input.Summary" class="validation"></span>
+                </label>
+
+                <label class="span-two">
+                    Location
+                    <input asp-for="Input.Location" />
+                    <span asp-validation-for="Input.Location" class="validation"></span>
+                </label>
+
+                <label class="span-two">
+                    Circumstances / Additional Details
+                    <textarea asp-for="Input.Circumstances" rows="6"></textarea>
+                    <span asp-validation-for="Input.Circumstances" class="validation"></span>
+                </label>
+            </div>
+
+            <div class="edit-actions">
+                <a class="edit-cancel" asp-page="/Requests/Details" asp-route-id="@RouteData.Values["id"]">Cancel</a>
+                <button class="edit-save" type="submit">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<style>
+.edit-request-page{background:#f4f7fa;min-height:calc(100vh - 52px);padding:22px 0 40px;color:#172f48}
+.edit-request-shell{width:min(980px,calc(100% - 32px));margin:0 auto}
+.edit-request-header{margin-bottom:14px}.edit-request-header h1{margin:5px 0 2px;font-size:28px}.edit-request-header p{margin:0;color:#64788c}
+.edit-back{color:#0f67c7;text-decoration:none;font-size:13px;font-weight:700}
+.edit-request-card{border:1px solid #d4dde6;border-radius:6px;background:#fff;padding:20px;box-shadow:0 1px 2px rgba(18,45,70,.04)}
+.edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.edit-grid label{display:grid;gap:5px;color:#334c63;font-size:13px;font-weight:700}
+.edit-grid input,.edit-grid select,.edit-grid textarea{box-sizing:border-box;width:100%;border:1px solid #b8c7d5;border-radius:4px;padding:9px 10px;font:inherit;background:#fff;color:#172f48}
+.edit-grid textarea{resize:vertical}.span-two{grid-column:1/-1}
+.edit-grid small{color:#6b7d8e;font-weight:500}
+.validation{color:#b42318;font-size:12px}
+.edit-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #e1e6eb}
+.edit-cancel,.edit-save{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 14px;border-radius:4px;font-size:13px;font-weight:700;text-decoration:none;cursor:pointer}
+.edit-cancel{border:1px solid #b8c7d5;background:#fff;color:#334c63}.edit-save{border:1px solid #0c5cb5;background:#0f6fd4;color:#fff}
+@@media(max-width:700px){.edit-grid{grid-template-columns:1fr}.span-two{grid-column:auto}}
+</style>
