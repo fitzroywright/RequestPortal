@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Administration;
 using RequestPortal.Application.Portal;
+using PortalStaffOrganizationSummary = RequestPortal.Application.Portal.StaffOrganizationSummary;
 
 namespace RequestPortal.Web.Pages.Staff;
 
@@ -20,7 +21,7 @@ public sealed class OrganizationsModel : PageModel
         this.staffOperationsService = staffOperationsService;
     }
 
-    public IReadOnlyList<StaffOrganizationSummary> Organizations { get; private set; } = Array.Empty<StaffOrganizationSummary>();
+    public IReadOnlyList<PortalStaffOrganizationSummary> Organizations { get; private set; } = Array.Empty<PortalStaffOrganizationSummary>();
     public IReadOnlyList<OrganizationReverificationWorkItem> ReverificationOrganizations { get; private set; } = Array.Empty<OrganizationReverificationWorkItem>();
     public IReadOnlyList<DocumentWorkItem> DocumentsAwaitingVerification { get; private set; } = Array.Empty<DocumentWorkItem>();
 
