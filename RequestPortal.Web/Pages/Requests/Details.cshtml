@@ -378,7 +378,7 @@
                         @if (!Model.RequestConversationReadOnly)
                         {
                             bool startingNewMessage = requestMessages.Length == 0 || replyThread is null;
-                            <form id="message-composer" method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="mock-message-composer">
+                            <form id="message-composer" method="post" enctype="multipart/form-data" asp-page-handler="Reply" class="mock-message-composer upload-aware-form">
                                 <input type="hidden" name="id" value="@Model.Request.Id" />
                                 @if (replyThread is not null){<input type="hidden" name="ReplyThreadId" value="@replyThread.ThreadId" />}
                                 <textarea name="Reply" rows="3" maxlength="10000" required placeholder="@(startingNewMessage ? "Type a new message..." : "Type your reply...")">@Model.Reply</textarea>
@@ -502,7 +502,7 @@
                         {
                             <details class="mock-upload-details">
                                 <summary>Upload file</summary>
-                                <form method="post" enctype="multipart/form-data" asp-page-handler="UploadDocument" class="mock-form-grid">
+                                <form method="post" enctype="multipart/form-data" asp-page-handler="UploadDocument" class="mock-form-grid upload-aware-form">
                                     <input type="hidden" name="id" value="@Model.Request.Id" />
                                     <label>
                                         Document type
@@ -544,7 +544,7 @@
 .mock-action-button,.mock-blue-button,.mock-mini-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-weight:700;cursor:pointer}
 .mock-action-button{min-height:38px;padding:0 14px;border-radius:4px;background:#fff;font-size:13px}
 .mock-action-edit{border:1px solid #7fb3e3;color:#0c67c7}.mock-action-cancel{border:1px solid #ee8f85;color:#d33e34}
-.mock-blue-button{min-height:34px;padding:0 13px;border:1px solid #0c5cb5;border-radius:4px;background:#0f6fd4;color:#fff;font-size:12px}
+.mock-blue-button{min-height:34px;padding:0 13px;border:1px solid #0c5cb5;border-radius:4px;background:#0f6fd4;color:#fff;font-size:12px}.upload-busy,.upload-busy *{cursor:wait!important}.upload-aware-form button[type="submit"]:disabled{opacity:.7;cursor:wait}
 .mock-mini-button{min-height:30px;padding:0 10px;border:1px solid #71a9df;border-radius:4px;background:#fff;color:#0d67c5;font-size:12px}
 .mock-tabs{display:flex;gap:4px;border-bottom:1px solid #d6dee6;margin-bottom:18px;padding-left:4px}
 .mock-tabs a{position:relative;padding:11px 16px 12px;color:#4e6278;text-decoration:none;font-size:13px;font-weight:650}
@@ -595,11 +595,43 @@
 (() => {
     const input = document.getElementById('reply-attachment');
     const name = document.getElementById('reply-attachment-name');
-    if (!input || !name) return;
-    input.addEventListener('change', () => {
-        const file = input.files && input.files.length > 0 ? input.files[0] : null;
-        name.textContent = file ? file.name : 'No file selected';
-        name.title = file ? file.name : '';
+    if (input && name) {
+        input.addEventListener('change', () => {
+            const file = input.files && input.files.length > 0 ? input.files[0] : null;
+            name.textContent = file ? file.name : 'No file selected';
+            name.title = file ? file.name : '';
+        });
+    }
+
+    document.querySelectorAll('.upload-aware-form').forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                return;
+            }
+
+            const fileInput = form.querySelector('input[type="file"]');
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                return;
+            }
+
+            document.documentElement.classList.add('upload-busy');
+            const submit = form.querySelector('button[type="submit"]');
+            if (submit) {
+                submit.disabled = true;
+                submit.dataset.originalText = submit.textContent || '';
+                submit.textContent = 'Uploading...';
+            }
+        });
+    });
+
+    window.addEventListener('pageshow', () => {
+        document.documentElement.classList.remove('upload-busy');
+        document.querySelectorAll('.upload-aware-form button[type="submit"][disabled]').forEach(button => {
+            button.disabled = false;
+            if (button.dataset.originalText) {
+                button.textContent = button.dataset.originalText;
+            }
+        });
     });
 })();
 </script>
