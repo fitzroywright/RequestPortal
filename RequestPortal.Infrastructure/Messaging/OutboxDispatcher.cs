@@ -699,6 +699,7 @@ public sealed class OutboxDispatcher
 
         try
         {
+            WhatsAppTemplate template = ResolveWhatsAppTemplate(subject);
             await notificationSender.SendAsync(
                 new NotificationEnvelope(
                     preference.Destination,
@@ -706,7 +707,10 @@ public sealed class OutboxDispatcher
                     body,
                     false,
                     transport,
-                    requestId?.ToString("D")),
+                    requestId?.ToString("D"),
+                    template.Name,
+                    "en_US",
+                    [SanitizeTemplateParameter(subject), SanitizeTemplateParameter(body)]),
                 cancellationToken);
             history.MarkSent(DateTimeOffset.UtcNow);
         }
@@ -716,6 +720,28 @@ public sealed class OutboxDispatcher
             throw;
         }
     }
+
+    private sealed record WhatsAppTemplate(string Name);
+
+    private static WhatsAppTemplate ResolveWhatsAppTemplate(string subject)
+    {
+        if (subject.StartsWith("New message:", StringComparison.OrdinalIgnoreCase))
+            return new("request_portal_new_message");
+        if (subject.StartsWith("Information required:", StringComparison.OrdinalIgnoreCase))
+            return new("request_portal_information_required");
+        if (subject.StartsWith("Request submitted:", StringComparison.OrdinalIgnoreCase) ||
+            subject.StartsWith("Request status:", StringComparison.OrdinalIgnoreCase))
+            return new("request_portal_request_update");
+        if (subject.StartsWith("Membership ", StringComparison.OrdinalIgnoreCase) ||
+            subject.StartsWith("Representative ", StringComparison.OrdinalIgnoreCase) ||
+            subject.StartsWith("Organization membership ", StringComparison.OrdinalIgnoreCase))
+            return new("request_portal_membership_update");
+
+        return new("request_portal_organization_update");
+    }
+
+    private static string SanitizeTemplateParameter(string value) =>
+        value.Replace("|", "/", StringComparison.Ordinal).Trim();
 
     private async Task DeliverEmailAsync(
         Guid userId,
