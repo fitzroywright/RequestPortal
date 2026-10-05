@@ -221,7 +221,14 @@ public sealed class DocumentService : IDocumentService
     {
         Guid documentId = Guid.NewGuid();
         string safeFileName = Path.GetFileName(originalFileName);
-        string storageKey = $"organizations/{organizationId:N}/{ownerType}/{ownerId:N}/{documentId:N}-{safeFileName}";
+        string storageKey = await BuildStorageKeyAsync(
+            documentId,
+            ownerType,
+            ownerId,
+            organizationId,
+            documentType,
+            safeFileName,
+            cancellationToken);
         DateTimeOffset now = clock.UtcNow;
         StoredFile stored = await fileStorage.StoreAsync(
             new StorageWriteRequest(
@@ -252,6 +259,38 @@ public sealed class DocumentService : IDocumentService
             await RollBackStorageAsync(stored.StorageKey, cancellationToken);
             throw;
         }
+    }
+
+    private async Task<string> BuildStorageKeyAsync(
+        Guid documentId,
+        DocumentOwnerType ownerType,
+        Guid ownerId,
+        Guid organizationId,
+        DocumentType documentType,
+        string safeFileName,
+        CancellationToken cancellationToken)
+    {
+        string fileName = $"{documentId:N}-{safeFileName}";
+
+        if (ownerType == DocumentOwnerType.AssistanceRequest)
+        {
+            string publicReference = await dbContext.AssistanceRequests
+                .AsNoTracking()
+                .Where(request => request.Id == ownerId)
+                .Select(request => request.PublicReference)
+                .SingleAsync(cancellationToken);
+
+            string category = documentType switch
+            {
+                DocumentType.MessageAttachment => "Message Attachments",
+                DocumentType.DeliveryEvidence => "Delivery",
+                _ => "Supporting Documents"
+            };
+
+            return $"Requests/{publicReference}/{category}/{fileName}";
+        }
+
+        return $"Organizations/{organizationId:N}/Documents/{fileName}";
     }
 
     private async Task RollBackStorageAsync(string storageKey, CancellationToken cancellationToken)
