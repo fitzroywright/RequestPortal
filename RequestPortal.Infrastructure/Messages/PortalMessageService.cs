@@ -537,20 +537,13 @@ public sealed class PortalMessageService : IPortalMessageService
 
         if (requestId.HasValue && !threadId.HasValue)
         {
-            var request = await dbContext.AssistanceRequests.AsNoTracking()
-                .Where(item => item.Id == requestId.Value)
-                .Select(item => new { item.CreatedByUserId, item.SubmittedByUserId })
-                .SingleAsync(cancellationToken);
-            bool owner = request.CreatedByUserId == senderUserId || request.SubmittedByUserId == senderUserId;
+            // Access to a request conversation follows the same organization-membership
+            // boundary as Request Details. EnsureApprovedMembershipAsync and
+            // ValidateRequestScopeAsync above already prove that the representative
+            // may access this organization's request. Notification subscription is
+            // a delivery preference, not an additional send-permission gate.
             MessageThread? canonical = await dbContext.MessageThreads.AsNoTracking()
                 .SingleOrDefaultAsync(item => item.Id == requestId.Value, cancellationToken);
-            bool participant = canonical is not null && await CanViewThreadAsync(senderUserId, false, canonical, cancellationToken);
-            bool subscribedManager = await dbContext.OrganizationMemberships.AsNoTracking()
-                .AnyAsync(item => item.OrganizationId == organizationId && item.UserId == senderUserId &&
-                    item.Status == MembershipStatus.Approved && item.Role == OrganizationRole.Administrator &&
-                    item.ReceiveRequestNotifications, cancellationToken);
-            if (!owner && !participant && !subscribedManager)
-                throw new UnauthorizedAccessException("Only the request owner, a participant or a subscribed manager may use the request conversation.");
             if (canonical?.ClosedUtc is not null)
                 throw new InvalidOperationException("This conversation is closed. Contact FFP to reopen it.");
         }
