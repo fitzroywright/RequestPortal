@@ -226,7 +226,10 @@
                             @if (Model.RequestId.HasValue)
                             {
                                 <details class="message-attachment-menu">
-                                    <summary class="button button-small button-outline" title="Link a request document">📎 Attach document</summary>
+                                    <summary class="button button-small button-outline staff-attach-button" title="Link a request document">
+                                        <svg class="staff-attach-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 6.5l-7.78 7.78a2.5 2.5 0 103.54 3.54l8.13-8.13a4.5 4.5 0 00-6.36-6.36L5.54 11.82a6.5 6.5 0 109.19 9.19l6.01-6.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        <span>Attach document</span>
+                                    </summary>
                                     <div class="message-attachment-picker">
                                         @if (Model.AvailableAttachments.Any(item => !item.IsArchived))
                                         {
@@ -298,6 +301,8 @@
 .staff-compose-footer .message-attachment-menu{position:relative}
 .staff-compose-footer .message-attachment-menu>summary{list-style:none}
 .staff-compose-footer .message-attachment-menu>summary::-webkit-details-marker{display:none}
+.staff-compose-footer .staff-attach-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;line-height:1}
+.staff-compose-footer .staff-attach-icon{display:block;width:16px;height:16px;flex:0 0 16px}
 .staff-compose-footer .message-attachment-picker{left:0;right:auto;bottom:calc(100% + 6px);top:auto;min-width:320px;max-width:520px}
 @@media(max-width:760px){
     .staff-compose-context,.staff-compose-recipient-grid{grid-template-columns:1fr}
