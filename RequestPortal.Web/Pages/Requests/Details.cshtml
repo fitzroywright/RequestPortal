@@ -385,7 +385,10 @@
                                 <span asp-validation-for="Reply" class="validation"></span>
                                 <div asp-validation-summary="ModelOnly" class="validation"></div>
                                 <div class="mock-composer-actions">
-                                    <label class="mock-attach-button">📎 Attach<input name="ReplyAttachment" type="file" /></label>
+                                    <div class="mock-attachment-picker">
+                                        <label class="mock-attach-button">📎 Attach<input id="reply-attachment" name="ReplyAttachment" type="file" /></label>
+                                        <span id="reply-attachment-name" class="mock-attachment-name">No file selected</span>
+                                    </div>
                                     <button class="mock-blue-button" type="submit">Send</button>
                                 </div>
                             </form>
@@ -558,7 +561,7 @@
 .mock-message-meta{display:flex;align-items:center;gap:12px;margin-bottom:4px}.mock-message-meta strong{font-size:13px}.mock-message-meta span{font-size:12px;color:#657789}.mock-message-more{margin-left:auto;font-weight:900}
 .mock-message-copy p{margin:0;font-size:13px;line-height:1.45}.mock-attachment-link{display:inline-block;margin-top:5px;font-size:12px;color:#0f67c7}
 .mock-message-composer{padding:14px 18px 16px;border-top:1px solid #e0e6eb;background:#f9fbfd}.mock-message-composer textarea{width:100%;box-sizing:border-box;resize:vertical;border:1px solid #b8c8d6;border-radius:4px;padding:9px 10px;font:inherit}
-.mock-composer-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}.mock-attach-button{position:relative;color:#0f67c7;font-size:12px;font-weight:700;cursor:pointer}.mock-attach-button input{position:absolute;opacity:0;width:1px;height:1px}
+.mock-composer-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}.mock-attachment-picker{display:flex;align-items:center;gap:8px;min-width:0}.mock-attach-button{position:relative;color:#0f67c7;font-size:12px;font-weight:700;cursor:pointer}.mock-attach-button input{position:absolute;opacity:0;width:1px;height:1px}.mock-attachment-name{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#607386;font-size:12px}
 .mock-readonly{padding:12px 18px;background:#f6f8fa;color:#667789}
 .mock-status-steps{padding:15px 20px 14px}.mock-status-step{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;min-height:39px;color:#4c6074}
 .mock-status-step:not(:last-child)::after{content:"";position:absolute;left:7px;top:18px;bottom:-2px;width:1px;background:#b7c6d2}
@@ -575,3 +578,16 @@
 @@media(max-width:1050px){.mock-detail-grid{grid-template-columns:1fr}.mock-detail-side{grid-template-columns:repeat(2,minmax(0,1fr))}.mock-summary-content{grid-template-columns:1fr}}
 @@media(max-width:720px){.capstone-quantity-row{grid-template-columns:1fr!important}.capstone-problem-grid{grid-template-columns:1fr}.mock-request-shell{width:calc(100% - 18px)}.mock-request-header{align-items:flex-start;flex-direction:column}.mock-tabs{overflow-x:auto}.mock-detail-side{grid-template-columns:1fr}.mock-summary-list>div,.mock-summary-description dl>div,.mock-side-list>div,.mock-related-list>div{grid-template-columns:1fr}.mock-form-row{grid-template-columns:1fr}}
 </style>
+
+<script>
+(() => {
+    const input = document.getElementById('reply-attachment');
+    const name = document.getElementById('reply-attachment-name');
+    if (!input || !name) return;
+    input.addEventListener('change', () => {
+        const file = input.files && input.files.length > 0 ? input.files[0] : null;
+        name.textContent = file ? file.name : 'No file selected';
+        name.title = file ? file.name : '';
+    });
+})();
+</script>
