@@ -17,6 +17,7 @@ using RequestPortal.Common.Messaging;
 using RequestPortal.Common.Time;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Organizations;
+using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Documents;
@@ -121,9 +122,47 @@ public sealed class DocumentService : IDocumentService
 
     public async Task<IReadOnlyList<DocumentSummary>> GetRequestDocumentsAsync(Guid userId, Guid requestId, bool isStaff, CancellationToken cancellationToken = default)
     {
-        Guid organizationId = await dbContext.AssistanceRequests.AsNoTracking().Where(request => request.Id == requestId).Select(request => request.OrganizationId).SingleAsync(cancellationToken);
-        if (!isStaff) await EnsureApprovedMemberAsync(userId, organizationId, cancellationToken);
-        return await QueryDocumentsAsync(DocumentOwnerType.AssistanceRequest, requestId, cancellationToken);
+        var request = await dbContext.AssistanceRequests.AsNoTracking()
+            .Where(item => item.Id == requestId)
+            .Select(item => new { item.OrganizationId, item.Status })
+            .SingleAsync(cancellationToken);
+
+        if (!isStaff)
+        {
+            await EnsureApprovedMemberAsync(userId, request.OrganizationId, cancellationToken);
+        }
+
+        Guid[] messageDocumentIds = await dbContext.MessageAttachments.AsNoTracking()
+            .Select(item => item.DocumentId)
+            .ToArrayAsync(cancellationToken);
+
+        HashSet<Guid> messageAttachmentIds = messageDocumentIds.ToHashSet();
+
+        return await dbContext.Documents.AsNoTracking()
+            .Where(document =>
+                document.OwnerType == DocumentOwnerType.AssistanceRequest &&
+                document.OwnerId == requestId &&
+                !document.IsArchived)
+            .OrderByDescending(document => document.UploadedUtc)
+            .Select(document => new DocumentSummary(
+                document.Id,
+                document.DocumentType,
+                document.OriginalFileName,
+                document.ContentType,
+                document.SizeBytes,
+                document.UploadedUtc,
+                document.VerificationStatus,
+                document.RetentionClass,
+                document.RetainUntilUtc,
+                document.IsArchived,
+                document.VerificationNotes,
+                !isStaff &&
+                document.UploadedByUserId == userId &&
+                (request.Status == RequestStatus.Draft || request.Status == RequestStatus.MoreInformationRequired) &&
+                document.DocumentType != DocumentType.MessageAttachment &&
+                document.DocumentType != DocumentType.DeliveryEvidence &&
+                !messageAttachmentIds.Contains(document.Id)))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<DocumentSummary>> GetOrganizationDocumentsAsync(Guid userId, Guid organizationId, bool isStaff, CancellationToken cancellationToken = default)
@@ -210,6 +249,66 @@ public sealed class DocumentService : IDocumentService
         document.MarkArchived(clock.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
         await AuditAsync(staffUserId, "DocumentArchived", documentId, document.OrganizationId, null, cancellationToken);
+    }
+
+    public async Task RemoveRequestDocumentAsync(
+        Guid userId,
+        Guid requestId,
+        Guid documentId,
+        CancellationToken cancellationToken = default)
+    {
+        var request = await dbContext.AssistanceRequests
+            .Where(item => item.Id == requestId)
+            .Select(item => new { item.OrganizationId, item.Status })
+            .SingleAsync(cancellationToken);
+
+        await EnsureApprovedMemberAsync(userId, request.OrganizationId, cancellationToken);
+
+        if (request.Status is not (RequestStatus.Draft or RequestStatus.MoreInformationRequired))
+        {
+            throw new InvalidOperationException("Files can only be removed while the request is Draft or More Information Required.");
+        }
+
+        StoredDocument document = await dbContext.Documents
+            .SingleOrDefaultAsync(item =>
+                item.Id == documentId &&
+                item.OwnerType == DocumentOwnerType.AssistanceRequest &&
+                item.OwnerId == requestId,
+                cancellationToken)
+            ?? throw new InvalidOperationException("The selected file does not belong to this request.");
+
+        if (document.IsArchived)
+        {
+            return;
+        }
+
+        if (document.UploadedByUserId != userId)
+        {
+            throw new UnauthorizedAccessException("You can only remove files that you uploaded.");
+        }
+
+        if (document.DocumentType is DocumentType.MessageAttachment or DocumentType.DeliveryEvidence)
+        {
+            throw new InvalidOperationException("This file is part of a protected request record and cannot be removed.");
+        }
+
+        bool usedByMessage = await dbContext.MessageAttachments.AsNoTracking()
+            .AnyAsync(item => item.DocumentId == documentId, cancellationToken);
+        if (usedByMessage)
+        {
+            throw new InvalidOperationException("Files attached to a sent message cannot be removed.");
+        }
+
+        document.MarkArchived(clock.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await AuditAsync(
+            userId,
+            "RequestDocumentRemoved",
+            document.Id,
+            document.OrganizationId,
+            $"Request={requestId:D}; File={document.OriginalFileName}",
+            cancellationToken);
     }
 
     private async Task<IReadOnlyList<DocumentSummary>> QueryDocumentsAsync(DocumentOwnerType ownerType, Guid ownerId, CancellationToken cancellationToken)
