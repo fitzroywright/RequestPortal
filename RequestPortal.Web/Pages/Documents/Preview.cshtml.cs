@@ -46,11 +46,32 @@ public sealed class PreviewModel(
 
             if (!IsPdf && !IsImage)
             {
-                HtmlPreview = await previewRenderer.RenderHtmlAsync(
-                    FileName,
-                    ContentType,
-                    download.Content,
-                    HttpContext.RequestAborted);
+                try
+                {
+                    HtmlPreview = await previewRenderer.RenderHtmlAsync(
+                        FileName,
+                        ContentType,
+                        download.Content,
+                        HttpContext.RequestAborted);
+                }
+                catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    ILogger logger = HttpContext.RequestServices
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("RequestPortal.Documents.Preview");
+
+                    logger.LogWarning(
+                        exception,
+                        "Document preview generation failed for {FileName}; falling back to download-only behavior. CorrelationId={CorrelationId}",
+                        FileName,
+                        HttpContext.TraceIdentifier);
+
+                    HtmlPreview = null;
+                }
             }
         }
 
