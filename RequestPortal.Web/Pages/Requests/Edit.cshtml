@@ -131,7 +131,14 @@
                                     <select name="Items[@i].UnitOfMeasureId">
                                         @foreach (var unit in Model.UnitsOfMeasure)
                                         {
-                                            <option value="@unit.Id" selected="@(unit.Id == Model.Items[i].UnitOfMeasureId)">@unit.Name (@unit.Code)</option>
+                                            if (unit.Id == Model.Items[i].UnitOfMeasureId)
+                                            {
+                                                <option value="@unit.Id" selected>@unit.Name (@unit.Code)</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@unit.Id">@unit.Name (@unit.Code)</option>
+                                            }
                                         }
                                     </select>
                                 </label>
