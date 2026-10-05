@@ -135,7 +135,7 @@ public sealed class DetailsModel : PageModel
             {
                 await using System.IO.Stream content = ReplyAttachment.OpenReadStream();
                 attachments.Add(await documentService.UploadForRequestAsync(user.Id, id,
-                    RequestPortal.Domain.Documents.DocumentType.RequestSupport,
+                    RequestPortal.Domain.Documents.DocumentType.MessageAttachment,
                     ReplyAttachment.FileName, ReplyAttachment.ContentType, ReplyAttachment.Length, content,
                     HttpContext.RequestAborted));
             }
