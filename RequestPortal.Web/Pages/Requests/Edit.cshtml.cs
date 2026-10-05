@@ -18,9 +18,13 @@ public sealed class EditModel(
     public RequestStatus Status { get; private set; }
     public IReadOnlyList<RequestCategoryOption> Categories { get; private set; } = Array.Empty<RequestCategoryOption>();
     public IReadOnlyList<ProgramClassificationOption> Programs { get; private set; } = Array.Empty<ProgramClassificationOption>();
+    public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
 
     [BindProperty]
     public EditInput Input { get; set; } = new();
+
+    [BindProperty]
+    public List<ItemInput> Items { get; set; } = [];
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
@@ -59,6 +63,27 @@ public sealed class EditModel(
             Circumstances = request.Circumstances
         };
 
+        Items = request.Items
+            .Select(item => new ItemInput
+            {
+                Id = item.Id,
+                ItemName = item.ItemName,
+                Description = item.Description,
+                Quantity = item.Quantity,
+                UnitOfMeasureId = item.UnitOfMeasureId,
+                Notes = item.Notes
+            })
+            .ToList();
+
+        if (Input.Kind == RequestKind.GoodsAndServices && Items.Count == 0)
+        {
+            Items.Add(new ItemInput
+            {
+                Quantity = 1,
+                UnitOfMeasureId = UnitsOfMeasure.FirstOrDefault()?.Id ?? Guid.Empty
+            });
+        }
+
         return Page();
     }
 
@@ -96,6 +121,30 @@ public sealed class EditModel(
             ModelState.AddModelError(nameof(Input.Kind), "Request type cannot be changed after submission.");
         }
 
+        if (Input.Kind == RequestKind.GoodsAndServices)
+        {
+            List<ItemInput> populatedItems = Items.Where(item => !item.IsBlank).ToList();
+            if (populatedItems.Count == 0)
+            {
+                ModelState.AddModelError(nameof(Items), "Add at least one requested item or service.");
+            }
+
+            for (int index = 0; index < populatedItems.Count; index++)
+            {
+                ItemInput item = populatedItems[index];
+                if (string.IsNullOrWhiteSpace(item.ItemName))
+                    ModelState.AddModelError($"Items[{index}].ItemName", "Item or service is required.");
+                if (string.IsNullOrWhiteSpace(item.Description))
+                    ModelState.AddModelError($"Items[{index}].Description", "Description or specification is required.");
+                if (item.Quantity <= 0)
+                    ModelState.AddModelError($"Items[{index}].Quantity", "Quantity must be greater than zero.");
+                if (!UnitsOfMeasure.Any(unit => unit.Id == item.UnitOfMeasureId))
+                    ModelState.AddModelError($"Items[{index}].UnitOfMeasureId", "Select a valid unit.");
+            }
+
+            Items = populatedItems;
+        }
+
         if (!ModelState.IsValid)
         {
             return Page();
@@ -114,6 +163,15 @@ public sealed class EditModel(
                 Input.Priority,
                 Input.Location,
                 Input.Circumstances,
+                Items.Where(item => !item.IsBlank)
+                    .Select(item => new EditableRequestItem(
+                        item.Id,
+                        item.ItemName,
+                        item.Description,
+                        item.Quantity,
+                        item.UnitOfMeasureId,
+                        item.Notes))
+                    .ToArray(),
                 HttpContext.RequestAborted);
         }
         catch (UnauthorizedAccessException exception)
@@ -135,11 +193,35 @@ public sealed class EditModel(
     {
         Categories = await referenceDataService.GetCategoriesAsync(HttpContext.RequestAborted);
         Programs = await referenceDataService.GetProgramsAsync(HttpContext.RequestAborted);
+        UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
     }
 
     private async Task<ApplicationUser> GetUserAsync() =>
         await userManager.GetUserAsync(User)
         ?? throw new InvalidOperationException("Authenticated portal user could not be resolved.");
+
+    public sealed class ItemInput
+    {
+        public Guid Id { get; set; }
+
+        [StringLength(250)]
+        public string ItemName { get; set; } = string.Empty;
+
+        [StringLength(2000)]
+        public string Description { get; set; } = string.Empty;
+
+        public decimal Quantity { get; set; } = 1;
+
+        public Guid UnitOfMeasureId { get; set; }
+
+        [StringLength(2000)]
+        public string? Notes { get; set; }
+
+        public bool IsBlank =>
+            string.IsNullOrWhiteSpace(ItemName) &&
+            string.IsNullOrWhiteSpace(Description) &&
+            string.IsNullOrWhiteSpace(Notes);
+    }
 
     public sealed class EditInput
     {
