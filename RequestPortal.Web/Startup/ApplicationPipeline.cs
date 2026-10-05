@@ -118,13 +118,32 @@ internal static class ApplicationPipeline
         , Func<Task> next)
     {
         context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-        context.Response.Headers["X-Frame-Options"] = "DENY";
         context.Response.Headers["Referrer-Policy"] =
             "strict-origin-when-cross-origin";
-        context.Response.Headers["Content-Security-Policy"] =
-            "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://login.microsoftonline.com https://accounts.google.com https://www.facebook.com https://api.login.yahoo.com https://login.yahoo.com https://appleid.apple.com";
         context.Response.Headers["Permissions-Policy"] =
             "camera=(), microphone=(), geolocation=(self)";
+
+        bool isDocumentPreviewRaw =
+            context.Request.Path.Equals(
+                "/Documents/Preview",
+                StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(
+                context.Request.Query["handler"],
+                "Raw",
+                StringComparison.OrdinalIgnoreCase);
+
+        if (isDocumentPreviewRaw)
+        {
+            context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+            context.Response.Headers["Content-Security-Policy"] =
+                "default-src 'self'; frame-ancestors 'self'; base-uri 'self'";
+        }
+        else
+        {
+            context.Response.Headers["X-Frame-Options"] = "DENY";
+            context.Response.Headers["Content-Security-Policy"] =
+                "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://login.microsoftonline.com https://accounts.google.com https://www.facebook.com https://api.login.yahoo.com https://login.yahoo.com https://appleid.apple.com";
+        }
 
         await next();
     }
