@@ -58,7 +58,7 @@ public sealed class ThreadModel(
             return NotFound();
         }
 
-        string safeFileName = download.FileName.Replace(""", string.Empty, StringComparison.Ordinal);
+        string safeFileName = download.FileName.Replace(((char)34).ToString(), string.Empty, StringComparison.Ordinal);
         Response.Headers.ContentDisposition =
             $"inline; filename=\"{safeFileName}\"; filename*=UTF-8''{Uri.EscapeDataString(download.FileName)}";
 
