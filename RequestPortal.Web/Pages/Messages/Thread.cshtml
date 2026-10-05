@@ -6,11 +6,11 @@
     ViewData["Title"] = Model.Thread?.Subject ?? "Conversation";
 }
 
-<section class="operational-page">
-    <div class="shell">
+<section class="operational-page conversation-page">
+    <div class="shell conversation-shell">
         @if (Model.Thread is not null)
         {
-            <div class="section-heading">
+            <div class="section-heading conversation-heading">
                 <div class="eyebrow" style="color:#b45b09">Conversation</div>
                 <h1>@Model.Thread.Subject</h1>
                 @if (Model.IsStaff)
@@ -62,78 +62,97 @@
                 </p>
             </div>
 
-            <div class="message-thread">
+            <div class="message-thread conversation-thread">
                 @foreach (MessageDetailView message in Model.Thread.Messages)
                 {
-                    <article class="message-bubble @(message.IsMine ? "message-mine" : null)">
-                        <div class="message-meta">
-                            @if (message.SenderKind == "Representative")
-                            {
-                                <img class="message-thread-avatar"
-                                     src="@(message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
-                                     alt="" />
-                            }
-                            <strong>@message.SenderName</strong>
-                            @if (message.SenderKind == "FFP Staff")
-                            {
-                                <span class="status">FFP Staff</span>
-                            }
-                            <span class="muted">@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</span>
-                        </div>
-                        <div class="message-body">@message.Body</div>
-                        @if (message.Attachments.Count > 0)
-                        {
-                            <div class="message-attachments"><span class="attachment-indicator" title="Documents linked to this message">📎</span>
-                                @foreach (MessageAttachmentView attachment in message.Attachments)
+                    <div class="conversation-row @(message.IsMine ? "is-mine" : "is-theirs")">
+                        <article class="message-bubble conversation-bubble">
+                            <div class="message-meta">
+                                @if (message.SenderKind == "Representative")
                                 {
-                                    @if (attachment.IsAvailable)
-                                    {
-                                        <a class="message-attachment"
-                                           target="_blank"
-                                           rel="noopener"
-                                           asp-page="/Documents/Preview"
-                                           asp-route-threadId="@Model.Thread.ThreadId"
-                                           asp-route-documentId="@attachment.DocumentId">
-                                            @attachment.FileName
-                                            <small>@($"{Math.Max(1, attachment.SizeBytes / 1024)} KB")</small>
-                                        </a>
-                                    }
-                                    else
-                                    {
-                                        <span class="message-attachment message-attachment-unavailable">
-                                            @attachment.FileName
-                                            <small>Unavailable or access denied</small>
-                                        </span>
-                                    }
+                                    <img class="message-thread-avatar"
+                                         src="@(message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
+                                         alt="" />
                                 }
+                                <strong>@message.SenderName</strong>
+                                @if (message.SenderKind == "FFP Staff")
+                                {
+                                    <span class="status">FFP Staff</span>
+                                }
+                                <span class="muted">@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</span>
                             </div>
-                        }
-                    </article>
+                            <div class="message-body">@message.Body</div>
+                            @if (message.Attachments.Count > 0)
+                            {
+                                <div class="message-attachments">
+                                    @foreach (MessageAttachmentView attachment in message.Attachments)
+                                    {
+                                        @if (attachment.IsAvailable)
+                                        {
+                                            <a class="message-attachment"
+                                               target="_blank"
+                                               rel="noopener"
+                                               asp-page="/Documents/Preview"
+                                               asp-route-threadId="@Model.Thread.ThreadId"
+                                               asp-route-documentId="@attachment.DocumentId">
+                                                📎 @attachment.FileName
+                                                <small>@($"{Math.Max(1, attachment.SizeBytes / 1024)} KB")</small>
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="message-attachment message-attachment-unavailable">
+                                                📎 @attachment.FileName
+                                                <small>Unavailable or access denied</small>
+                                            </span>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </article>
+                    </div>
                 }
             </div>
 
             @if (!Model.Thread.ClosedUtc.HasValue)
             {
-            <form method="post" class="card" style="margin-top:20px">
-                <label asp-for="Reply">@(Model.Thread.Audience == MessageAudience.PersonalNote ? "Add note" : "Reply")</label>
-                <textarea asp-for="Reply" rows="6" maxlength="10000" required></textarea>
+            <form method="post" class="conversation-composer">
+                <div class="conversation-composer-head">
+                    <label asp-for="Reply">@(Model.Thread.Audience == MessageAudience.PersonalNote ? "Add note" : "Reply")</label>
+                    <span class="muted">Your reply will be added to this conversation.</span>
+                </div>
+
+                <textarea asp-for="Reply"
+                          rows="5"
+                          maxlength="10000"
+                          required
+                          placeholder="Write your reply..."></textarea>
                 <span asp-validation-for="Reply" class="validation"></span>
 
-                @if (Model.AvailableAttachments.Count > 0)
-                {
-                    <fieldset class="field" style="border:1px solid #dde3e8;padding:14px;margin:14px 0">
-                        <legend style="font-weight:700">Link request documents</legend>
-                        @foreach (var document in Model.AvailableAttachments.Where(item => !item.IsArchived))
+                <div class="conversation-composer-footer">
+                    <div class="conversation-attachment-area">
+                        @if (Model.AvailableAttachments.Any(item => !item.IsArchived))
                         {
-                            <label class="check-row">
-                                <input type="checkbox" name="AttachmentDocumentIds" value="@document.Id" />
-                                <span>@document.OriginalFileName <small class="muted">(@document.DocumentType)</small></span>
-                            </label>
+                            <details class="conversation-attachments-picker">
+                                <summary class="button button-small button-outline">📎 Attach document</summary>
+                                <div class="conversation-attachments-menu">
+                                    <strong>Link request documents</strong>
+                                    @foreach (var document in Model.AvailableAttachments.Where(item => !item.IsArchived))
+                                    {
+                                        <label class="check-row">
+                                            <input type="checkbox" name="AttachmentDocumentIds" value="@document.Id" />
+                                            <span>@document.OriginalFileName <small class="muted">(@document.DocumentType)</small></span>
+                                        </label>
+                                    }
+                                </div>
+                            </details>
                         }
-                    </fieldset>
-                }
+                    </div>
 
-                <button class="button" type="submit">@(Model.Thread.Audience == MessageAudience.PersonalNote ? "Save note" : "Send reply")</button>
+                    <button class="button conversation-send" type="submit">
+                        @(Model.Thread.Audience == MessageAudience.PersonalNote ? "Save note" : "Send reply")
+                    </button>
+                </div>
             </form>
             }
             else
@@ -149,6 +168,47 @@
 
 
 <style>
-.message-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.message-thread-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid #cfd7df;background:#e7edf2}
+.conversation-page{padding:16px 0 40px}
+.conversation-shell{width:min(1320px,calc(100% - 32px));margin:0 auto}
+.conversation-heading{margin-bottom:14px}
+.conversation-heading h1{margin-bottom:6px}
+.conversation-context{margin:6px 0 0}
+.conversation-thread{display:flex;flex-direction:column;gap:10px;padding:14px 0 6px}
+.conversation-row{display:flex;width:100%}
+.conversation-row.is-mine{justify-content:flex-end}
+.conversation-row.is-theirs{justify-content:flex-start}
+.conversation-bubble{width:min(72%,760px);padding:12px 14px;border:1px solid #d4dde6;border-radius:10px;background:#fff;box-shadow:0 1px 2px rgba(18,45,70,.04)}
+.conversation-row.is-mine .conversation-bubble{background:#f4f8fc;border-color:#cad9e6}
+.message-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.message-meta .muted{margin-left:auto;font-size:.76rem}
+.message-thread-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid #cfd7df;background:#e7edf2}
+.message-body{white-space:pre-wrap;line-height:1.45;font-size:.93rem}
+.message-attachments{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.message-attachment{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #d4dde6;border-radius:5px;background:#fff;color:#0f67c7;text-decoration:none;font-size:.78rem}
+.message-attachment small{color:#6b7d8e}
+.conversation-composer{margin-top:14px;border:1px solid #cfd7df;border-radius:8px;background:#fff;overflow:visible}
+.conversation-composer-head{display:flex;align-items:baseline;gap:10px;padding:11px 14px;border-bottom:1px solid #e2e7ec}
+.conversation-composer-head label{font-size:.86rem;font-weight:800}
+.conversation-composer-head .muted{font-size:.76rem}
+.conversation-composer textarea{display:block;width:100%;min-height:130px;box-sizing:border-box;border:0;outline:0;resize:vertical;padding:13px 14px;font:inherit;background:#fff}
+.conversation-composer textarea:focus{box-shadow:inset 0 0 0 2px #d7e8f8}
+.conversation-composer .validation{display:block;padding:0 14px 8px}
+.conversation-composer-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-top:1px solid #e2e7ec;background:#f7f9fb}
+.conversation-attachment-area{position:relative}
+.conversation-attachments-picker{position:relative}
+.conversation-attachments-picker>summary{list-style:none;cursor:pointer}
+.conversation-attachments-picker>summary::-webkit-details-marker{display:none}
+.conversation-attachments-menu{position:absolute;left:0;bottom:calc(100% + 6px);z-index:10;min-width:330px;max-width:520px;max-height:260px;overflow:auto;padding:12px;border:1px solid #cfd7df;border-radius:7px;background:#fff;box-shadow:0 8px 24px rgba(24,44,64,.16)}
+.conversation-attachments-menu strong{display:block;margin-bottom:8px;font-size:.8rem}
+.conversation-attachments-menu .check-row{padding:5px 0}
+.conversation-send{min-width:110px}
+@@media(max-width:760px){
+    .conversation-shell{width:calc(100% - 18px)}
+    .conversation-bubble{width:88%}
+    .message-meta .muted{width:100%;margin-left:0}
+    .conversation-composer-head{align-items:flex-start;flex-direction:column;gap:2px}
+    .conversation-composer-footer{align-items:stretch;flex-direction:column}
+    .conversation-send{width:100%}
+    .conversation-attachments-menu{left:0;right:auto;min-width:min(330px,calc(100vw - 44px))}
+}
 </style>
