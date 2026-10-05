@@ -405,6 +405,33 @@ public sealed class DetailsModel : PageModel
         return RedirectToPage(new { id });
     }
 
+    public async Task<IActionResult> OnPostRemoveDocumentAsync(Guid id, Guid documentId)
+    {
+        ApplicationUser user = await GetUserAsync();
+
+        try
+        {
+            await documentService.RemoveRequestDocumentAsync(
+                user.Id,
+                id,
+                documentId,
+                HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            ModelState.AddModelError(string.Empty, exception.Message);
+            return await LoadPageAsync(user, id);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(string.Empty, exception.Message);
+            return await LoadPageAsync(user, id);
+        }
+
+        TempData["Success"] = "File removed.";
+        return RedirectToPage(new { id });
+    }
+
     public async Task<IActionResult> OnGetDownloadAsync(Guid id, Guid documentId)
     {
         ApplicationUser user = await GetUserAsync();
