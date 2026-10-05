@@ -53,10 +53,20 @@ public sealed class ThreadModel(
             IsStaff,
             HttpContext.RequestAborted);
 
-        return download is null
-            ? NotFound()
+        if (download is null)
+        {
+            return NotFound();
+        }
+
+        return IsInlinePreviewType(download.ContentType)
+            ? File(download.Content, download.ContentType)
             : File(download.Content, download.ContentType, download.FileName);
     }
+
+    private static bool IsInlinePreviewType(string contentType) =>
+        contentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) ||
+        contentType.Equals("image/png", StringComparison.OrdinalIgnoreCase) ||
+        contentType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase);
 
     public async Task<IActionResult> OnPostAssignAsync(Guid id)
     {
