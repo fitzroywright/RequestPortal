@@ -266,5 +266,6 @@ public sealed class DeliveryServiceSecurityTests
         public Task RejectVerificationAsync(Guid staffUserId, Guid documentId, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task SetRetentionAsync(Guid staffUserId, Guid documentId, DocumentRetentionClass retentionClass, DateTimeOffset? retainUntilUtc, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task ArchiveAsync(Guid staffUserId, Guid documentId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task RemoveRequestDocumentAsync(Guid userId, Guid requestId, Guid documentId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }
