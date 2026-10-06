@@ -46,10 +46,11 @@ public sealed class PortalMessagingTests
         Assert.Equal(2, database.Db.PortalMessages.Count());
         Assert.Single(database.Db.MessageThreads);
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SendToSharedStaffAsync(
+        Guid reusedByApprovedRepresentative = await service.SendToSharedStaffAsync(
             otherRepresentative.Id, organization.Id, request.Id, null,
-            "Unrelated representative", "This user is not a participant.", cancellationToken));
-        Assert.Null(await service.GetThreadAsync(otherRepresentative.Id, false, canonical, cancellationToken));
+            "Organization representative", "Approved organization members share the request conversation.", cancellationToken);
+        Assert.Equal(canonical, reusedByApprovedRepresentative);
+        Assert.NotNull(await service.GetThreadAsync(otherRepresentative.Id, false, canonical, cancellationToken));
 
         Guid restricted = await service.SavePersonalNoteAsync(applicant.Id, organization.Id, request.Id, null,
             "Private note", "This must remain private.", cancellationToken);
