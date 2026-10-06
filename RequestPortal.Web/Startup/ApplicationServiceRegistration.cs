@@ -70,6 +70,8 @@ internal static class ApplicationServiceRegistration
             IPortalMessageService
             , PortalMessageService>();
 
+        builder.Services.AddScoped<MessageArchiveService>();
+
         builder.Services.AddScoped<
             INotificationPreferenceService
             , NotificationPreferenceService>();
