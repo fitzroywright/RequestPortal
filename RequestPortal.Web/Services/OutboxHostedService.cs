@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RequestPortal.Infrastructure.Messaging;
+using RequestPortal.Infrastructure.Messages;
 using RequestPortal.Infrastructure.Organizations;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -31,6 +32,7 @@ public sealed class OutboxHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         DateTimeOffset nextRegistrationReminderProjectionUtc = DateTimeOffset.MinValue;
+        DateTimeOffset nextMessageArchiveUtc = DateTimeOffset.MinValue;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -54,6 +56,24 @@ public sealed class OutboxHostedService : BackgroundService
                         logger.LogInformation("Queued {ReminderCount} organization registration reminder(s).", queued);
                     }
                     nextRegistrationReminderProjectionUtc = DateTimeOffset.UtcNow.AddHours(6);
+                }
+
+                if (DateTimeOffset.UtcNow >= nextMessageArchiveUtc)
+                {
+                    int archiveAfterDays = Math.Max(
+                        1,
+                        configuration.GetValue("Messaging:ArchiveAfterDays", 365));
+                    DateTimeOffset cutoffUtc = DateTimeOffset.UtcNow.AddDays(-archiveAfterDays);
+                    MessageArchiveService archiveService = services.GetRequiredService<MessageArchiveService>();
+                    int archived = await archiveService.ArchiveInactiveThreadsAsync(cutoffUtc, stoppingToken);
+                    if (archived > 0)
+                    {
+                        logger.LogInformation(
+                            "Archived {ConversationCount} inactive message conversation(s) older than {ArchiveAfterDays} days.",
+                            archived,
+                            archiveAfterDays);
+                    }
+                    nextMessageArchiveUtc = DateTimeOffset.UtcNow.AddHours(6);
                 }
 
                 OutboxDispatcher dispatcher = services.GetRequiredService<OutboxDispatcher>();
