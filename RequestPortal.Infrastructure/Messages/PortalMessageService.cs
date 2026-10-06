@@ -46,14 +46,18 @@ public sealed class PortalMessageService : IPortalMessageService
                 cancellationToken);
         }
 
-        return await dbContext.MessageRecipients
-            .AsNoTracking()
-            .CountAsync(
-                recipient =>
-                    recipient.UserId == userId &&
-                    recipient.ReadUtc == null &&
-                    recipient.ArchivedUtc == null,
-                cancellationToken);
+        return await (
+            from recipient in dbContext.MessageRecipients.AsNoTracking()
+            join message in dbContext.PortalMessages.AsNoTracking()
+                on recipient.MessageId equals message.Id
+            join thread in dbContext.MessageThreads.AsNoTracking()
+                on message.ThreadId equals thread.Id
+            where recipient.UserId == userId &&
+                  recipient.ReadUtc == null &&
+                  recipient.ArchivedUtc == null &&
+                  thread.ClosedUtc == null
+            select recipient)
+            .CountAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<MailboxMessageView>> GetInboxAsync(
@@ -248,9 +252,10 @@ public sealed class PortalMessageService : IPortalMessageService
             join request in dbContext.AssistanceRequests.AsNoTracking()
                 on thread.RequestId equals request.Id into requests
             from request in requests.DefaultIfEmpty()
-            where isStaff
-                ? message.SenderKind == PortalMessageSenderKind.FfpStaff
-                : message.SenderUserId == userId
+            where thread.ClosedUtc == null &&
+                  (isStaff
+                    ? message.SenderKind == PortalMessageSenderKind.FfpStaff
+                    : message.SenderUserId == userId)
             orderby message.SentUtc descending
             select new
             {
