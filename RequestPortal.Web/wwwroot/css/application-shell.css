@@ -2813,12 +2813,48 @@ body.authenticated-app{
     box-shadow:0 1px 2px rgba(18,43,67,.04);
 }
 .authenticated-app .request-mini-card-title{
+    min-height:34px;
     padding:8px 11px;
     border-bottom:1px solid #dce4eb;
     background:#f6f9fb;
     color:#173955;
     font-size:.78rem;
     font-weight:800;
+    box-sizing:border-box;
+}
+.authenticated-app .request-mini-card-title-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+}
+.authenticated-app .request-title-link-button{
+    appearance:none;
+    border:0;
+    padding:0;
+    margin:0;
+    background:transparent;
+    color:#1f5f8b;
+    font:inherit;
+    font-size:.72rem;
+    font-weight:750;
+    line-height:1;
+    text-decoration:underline;
+    text-underline-offset:2px;
+    cursor:pointer;
+    white-space:nowrap;
+}
+.authenticated-app .request-title-link-button:hover{
+    color:#143f5d;
+}
+.authenticated-app .request-title-link-button:focus-visible{
+    outline:2px solid currentColor;
+    outline-offset:2px;
+    border-radius:2px;
+}
+.authenticated-app .request-title-link-button:disabled{
+    opacity:.55;
+    cursor:wait;
 }
 .authenticated-app .request-mini-card-body{
     padding:10px 11px;
@@ -2846,7 +2882,13 @@ body.authenticated-app{
     min-width:0;
 }
 .authenticated-app .address-grid{
-    grid-template-columns:1fr;
+    grid-template-columns:minmax(0,1fr) max-content;
+}
+.authenticated-app .request-address-card .request-address-field{
+    grid-column:1/-1;
+}
+.authenticated-app .request-address-card .request-parish-field{
+    min-width:150px;
 }
 .authenticated-app .request-summary-grid{
     grid-template-columns:minmax(0,1fr) max-content;
@@ -2878,20 +2920,21 @@ body.authenticated-app{
     margin-bottom:4px;
 }
 .authenticated-app .request-mini-card-footer{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    min-height:42px;
-    padding:7px 10px;
-    border-top:1px solid #dce4eb;
-    background:#f8fafc;
-}
-.authenticated-app .request-mini-card-footer .button{
-    flex:0 0 auto;
+    min-height:0;
+    padding:0 11px;
+    border:0;
+    background:transparent;
 }
 .authenticated-app .request-mini-card-footer #location-status{
+    display:block;
     min-width:0;
     font-size:.7rem;
+}
+.authenticated-app .request-mini-card-footer #location-status:empty{
+    display:none;
+}
+.authenticated-app .request-mini-card-footer #location-status:not(:empty){
+    padding:0 0 8px;
 }
 
 @media(max-width:1100px){
@@ -2926,8 +2969,15 @@ body.authenticated-app{
     .authenticated-app .request-summary-card .request-priority-field select{
         width:100%;
     }
-    .authenticated-app .classification-grid{
+    .authenticated-app .classification-grid,
+    .authenticated-app .address-grid{
         grid-template-columns:1fr;
+    }
+    .authenticated-app .request-address-card .request-address-field{
+        grid-column:auto;
+    }
+    .authenticated-app .request-address-card .request-parish-field{
+        min-width:0;
     }
 }
 
