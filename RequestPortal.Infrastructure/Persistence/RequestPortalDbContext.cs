@@ -26,6 +26,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
     public DbSet<OrganizationInvitation> OrganizationInvitations => Set<OrganizationInvitation>();
     public DbSet<AssistanceRequest> AssistanceRequests => Set<AssistanceRequest>();
+    public DbSet<QuickIntakeRecord> QuickIntakes => Set<QuickIntakeRecord>();
     public DbSet<AssistanceRequestItem> AssistanceRequestItems => Set<AssistanceRequestItem>();
     public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
     public DbSet<ProjectProposal> ProjectProposals => Set<ProjectProposal>();
