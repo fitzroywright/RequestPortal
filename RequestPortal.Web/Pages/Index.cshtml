@@ -59,15 +59,6 @@
             else
             {
                 <aside class="home-signin-card public-signin-card">
-                    @if (!string.IsNullOrWhiteSpace(Model.QuickIntakeReference))
-                    {
-                        <div class="quick-intake-success" role="status">
-                            <strong>Request received</strong>
-                            <span>Your reference is <b>@Model.QuickIntakeReference</b>.</span>
-                            <small>Updates will be sent to @Model.QuickIntakeMobile on WhatsApp.</small>
-                        </div>
-                    }
-
                     <div class="home-signin-heading">
                         <span class="home-signin-icon" aria-hidden="true">↗</span>
                         <div>
@@ -135,85 +126,18 @@
 
                     <div class="home-signin-divider"><span>Need help without an account?</span></div>
 
-                    <details class="quick-intake-panel" @(ViewData.ModelState.IsValid && string.IsNullOrWhiteSpace(Model.QuickIntakeReference) ? null : "open")>
-                        <summary>
-                            <span>
-                                <strong>Quick Request</strong>
-                                <small>No username or sign-in required. We will send updates to you on WhatsApp.</small>
-                            </span>
-                            <b aria-hidden="true">+</b>
-                        </summary>
-
-                        <form method="post" asp-page-handler="QuickIntake" class="quick-intake-form">
-                            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
-                            <input asp-for="QuickIntake.Website" class="quick-intake-trap" tabindex="-1" autocomplete="off" aria-hidden="true" />
-
-                            <div class="quick-intake-two">
-                                <label>
-                                    <span>First name</span>
-                                    <input asp-for="QuickIntake.FirstName" autocomplete="given-name" />
-                                    <span asp-validation-for="QuickIntake.FirstName"></span>
-                                </label>
-                                <label>
-                                    <span>Last name</span>
-                                    <input asp-for="QuickIntake.LastName" autocomplete="family-name" />
-                                    <span asp-validation-for="QuickIntake.LastName"></span>
-                                </label>
-                            </div>
-
-                            <label>
-                                <span>WhatsApp mobile number</span>
-                                <input asp-for="QuickIntake.MobileNumber" type="tel" inputmode="tel" autocomplete="tel" placeholder="+1 876 555 1234" />
-                                <span asp-validation-for="QuickIntake.MobileNumber"></span>
-                            </label>
-
-                            <div class="quick-intake-two">
-                                <label>
-                                    <span>Parish</span>
-                                    <select asp-for="QuickIntake.Parish">
-                                        <option value="">Select parish</option>
-                                        <option>Kingston</option><option>St. Andrew</option><option>St. Catherine</option>
-                                        <option>Clarendon</option><option>Manchester</option><option>St. Elizabeth</option>
-                                        <option>Westmoreland</option><option>Hanover</option><option>St. James</option>
-                                        <option>Trelawny</option><option>St. Ann</option><option>St. Mary</option>
-                                        <option>Portland</option><option>St. Thomas</option>
-                                    </select>
-                                    <span asp-validation-for="QuickIntake.Parish"></span>
-                                </label>
-                                <label>
-                                    <span>Town / community</span>
-                                    <input asp-for="QuickIntake.Town" autocomplete="address-level2" />
-                                    <span asp-validation-for="QuickIntake.Town"></span>
-                                </label>
-                            </div>
-
-                            <label>
-                                <span>Type of assistance</span>
-                                <select asp-for="QuickIntake.Category">
-                                    <option value="">Select if known</option>
-                                    @foreach (var category in Model.QuickIntakeCategories)
-                                    {
-                                        <option value="@category.Name">@(!string.IsNullOrWhiteSpace(category.ParentName) ? $"{category.ParentName} — {category.Name}" : category.Name)</option>
-                                    }
-                                </select>
-                            </label>
-
-                            <label>
-                                <span>What assistance do you need?</span>
-                                <textarea asp-for="QuickIntake.AssistanceNeeded" rows="3" placeholder="Briefly tell us what you need."></textarea>
-                                <span asp-validation-for="QuickIntake.AssistanceNeeded"></span>
-                            </label>
-
-                            <label class="quick-intake-consent">
-                                <input asp-for="QuickIntake.ConsentToWhatsApp" />
-                                <span>FFP may send updates about this request to this WhatsApp number.</span>
-                            </label>
-                            <span asp-validation-for="QuickIntake.ConsentToWhatsApp"></span>
-
-                            <button class="button quick-intake-submit" type="submit">Send Quick Request</button>
-                            <small class="quick-intake-note">You can later convert this request to a normal Individual account without losing the request reference or history.</small>
-                        </form>
-                    </details>
+                    <section class="quick-request-entry" aria-label="Quick Request">
+                        <span class="quick-request-bolt" aria-hidden="true">⚡</span>
+                        <div class="quick-request-copy">
+                            <strong>Need help now?</strong>
+                            <h3>Use Quick Request</h3>
+                            <p>No account needed. We will send updates to your WhatsApp number.</p>
+                            <a class="quick-request-button" asp-page="/QuickIntake">
+                                Go to Quick Request <span aria-hidden="true">→</span>
+                            </a>
+                        </div>
+                        <a class="quick-request-chevron" asp-page="/QuickIntake" aria-label="Open Quick Request">›</a>
+                    </section>
 
                     <div class="home-signin-divider"><span>FFP team member?</span></div>
 
@@ -872,68 +796,90 @@
         .public-hero-arrow { display: none; }
     }
 
-    .quick-intake-success {
-        display:grid;
-        gap:3px;
-        margin-bottom:16px;
-        padding:12px 14px;
-        border:1px solid #a8d8bb;
-        border-radius:10px;
-        background:#f1fbf5;
-        color:#174c2d;
+    .quick-request-entry {
+        position: relative;
+        display: grid;
+        grid-template-columns: 54px minmax(0, 1fr) 24px;
+        gap: 12px;
+        align-items: start;
+        margin-top: 2px;
+        padding: 16px;
+        border: 1px solid #f2dfbf;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #fff8eb 0%, #fffdf8 72%);
+        box-shadow: 0 8px 24px rgba(69, 48, 20, .06);
     }
-    .quick-intake-success span,.quick-intake-success small { color:#2d6342; }
-    .quick-intake-panel {
-        margin:0;
-        border:1px solid #dbe5ec;
-        border-radius:12px;
-        background:#f8fbfd;
-        overflow:hidden;
+    .quick-request-bolt {
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #fff0cf;
+        color: #f5a000;
+        font-size: 1.7rem;
+        line-height: 1;
     }
-    .quick-intake-panel summary {
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:12px;
-        padding:13px 14px;
-        cursor:pointer;
-        list-style:none;
-        color:var(--home-text);
+    .quick-request-copy {
+        min-width: 0;
     }
-    .quick-intake-panel summary::-webkit-details-marker { display:none; }
-    .quick-intake-panel summary span { display:grid; gap:2px; }
-    .quick-intake-panel summary small { color:var(--home-muted); font-weight:500; line-height:1.3; }
-    .quick-intake-panel[open] summary b { transform:rotate(45deg); }
-    .quick-intake-form {
-        display:grid;
-        gap:11px;
-        padding:0 14px 14px;
-        border-top:1px solid #e5edf2;
+    .quick-request-copy > strong {
+        display: block;
+        margin-bottom: 1px;
+        color: #0e2c4d;
+        font-size: .82rem;
+        font-weight: 800;
     }
-    .quick-intake-form > label,.quick-intake-two label { display:grid; gap:5px; font-size:.83rem; font-weight:700; }
-    .quick-intake-form input,.quick-intake-form select,.quick-intake-form textarea {
-        width:100%;
-        box-sizing:border-box;
-        min-height:44px;
-        border:1px solid #cbd8e2;
-        border-radius:8px;
-        padding:9px 10px;
-        background:#fff;
-        color:#0e2c4d;
-        font:inherit;
+    .quick-request-copy h3 {
+        margin: 0;
+        color: #0b2d57;
+        font-size: 1.08rem;
+        line-height: 1.15;
     }
-    .quick-intake-form textarea { min-height:82px; resize:vertical; }
-    .quick-intake-two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .quick-intake-consent { grid-template-columns:auto 1fr !important; align-items:start; font-weight:600 !important; line-height:1.35; }
-    .quick-intake-consent input { width:18px; min-height:18px; height:18px; margin-top:1px; }
-    .quick-intake-submit { width:100%; min-height:46px; }
-    .quick-intake-note { color:var(--home-muted); line-height:1.35; }
-    .quick-intake-trap { position:absolute !important; left:-10000px !important; width:1px !important; height:1px !important; }
-    .field-validation-error,.validation-summary-errors { color:#9d241d; font-size:.78rem; }
-    @media (max-width:640px) {
-        .quick-intake-two { grid-template-columns:1fr; }
-        .quick-intake-panel summary { padding:12px; }
-        .quick-intake-form { padding:0 12px 12px; }
+    .quick-request-copy p {
+        margin: 4px 0 11px;
+        color: #52677f;
+        font-size: .82rem;
+        line-height: 1.35;
+    }
+    .quick-request-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 42px;
+        width: 100%;
+        box-sizing: border-box;
+        border: 2px solid #f36c21;
+        border-radius: 7px;
+        color: #e75d12;
+        background: #fff;
+        text-decoration: none;
+        font-size: .84rem;
+        font-weight: 800;
+    }
+    .quick-request-button:hover {
+        background: #fff6ef;
+        color: #d9540c;
+    }
+    .quick-request-chevron {
+        align-self: center;
+        color: #0b2d57;
+        font-size: 2rem;
+        line-height: 1;
+        text-decoration: none;
+    }
+    @media (max-width: 480px) {
+        .quick-request-entry {
+            grid-template-columns: 46px minmax(0, 1fr) 18px;
+            gap: 10px;
+            padding: 14px;
+        }
+        .quick-request-bolt {
+            width: 42px;
+            height: 42px;
+            font-size: 1.45rem;
+        }
     }
 
 </style>
