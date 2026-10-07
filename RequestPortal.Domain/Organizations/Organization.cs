@@ -87,6 +87,16 @@ public sealed class Organization
 
     public IReadOnlyCollection<OrganizationMembership> Memberships => memberships.AsReadOnly();
 
+    public void Rename(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Organization name is required.", nameof(name));
+        }
+
+        Name = name.Trim();
+    }
+
     public bool IsRegistrationExpired(DateOnly asOfDate)
     {
         return RegistrationExpiryDate.HasValue && RegistrationExpiryDate.Value < asOfDate;
