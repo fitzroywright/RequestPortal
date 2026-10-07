@@ -22,6 +22,7 @@ public sealed class ReviewModel : PageModel
     private readonly IProjectPlanningService projectPlanningService;
     private readonly IRequestReferenceDataService referenceDataService;
     private readonly IDeliveryService deliveryService;
+    private readonly IQuickIntakeService quickIntakeService;
 
     public ReviewModel(
         UserManager<ApplicationUser> userManager,
@@ -30,7 +31,8 @@ public sealed class ReviewModel : PageModel
         IProjectProposalService projectProposalService,
         IProjectPlanningService projectPlanningService,
         IRequestReferenceDataService referenceDataService,
-        IDeliveryService deliveryService)
+        IDeliveryService deliveryService,
+        IQuickIntakeService quickIntakeService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
@@ -39,6 +41,7 @@ public sealed class ReviewModel : PageModel
         this.projectPlanningService = projectPlanningService;
         this.referenceDataService = referenceDataService;
         this.deliveryService = deliveryService;
+        this.quickIntakeService = quickIntakeService;
     }
 
     public new RequestDetail? Request { get; private set; }
@@ -47,11 +50,50 @@ public sealed class ReviewModel : PageModel
     public IReadOnlyList<DocumentSummary> Documents { get; private set; } = Array.Empty<DocumentSummary>();
     public IReadOnlyList<DeliveryView> Deliveries { get; private set; } = Array.Empty<DeliveryView>();
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
+    public QuickIntakeView? QuickIntake { get; private set; }
+
+    [BindProperty]
+    public string? ConversionEmail { get; set; }
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
         ApplicationUser staffUser = await GetStaffUserAsync();
         return await LoadPageAsync(staffUser, id);
+    }
+
+    public async Task<IActionResult> OnPostConvertQuickIntakeAsync(Guid id)
+    {
+        ApplicationUser staffUser = await GetStaffUserAsync();
+
+        if (string.IsNullOrWhiteSpace(ConversionEmail))
+        {
+            ModelState.AddModelError(nameof(ConversionEmail), "Enter the email address of the Individual portal account.");
+            return await LoadPageAsync(staffUser, id);
+        }
+
+        ApplicationUser? individual = await userManager.FindByEmailAsync(ConversionEmail.Trim());
+        if (individual is null || individual.IsInternalStaff)
+        {
+            ModelState.AddModelError(nameof(ConversionEmail), "No Individual portal account was found for that email address.");
+            return await LoadPageAsync(staffUser, id);
+        }
+
+        try
+        {
+            await quickIntakeService.ConvertToIndividualAsync(
+                id,
+                individual.Id,
+                staffUser.Id,
+                HttpContext.RequestAborted);
+
+            TempData["Success"] = $"Quick Intake converted to the Individual account for {individual.DisplayName}.";
+            return RedirectToPage(new { id });
+        }
+        catch (InvalidOperationException exception)
+        {
+            ModelState.AddModelError(nameof(ConversionEmail), exception.Message);
+            return await LoadPageAsync(staffUser, id);
+        }
     }
 
     public async Task<IActionResult> OnGetDownloadAsync(Guid id, Guid documentId)
@@ -102,6 +144,7 @@ public sealed class ReviewModel : PageModel
         Documents = await documentService.GetRequestDocumentsAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
         Deliveries = await deliveryService.GetForRequestAsync(id, HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
+        QuickIntake = await quickIntakeService.GetAsync(id, HttpContext.RequestAborted);
         return Page();
     }
 
