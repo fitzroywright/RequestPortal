@@ -18,8 +18,26 @@ public sealed record QuickIntakeResult(
     string PublicReference,
     string MobileNumber);
 
+public sealed record QuickIntakeView(
+    Guid RequestId,
+    string FirstName,
+    string LastName,
+    string MobileNumber,
+    string Parish,
+    string? Town,
+    DateTimeOffset CreatedUtc,
+    Guid? ConvertedToUserId,
+    DateTimeOffset? ConvertedUtc)
+{
+    public bool IsConverted => ConvertedToUserId.HasValue;
+}
+
 public interface IQuickIntakeService
 {
+    Task<QuickIntakeView?> GetAsync(
+        Guid requestId,
+        CancellationToken cancellationToken = default);
+
     Task<QuickIntakeResult> CreateAsync(
         QuickIntakeSubmission submission,
         CancellationToken cancellationToken = default);
