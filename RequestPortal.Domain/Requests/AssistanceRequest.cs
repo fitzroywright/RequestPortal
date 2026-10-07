@@ -142,6 +142,20 @@ public sealed class AssistanceRequest
         items.Add(item);
     }
 
+    public void ConvertApplicant(Guid userId)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("User id is required.", nameof(userId));
+        }
+
+        CreatedByUserId = userId;
+        if (SubmittedByUserId.HasValue)
+        {
+            SubmittedByUserId = userId;
+        }
+    }
+
     public void Submit(Guid userId, DateTimeOffset submittedUtc)
     {
         EnsureDraft();

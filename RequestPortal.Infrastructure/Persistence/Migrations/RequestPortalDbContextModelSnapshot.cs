@@ -280,6 +280,69 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.ToTable("beneficiaries", (string)null);
                 });
 
+            modelBuilder.Entity("RequestPortal.Domain.Requests.QuickIntakeRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AnonymousUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConvertedByStaffUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConvertedToUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConvertedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("IndividualContextId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("MobileNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Parish")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Town")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConvertedToUserId");
+
+                    b.HasIndex("MobileNumber");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique();
+
+                    b.ToTable("quick_intakes", (string)null);
+                });
+
             modelBuilder.Entity("RequestPortal.Domain.Countries.CountryConfiguration", b =>
                 {
                     b.Property<string>("CountryCode")

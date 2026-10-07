@@ -29,6 +29,40 @@
                 </div>
             </div>
 
+            @if (Model.QuickIntake is not null)
+            {
+                <section class="card" style="margin-bottom:1.5rem;border-left:4px solid #f36c21">
+                    <div class="action-row" style="justify-content:space-between;align-items:start">
+                        <div>
+                            <div class="eyebrow" style="color:#b45b09">Anonymous Quick Intake</div>
+                            <h2 style="margin:.25rem 0">@Model.QuickIntake.FirstName @Model.QuickIntake.LastName</h2>
+                            <p class="muted" style="margin:0">
+                                WhatsApp: <strong>@Model.QuickIntake.MobileNumber</strong> ·
+                                @Model.QuickIntake.Town@(!string.IsNullOrWhiteSpace(Model.QuickIntake.Town) ? ", " : "")@Model.QuickIntake.Parish
+                            </p>
+                        </div>
+                        @if (Model.QuickIntake.IsConverted)
+                        {
+                            <span class="status">Converted to Individual</span>
+                        }
+                    </div>
+
+                    @if (!Model.QuickIntake.IsConverted)
+                    {
+                        <p>This request is being tracked by outbound WhatsApp messages only. Convert it after the applicant has a normal Individual portal account.</p>
+                        <form method="post" asp-page-handler="ConvertQuickIntake" asp-route-id="@Model.Request.Id" class="action-row" style="align-items:end">
+                            <label style="min-width:min(100%,360px)">
+                                <span>Individual account email</span>
+                                <input asp-for="ConversionEmail" type="email" autocomplete="email" placeholder="applicant@example.com" />
+                                <span asp-validation-for="ConversionEmail"></span>
+                            </label>
+                            <button class="button" type="submit">Convert to Individual</button>
+                        </form>
+                        <small class="muted">The request number, status history and request context are retained. Future notifications move to the Individual account.</small>
+                    }
+                </section>
+            }
+
             @await Component.InvokeAsync("RequestConversation", new { requestId = Model.Request.Id, returnUrl = Url.Page("/Staff/Review", new { id = Model.Request.Id }) ?? $"/Staff/Review/{Model.Request.Id}", compact = false })
 
             <div class="dashboard-grid">

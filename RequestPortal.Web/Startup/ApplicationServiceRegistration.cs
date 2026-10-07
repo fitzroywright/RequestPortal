@@ -181,6 +181,10 @@ internal static class ApplicationServiceRegistration
             , RequestDraftService>();
 
         builder.Services.AddScoped<
+            IQuickIntakeService
+            , QuickIntakeService>();
+
+        builder.Services.AddScoped<
             IProjectProposalService
             , ProjectProposalService>();
 
