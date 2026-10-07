@@ -23,6 +23,26 @@ public sealed class QuickIntakeService : IQuickIntakeService
         this.dbContext = dbContext;
     }
 
+    public async Task<QuickIntakeView?> GetAsync(
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.QuickIntakes
+            .AsNoTracking()
+            .Where(item => item.RequestId == requestId)
+            .Select(item => new QuickIntakeView(
+                item.RequestId,
+                item.FirstName,
+                item.LastName,
+                item.MobileNumber,
+                item.Parish,
+                item.Town,
+                item.CreatedUtc,
+                item.ConvertedToUserId,
+                item.ConvertedUtc))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<QuickIntakeResult> CreateAsync(
         QuickIntakeSubmission submission,
         CancellationToken cancellationToken = default)
