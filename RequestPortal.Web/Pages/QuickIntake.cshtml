@@ -16,6 +16,10 @@
                     <span>Request reference</span>
                     <strong>@Model.RequestReference</strong>
                 </div>
+                @if (!string.IsNullOrWhiteSpace(Model.AttachmentWarning))
+                {
+                    <p class="quick-intake-errors" role="alert">@Model.AttachmentWarning</p>
+                }
                 <p class="quick-intake-muted">We may use <strong>@Model.Telephone</strong> to contact you about this request.</p>
                 <a class="quick-intake-primary" asp-page="/Index">Return to Request Portal</a>
             </section>
@@ -26,11 +30,11 @@
                 <header class="quick-intake-header">
                     <div>
                         <h1>Quick Intake Form</h1>
-                        <p>No account needed. All fields are required except Email.</p>
+                        <p>No account needed. All fields are required except Email and supporting attachments.</p>
                     </div>
                 </header>
 
-                <form method="post" class="quick-intake-form">
+                <form method="post" enctype="multipart/form-data" class="quick-intake-form">
                     <div asp-validation-summary="ModelOnly" class="quick-intake-errors"></div>
                     <input asp-for="Input.Website" class="quick-intake-trap" tabindex="-1" autocomplete="off" aria-hidden="true" />
 
@@ -117,6 +121,15 @@
                     </div>
                     <span asp-validation-for="Input.HelpCategory"></span>
 
+                    <details class="quick-intake-attachments">
+                        <summary>📎 Attach photos or documents (optional)</summary>
+                        <div class="quick-intake-attachment-body">
+                            <p>Photos and PDF documents can help us understand your request. You may submit without attachments. Up to 5 files, 10 MB each.</p>
+                            <label><span>Choose photos or files</span><input asp-for="Attachments" type="file" multiple accept="image/jpeg,image/png,application/pdf" /></label>
+                            <label><span>Take a photo (phone or tablet)</span><input asp-for="CameraPhotos" type="file" multiple accept="image/*" capture="environment" /></label>
+                            <span asp-validation-for="Attachments"></span>
+                        </div>
+                    </details>
                     <button class="quick-intake-primary" type="submit">Submit</button>
                 </form>
             </section>
@@ -134,7 +147,7 @@
 .quick-intake-form input:focus,.quick-intake-form select:focus{border-color:#f36c21;outline:3px solid rgba(243,108,33,.12)}
 .choice-group{border:1px solid #dbe5ec;border-radius:10px;padding:12px}.choice-group legend{padding:0 6px;font-weight:800;font-size:.88rem;color:#173b60}.check-option{grid-template-columns:auto 1fr!important;align-items:center!important;gap:8px!important;margin:7px 0}.check-option input{width:18px;height:18px;min-height:18px}
 .help-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.help-card{grid-template-columns:auto 1fr!important;align-items:start!important;padding:12px;border:1px solid #dbe5ec;border-radius:10px;cursor:pointer}.help-card:has(input:checked){border-color:#f36c21;background:#fff7f1}.help-card input{width:18px;height:18px;min-height:18px;margin-top:2px}.help-card strong,.help-card small{display:block}.help-card small{margin-top:3px;color:#65788b;font-weight:500;line-height:1.35}
-.quick-intake-primary{min-height:52px;border:0;border-radius:9px;background:#f36c21;color:#fff;font:inherit;font-weight:900;cursor:pointer}.quick-intake-errors,.field-validation-error{color:#a32920;font-size:.82rem}.quick-intake-trap{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important}
+.quick-intake-attachments{border:1px solid #dbe5ec;border-radius:10px;overflow:hidden}.quick-intake-attachments summary{padding:12px 14px;cursor:pointer;font-size:.9rem;font-weight:800;color:#173b60}.quick-intake-attachments summary:focus-visible{outline:3px solid #f36c21}.quick-intake-attachment-body{padding:0 14px 14px;display:grid;gap:12px}.quick-intake-attachment-body p{font-size:.85rem;color:#5b6f83;margin:0}.quick-intake-primary{min-height:52px;border:0;border-radius:9px;background:#f36c21;color:#fff;font:inherit;font-weight:900;cursor:pointer}.quick-intake-errors,.field-validation-error{color:#a32920;font-size:.82rem}.quick-intake-trap{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important}
 .quick-intake-complete{padding:30px 24px;text-align:center}.quick-intake-complete-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 14px;border-radius:50%;background:#eaf8ef;color:#21834c;font-size:1.7rem;font-weight:900}.quick-intake-reference{display:grid;gap:3px;margin:20px 0;padding:16px;border:1px solid #dce7ee;border-radius:12px;background:#f7fafc}.quick-intake-reference strong{font-size:1.4rem}.quick-intake-muted{color:#617488}
 @@media(max-width:620px){.quick-intake-page{padding:8px}.quick-intake-card{border-radius:12px}.quick-intake-form{padding:16px}.quick-intake-row,.help-grid{grid-template-columns:1fr}.quick-intake-form input,.quick-intake-form select{font-size:16px}}
 </style>
