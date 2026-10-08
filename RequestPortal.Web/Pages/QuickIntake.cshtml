@@ -1,30 +1,22 @@
 @page
 @model RequestPortal.Web.Pages.QuickIntakeModel
 @{
-    ViewData["Title"] = "Quick Request";
+    ViewData["Title"] = "Quick Intake";
 }
 
 <section class="quick-intake-page">
     <div class="quick-intake-shell">
-        <a class="quick-intake-back" asp-page="/Index">← Back to sign in</a>
-
         @if (!string.IsNullOrWhiteSpace(Model.RequestReference))
         {
             <section class="quick-intake-card quick-intake-complete" role="status">
                 <div class="quick-intake-complete-icon" aria-hidden="true">✓</div>
                 <h1>Request received</h1>
                 <p>Your request has been sent to Food For The Poor Jamaica.</p>
-
                 <div class="quick-intake-reference">
                     <span>Request reference</span>
                     <strong>@Model.RequestReference</strong>
                 </div>
-
-                <p class="quick-intake-muted">
-                    We will send updates about this request to
-                    <strong>@Model.WhatsAppNumber</strong> on WhatsApp.
-                </p>
-
+                <p class="quick-intake-muted">We may use <strong>@Model.Telephone</strong> to contact you about this request.</p>
                 <a class="quick-intake-primary" asp-page="/Index">Return to Request Portal</a>
             </section>
         }
@@ -32,10 +24,9 @@
         {
             <section class="quick-intake-card">
                 <header class="quick-intake-header">
-                    <span class="quick-intake-header-icon" aria-hidden="true">⚡</span>
                     <div>
-                        <h1>Quick Request</h1>
-                        <p>No account needed. Tell us what you need and we will send updates to your WhatsApp number.</p>
+                        <h1>Quick Intake Form</h1>
+                        <p>No account needed. All fields are required except Email.</p>
                     </div>
                 </header>
 
@@ -43,97 +34,90 @@
                     <div asp-validation-summary="ModelOnly" class="quick-intake-errors"></div>
                     <input asp-for="Input.Website" class="quick-intake-trap" tabindex="-1" autocomplete="off" aria-hidden="true" />
 
+                    <h2>Personal Information</h2>
                     <div class="quick-intake-row">
-                        <label>
-                            <span>First Name <b>*</b></span>
-                            <input asp-for="Input.FirstName" autocomplete="given-name" />
-                            <span asp-validation-for="Input.FirstName"></span>
-                        </label>
-
-                        <label>
-                            <span>Last Name <b>*</b></span>
-                            <input asp-for="Input.LastName" autocomplete="family-name" />
-                            <span asp-validation-for="Input.LastName"></span>
+                        <label><span>First Name <b>*</b></span><input asp-for="Input.FirstName" autocomplete="given-name" /><span asp-validation-for="Input.FirstName"></span></label>
+                        <label><span>Last Name <b>*</b></span><input asp-for="Input.LastName" autocomplete="family-name" /><span asp-validation-for="Input.LastName"></span></label>
+                    </div>
+                    <div class="quick-intake-row">
+                        <label><span>Date Of Birth <b>*</b></span><input asp-for="Input.DateOfBirth" type="date" /><span asp-validation-for="Input.DateOfBirth"></span></label>
+                        <label><span>Gender <b>*</b></span>
+                            <select asp-for="Input.Gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Non-Binary</option></select>
+                            <span asp-validation-for="Input.Gender"></span>
                         </label>
                     </div>
-
-                    <label>
-                        <span>WhatsApp Mobile Number <b>*</b></span>
-                        <input asp-for="Input.MobileNumber"
-                               type="tel"
-                               inputmode="tel"
-                               autocomplete="tel"
-                               placeholder="+1 876 555 1234" />
-                        <small>We will use this number to send updates about your request.</small>
-                        <span asp-validation-for="Input.MobileNumber"></span>
+                    <label><span>Marital Status <b>*</b></span>
+                        <select asp-for="Input.MaritalStatus"><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select>
+                        <span asp-validation-for="Input.MaritalStatus"></span>
                     </label>
 
+                    <h2>Contact & Address</h2>
                     <div class="quick-intake-row">
-                        <label>
-                            <span>Parish <b>*</b></span>
+                        <label><span>Telephone <b>*</b></span><input asp-for="Input.Telephone" type="tel" inputmode="tel" autocomplete="tel" /><span asp-validation-for="Input.Telephone"></span></label>
+                        <label><span>Email <em>(Optional)</em></span><input asp-for="Input.Email" type="email" autocomplete="email" /><span asp-validation-for="Input.Email"></span></label>
+                    </div>
+                    <label><span>Street Address <b>*</b></span><input asp-for="Input.StreetAddress" autocomplete="street-address" /><span asp-validation-for="Input.StreetAddress"></span></label>
+                    <div class="quick-intake-row">
+                        <label><span>Community/District <b>*</b></span><input asp-for="Input.CommunityDistrict" autocomplete="address-level2" /><span asp-validation-for="Input.CommunityDistrict"></span></label>
+                        <label><span>Parish <b>*</b></span>
                             <select asp-for="Input.Parish">
                                 <option value="">Select parish</option>
-                                <option>Kingston</option>
-                                <option>St. Andrew</option>
-                                <option>St. Catherine</option>
-                                <option>Clarendon</option>
-                                <option>Manchester</option>
-                                <option>St. Elizabeth</option>
-                                <option>Westmoreland</option>
-                                <option>Hanover</option>
-                                <option>St. James</option>
-                                <option>Trelawny</option>
-                                <option>St. Ann</option>
-                                <option>St. Mary</option>
-                                <option>Portland</option>
-                                <option>St. Thomas</option>
+                                <option>Kingston</option><option>St. Andrew</option><option>St. Catherine</option><option>Clarendon</option>
+                                <option>Manchester</option><option>St. Elizabeth</option><option>Westmoreland</option><option>Hanover</option>
+                                <option>St. James</option><option>Trelawny</option><option>St. Ann</option><option>St. Mary</option>
+                                <option>Portland</option><option>St. Thomas</option>
                             </select>
                             <span asp-validation-for="Input.Parish"></span>
                         </label>
-
-                        <label>
-                            <span>Town / Community</span>
-                            <input asp-for="Input.Town" autocomplete="address-level2" />
-                            <span asp-validation-for="Input.Town"></span>
-                        </label>
                     </div>
 
-                    <label>
-                        <span>Type of Assistance</span>
-                        <select asp-for="Input.Category">
-                            <option value="">Select if known</option>
-                            @foreach (var category in Model.Categories)
-                            {
-                                <option value="@category.Name">
-                                    @(!string.IsNullOrWhiteSpace(category.ParentName)
-                                        ? $"{category.ParentName} — {category.Name}"
-                                        : category.Name)
-                                </option>
-                            }
-                        </select>
+                    <h2>Household & Economic Information</h2>
+                    <div class="quick-intake-row">
+                        <label><span>Employment Status <b>*</b></span>
+                            <select asp-for="Input.EmploymentStatus"><option value="">Select</option><option>Employed</option><option>Self Employed</option><option>Unemployed</option><option>Student</option></select>
+                            <span asp-validation-for="Input.EmploymentStatus"></span>
+                        </label>
+                        <label><span>Monthly Income <b>*</b></span><input asp-for="Input.MonthlyIncome" type="number" min="0" step="0.01" inputmode="decimal" /><span asp-validation-for="Input.MonthlyIncome"></span></label>
+                    </div>
+                    <label><span>Do you have any children under 18 years of age that live with you full time? <b>*</b></span>
+                        <select asp-for="Input.HasChildrenUnder18LivingFullTime"><option value="">Select</option><option>Yes</option><option>No</option></select>
+                        <span asp-validation-for="Input.HasChildrenUnder18LivingFullTime"></span>
+                    </label>
+                    <label><span>Do you have a disability or serious medical condition? <b>*</b></span>
+                        <select asp-for="Input.HasDisabilityOrSeriousMedicalCondition"><option value="">Select</option><option>Yes</option><option>No</option></select>
+                        <span asp-validation-for="Input.HasDisabilityOrSeriousMedicalCondition"></span>
                     </label>
 
-                    <label>
-                        <span>What assistance do you need? <b>*</b></span>
-                        <textarea asp-for="Input.AssistanceNeeded"
-                                  rows="5"
-                                  placeholder="Briefly tell us what you need."></textarea>
-                        <span asp-validation-for="Input.AssistanceNeeded"></span>
-                    </label>
+                    <h2>Current Assistance</h2>
+                    <fieldset class="choice-group">
+                        <legend>Do you currently participate in any of the following programs? Select all that apply. <b>*</b></legend>
+                        @foreach (string program in new[] { "None", "PATH", "Poor Relief Dole", "Rehabilitation Programme", "Solidarity Program", "CARE" })
+                        {
+                            <label class="check-option"><input type="checkbox" name="Input.AssistancePrograms" value="@program" checked="@Model.Input.AssistancePrograms.Contains(program)" /><span>@program</span></label>
+                        }
+                        <span asp-validation-for="Input.AssistancePrograms"></span>
+                    </fieldset>
 
-                    <label class="quick-intake-consent">
-                        <input asp-for="Input.ConsentToWhatsApp" />
-                        <span>FFP may send updates about this request to this WhatsApp number.</span>
-                    </label>
-                    <span asp-validation-for="Input.ConsentToWhatsApp"></span>
+                    <h2>What do you need help with today? <b>*</b></h2>
+                    <div class="help-grid">
+                        @foreach (var item in new[] {
+                            ("Food", "Food Package, Backyard Garden, etc."),
+                            ("Housing", "Homeless, needs repairs, etc."),
+                            ("Earn an Income", "Starting a business, just released from prison, etc."),
+                            ("Education", "Scholarship, band camp, etc."),
+                            ("Health", "Wheelchair, medical supplies, etc."),
+                            ("Water & Hygiene", "Water tank, toiletries, etc.")
+                        })
+                        {
+                            <label class="help-card">
+                                <input type="radio" asp-for="Input.HelpCategory" value="@item.Item1" />
+                                <span><strong>@item.Item1</strong><small>@item.Item2</small></span>
+                            </label>
+                        }
+                    </div>
+                    <span asp-validation-for="Input.HelpCategory"></span>
 
-                    <button class="quick-intake-primary" type="submit">
-                        Send Quick Request
-                    </button>
-
-                    <p class="quick-intake-footnote">
-                        You can later convert this request to a normal Individual account without losing the request reference or history.
-                    </p>
+                    <button class="quick-intake-primary" type="submit">Send Quick Request</button>
                 </form>
             </section>
         }
@@ -141,269 +125,16 @@
 </section>
 
 <style>
-    .quick-intake-page {
-        min-height: calc(100vh - 90px);
-        padding: 24px 14px 42px;
-        background:
-            linear-gradient(180deg, #f2f7fb 0%, #ffffff 58%);
-        color: #0e2c4d;
-    }
-
-    .quick-intake-shell {
-        width: min(100%, 620px);
-        margin: 0 auto;
-    }
-
-    .quick-intake-back {
-        display: inline-flex;
-        align-items: center;
-        margin: 0 0 12px 2px;
-        color: #0b3b68;
-        text-decoration: none;
-        font-weight: 700;
-        font-size: .9rem;
-    }
-
-    .quick-intake-card {
-        border: 1px solid #dbe5ec;
-        border-radius: 18px;
-        background: #fff;
-        box-shadow: 0 16px 38px rgba(13, 49, 78, .10);
-        overflow: hidden;
-    }
-
-    .quick-intake-header {
-        display: grid;
-        grid-template-columns: 54px minmax(0, 1fr);
-        gap: 14px;
-        align-items: start;
-        padding: 22px 22px 18px;
-        border-bottom: 1px solid #e7eef3;
-        background: linear-gradient(135deg, #fff9ef 0%, #ffffff 74%);
-    }
-
-    .quick-intake-header-icon {
-        display: grid;
-        place-items: center;
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        background: #fff0cf;
-        color: #f5a000;
-        font-size: 1.8rem;
-    }
-
-    .quick-intake-header h1,
-    .quick-intake-complete h1 {
-        margin: 0;
-        color: #0b2d57;
-        font-size: clamp(1.65rem, 5vw, 2.1rem);
-        line-height: 1.08;
-    }
-
-    .quick-intake-header p {
-        margin: 7px 0 0;
-        color: #52677f;
-        line-height: 1.45;
-        font-size: .95rem;
-    }
-
-    .quick-intake-form {
-        display: grid;
-        gap: 16px;
-        padding: 20px 22px 24px;
-    }
-
-    .quick-intake-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
-    }
-
-    .quick-intake-form > label,
-    .quick-intake-row label {
-        display: grid;
-        gap: 6px;
-        color: #173b60;
-        font-size: .88rem;
-        font-weight: 800;
-    }
-
-    .quick-intake-form label > span:first-child b {
-        color: #d94f13;
-    }
-
-    .quick-intake-form input,
-    .quick-intake-form select,
-    .quick-intake-form textarea {
-        width: 100%;
-        box-sizing: border-box;
-        min-height: 48px;
-        padding: 11px 12px;
-        border: 1px solid #cbd8e2;
-        border-radius: 9px;
-        background: #fff;
-        color: #0e2c4d;
-        font: inherit;
-        font-weight: 500;
-    }
-
-    .quick-intake-form textarea {
-        min-height: 118px;
-        resize: vertical;
-        line-height: 1.4;
-    }
-
-    .quick-intake-form input:focus,
-    .quick-intake-form select:focus,
-    .quick-intake-form textarea:focus {
-        border-color: #f36c21;
-        outline: 3px solid rgba(243, 108, 33, .12);
-    }
-
-    .quick-intake-form small,
-    .quick-intake-footnote,
-    .quick-intake-muted {
-        color: #617488;
-        font-size: .8rem;
-        line-height: 1.4;
-    }
-
-    .quick-intake-consent {
-        grid-template-columns: auto 1fr !important;
-        align-items: start;
-        gap: 9px !important;
-        font-weight: 600 !important;
-        line-height: 1.4;
-    }
-
-    .quick-intake-consent input {
-        width: 19px;
-        height: 19px;
-        min-height: 19px;
-        margin-top: 1px;
-    }
-
-    .quick-intake-primary {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        min-height: 50px;
-        box-sizing: border-box;
-        border: 0;
-        border-radius: 9px;
-        background: #f36c21;
-        color: #fff;
-        text-decoration: none;
-        font: inherit;
-        font-weight: 800;
-        cursor: pointer;
-        box-shadow: 0 8px 20px rgba(243, 108, 33, .22);
-    }
-
-    .quick-intake-primary:hover {
-        background: #dd5b16;
-        color: #fff;
-    }
-
-    .quick-intake-errors,
-    .field-validation-error {
-        color: #a32920;
-        font-size: .82rem;
-    }
-
-    .quick-intake-trap {
-        position: absolute !important;
-        left: -10000px !important;
-        width: 1px !important;
-        height: 1px !important;
-    }
-
-    .quick-intake-complete {
-        padding: 30px 24px;
-        text-align: center;
-    }
-
-    .quick-intake-complete-icon {
-        display: grid;
-        place-items: center;
-        width: 58px;
-        height: 58px;
-        margin: 0 auto 14px;
-        border-radius: 50%;
-        background: #eaf8ef;
-        color: #21834c;
-        font-size: 1.7rem;
-        font-weight: 900;
-    }
-
-    .quick-intake-complete > p {
-        color: #52677f;
-    }
-
-    .quick-intake-reference {
-        display: grid;
-        gap: 3px;
-        margin: 20px 0;
-        padding: 16px;
-        border: 1px solid #dce7ee;
-        border-radius: 12px;
-        background: #f7fafc;
-    }
-
-    .quick-intake-reference span {
-        color: #617488;
-        font-size: .78rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: .06em;
-    }
-
-    .quick-intake-reference strong {
-        color: #0b2d57;
-        font-size: 1.45rem;
-    }
-
-    @@media (max-width: 560px) {
-        .quick-intake-page {
-            padding: 12px 10px 28px;
-        }
-
-        .quick-intake-card {
-            border-radius: 14px;
-        }
-
-        .quick-intake-header {
-            grid-template-columns: 46px minmax(0, 1fr);
-            gap: 11px;
-            padding: 18px 16px 15px;
-        }
-
-        .quick-intake-header-icon {
-            width: 44px;
-            height: 44px;
-            font-size: 1.55rem;
-        }
-
-        .quick-intake-form {
-            padding: 16px;
-            gap: 14px;
-        }
-
-        .quick-intake-row {
-            grid-template-columns: 1fr;
-            gap: 14px;
-        }
-
-        .quick-intake-form input,
-        .quick-intake-form select,
-        .quick-intake-form textarea {
-            font-size: 16px;
-        }
-
-        .quick-intake-primary {
-            min-height: 52px;
-        }
-    }
+.quick-intake-page{min-height:100vh;padding:18px 12px 38px;background:linear-gradient(180deg,#f3f7fa,#fff);color:#14324d}
+.quick-intake-shell{width:min(100%,760px);margin:auto}.quick-intake-card{background:#fff;border:1px solid #dbe5ec;border-radius:16px;box-shadow:0 14px 36px rgba(13,49,78,.1);overflow:hidden}
+.quick-intake-header{padding:22px;border-bottom:1px solid #e7eef3;background:#fffaf4}.quick-intake-header h1{margin:0;color:#0b2d57;font-size:1.8rem}.quick-intake-header p{margin:6px 0 0;color:#5b6f83}
+.quick-intake-form{display:grid;gap:14px;padding:20px 22px 24px}.quick-intake-form h2{margin:10px 0 0;color:#0b2d57;font-size:1rem;border-bottom:1px solid #e6edf2;padding-bottom:6px}
+.quick-intake-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.quick-intake-form label{display:grid;gap:6px;font-size:.88rem;font-weight:800;color:#173b60}
+.quick-intake-form b{color:#c92f2f}.quick-intake-form em{font-style:normal;font-weight:600;color:#6f7d89}.quick-intake-form input,.quick-intake-form select{width:100%;box-sizing:border-box;min-height:48px;padding:10px 12px;border:1px solid #cbd8e2;border-radius:9px;background:#fff;color:#0e2c4d;font:inherit;font-weight:500}
+.quick-intake-form input:focus,.quick-intake-form select:focus{border-color:#f36c21;outline:3px solid rgba(243,108,33,.12)}
+.choice-group{border:1px solid #dbe5ec;border-radius:10px;padding:12px}.choice-group legend{padding:0 6px;font-weight:800;font-size:.88rem;color:#173b60}.check-option{grid-template-columns:auto 1fr!important;align-items:center!important;gap:8px!important;margin:7px 0}.check-option input{width:18px;height:18px;min-height:18px}
+.help-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.help-card{grid-template-columns:auto 1fr!important;align-items:start!important;padding:12px;border:1px solid #dbe5ec;border-radius:10px;cursor:pointer}.help-card:has(input:checked){border-color:#f36c21;background:#fff7f1}.help-card input{width:18px;height:18px;min-height:18px;margin-top:2px}.help-card strong,.help-card small{display:block}.help-card small{margin-top:3px;color:#65788b;font-weight:500;line-height:1.35}
+.quick-intake-primary{min-height:52px;border:0;border-radius:9px;background:#f36c21;color:#fff;font:inherit;font-weight:900;cursor:pointer}.quick-intake-errors,.field-validation-error{color:#a32920;font-size:.82rem}.quick-intake-trap{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important}
+.quick-intake-complete{padding:30px 24px;text-align:center}.quick-intake-complete-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 14px;border-radius:50%;background:#eaf8ef;color:#21834c;font-size:1.7rem;font-weight:900}.quick-intake-reference{display:grid;gap:3px;margin:20px 0;padding:16px;border:1px solid #dce7ee;border-radius:12px;background:#f7fafc}.quick-intake-reference strong{font-size:1.4rem}.quick-intake-muted{color:#617488}
+@@media(max-width:620px){.quick-intake-page{padding:8px}.quick-intake-card{border-radius:12px}.quick-intake-form{padding:16px}.quick-intake-row,.help-grid{grid-template-columns:1fr}.quick-intake-form input,.quick-intake-form select{font-size:16px}}
 </style>
