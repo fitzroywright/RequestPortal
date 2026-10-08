@@ -63,7 +63,9 @@ public interface IQuickIntakeService
         QuickIntakeSubmission submission,
         CancellationToken cancellationToken = default);
 
-    Task<Guid> GetAnonymousUploaderIdAsync(Guid requestId, CancellationToken cancellationToken = default);\n\n    Task ConvertToIndividualAsync(
+    Task<Guid> GetAnonymousUploaderIdAsync(Guid requestId, CancellationToken cancellationToken = default);
+
+    Task ConvertToIndividualAsync(
         Guid requestId,
         Guid userId,
         Guid staffUserId,
