@@ -84,9 +84,27 @@ public sealed class QuickIntakeService : IQuickIntakeService
 
     public async Task<QuickIntakeResult> CreateAsync(
         QuickIntakeSubmission submission,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? requestId = null)
     {
         ArgumentNullException.ThrowIfNull(submission);
+        if (requestId.HasValue && requestId.Value == Guid.Empty)
+            throw new ArgumentException("Invalid submission identifier.");
+        if (requestId.HasValue)
+        {
+            var existing = await dbContext.QuickIntakes.AsNoTracking()
+                .Where(item => item.RequestId == requestId.Value)
+                .Select(item => new { item.RequestId, item.MobileNumber })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (existing is not null)
+            {
+                string reference = await dbContext.AssistanceRequests.AsNoTracking()
+                    .Where(item => item.Id == existing.RequestId)
+                    .Select(item => item.PublicReference)
+                    .SingleAsync(cancellationToken);
+                return new QuickIntakeResult(existing.RequestId, reference, existing.MobileNumber);
+            }
+        }
 
         string firstName = Require(submission.FirstName, "First name");
         string lastName = Require(submission.LastName, "Last name");
@@ -167,7 +185,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
         string publicReference = $"RP-{now:yy}-{number:D5}";
 
         AssistanceRequest request = new(
-            Guid.NewGuid(),
+            requestId ?? Guid.NewGuid(),
             publicReference,
             individualContext.Id,
             anonymousUserId,

@@ -61,7 +61,8 @@ public interface IQuickIntakeService
 
     Task<QuickIntakeResult> CreateAsync(
         QuickIntakeSubmission submission,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? requestId = null);
 
     Task<Guid> GetAnonymousUploaderIdAsync(Guid requestId, CancellationToken cancellationToken = default);
 

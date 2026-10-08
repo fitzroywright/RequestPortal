@@ -21,6 +21,11 @@ public sealed class QuickIntakeModel : PageModel
     [BindProperty]
     public InputModel Input { get; set; } = new();
 
+    [BindProperty] public Guid SubmissionId { get; set; }
+    [BindProperty] public Guid RequestId { get; set; }
+    [BindProperty] public int AttachmentIndex { get; set; }
+    [BindProperty] public IFormFile? AttachmentFile { get; set; }
+
     [BindProperty] public List<IFormFile> Attachments { get; set; } = new();
     [BindProperty] public List<IFormFile> CameraPhotos { get; set; } = new();
     public string? AttachmentWarning { get; private set; }
@@ -105,6 +110,58 @@ public sealed class QuickIntakeModel : PageModel
         {
             ModelState.AddModelError(string.Empty, $"We could not create the quick request. {exception.Message}");
             return Page();
+        }
+    }
+
+    public async Task<IActionResult> OnPostStartAsync()
+    {
+        if (SubmissionId == Guid.Empty || !string.IsNullOrWhiteSpace(Input.Website))
+            return BadRequest(new { error = "Invalid submission." });
+        if (Input.DateOfBirth is null)
+            ModelState.AddModelError("Input.DateOfBirth", "Date of birth is required.");
+        if (Input.AssistancePrograms.Count == 0 ||
+            (Input.AssistancePrograms.Contains("None", StringComparer.OrdinalIgnoreCase) && Input.AssistancePrograms.Count > 1))
+            ModelState.AddModelError("Input.AssistancePrograms", "Choose valid assistance programmes.");
+        if (!ModelState.IsValid)
+            return BadRequest(new { error = "Please correct the required fields." });
+        try
+        {
+            var result = await quickIntakeService.CreateAsync(
+                new QuickIntakeSubmission(Input.FirstName, Input.LastName, Input.DateOfBirth!.Value,
+                    Input.Gender, Input.MaritalStatus, Input.Telephone, Input.Email,
+                    Input.StreetAddress, Input.CommunityDistrict, Input.Parish,
+                    Input.EmploymentStatus, Input.MonthlyIncome,
+                    string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
+                    string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
+                    Input.AssistancePrograms, Input.HelpCategory),
+                HttpContext.RequestAborted, SubmissionId);
+            return new JsonResult(new { requestId = result.RequestId, reference = result.PublicReference });
+        }
+        catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
+        catch (InvalidOperationException) { return StatusCode(503, new { error = "Request service temporarily unavailable. Please retry." }); }
+    }
+
+    public async Task<IActionResult> OnPostUploadAsync()
+    {
+        if (RequestId == Guid.Empty || SubmissionId == Guid.Empty || RequestId != SubmissionId ||
+            AttachmentFile is null || AttachmentIndex is < 0 or > 4)
+            return BadRequest(new { error = "Invalid attachment upload." });
+        if (AttachmentFile.Length <= 0 || AttachmentFile.Length > 10 * 1024 * 1024)
+            return BadRequest(new { error = "Each attachment must be between 1 byte and 10 MB." });
+        string extension = Path.GetExtension(AttachmentFile.FileName).ToLowerInvariant();
+        if (extension is not (".jpg" or ".jpeg" or ".png" or ".pdf"))
+            return BadRequest(new { error = "Only JPG, PNG, or PDF attachments are supported." });
+        try
+        {
+            Guid uploader = await quickIntakeService.GetAnonymousUploaderIdAsync(RequestId, HttpContext.RequestAborted);
+            await using var stream = AttachmentFile.OpenReadStream();
+            await documentService.UploadForRequestAsync(uploader, RequestId, DocumentType.RequestSupport,
+                AttachmentFile.FileName, AttachmentFile.ContentType, AttachmentFile.Length, stream, HttpContext.RequestAborted);
+            return new JsonResult(new { uploaded = true });
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or UnauthorizedAccessException or IOException)
+        {
+            return StatusCode(503, new { error = "The attachment could not be saved. Please retry." });
         }
     }
 
