@@ -36,6 +36,8 @@ public sealed class IndexModel : PageModel
 
     public IReadOnlyList<RequestSummary> SubmittedRequests { get; private set; } = Array.Empty<RequestSummary>();
 
+    public IReadOnlyDictionary<Guid, string> UnverifiedQuickIntakeApplicants { get; private set; } = new Dictionary<Guid, string>();
+
     public StaffOperationsSnapshot Operations { get; private set; } = new(
         Array.Empty<PendingOrganizationWorkItem>(),
         Array.Empty<OrganizationReverificationWorkItem>(),
@@ -75,6 +77,10 @@ public sealed class IndexModel : PageModel
         // These services share the scoped EF context; queries must be sequential.
         PendingOrganizations = await workflowService.GetPendingOrganizationsAsync(HttpContext.RequestAborted);
         SubmittedRequests = await workflowService.GetSubmittedRequestsAsync(HttpContext.RequestAborted);
+        var submittedIds = SubmittedRequests.Select(item => item.Id).ToArray();
+        UnverifiedQuickIntakeApplicants = await dbContext.QuickIntakes.AsNoTracking()
+            .Where(item => submittedIds.Contains(item.RequestId) && item.ConvertedToUserId == null)
+            .ToDictionaryAsync(item => item.RequestId, item => item.FirstName + " " + item.LastName, HttpContext.RequestAborted);
         Operations = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
         return Page();
     }
