@@ -14,6 +14,7 @@ internal static class ApplicationPipeline
         }
 
         app.UseForwardedHeaders();
+        app.Use(ApplyQuickIntakeEntryHostRoutingAsync);
         app.UseStatusCodePages(async statusCodeContext =>
         {
             HttpContext context = statusCodeContext.HttpContext;
@@ -39,6 +40,25 @@ internal static class ApplicationPipeline
         app.Use(ApplyAlternateAuthenticatedPrincipalAsync);
         app.Use(PreventAuthenticatedPageCachingAsync);
         app.UseAuthorization();
+    }
+
+    private static async Task ApplyQuickIntakeEntryHostRoutingAsync(HttpContext context, Func<Task> next)
+    {
+        if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/")
+        {
+            string host = context.Request.Host.Host;
+
+            if (string.Equals(host, "helpme.ffpja.org", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Request.Path = "/QuickIntake";
+            }
+            else if (string.Equals(host, "help.ffpja.org", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Request.Path = "/QuickIntakeWelcome";
+            }
+        }
+
+        await next();
     }
 
     private static async Task RecordRequestFailureAsync(HttpContext context, Func<Task> next)

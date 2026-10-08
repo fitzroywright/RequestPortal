@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -16,6 +17,31 @@ namespace RequestPortal.Infrastructure.Requests;
 
 public sealed class QuickIntakeService : IQuickIntakeService
 {
+    private static readonly HashSet<string> AllowedGenders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Male", "Female", "Non-Binary"
+    };
+
+    private static readonly HashSet<string> AllowedMaritalStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Single", "Married", "Divorced", "Widowed"
+    };
+
+    private static readonly HashSet<string> AllowedEmploymentStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Employed", "Self Employed", "Unemployed", "Student"
+    };
+
+    private static readonly HashSet<string> AllowedPrograms = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "None", "PATH", "Poor Relief Dole", "Rehabilitation Programme", "Solidarity Program", "CARE"
+    };
+
+    private static readonly HashSet<string> AllowedHelpCategories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Food", "Housing", "Earn an Income", "Education", "Health", "Water & Hygiene"
+    };
+
     private readonly RequestPortalDbContext dbContext;
 
     public QuickIntakeService(RequestPortalDbContext dbContext)
@@ -27,20 +53,33 @@ public sealed class QuickIntakeService : IQuickIntakeService
         Guid requestId,
         CancellationToken cancellationToken = default)
     {
-        return await dbContext.QuickIntakes
+        QuickIntakeRecord? intake = await dbContext.QuickIntakes
             .AsNoTracking()
-            .Where(item => item.RequestId == requestId)
-            .Select(item => new QuickIntakeView(
-                item.RequestId,
-                item.FirstName,
-                item.LastName,
-                item.MobileNumber,
-                item.Parish,
-                item.Town,
-                item.CreatedUtc,
-                item.ConvertedToUserId,
-                item.ConvertedUtc))
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(item => item.RequestId == requestId, cancellationToken);
+
+        if (intake is null) return null;
+
+        return new QuickIntakeView(
+            intake.RequestId,
+            intake.FirstName,
+            intake.LastName,
+            intake.DateOfBirth,
+            intake.Gender,
+            intake.MaritalStatus,
+            intake.MobileNumber,
+            intake.Email,
+            intake.StreetAddress,
+            intake.CommunityDistrict,
+            intake.Parish,
+            intake.EmploymentStatus,
+            intake.MonthlyIncome,
+            intake.HasChildrenUnder18LivingFullTime,
+            intake.HasDisabilityOrSeriousMedicalCondition,
+            ParsePrograms(intake.AssistancePrograms),
+            intake.HelpCategory,
+            intake.CreatedUtc,
+            intake.ConvertedToUserId,
+            intake.ConvertedUtc);
     }
 
     public async Task<QuickIntakeResult> CreateAsync(
@@ -51,11 +90,26 @@ public sealed class QuickIntakeService : IQuickIntakeService
 
         string firstName = Require(submission.FirstName, "First name");
         string lastName = Require(submission.LastName, "Last name");
-        string mobile = NormalizeMobile(submission.MobileNumber);
+        if (submission.DateOfBirth == default || submission.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
+            throw new ArgumentException("Enter a valid date of birth.");
+
+        string gender = RequireAllowed(submission.Gender, "Gender", AllowedGenders);
+        string maritalStatus = RequireAllowed(submission.MaritalStatus, "Marital status", AllowedMaritalStatuses);
+        string mobile = NormalizeMobile(submission.Telephone);
+        string? email = Normalize(submission.Email);
+        string streetAddress = Require(submission.StreetAddress, "Street address");
+        string communityDistrict = Require(submission.CommunityDistrict, "Community/District");
         string parish = Require(submission.Parish, "Parish");
-        string assistanceNeeded = Require(submission.AssistanceNeeded, "Assistance needed");
+        string employmentStatus = RequireAllowed(submission.EmploymentStatus, "Employment status", AllowedEmploymentStatuses);
+
+        if (submission.MonthlyIncome < 0)
+            throw new ArgumentException("Monthly income cannot be negative.");
+
+        string programs = NormalizePrograms(submission.AssistancePrograms);
+        string helpCategory = RequireAllowed(submission.HelpCategory, "What do you need help with today", AllowedHelpCategories);
         string displayName = $"{firstName} {lastName}";
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        string location = BuildLocation(streetAddress, communityDistrict, parish);
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -69,11 +123,22 @@ public sealed class QuickIntakeService : IQuickIntakeService
             DisplayName = displayName,
             PhoneNumber = mobile,
             PhoneNumberConfirmed = false,
+            Email = email,
+            NormalizedEmail = email?.ToUpperInvariant(),
+            EmailConfirmed = false,
             CreatedUtc = now,
             IndividualProfileUpdateRequired = true,
             IndividualProfileUpdateRequiredUtc = now,
+            DateOfBirth = submission.DateOfBirth,
+            Gender = gender,
+            MaritalStatus = maritalStatus,
+            HomeAddress = streetAddress,
+            DistrictArea = communityDistrict,
             Parish = parish,
-            Town = Normalize(submission.Town)
+            Town = communityDistrict,
+            EmploymentStatus = employmentStatus,
+            MonthlyHouseholdIncome = submission.MonthlyIncome,
+            ChildrenUnder18 = submission.HasChildrenUnder18LivingFullTime ? 1 : 0
         };
         dbContext.Users.Add(anonymousUser);
 
@@ -86,9 +151,9 @@ public sealed class QuickIntakeService : IQuickIntakeService
         individualContext.UpdateProfile(
             null,
             "IndividualContext",
-            BuildLocation(submission.Town, parish),
+            location,
             mobile,
-            null,
+            email,
             displayName,
             null);
 
@@ -107,15 +172,15 @@ public sealed class QuickIntakeService : IQuickIntakeService
             individualContext.Id,
             anonymousUserId,
             now);
-        request.SetSummary(assistanceNeeded);
+        request.SetSummary(helpCategory);
         request.SetDetails(
             null,
-            Normalize(submission.Category),
+            helpCategory,
             null,
             null,
             RequestPriority.Normal,
-            BuildLocation(submission.Town, parish),
-            "Submitted through anonymous Quick Intake. Applicant is being tracked by outbound WhatsApp until converted to a normal Individual account.");
+            location,
+            $"Submitted through anonymous Quick Intake. Current programmes: {programs}. Applicant is being tracked by telephone until converted to a normal Individual account.");
 
         var unit = await dbContext.UnitsOfMeasure
             .AsNoTracking()
@@ -128,8 +193,8 @@ public sealed class QuickIntakeService : IQuickIntakeService
         request.AddItem(new AssistanceRequestItem(
             Guid.NewGuid(),
             request.Id,
-            "Assistance requested",
-            assistanceNeeded,
+            helpCategory,
+            HelpCategoryDescription(helpCategory),
             1,
             unit.Id,
             "Captured through Quick Intake."));
@@ -151,9 +216,20 @@ public sealed class QuickIntakeService : IQuickIntakeService
             individualContext.Id,
             firstName,
             lastName,
+            submission.DateOfBirth,
+            gender,
+            maritalStatus,
             mobile,
+            email,
+            streetAddress,
+            communityDistrict,
             parish,
-            submission.Town,
+            employmentStatus,
+            submission.MonthlyIncome,
+            submission.HasChildrenUnder18LivingFullTime,
+            submission.HasDisabilityOrSeriousMedicalCondition,
+            programs,
+            helpCategory,
             now));
 
         RequestSubmittedMessage submitted = new(
@@ -238,24 +314,34 @@ public sealed class QuickIntakeService : IQuickIntakeService
             ? $"{intake.FirstName} {intake.LastName}"
             : targetUser.DisplayName.Trim();
 
+        string location = BuildLocation(intake.StreetAddress, intake.CommunityDistrict, intake.Parish);
         context.Rename(displayName);
         context.UpdateProfile(
             null,
             "IndividualContext",
-            BuildLocation(intake.Town, intake.Parish),
+            location,
             string.IsNullOrWhiteSpace(targetUser.PhoneNumber) ? intake.MobileNumber : targetUser.PhoneNumber,
-            targetUser.Email,
+            string.IsNullOrWhiteSpace(targetUser.Email) ? intake.Email : targetUser.Email,
             displayName,
             null);
 
-        if (string.IsNullOrWhiteSpace(targetUser.DisplayName))
-            targetUser.DisplayName = displayName;
-        if (string.IsNullOrWhiteSpace(targetUser.PhoneNumber))
-            targetUser.PhoneNumber = intake.MobileNumber;
-        if (string.IsNullOrWhiteSpace(targetUser.Parish))
-            targetUser.Parish = intake.Parish;
-        if (string.IsNullOrWhiteSpace(targetUser.Town))
-            targetUser.Town = intake.Town;
+        if (string.IsNullOrWhiteSpace(targetUser.DisplayName)) targetUser.DisplayName = displayName;
+        if (string.IsNullOrWhiteSpace(targetUser.PhoneNumber)) targetUser.PhoneNumber = intake.MobileNumber;
+        if (string.IsNullOrWhiteSpace(targetUser.Email) && !string.IsNullOrWhiteSpace(intake.Email))
+        {
+            targetUser.Email = intake.Email;
+            targetUser.NormalizedEmail = intake.Email.ToUpperInvariant();
+        }
+        targetUser.DateOfBirth ??= intake.DateOfBirth;
+        targetUser.Gender ??= intake.Gender;
+        targetUser.MaritalStatus ??= intake.MaritalStatus;
+        targetUser.HomeAddress ??= intake.StreetAddress;
+        targetUser.DistrictArea ??= intake.CommunityDistrict;
+        targetUser.Parish ??= intake.Parish;
+        targetUser.Town ??= intake.CommunityDistrict;
+        targetUser.EmploymentStatus ??= intake.EmploymentStatus;
+        targetUser.MonthlyHouseholdIncome ??= intake.MonthlyIncome;
+        targetUser.ChildrenUnder18 ??= intake.HasChildrenUnder18LivingFullTime ? 1 : 0;
 
         targetUser.IndividualProfileUpdateRequired = true;
         targetUser.IndividualProfileUpdateRequiredUtc ??= now;
@@ -290,18 +376,57 @@ public sealed class QuickIntakeService : IQuickIntakeService
             ? throw new ArgumentException($"{label} is required.")
             : value.Trim();
 
+    private static string RequireAllowed(string? value, string label, HashSet<string> allowed)
+    {
+        string normalized = Require(value, label);
+        string? canonical = allowed.FirstOrDefault(item => string.Equals(item, normalized, StringComparison.OrdinalIgnoreCase));
+        return canonical ?? throw new ArgumentException($"{label} contains an invalid selection.");
+    }
+
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static string BuildLocation(string? town, string parish)
+    private static string BuildLocation(string streetAddress, string communityDistrict, string parish) =>
+        $"{streetAddress}, {communityDistrict}, {parish}";
+
+    private static string NormalizePrograms(IReadOnlyList<string> values)
     {
-        string? normalizedTown = Normalize(town);
-        return normalizedTown is null ? parish : $"{normalizedTown}, {parish}";
+        if (values is null || values.Count == 0)
+            throw new ArgumentException("Select at least one programme or None.");
+
+        List<string> normalized = values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => AllowedPrograms.FirstOrDefault(item => string.Equals(item, value.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new ArgumentException("Current assistance programmes contain an invalid selection."))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.Count == 0)
+            throw new ArgumentException("Select at least one programme or None.");
+
+        if (normalized.Contains("None", StringComparer.OrdinalIgnoreCase) && normalized.Count > 1)
+            throw new ArgumentException("None cannot be selected with another programme.");
+
+        return string.Join("|", normalized);
     }
+
+    private static IReadOnlyList<string> ParsePrograms(string value) =>
+        value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static string HelpCategoryDescription(string category) => category switch
+    {
+        "Food" => "Food package, backyard garden, or related food assistance.",
+        "Housing" => "Homelessness, home repairs, or related housing assistance.",
+        "Earn an Income" => "Income generation, starting a business, reintegration after prison, or related livelihood assistance.",
+        "Education" => "Scholarship, band camp, school, or related education assistance.",
+        "Health" => "Wheelchair, medical supplies, or related health assistance.",
+        "Water & Hygiene" => "Water tank, toiletries, or related water and hygiene assistance.",
+        _ => category
+    };
 
     private static string NormalizeMobile(string value)
     {
-        string raw = Require(value, "WhatsApp mobile number");
+        string raw = Require(value, "Telephone");
         string compact = new(raw.Where(character => char.IsDigit(character) || character == '+').ToArray());
 
         if (compact.StartsWith("00", StringComparison.Ordinal))
@@ -315,7 +440,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
 
         int digitCount = compact.Count(char.IsDigit);
         if (digitCount is < 10 or > 15)
-            throw new ArgumentException("Enter a valid WhatsApp mobile number including country code.");
+            throw new ArgumentException("Enter a valid telephone number including country code.");
 
         return compact;
     }

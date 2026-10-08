@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -7,24 +8,44 @@ namespace RequestPortal.Application.Requests;
 public sealed record QuickIntakeSubmission(
     string FirstName,
     string LastName,
-    string MobileNumber,
+    DateOnly DateOfBirth,
+    string Gender,
+    string MaritalStatus,
+    string Telephone,
+    string? Email,
+    string StreetAddress,
+    string CommunityDistrict,
     string Parish,
-    string? Town,
-    string? Category,
-    string AssistanceNeeded);
+    string EmploymentStatus,
+    decimal MonthlyIncome,
+    bool HasChildrenUnder18LivingFullTime,
+    bool HasDisabilityOrSeriousMedicalCondition,
+    IReadOnlyList<string> AssistancePrograms,
+    string HelpCategory);
 
 public sealed record QuickIntakeResult(
     Guid RequestId,
     string PublicReference,
-    string MobileNumber);
+    string Telephone);
 
 public sealed record QuickIntakeView(
     Guid RequestId,
     string FirstName,
     string LastName,
-    string MobileNumber,
+    DateOnly DateOfBirth,
+    string Gender,
+    string MaritalStatus,
+    string Telephone,
+    string? Email,
+    string StreetAddress,
+    string CommunityDistrict,
     string Parish,
-    string? Town,
+    string EmploymentStatus,
+    decimal MonthlyIncome,
+    bool HasChildrenUnder18LivingFullTime,
+    bool HasDisabilityOrSeriousMedicalCondition,
+    IReadOnlyList<string> AssistancePrograms,
+    string HelpCategory,
     DateTimeOffset CreatedUtc,
     Guid? ConvertedToUserId,
     DateTimeOffset? ConvertedUtc)

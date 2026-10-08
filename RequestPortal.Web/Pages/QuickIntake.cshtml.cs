@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
 
 namespace RequestPortal.Web.Pages;
@@ -9,51 +8,37 @@ namespace RequestPortal.Web.Pages;
 public sealed class QuickIntakeModel : PageModel
 {
     private readonly IQuickIntakeService quickIntakeService;
-    private readonly IRequestReferenceDataService referenceDataService;
 
-    public QuickIntakeModel(
-        IQuickIntakeService quickIntakeService,
-        IRequestReferenceDataService referenceDataService)
+    public QuickIntakeModel(IQuickIntakeService quickIntakeService)
     {
         this.quickIntakeService = quickIntakeService;
-        this.referenceDataService = referenceDataService;
     }
 
     [BindProperty]
     public InputModel Input { get; set; } = new();
 
-    public IReadOnlyList<RequestCategoryOption> Categories { get; private set; } =
-        Array.Empty<RequestCategoryOption>();
-
     public string? RequestReference { get; private set; }
+    public string? Telephone { get; private set; }
 
-    public string? WhatsAppNumber { get; private set; }
-
-    public async Task OnGetAsync()
-    {
-        await LoadReferenceDataAsync();
-    }
+    public void OnGet() { }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        await LoadReferenceDataAsync();
-
         if (!string.IsNullOrWhiteSpace(Input.Website))
-        {
             return Page();
-        }
 
-        if (!Input.ConsentToWhatsApp)
-        {
-            ModelState.AddModelError(
-                "Input.ConsentToWhatsApp",
-                "Please confirm that FFP may send updates to this WhatsApp number.");
-        }
+        if (Input.DateOfBirth is null)
+            ModelState.AddModelError("Input.DateOfBirth", "Date of birth is required.");
+
+        if (Input.AssistancePrograms.Count == 0)
+            ModelState.AddModelError("Input.AssistancePrograms", "Select at least one programme or None.");
+
+        if (Input.AssistancePrograms.Contains("None", StringComparer.OrdinalIgnoreCase) &&
+            Input.AssistancePrograms.Count > 1)
+            ModelState.AddModelError("Input.AssistancePrograms", "None cannot be selected with another programme.");
 
         if (!ModelState.IsValid)
-        {
             return Page();
-        }
 
         try
         {
@@ -61,17 +46,25 @@ public sealed class QuickIntakeModel : PageModel
                 new QuickIntakeSubmission(
                     Input.FirstName,
                     Input.LastName,
-                    Input.MobileNumber,
+                    Input.DateOfBirth!.Value,
+                    Input.Gender,
+                    Input.MaritalStatus,
+                    Input.Telephone,
+                    Input.Email,
+                    Input.StreetAddress,
+                    Input.CommunityDistrict,
                     Input.Parish,
-                    Input.Town,
-                    Input.Category,
-                    Input.AssistanceNeeded),
+                    Input.EmploymentStatus,
+                    Input.MonthlyIncome,
+                    string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
+                    string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
+                    Input.AssistancePrograms,
+                    Input.HelpCategory),
                 HttpContext.RequestAborted);
 
             RequestReference = result.PublicReference;
-            WhatsAppNumber = result.MobileNumber;
+            Telephone = result.Telephone;
             Input = new InputModel();
-
             return Page();
         }
         catch (ArgumentException exception)
@@ -81,16 +74,9 @@ public sealed class QuickIntakeModel : PageModel
         }
         catch (InvalidOperationException exception)
         {
-            ModelState.AddModelError(
-                string.Empty,
-                $"We could not create the quick request. {exception.Message}");
+            ModelState.AddModelError(string.Empty, $"We could not create the quick request. {exception.Message}");
             return Page();
         }
-    }
-
-    private async Task LoadReferenceDataAsync()
-    {
-        Categories = await referenceDataService.GetCategoriesAsync(HttpContext.RequestAborted);
     }
 
     public sealed class InputModel
@@ -101,24 +87,45 @@ public sealed class QuickIntakeModel : PageModel
         [Required, StringLength(150)]
         public string LastName { get; set; } = string.Empty;
 
+        public DateOnly? DateOfBirth { get; set; }
+
+        [Required, RegularExpression("Male|Female|Non-Binary")]
+        public string Gender { get; set; } = string.Empty;
+
+        [Required, RegularExpression("Single|Married|Divorced|Widowed")]
+        public string MaritalStatus { get; set; } = string.Empty;
+
         [Required, StringLength(40)]
-        [Display(Name = "WhatsApp mobile number")]
-        public string MobileNumber { get; set; } = string.Empty;
+        public string Telephone { get; set; } = string.Empty;
+
+        [EmailAddress, StringLength(320)]
+        public string? Email { get; set; }
+
+        [Required, StringLength(250)]
+        public string StreetAddress { get; set; } = string.Empty;
+
+        [Required, StringLength(150)]
+        public string CommunityDistrict { get; set; } = string.Empty;
 
         [Required, StringLength(100)]
         public string Parish { get; set; } = string.Empty;
 
-        [StringLength(150)]
-        public string? Town { get; set; }
+        [Required, RegularExpression("Employed|Self Employed|Unemployed|Student")]
+        public string EmploymentStatus { get; set; } = string.Empty;
 
-        [StringLength(150)]
-        public string? Category { get; set; }
+        [Range(typeof(decimal), "0", "999999999999.99")]
+        public decimal MonthlyIncome { get; set; }
 
-        [Required, StringLength(4000, MinimumLength = 10)]
-        [Display(Name = "What assistance do you need?")]
-        public string AssistanceNeeded { get; set; } = string.Empty;
+        [Required, RegularExpression("Yes|No")]
+        public string HasChildrenUnder18LivingFullTime { get; set; } = string.Empty;
 
-        public bool ConsentToWhatsApp { get; set; }
+        [Required, RegularExpression("Yes|No")]
+        public string HasDisabilityOrSeriousMedicalCondition { get; set; } = string.Empty;
+
+        public List<string> AssistancePrograms { get; set; } = new();
+
+        [Required, RegularExpression("Food|Housing|Earn an Income|Education|Health|Water & Hygiene")]
+        public string HelpCategory { get; set; } = string.Empty;
 
         public string? Website { get; set; }
     }
