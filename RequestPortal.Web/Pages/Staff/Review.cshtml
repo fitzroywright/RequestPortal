@@ -37,8 +37,8 @@
                             <div class="eyebrow" style="color:#b45b09">Anonymous Quick Intake</div>
                             <h2 style="margin:.25rem 0">@Model.QuickIntake.FirstName @Model.QuickIntake.LastName</h2>
                             <p class="muted" style="margin:0">
-                                WhatsApp: <strong>@Model.QuickIntake.MobileNumber</strong> ·
-                                @Model.QuickIntake.Town@(!string.IsNullOrWhiteSpace(Model.QuickIntake.Town) ? ", " : "")@Model.QuickIntake.Parish
+                                WhatsApp: <strong>@Model.QuickIntake.Telephone</strong> ·
+                                @Model.QuickIntake.CommunityDistrict, @Model.QuickIntake.Parish
                             </p>
                         </div>
                         @if (Model.QuickIntake.IsConverted)
