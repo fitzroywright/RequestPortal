@@ -103,6 +103,7 @@
                             <thead>
                                 <tr>
                                     <th>Reference</th>
+                                    <th>Applicant</th>
                                     <th>Organization</th>
                                     <th>Summary</th>
                                     <th class="staff-age-column">Age</th>
@@ -118,6 +119,17 @@
                                         <a asp-page="/Staff/Review" asp-route-id="@request.Id">
                                             <strong>@request.PublicReference</strong>
                                         </a>
+                                    </td>
+                                    <td>
+                                        @if (Model.UnverifiedQuickIntakeApplicants.TryGetValue(request.Id, out string? applicantName))
+                                        {
+                                            <strong>@applicantName</strong>
+                                            <span class="muted" style="display:block;font-size:.8rem">Unverified User · Anonymous Quick Intake</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="muted">Registered requester</span>
+                                        }
                                     </td>
                                     <td>@request.OrganizationName</td>
                                     <td>@request.Summary</td>

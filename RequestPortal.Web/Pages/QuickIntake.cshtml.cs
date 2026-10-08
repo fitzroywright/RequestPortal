@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using RequestPortal.Application.Documents;
+using RequestPortal.Domain.Documents;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Requests;
 
@@ -8,15 +10,20 @@ namespace RequestPortal.Web.Pages;
 public sealed class QuickIntakeModel : PageModel
 {
     private readonly IQuickIntakeService quickIntakeService;
+    private readonly IDocumentService documentService;
 
-    public QuickIntakeModel(IQuickIntakeService quickIntakeService)
+    public QuickIntakeModel(IQuickIntakeService quickIntakeService, IDocumentService documentService)
     {
         this.quickIntakeService = quickIntakeService;
+        this.documentService = documentService;
     }
 
     [BindProperty]
     public InputModel Input { get; set; } = new();
 
+    [BindProperty] public List<IFormFile> Attachments { get; set; } = new();
+    [BindProperty] public List<IFormFile> CameraPhotos { get; set; } = new();
+    public string? AttachmentWarning { get; private set; }
     public string? RequestReference { get; private set; }
     public string? Telephone { get; private set; }
 
@@ -36,6 +43,10 @@ public sealed class QuickIntakeModel : PageModel
         if (Input.AssistancePrograms.Contains("None", StringComparer.OrdinalIgnoreCase) &&
             Input.AssistancePrograms.Count > 1)
             ModelState.AddModelError("Input.AssistancePrograms", "None cannot be selected with another programme.");
+
+        var files = Attachments.Concat(CameraPhotos).Where(file => file.Length > 0).ToArray();
+        if (files.Length > 5 || files.Any(file => file.Length > 10 * 1024 * 1024))
+            ModelState.AddModelError(nameof(Attachments), "Attach up to 5 files, each no larger than 10 MB.");
 
         if (!ModelState.IsValid)
             return Page();
@@ -63,6 +74,24 @@ public sealed class QuickIntakeModel : PageModel
                 HttpContext.RequestAborted);
 
             RequestReference = result.PublicReference;
+            if (files.Length > 0)
+            {
+                try
+                {
+                    Guid uploaderId = await quickIntakeService.GetAnonymousUploaderIdAsync(result.RequestId, HttpContext.RequestAborted);
+                    foreach (IFormFile file in files)
+                    {
+                        await using var stream = file.OpenReadStream();
+                        await documentService.UploadForRequestAsync(uploaderId, result.RequestId,
+                            DocumentType.RequestSupport, file.FileName, file.ContentType, file.Length,
+                            stream, HttpContext.RequestAborted);
+                    }
+                }
+                catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or UnauthorizedAccessException or IOException)
+                {
+                    AttachmentWarning = "Your request was received, but one or more attachments could not be saved. Please quote your reference when contacting us.";
+                }
+            }
             Telephone = result.Telephone;
             Input = new InputModel();
             return Page();

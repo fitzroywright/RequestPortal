@@ -253,6 +253,14 @@ public sealed class QuickIntakeService : IQuickIntakeService
         return new QuickIntakeResult(request.Id, publicReference, mobile);
     }
 
+    public async Task<Guid> GetAnonymousUploaderIdAsync(Guid requestId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.QuickIntakes.AsNoTracking()
+            .Where(item => item.RequestId == requestId)
+            .Select(item => item.AnonymousUserId)
+            .SingleAsync(cancellationToken);
+    }
+
     public async Task ConvertToIndividualAsync(
         Guid requestId,
         Guid userId,
