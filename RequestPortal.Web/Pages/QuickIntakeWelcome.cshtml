@@ -1,0 +1,23 @@
+@page
+@{
+    ViewData["Title"] = "Get Help";
+}
+
+<section class="help-entry-page">
+    <div class="help-entry-card">
+        <img src="~/img/ffp-logo.png" alt="Food For The Poor Jamaica" class="help-entry-logo" onerror="this.style.display='none'" />
+        <h1>Need Help?</h1>
+        <p>Use our Quick Intake Form to tell Food For The Poor Jamaica what assistance you need.</p>
+        <a class="help-entry-button" asp-page="/QuickIntake">GET HELP NOW</a>
+        <small>No account is required.</small>
+    </div>
+</section>
+
+<style>
+.help-entry-page{min-height:calc(100vh - 70px);display:grid;place-items:center;padding:24px;background:linear-gradient(180deg,#f5f8fb,#fff);box-sizing:border-box}
+.help-entry-card{width:min(100%,520px);padding:38px 28px;text-align:center;background:#fff;border:1px solid #dce5eb;border-radius:18px;box-shadow:0 18px 44px rgba(13,49,78,.12)}
+.help-entry-logo{max-width:190px;max-height:90px;object-fit:contain;margin-bottom:18px}.help-entry-card h1{margin:0;color:#0b2d57;font-size:clamp(2rem,8vw,3rem)}.help-entry-card p{margin:12px auto 26px;max-width:420px;color:#566c80;line-height:1.5}
+.help-entry-button{display:flex;align-items:center;justify-content:center;min-height:72px;width:100%;box-sizing:border-box;border-radius:12px;background:#c91f26;color:#fff;text-decoration:none;font-size:1.35rem;font-weight:900;letter-spacing:.02em;box-shadow:0 10px 24px rgba(201,31,38,.24)}
+.help-entry-button:hover{background:#a9151b;color:#fff}.help-entry-card small{display:block;margin-top:16px;color:#748493}
+@@media(max-width:520px){.help-entry-page{padding:12px}.help-entry-card{padding:30px 18px}.help-entry-button{min-height:68px;font-size:1.2rem}}
+</style>
