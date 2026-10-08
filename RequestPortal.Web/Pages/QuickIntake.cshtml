@@ -35,6 +35,7 @@
                 </header>
 
                 <form method="post" enctype="multipart/form-data" class="quick-intake-form" id="quickIntakeForm">
+                    @Html.AntiForgeryToken()
                     <div asp-validation-summary="ModelOnly" class="quick-intake-errors"></div>
                     <input asp-for="Input.Website" class="quick-intake-trap" tabindex="-1" autocomplete="off" aria-hidden="true" />
 
@@ -139,6 +140,9 @@
                     </details>
                     <button class="quick-intake-primary" id="quickIntakeSubmit" type="submit"><span id="quickIntakeSubmitLabel">Submit</span><span class="quick-intake-spinner" aria-hidden="true"></span></button>
                     <p id="quickIntakeSubmitStatus" class="quick-intake-submit-status" role="status" aria-live="polite" hidden>Submitting your request. Please wait…</p>
+                    <progress id="quickIntakeProgress" max="100" value="0" hidden style="width:100%"></progress>
+                    <button id="quickIntakeRetry" type="button" hidden class="quick-intake-primary">Retry upload</button>
+                    <div id="quickIntakeResult" role="status" aria-live="polite" hidden></div>
                 </form>
             </section>
         }
@@ -176,24 +180,100 @@
             selection.textContent = count ? (count === 1 ? 'Photo ready: ' + camera.files[0].name : count + ' photos ready') : 'Use your phone or tablet camera';
         });
     }
-    form.addEventListener('submit', event => {
-        if (form.dataset.submitting === 'true') {
-            event.preventDefault();
-            return;
+    const progress = document.getElementById('quickIntakeProgress');
+    const retry = document.getElementById('quickIntakeRetry');
+    const resultBox = document.getElementById('quickIntakeResult');
+    const key = 'quickIntakeSubmissionId';
+    const uuid = () => crypto.randomUUID();
+    let submissionId = sessionStorage.getItem(key) || uuid();
+    sessionStorage.setItem(key, submissionId);
+    let saved = null;
+    let nextFile = 0;
+    let busy = false;
+    const attachments = () => [
+        ...Array.from(document.getElementById('Attachments')?.files || []),
+        ...Array.from(camera?.files || [])
+    ];
+    const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value;
+    const request = (handler, data, onProgress) => new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action.split('?')[0] + '?handler=' + handler);
+        xhr.setRequestHeader('RequestVerificationToken', token);
+        xhr.responseType = 'json';
+        xhr.onload = () => xhr.status >= 200 && xhr.status < 300
+            ? resolve(xhr.response)
+            : reject(new Error(xhr.response?.error || 'The server could not complete this step.'));
+        xhr.onerror = () => reject(new Error('Connection lost. Please retry.'));
+        xhr.ontimeout = () => reject(new Error('The request timed out. Please retry.'));
+        xhr.timeout = 120000;
+        if (onProgress) xhr.upload.onprogress = event => {
+            if (event.lengthComputable) onProgress(Math.round(100 * event.loaded / event.total));
+        };
+        xhr.send(data);
+    });
+    const setBusy = value => {
+        busy = value;
+        button.disabled = value;
+        button.setAttribute('aria-busy', String(value));
+        label.textContent = value ? 'Submitting…' : 'Submit';
+    };
+    async function submitStages() {
+        if (busy) return;
+        setBusy(true);
+        retry.hidden = true;
+        resultBox.hidden = true;
+        try {
+            const files = attachments();
+            if (files.length > 5 || files.some(f => f.size > 10 * 1024 * 1024 || f.size === 0))
+                throw new Error('Choose up to 5 files, each between 1 byte and 10 MB.');
+            if (!saved) {
+                status.hidden = false;
+                status.textContent = 'Saving your request information…';
+                const data = new FormData(form);
+                data.delete('Attachments');
+                data.delete('CameraPhotos');
+                data.append('SubmissionId', submissionId);
+                saved = await request('Start', data);
+            }
+            progress.hidden = files.length === 0;
+            for (; nextFile < files.length; nextFile++) {
+                status.textContent = 'Uploading attachment ' + (nextFile + 1) + ' of ' + files.length + '…';
+                progress.value = 0;
+                const data = new FormData();
+                data.append('SubmissionId', submissionId);
+                data.append('RequestId', saved.requestId);
+                data.append('AttachmentIndex', String(nextFile));
+                data.append('AttachmentFile', files[nextFile], files[nextFile].name);
+                await request('Upload', data, percent => { progress.value = percent; });
+            }
+            status.hidden = true;
+            progress.hidden = true;
+            form.hidden = true;
+            resultBox.hidden = false;
+            resultBox.innerHTML = '';
+            const heading = document.createElement('h2');
+            heading.textContent = 'Request received';
+            const reference = document.createElement('p');
+            reference.textContent = 'Your request reference: ' + saved.reference;
+            resultBox.append(heading, reference);
+            form.parentNode.appendChild(resultBox);
+            sessionStorage.removeItem(key);
+        } catch (error) {
+            status.hidden = false;
+            status.textContent = saved
+                ? 'Your request information is saved. An attachment could not be uploaded: ' + error.message
+                : 'Your request could not be confirmed: ' + error.message;
+            retry.hidden = !saved;
+            label.textContent = 'Retry submission';
+        } finally {
+            setBusy(false);
         }
-        if (!form.checkValidity()) return;
-        form.dataset.submitting = 'true';
-        button.disabled = true;
-        button.setAttribute('aria-busy', 'true');
-        label.textContent = 'Submitting…';
-        status.hidden = false;
+    }
+    form.addEventListener('submit', event => {
+        event.preventDefault();
+        if (busy || !form.checkValidity()) return;
+        submitStages();
     });
-    window.addEventListener('pageshow', () => {
-        form.dataset.submitting = 'false';
-        button.disabled = false;
-        button.removeAttribute('aria-busy');
-        label.textContent = 'Submit';
-        status.hidden = true;
-    });
+    retry.addEventListener('click', submitStages);
 })();
 </script>
