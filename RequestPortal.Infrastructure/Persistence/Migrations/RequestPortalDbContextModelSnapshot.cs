@@ -289,6 +289,16 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("AnonymousUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AssistancePrograms")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("CommunityDistrict")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.Property<DateTimeOffset>("CreatedUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -301,10 +311,38 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ConvertedUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateOnly>("DateOfBirth")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("EmploymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Gender")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("HasChildrenUnder18LivingFullTime")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("HasDisabilityOrSeriousMedicalCondition")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("HelpCategory")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<Guid>("IndividualContextId")
                         .HasColumnType("uuid");
@@ -314,10 +352,19 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<string>("MaritalStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("MobileNumber")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<decimal>("MonthlyIncome")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
 
                     b.Property<string>("Parish")
                         .IsRequired()
@@ -327,9 +374,10 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("RequestId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Town")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
+                    b.Property<string>("StreetAddress")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.HasKey("Id");
 
