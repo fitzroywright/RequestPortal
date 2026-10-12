@@ -39,6 +39,10 @@
                             <p class="muted" style="margin:0">
                                 WhatsApp: <strong>@Model.QuickIntake.Telephone</strong> ·
                                 @Model.QuickIntake.CommunityDistrict, @Model.QuickIntake.Parish
+                                @if (!string.IsNullOrWhiteSpace(Model.QuickIntake.SecondaryTelephone))
+                                {
+                                    <br /><span>Secondary phone: <strong>@Model.QuickIntake.SecondaryTelephone</strong></span>
+                                }
                             </p>
                         </div>
                         @if (Model.QuickIntake.IsConverted)

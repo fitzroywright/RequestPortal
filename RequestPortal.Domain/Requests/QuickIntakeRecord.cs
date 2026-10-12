@@ -27,7 +27,8 @@ public sealed class QuickIntakeRecord
         bool hasDisabilityOrSeriousMedicalCondition,
         string assistancePrograms,
         string helpCategory,
-        DateTimeOffset createdUtc)
+        DateTimeOffset createdUtc,
+        string? secondaryTelephone = null)
     {
         if (id == Guid.Empty) throw new ArgumentException("Quick intake id is required.", nameof(id));
         if (requestId == Guid.Empty) throw new ArgumentException("Request id is required.", nameof(requestId));
@@ -56,6 +57,7 @@ public sealed class QuickIntakeRecord
         Gender = gender.Trim();
         MaritalStatus = maritalStatus.Trim();
         MobileNumber = mobileNumber.Trim();
+        SecondaryTelephone = Normalize(secondaryTelephone);
         Email = Normalize(email);
         StreetAddress = streetAddress.Trim();
         CommunityDistrict = communityDistrict.Trim();
@@ -79,6 +81,7 @@ public sealed class QuickIntakeRecord
     public string Gender { get; private set; } = string.Empty;
     public string MaritalStatus { get; private set; } = string.Empty;
     public string MobileNumber { get; private set; } = string.Empty;
+    public string? SecondaryTelephone { get; private set; }
     public string? Email { get; private set; }
     public string StreetAddress { get; private set; } = string.Empty;
     public string CommunityDistrict { get; private set; } = string.Empty;

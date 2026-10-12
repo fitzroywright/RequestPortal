@@ -75,7 +75,7 @@ public sealed class QuickIntakeModel : PageModel
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms,
-                    Input.HelpCategory),
+                    Input.HelpCategory, Input.SecondaryTelephone),
                 HttpContext.RequestAborted);
 
             RequestReference = result.PublicReference;
@@ -133,7 +133,7 @@ public sealed class QuickIntakeModel : PageModel
                     Input.EmploymentStatus, Input.MonthlyIncome,
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
-                    Input.AssistancePrograms, Input.HelpCategory),
+                    Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone),
                 HttpContext.RequestAborted, SubmissionId);
             return new JsonResult(new { requestId = result.RequestId, reference = result.PublicReference });
         }
@@ -183,6 +183,9 @@ public sealed class QuickIntakeModel : PageModel
 
         [Required, StringLength(40)]
         public string Telephone { get; set; } = string.Empty;
+
+        [StringLength(40)]
+        public string? SecondaryTelephone { get; set; }
 
         [EmailAddress, StringLength(320)]
         public string? Email { get; set; }

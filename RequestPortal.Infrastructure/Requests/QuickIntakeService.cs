@@ -79,7 +79,8 @@ public sealed class QuickIntakeService : IQuickIntakeService
             intake.HelpCategory,
             intake.CreatedUtc,
             intake.ConvertedToUserId,
-            intake.ConvertedUtc);
+            intake.ConvertedUtc,
+            intake.SecondaryTelephone);
     }
 
     public async Task<QuickIntakeResult> CreateAsync(
@@ -114,6 +115,17 @@ public sealed class QuickIntakeService : IQuickIntakeService
         string gender = RequireAllowed(submission.Gender, "Gender", AllowedGenders);
         string maritalStatus = RequireAllowed(submission.MaritalStatus, "Marital status", AllowedMaritalStatuses);
         string mobile = NormalizeMobile(submission.Telephone);
+        string? secondaryTelephone = Normalize(submission.SecondaryTelephone);
+        if (secondaryTelephone is not null)
+        {
+            if (secondaryTelephone.Length > 40)
+                throw new ArgumentException("Secondary phone number cannot exceed 40 characters.");
+            try { secondaryTelephone = NormalizeMobile(secondaryTelephone); }
+            catch (ArgumentException)
+            {
+                throw new ArgumentException("Enter a valid secondary phone number including country code.");
+            }
+        }
         string? email = Normalize(submission.Email);
         string streetAddress = Require(submission.StreetAddress, "Street address");
         string communityDistrict = Require(submission.CommunityDistrict, "Community/District");
@@ -248,7 +260,8 @@ public sealed class QuickIntakeService : IQuickIntakeService
             submission.HasDisabilityOrSeriousMedicalCondition,
             programs,
             helpCategory,
-            now));
+            now,
+            secondaryTelephone));
 
         RequestSubmittedMessage submitted = new(
             Guid.NewGuid(),
