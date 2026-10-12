@@ -30,7 +30,7 @@
                 <header class="quick-intake-header">
                     <div>
                         <h1>Quick Intake Form</h1>
-                        <p>No account needed. All fields are required except Email and supporting attachments.</p>
+                        <p>No account needed. All fields are required except secondary phone number, Email and supporting attachments.</p>
                     </div>
                 </header>
 
@@ -59,6 +59,9 @@
                     <h2>Contact & Address</h2>
                     <div class="quick-intake-row">
                         <label><span>Telephone <b>*</b></span><input asp-for="Input.Telephone" type="tel" inputmode="tel" autocomplete="tel" /><span asp-validation-for="Input.Telephone"></span></label>
+                        <label><span>Secondary Phone Number <em>(Optional)</em></span><input asp-for="Input.SecondaryTelephone" type="tel" inputmode="tel" autocomplete="section-secondary tel" maxlength="40" /><span asp-validation-for="Input.SecondaryTelephone"></span></label>
+                    </div>
+                    <div class="quick-intake-row">
                         <label><span>Email <em>(Optional)</em></span><input asp-for="Input.Email" type="email" autocomplete="email" /><span asp-validation-for="Input.Email"></span></label>
                     </div>
                     <label><span>Street Address <b>*</b></span><input asp-for="Input.StreetAddress" autocomplete="street-address" /><span asp-validation-for="Input.StreetAddress"></span></label>

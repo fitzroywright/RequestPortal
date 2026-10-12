@@ -374,6 +374,10 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("RequestId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("SecondaryTelephone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<string>("StreetAddress")
                         .IsRequired()
                         .HasMaxLength(250)

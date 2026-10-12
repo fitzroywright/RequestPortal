@@ -16,6 +16,7 @@ internal sealed class QuickIntakeRecordConfiguration : IEntityTypeConfiguration<
         builder.Property(item => item.Gender).HasMaxLength(32).IsRequired();
         builder.Property(item => item.MaritalStatus).HasMaxLength(32).IsRequired();
         builder.Property(item => item.MobileNumber).HasMaxLength(40).IsRequired();
+        builder.Property(item => item.SecondaryTelephone).HasMaxLength(40);
         builder.Property(item => item.Email).HasMaxLength(320);
         builder.Property(item => item.StreetAddress).HasMaxLength(250).IsRequired();
         builder.Property(item => item.CommunityDistrict).HasMaxLength(150).IsRequired();

@@ -21,7 +21,8 @@ public sealed record QuickIntakeSubmission(
     bool HasChildrenUnder18LivingFullTime,
     bool HasDisabilityOrSeriousMedicalCondition,
     IReadOnlyList<string> AssistancePrograms,
-    string HelpCategory);
+    string HelpCategory,
+    string? SecondaryTelephone = null);
 
 public sealed record QuickIntakeResult(
     Guid RequestId,
@@ -48,7 +49,8 @@ public sealed record QuickIntakeView(
     string HelpCategory,
     DateTimeOffset CreatedUtc,
     Guid? ConvertedToUserId,
-    DateTimeOffset? ConvertedUtc)
+    DateTimeOffset? ConvertedUtc,
+    string? SecondaryTelephone = null)
 {
     public bool IsConverted => ConvertedToUserId.HasValue;
 }
