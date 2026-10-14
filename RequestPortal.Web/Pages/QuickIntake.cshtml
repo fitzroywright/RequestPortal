@@ -30,7 +30,7 @@
                 <header class="quick-intake-header">
                     <div>
                         <h1>Quick Intake Form</h1>
-                        <p>No account needed. All fields are required except secondary phone number, Email and supporting attachments.</p>
+                        <p>@(User.Identity?.IsAuthenticated == true ? "Your request will be linked to your account." : "No account needed.") All fields are required except secondary phone number, Email and supporting attachments.</p>
                     </div>
                 </header>
 

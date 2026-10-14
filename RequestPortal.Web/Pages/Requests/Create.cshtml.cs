@@ -92,7 +92,7 @@ public sealed class CreateModel : PageModel
     [BindProperty]
     public SupportingDocumentsInput SupportingDocuments { get; set; } = new();
 
-    public async Task OnGetAsync(RequestKind? kind = null)
+    public async Task<IActionResult> OnGetAsync(RequestKind? kind = null)
     {
         if (kind.HasValue)
         {
@@ -103,6 +103,8 @@ public sealed class CreateModel : PageModel
         {
             ApplicationUser user = await GetUserAsync();
             await LoadPageDataAsync(user);
+            if ((!kind.HasValue || kind == RequestKind.GoodsAndServices) && Organizations.All(item => item.IsIndividualContext))
+                return RedirectToPage("/QuickIntake");
             if (Input.OrganizationId == Guid.Empty && Organizations.Count == 1)
             {
                 Input.OrganizationId = Organizations[0].Id;
@@ -114,6 +116,7 @@ public sealed class CreateModel : PageModel
                 exception,
                 "loading the New Request page");
         }
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
