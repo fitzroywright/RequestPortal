@@ -42,19 +42,26 @@ public sealed class QuickIntakeModel : PageModel
             ? await userManager.GetUserAsync(User) : null;
         if (user is null) return;
         string[] name = (user.DisplayName ?? "").Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        Input.FirstName = name.FirstOrDefault() ?? "";
-        Input.LastName = name.Length > 1 ? name[1] : "";
+        Input.FirstName = user.FirstName ?? name.FirstOrDefault() ?? "";
+        Input.LastName = user.LastName ?? (name.Length > 1 ? name[1] : "");
         Input.DateOfBirth = user.DateOfBirth;
         Input.Gender = string.Equals(user.Gender, "Non-Binary", StringComparison.OrdinalIgnoreCase)
             ? "Prefer not to Say" : user.Gender ?? "";
         Input.MaritalStatus = user.MaritalStatus ?? "";
         Input.Telephone = user.PhoneNumber ?? "";
         Input.Email = user.Email;
+        Input.SecondaryTelephone = user.AlternativePhoneNumber;
         Input.StreetAddress = user.HomeAddress ?? "";
         Input.CommunityDistrict = user.DistrictArea ?? user.Town ?? "";
         Input.Parish = user.Parish ?? "";
         Input.EmploymentStatus = user.EmploymentStatus ?? "";
         Input.MonthlyIncome = user.MonthlyHouseholdIncome ?? 0;
+        Input.HasChildrenUnder18LivingFullTime = user.HasChildrenUnder18LivingFullTime.HasValue
+            ? (user.HasChildrenUnder18LivingFullTime.Value ? "Yes" : "No") : "";
+        Input.HasDisabilityOrSeriousMedicalCondition = user.HasDisabilityOrSeriousMedicalCondition.HasValue
+            ? (user.HasDisabilityOrSeriousMedicalCondition.Value ? "Yes" : "No") : "";
+        Input.AssistancePrograms = ProfileIntakeChoices.Parse(user.AssistancePrograms, '|');
+        Input.VictimCircumstances = ProfileIntakeChoices.Parse(user.VictimCircumstances, ';');
     }
 
     private async Task<Guid?> GetApplicantIdAsync()

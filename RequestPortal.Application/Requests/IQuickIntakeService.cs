@@ -51,7 +51,8 @@ public sealed record QuickIntakeView(
     DateTimeOffset CreatedUtc,
     Guid? ConvertedToUserId,
     DateTimeOffset? ConvertedUtc,
-    string? SecondaryTelephone = null)
+    string? SecondaryTelephone = null,
+    string? VictimCircumstances = null)
 {
     public bool IsConverted => ConvertedToUserId.HasValue;
 }

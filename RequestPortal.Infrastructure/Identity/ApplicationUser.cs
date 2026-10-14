@@ -21,6 +21,13 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public bool IndividualProfileUpdateRequired { get; set; }
     public DateTimeOffset? IndividualProfileUpdateRequiredUtc { get; set; }
 
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public bool? HasChildrenUnder18LivingFullTime { get; set; }
+    public bool? HasDisabilityOrSeriousMedicalCondition { get; set; }
+    public string? AssistancePrograms { get; set; }
+    public string? VictimCircumstances { get; set; }
+
     public DateOnly? DateOfBirth { get; set; }
     public string? Gender { get; set; }
     public string? NationalIdTrn { get; set; }

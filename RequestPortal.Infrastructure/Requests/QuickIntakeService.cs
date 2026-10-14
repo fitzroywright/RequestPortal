@@ -80,7 +80,8 @@ public sealed class QuickIntakeService : IQuickIntakeService
             intake.CreatedUtc,
             intake.ConvertedToUserId,
             intake.ConvertedUtc,
-            intake.SecondaryTelephone);
+            intake.SecondaryTelephone,
+            intake.VictimCircumstances);
     }
 
     public async Task<QuickIntakeResult> CreateAsync(
@@ -178,7 +179,14 @@ public sealed class QuickIntakeService : IQuickIntakeService
             Town = communityDistrict,
             EmploymentStatus = employmentStatus,
             MonthlyHouseholdIncome = submission.MonthlyIncome,
-            ChildrenUnder18 = submission.HasChildrenUnder18LivingFullTime ? 1 : 0
+            FirstName = firstName,
+            LastName = lastName,
+            AlternativePhoneNumber = secondaryTelephone,
+            HasChildrenUnder18LivingFullTime = submission.HasChildrenUnder18LivingFullTime,
+            HasDisabilityOrSeriousMedicalCondition = submission.HasDisabilityOrSeriousMedicalCondition,
+            AssistancePrograms = programs,
+            VictimCircumstances = victimCircumstances,
+            ChildrenUnder18 = submission.HasChildrenUnder18LivingFullTime ? null : 0
         };
         if (signedInApplicant is null) dbContext.Users.Add(anonymousUser);
 
@@ -222,7 +230,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
             null,
             RequestPriority.Normal,
             location,
-            $"Submitted through anonymous Quick Intake. Current programmes: {programs}. Victim circumstances: {victimCircumstances ?? "(not captured)"}. Applicant is being tracked by telephone until converted to a normal Individual account.");
+            $"Submitted through {(signedInApplicant is null ? "anonymous" : "signed-in")} Quick Intake. Current programmes: {programs}. Victim circumstances: {victimCircumstances ?? "(not captured)"}. {(signedInApplicant is null ? "Applicant is being tracked by telephone until converted to a normal Individual account." : "Applicant is linked to an existing Individual account.")}");
 
         var unit = await dbContext.UnitsOfMeasure
             .AsNoTracking()
@@ -272,7 +280,10 @@ public sealed class QuickIntakeService : IQuickIntakeService
             programs,
             helpCategory,
             now,
-            secondaryTelephone);
+            secondaryTelephone,
+            victimCircumstances);
+        if (signedInApplicant is not null)
+            IntakeProfilePromotion.FillMissing(signedInApplicant, intake);
         if (signedInApplicant is not null)
             intake.MarkConverted(signedInApplicant.Id, signedInApplicant.Id, now);
         dbContext.QuickIntakes.Add(intake);
@@ -394,7 +405,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
         targetUser.Town ??= intake.CommunityDistrict;
         targetUser.EmploymentStatus ??= intake.EmploymentStatus;
         targetUser.MonthlyHouseholdIncome ??= intake.MonthlyIncome;
-        targetUser.ChildrenUnder18 ??= intake.HasChildrenUnder18LivingFullTime ? 1 : 0;
+        IntakeProfilePromotion.FillMissing(targetUser, intake);
 
         targetUser.IndividualProfileUpdateRequired = true;
         targetUser.IndividualProfileUpdateRequiredUtc ??= now;
