@@ -44,6 +44,15 @@ public sealed class SharedIntakeTests
             Assert.Equal(applicantId, request.SubmittedByUserId);
             Assert.Equal(applicantId, intake.ConvertedToUserId);
         }
+        ApplicationUser profile = await database.Db.Users.SingleAsync(token);
+        Assert.Equal("Test", profile.FirstName);
+        Assert.Equal("Applicant", profile.LastName);
+        Assert.Equal("+18765550124", profile.AlternativePhoneNumber);
+        Assert.False(profile.HasChildrenUnder18LivingFullTime);
+        Assert.False(profile.HasDisabilityOrSeriousMedicalCondition);
+        Assert.Equal("None", profile.AssistancePrograms);
+        Assert.Equal("House Fire; Flooding", profile.VictimCircumstances);
+        Assert.Equal("House Fire; Flooding", intake.VictimCircumstances);
         Assert.Equal(1, await database.Db.Users.CountAsync(token));
         Assert.Equal(result, await service.CreateAsync(submission, token, requestId, signedIn ? applicantId : null));
         Assert.Equal(1, await database.Db.AssistanceRequests.CountAsync(token));

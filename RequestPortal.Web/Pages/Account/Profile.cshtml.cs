@@ -1,3 +1,4 @@
+using RequestPortal.Application.Requests;
 using System.ComponentModel.DataAnnotations;
 using Common.Storage;
 using Microsoft.AspNetCore.Authentication;
@@ -91,12 +92,30 @@ public sealed class ProfileModel : PageModel
         ApplicationUser user = await GetUserAsync();
         KeepValidationFor(nameof(ProfileInput));
 
+        if (ProfileInput.AssistancePrograms.Count > 0)
+        {
+            try { ProfileIntakeChoices.NormalizePrograms(ProfileInput.AssistancePrograms); }
+            catch (ArgumentException exception) { ModelState.AddModelError("ProfileInput.AssistancePrograms", exception.Message); }
+        }
+        if (ProfileInput.VictimCircumstances.Count > 0)
+        {
+            try { QuickIntakeVictimCircumstances.Normalize(ProfileInput.VictimCircumstances); }
+            catch (ArgumentException exception) { ModelState.AddModelError("ProfileInput.VictimCircumstances", exception.Message); }
+        }
         if (!ModelState.IsValid)
         {
             await LoadAsync(user, preserveInput: true);
             return Page();
         }
 
+        user.FirstName = Normalize(ProfileInput.FirstName);
+        user.LastName = Normalize(ProfileInput.LastName);
+        user.HasChildrenUnder18LivingFullTime = ProfileInput.HasChildrenUnder18LivingFullTime;
+        user.HasDisabilityOrSeriousMedicalCondition = ProfileInput.HasDisabilityOrSeriousMedicalCondition;
+        user.AssistancePrograms = ProfileInput.AssistancePrograms.Count == 0 ? null
+            : ProfileIntakeChoices.NormalizePrograms(ProfileInput.AssistancePrograms);
+        user.VictimCircumstances = ProfileInput.VictimCircumstances.Count == 0 ? null
+            : QuickIntakeVictimCircumstances.Normalize(ProfileInput.VictimCircumstances);
         user.DisplayName = ProfileInput.DisplayName.Trim();
         user.Email = ProfileInput.Email.Trim();
         user.PhoneNumber = string.IsNullOrWhiteSpace(ProfileInput.PhoneNumber)
@@ -341,6 +360,12 @@ public sealed class ProfileModel : PageModel
         {
             ProfileInput = new PersonalProfileInput
             {
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                HasChildrenUnder18LivingFullTime = user.HasChildrenUnder18LivingFullTime,
+                HasDisabilityOrSeriousMedicalCondition = user.HasDisabilityOrSeriousMedicalCondition,
+                AssistancePrograms = ProfileIntakeChoices.Parse(user.AssistancePrograms, '|'),
+                VictimCircumstances = ProfileIntakeChoices.Parse(user.VictimCircumstances, ';'),
                 DisplayName = user.DisplayName,
                 Email = user.Email ?? string.Empty,
                 PhoneNumber = user.PhoneNumber,
@@ -433,6 +458,13 @@ public sealed class ProfileModel : PageModel
 
     public sealed class PersonalProfileInput
     {
+        [StringLength(150)] public string? FirstName { get; set; }
+        [StringLength(150)] public string? LastName { get; set; }
+        public bool? HasChildrenUnder18LivingFullTime { get; set; }
+        public bool? HasDisabilityOrSeriousMedicalCondition { get; set; }
+        public List<string> AssistancePrograms { get; set; } = new();
+        public List<string> VictimCircumstances { get; set; } = new();
+
         [Required, StringLength(250, MinimumLength = 2)]
         public string DisplayName { get; set; } = string.Empty;
 

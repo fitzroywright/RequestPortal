@@ -61,6 +61,16 @@
 
                         <div class="grid-2">
                             <div class="field">
+                                <label asp-for="ProfileInput.FirstName">First name</label>
+                                <input asp-for="ProfileInput.FirstName" />
+                                <span asp-validation-for="ProfileInput.FirstName" class="validation"></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="ProfileInput.LastName">Last name</label>
+                                <input asp-for="ProfileInput.LastName" />
+                                <span asp-validation-for="ProfileInput.LastName" class="validation"></span>
+                            </div>
+                            <div class="field">
                                 <label asp-for="ProfileInput.DisplayName">Full name</label>
                                 <input asp-for="ProfileInput.DisplayName" />
                                 <span asp-validation-for="ProfileInput.DisplayName" class="validation"></span>
@@ -262,6 +272,36 @@
                         <span>Registered identity</span>
                         <strong>@Model.RegisteredIdentity</strong>
                     </div>
+                    <div class="profile-intake-section">
+                        <div class="profile-intake-heading"><strong>Intake information</strong></div>
+                        <div class="field">
+                            <label asp-for="ProfileInput.HasChildrenUnder18LivingFullTime">Do you have any children under 18 years of age that live with you full time?</label>
+                            <select asp-for="ProfileInput.HasChildrenUnder18LivingFullTime"><option value="">Not provided</option><option value="true">Yes</option><option value="false">No</option></select>
+                            <span asp-validation-for="ProfileInput.HasChildrenUnder18LivingFullTime" class="validation"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="ProfileInput.HasDisabilityOrSeriousMedicalCondition">Do you have a disability or serious medical condition?</label>
+                            <select asp-for="ProfileInput.HasDisabilityOrSeriousMedicalCondition"><option value="">Not provided</option><option value="true">Yes</option><option value="false">No</option></select>
+                            <span asp-validation-for="ProfileInput.HasDisabilityOrSeriousMedicalCondition" class="validation"></span>
+                        </div>
+                        <fieldset class="profile-intake-choices">
+                            <legend>Do you currently participate in any of the following programs? Select all that apply.</legend>
+                            @foreach (string program in RequestPortal.Application.Requests.ProfileIntakeChoices.Programs)
+                            {
+                                <label><input type="checkbox" name="ProfileInput.AssistancePrograms" value="@program" checked="@Model.ProfileInput.AssistancePrograms.Contains(program)" /> @program</label>
+                            }
+                            <span asp-validation-for="ProfileInput.AssistancePrograms" class="validation"></span>
+                        </fieldset>
+                        <fieldset class="profile-intake-choices">
+                            <legend>Are you a victim of any of the following? Select all that apply.</legend>
+                            @foreach (string circumstance in RequestPortal.Application.Requests.QuickIntakeVictimCircumstances.Options)
+                            {
+                                <label><input type="checkbox" name="ProfileInput.VictimCircumstances" value="@circumstance" checked="@Model.ProfileInput.VictimCircumstances.Contains(circumstance)" /> @circumstance</label>
+                            }
+                            <span asp-validation-for="ProfileInput.VictimCircumstances" class="validation"></span>
+                        </fieldset>
+                    </div>
+
                     <button class="button button-small" type="submit">Save individual profile</button>
                 </form>
             </section>
@@ -404,6 +444,8 @@
 </section>
 
 <style>
+.profile-intake-choices{display:grid;gap:8px;border:1px solid #dbe5ec;border-radius:8px;padding:12px;margin-top:12px}.profile-intake-choices label{display:flex;align-items:center;gap:8px}.profile-intake-choices input[type=checkbox]{width:18px!important;height:18px;min-height:18px;flex:0 0 18px;margin:0}
+
 .individual-intake-form{display:grid;gap:16px}.profile-intake-section{display:grid;gap:10px;padding-top:4px}.profile-intake-section+.profile-intake-section{padding-top:14px;border-top:1px solid #e2e7ea}.profile-intake-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.profile-intake-heading strong{color:#18364d}.profile-intake-heading small{color:#68757f}
 </style>
 

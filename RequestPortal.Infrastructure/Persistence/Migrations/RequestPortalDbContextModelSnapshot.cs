@@ -282,6 +282,8 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RequestPortal.Domain.Requests.QuickIntakeRecord", b =>
                 {
+                    b.Property<string>("VictimCircumstances").HasColumnType("text");
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
@@ -1675,6 +1677,13 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RequestPortal.Infrastructure.Identity.ApplicationUser", b =>
                 {
+                    b.Property<string>("FirstName").HasColumnType("text");
+                    b.Property<string>("LastName").HasColumnType("text");
+                    b.Property<bool?>("HasChildrenUnder18LivingFullTime").HasColumnType("boolean");
+                    b.Property<bool?>("HasDisabilityOrSeriousMedicalCondition").HasColumnType("boolean");
+                    b.Property<string>("AssistancePrograms").HasColumnType("text");
+                    b.Property<string>("VictimCircumstances").HasColumnType("text");
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
