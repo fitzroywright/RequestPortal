@@ -22,7 +22,8 @@ public sealed record QuickIntakeSubmission(
     bool HasDisabilityOrSeriousMedicalCondition,
     IReadOnlyList<string> AssistancePrograms,
     string HelpCategory,
-    string? SecondaryTelephone = null);
+    string? SecondaryTelephone = null,
+    IReadOnlyList<string>? VictimCircumstances = null);
 
 public sealed record QuickIntakeResult(
     Guid RequestId,
@@ -64,7 +65,8 @@ public interface IQuickIntakeService
     Task<QuickIntakeResult> CreateAsync(
         QuickIntakeSubmission submission,
         CancellationToken cancellationToken = default,
-        Guid? requestId = null);
+        Guid? requestId = null,
+        Guid? applicantUserId = null);
 
     Task<Guid> GetAnonymousUploaderIdAsync(Guid requestId, CancellationToken cancellationToken = default);
 

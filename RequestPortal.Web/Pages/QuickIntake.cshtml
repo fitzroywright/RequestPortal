@@ -30,7 +30,7 @@
                 <header class="quick-intake-header">
                     <div>
                         <h1>Quick Intake Form</h1>
-                        <p>No account needed. All fields are required except secondary phone number, Email and supporting attachments.</p>
+                        <p>@(User.Identity?.IsAuthenticated == true ? "Your request will be linked to your account." : "No account needed.") All fields are required except secondary phone number, Email and supporting attachments.</p>
                     </div>
                 </header>
 
@@ -95,6 +95,16 @@
                         <select asp-for="Input.HasDisabilityOrSeriousMedicalCondition"><option value="">Select</option><option>Yes</option><option>No</option></select>
                         <span asp-validation-for="Input.HasDisabilityOrSeriousMedicalCondition"></span>
                     </label>
+
+                    <fieldset class="choice-group">
+                        <legend>Are you a victim of any of the following? <b>*</b></legend>
+                        <p>Select all that apply, or select None of the above.</p>
+                        @foreach (string circumstance in RequestPortal.Application.Requests.QuickIntakeVictimCircumstances.Options)
+                        {
+                            <label class="check-option"><input type="checkbox" name="Input.VictimCircumstances" value="@circumstance" checked="@Model.Input.VictimCircumstances.Contains(circumstance)" /><span>@circumstance</span></label>
+                        }
+                        <span asp-validation-for="Input.VictimCircumstances"></span>
+                    </fieldset>
 
                     <h2>Current Assistance</h2>
                     <fieldset class="choice-group">

@@ -86,7 +86,8 @@ public sealed class QuickIntakeService : IQuickIntakeService
     public async Task<QuickIntakeResult> CreateAsync(
         QuickIntakeSubmission submission,
         CancellationToken cancellationToken = default,
-        Guid? requestId = null)
+        Guid? requestId = null,
+        Guid? applicantUserId = null)
     {
         ArgumentNullException.ThrowIfNull(submission);
         if (requestId.HasValue && requestId.Value == Guid.Empty)
@@ -95,10 +96,12 @@ public sealed class QuickIntakeService : IQuickIntakeService
         {
             var existing = await dbContext.QuickIntakes.AsNoTracking()
                 .Where(item => item.RequestId == requestId.Value)
-                .Select(item => new { item.RequestId, item.MobileNumber })
+                .Select(item => new { item.RequestId, item.MobileNumber, item.ConvertedToUserId })
                 .SingleOrDefaultAsync(cancellationToken);
             if (existing is not null)
             {
+                if (existing.ConvertedToUserId != applicantUserId)
+                    throw new ArgumentException("This submission belongs to a different applicant.");
                 string reference = await dbContext.AssistanceRequests.AsNoTracking()
                     .Where(item => item.Id == existing.RequestId)
                     .Select(item => item.PublicReference)
@@ -135,6 +138,9 @@ public sealed class QuickIntakeService : IQuickIntakeService
         if (submission.MonthlyIncome < 0)
             throw new ArgumentException("Monthly income cannot be negative.");
 
+        string? victimCircumstances = submission.VictimCircumstances is null
+            ? null
+            : QuickIntakeVictimCircumstances.Normalize(submission.VictimCircumstances);
         string programs = NormalizePrograms(submission.AssistancePrograms);
         string helpCategory = RequireAllowed(submission.HelpCategory, "What do you need help with today", AllowedHelpCategories);
         string displayName = $"{firstName} {lastName}";
@@ -143,7 +149,11 @@ public sealed class QuickIntakeService : IQuickIntakeService
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        Guid anonymousUserId = Guid.NewGuid();
+        ApplicationUser? signedInApplicant = applicantUserId.HasValue
+            ? await dbContext.Users.SingleOrDefaultAsync(item => item.Id == applicantUserId.Value, cancellationToken)
+                ?? throw new ArgumentException("The signed-in applicant could not be found.")
+            : null;
+        Guid anonymousUserId = signedInApplicant?.Id ?? Guid.NewGuid();
         string internalUserName = $"quick-{anonymousUserId:N}@requestportal.local";
         ApplicationUser anonymousUser = new()
         {
@@ -170,26 +180,28 @@ public sealed class QuickIntakeService : IQuickIntakeService
             MonthlyHouseholdIncome = submission.MonthlyIncome,
             ChildrenUnder18 = submission.HasChildrenUnder18LivingFullTime ? 1 : 0
         };
-        dbContext.Users.Add(anonymousUser);
+        if (signedInApplicant is null) dbContext.Users.Add(anonymousUser);
 
-        Organization individualContext = new(
-            Guid.NewGuid(),
-            $"Quick Intake - {displayName}",
-            "JM",
-            anonymousUserId,
-            now);
-        individualContext.UpdateProfile(
-            null,
-            "IndividualContext",
-            location,
-            mobile,
-            email,
-            displayName,
-            null);
+        Organization? existingContext = signedInApplicant is null ? null
+            : await dbContext.Organizations.Include(item => item.Memberships)
+                .Where(item => item.OrganizationType == "IndividualContext"
+                    && item.RegisteredByUserId == signedInApplicant.Id
+                    && item.Status == OrganizationStatus.Approved)
+                .OrderBy(item => item.CreatedUtc).FirstOrDefaultAsync(cancellationToken);
+        if (existingContext is not null && !existingContext.Memberships.Any(item =>
+            item.UserId == anonymousUserId && item.Status == MembershipStatus.Approved))
+            throw new InvalidOperationException("Your individual request context does not have an active membership.");
 
-        individualContext.RequestMembership(Guid.NewGuid(), anonymousUserId, now);
-        dbContext.Organizations.Add(individualContext);
-        individualContext.Approve(anonymousUserId, now);
+        Organization individualContext = existingContext ?? new Organization(
+            Guid.NewGuid(), signedInApplicant is null ? $"Quick Intake - {displayName}" : displayName,
+            "JM", anonymousUserId, now);
+        if (existingContext is null)
+        {
+            individualContext.UpdateProfile(null, "IndividualContext", location, mobile, email, displayName, null);
+            individualContext.RequestMembership(Guid.NewGuid(), anonymousUserId, now);
+            dbContext.Organizations.Add(individualContext);
+            individualContext.Approve(anonymousUserId, now);
+        }
 
         long number = await dbContext.Database
             .SqlQueryRaw<long>("SELECT nextval('request_code_sequence') AS \"Value\"")
@@ -210,7 +222,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
             null,
             RequestPriority.Normal,
             location,
-            $"Submitted through anonymous Quick Intake. Current programmes: {programs}. Applicant is being tracked by telephone until converted to a normal Individual account.");
+            $"Submitted through anonymous Quick Intake. Current programmes: {programs}. Victim circumstances: {victimCircumstances ?? "(not captured)"}. Applicant is being tracked by telephone until converted to a normal Individual account.");
 
         var unit = await dbContext.UnitsOfMeasure
             .AsNoTracking()
@@ -232,14 +244,13 @@ public sealed class QuickIntakeService : IQuickIntakeService
         request.Submit(anonymousUserId, now);
         dbContext.AssistanceRequests.Add(request);
 
-        dbContext.NotificationPreferences.Add(new NotificationPreference(
-            Guid.NewGuid(),
-            anonymousUserId,
-            NotificationChannel.WhatsApp,
-            mobile,
-            enabled: true));
+        NotificationPreference? whatsapp = await dbContext.NotificationPreferences
+            .SingleOrDefaultAsync(item => item.UserId == anonymousUserId && item.Channel == NotificationChannel.WhatsApp, cancellationToken);
+        if (whatsapp is null)
+            dbContext.NotificationPreferences.Add(new NotificationPreference(
+                Guid.NewGuid(), anonymousUserId, NotificationChannel.WhatsApp, mobile, enabled: true));
 
-        dbContext.QuickIntakes.Add(new QuickIntakeRecord(
+        QuickIntakeRecord intake = new QuickIntakeRecord(
             Guid.NewGuid(),
             request.Id,
             anonymousUserId,
@@ -261,7 +272,10 @@ public sealed class QuickIntakeService : IQuickIntakeService
             programs,
             helpCategory,
             now,
-            secondaryTelephone));
+            secondaryTelephone);
+        if (signedInApplicant is not null)
+            intake.MarkConverted(signedInApplicant.Id, signedInApplicant.Id, now);
+        dbContext.QuickIntakes.Add(intake);
 
         RequestSubmittedMessage submitted = new(
             Guid.NewGuid(),

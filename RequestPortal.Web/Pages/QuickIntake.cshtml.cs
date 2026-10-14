@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Identity;
+using RequestPortal.Infrastructure.Identity;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using RequestPortal.Application.Documents;
@@ -11,11 +13,13 @@ public sealed class QuickIntakeModel : PageModel
 {
     private readonly IQuickIntakeService quickIntakeService;
     private readonly IDocumentService documentService;
+    private readonly UserManager<ApplicationUser> userManager;
 
-    public QuickIntakeModel(IQuickIntakeService quickIntakeService, IDocumentService documentService)
+    public QuickIntakeModel(IQuickIntakeService quickIntakeService, IDocumentService documentService, UserManager<ApplicationUser> userManager)
     {
         this.quickIntakeService = quickIntakeService;
         this.documentService = documentService;
+        this.userManager = userManager;
     }
 
     [BindProperty]
@@ -32,7 +36,33 @@ public sealed class QuickIntakeModel : PageModel
     public string? RequestReference { get; private set; }
     public string? Telephone { get; private set; }
 
-    public void OnGet() { }
+    public async Task OnGetAsync()
+    {
+        ApplicationUser? user = User.Identity?.IsAuthenticated == true
+            ? await userManager.GetUserAsync(User) : null;
+        if (user is null) return;
+        string[] name = (user.DisplayName ?? "").Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        Input.FirstName = name.FirstOrDefault() ?? "";
+        Input.LastName = name.Length > 1 ? name[1] : "";
+        Input.DateOfBirth = user.DateOfBirth;
+        Input.Gender = user.Gender ?? "";
+        Input.MaritalStatus = user.MaritalStatus ?? "";
+        Input.Telephone = user.PhoneNumber ?? "";
+        Input.Email = user.Email;
+        Input.StreetAddress = user.HomeAddress ?? "";
+        Input.CommunityDistrict = user.DistrictArea ?? user.Town ?? "";
+        Input.Parish = user.Parish ?? "";
+        Input.EmploymentStatus = user.EmploymentStatus ?? "";
+        Input.MonthlyIncome = user.MonthlyHouseholdIncome ?? 0;
+    }
+
+    private async Task<Guid?> GetApplicantIdAsync()
+    {
+        if (User.Identity?.IsAuthenticated != true) return null;
+        ApplicationUser user = await userManager.GetUserAsync(User)
+            ?? throw new InvalidOperationException("The signed-in applicant could not be resolved.");
+        return user.Id;
+    }
 
     public async Task<IActionResult> OnPostAsync()
     {
@@ -53,6 +83,11 @@ public sealed class QuickIntakeModel : PageModel
         if (files.Length > 5 || files.Any(file => file.Length > 10 * 1024 * 1024))
             ModelState.AddModelError(nameof(Attachments), "Attach up to 5 files, each no larger than 10 MB.");
 
+        try { QuickIntakeVictimCircumstances.Normalize(Input.VictimCircumstances); }
+        catch (ArgumentException exception)
+        {
+            ModelState.AddModelError("Input.VictimCircumstances", exception.Message);
+        }
         if (!ModelState.IsValid)
             return Page();
 
@@ -75,8 +110,8 @@ public sealed class QuickIntakeModel : PageModel
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms,
-                    Input.HelpCategory, Input.SecondaryTelephone),
-                HttpContext.RequestAborted);
+                    Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
+                HttpContext.RequestAborted, applicantUserId: await GetApplicantIdAsync());
 
             RequestReference = result.PublicReference;
             if (files.Length > 0)
@@ -122,6 +157,11 @@ public sealed class QuickIntakeModel : PageModel
         if (Input.AssistancePrograms.Count == 0 ||
             (Input.AssistancePrograms.Contains("None", StringComparer.OrdinalIgnoreCase) && Input.AssistancePrograms.Count > 1))
             ModelState.AddModelError("Input.AssistancePrograms", "Choose valid assistance programmes.");
+        try { QuickIntakeVictimCircumstances.Normalize(Input.VictimCircumstances); }
+        catch (ArgumentException exception)
+        {
+            ModelState.AddModelError("Input.VictimCircumstances", exception.Message);
+        }
         if (!ModelState.IsValid)
             return BadRequest(new { error = "Please correct the required fields." });
         try
@@ -133,8 +173,8 @@ public sealed class QuickIntakeModel : PageModel
                     Input.EmploymentStatus, Input.MonthlyIncome,
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
-                    Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone),
-                HttpContext.RequestAborted, SubmissionId);
+                    Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
+                HttpContext.RequestAborted, SubmissionId, await GetApplicantIdAsync());
             return new JsonResult(new { requestId = result.RequestId, reference = result.PublicReference });
         }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
@@ -210,6 +250,8 @@ public sealed class QuickIntakeModel : PageModel
 
         [Required, RegularExpression("Yes|No")]
         public string HasDisabilityOrSeriousMedicalCondition { get; set; } = string.Empty;
+
+        public List<string> VictimCircumstances { get; set; } = new();
 
         public List<string> AssistancePrograms { get; set; } = new();
 
