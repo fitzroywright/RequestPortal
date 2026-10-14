@@ -132,3 +132,9 @@ public sealed record PortalMessageNotificationRequestedMessage(
     string SenderName,
     string Subject,
     IReadOnlyCollection<Guid> RecipientUserIds) : IMessage;
+
+public sealed record FfpManagerClientConfirmationRequestedMessage(
+    Guid MessageId, DateTimeOffset OccurredUtc, Guid RequestId, string ApplicationNumber) : IMessage;
+
+public sealed record FfpManagerStaffEmailRequestedMessage(
+    Guid MessageId, DateTimeOffset OccurredUtc, Guid RequestId, string ApplicationNumber) : IMessage;

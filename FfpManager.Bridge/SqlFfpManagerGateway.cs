@@ -24,13 +24,19 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         ExistingApplication? existing = await FindByPortalRequestIdAsync(connection, transaction, submission.PortalRequestId, cancellationToken);
         if (existing is not null)
         {
+            string existingReference = await FfpManagerReferenceNumberGenerator.EnsureExistingAsync(
+                connection, transaction, existing.Id, existing.ReferenceNo,
+                existing.DateCreated ?? submission.SubmittedUtc, submission, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return new ExternalApplicationReference(
                 existing.Id.ToString(),
-                existing.ReferenceNo ?? existing.Code ?? existing.Id.ToString(),
+                existingReference,
                 existing.DateCreated ?? submission.SubmittedUtc,
                 AlreadyExisted: true);
         }
+
+        var generatedReference = await FfpManagerReferenceNumberGenerator.GenerateAsync(
+            connection, transaction, submission.Parish, submission.SubmittedUtc, cancellationToken);
 
         long? statusId = string.IsNullOrWhiteSpace(options.InitialApplicationStatus)
             ? null
@@ -41,20 +47,20 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             (
                 Code, ReferenceNo, Name, ContactPerson, MainContactNo, ApplicationDate, DateReceived,
                 Comments, Programme, Requirements, ApplicationStatus, UserName, DateCreated, DateUpdated,
-                AuditID, CreatedBy, ExternalRequestId
+                AuditID, CreatedBy, ExternalRequestId, Parish, DocumentSource
             )
             OUTPUT INSERTED.ID
             VALUES
             (
                 @Code, @ReferenceNo, @Name, @ContactPerson, @MainContactNo, @ApplicationDate, @DateReceived,
                 @Comments, @Programme, @Requirements, @ApplicationStatus, @UserName, @DateCreated, @DateUpdated,
-                @AuditID, @CreatedBy, @ExternalRequestId
+                @AuditID, @CreatedBy, @ExternalRequestId, @Parish, @DocumentSource
             );
             """;
 
         await using SqlCommand command = new(insertApplication, connection, transaction);
         AddNullable(command, "@Code", submission.PublicReference, SqlDbType.NVarChar, 500);
-        AddNullable(command, "@ReferenceNo", submission.PublicReference, SqlDbType.NVarChar, 500);
+        AddNullable(command, "@ReferenceNo", generatedReference.ReferenceNo, SqlDbType.NVarChar, 500);
         AddNullable(command, "@Name", submission.OrganizationName, SqlDbType.VarChar, 400);
         AddNullable(command, "@ContactPerson", submission.OrganizationName, SqlDbType.NVarChar, 255);
         AddNullable(command, "@MainContactNo", submission.OrganizationPhone, SqlDbType.NVarChar, 255);
@@ -71,6 +77,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
         command.Parameters.Add("@ExternalRequestId", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
 
+        command.Parameters.Add("@Parish", SqlDbType.BigInt).Value = generatedReference.ParishId;
+        AddNullable(command, "@DocumentSource", submission.DocumentSource, SqlDbType.NVarChar, 255);
         object? inserted = await command.ExecuteScalarAsync(cancellationToken);
         long applicationId = Convert.ToInt64(inserted, System.Globalization.CultureInfo.InvariantCulture);
 
@@ -82,7 +90,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         await transaction.CommitAsync(cancellationToken);
         return new ExternalApplicationReference(
             applicationId.ToString(),
-            submission.PublicReference,
+            generatedReference.ReferenceNo,
             submission.SubmittedUtc,
             AlreadyExisted: false);
     }

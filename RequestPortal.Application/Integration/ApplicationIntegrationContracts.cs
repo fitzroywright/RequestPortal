@@ -30,7 +30,9 @@ public sealed record ExternalApplicationSubmission(
     string? Location,
     string? Circumstances,
     IReadOnlyList<ExternalApplicationItem> Items,
-    IReadOnlyList<ExternalArtifactDescriptor> Artifacts);
+    IReadOnlyList<ExternalArtifactDescriptor> Artifacts,
+    string? Parish = null,
+    string DocumentSource = "Request Portal");
 
 public sealed record ExternalApplicationReference(string ApplicationId, string? ApplicationNumber, DateTimeOffset AcceptedUtc, bool AlreadyExisted = false);
 public sealed record ExternalApplicationStatus(string ApplicationId, string StatusCode, string StatusText, DateTimeOffset ChangedUtc, string? Detail = null, bool IsTerminal = false);
