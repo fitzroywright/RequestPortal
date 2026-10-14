@@ -92,12 +92,10 @@ public sealed class ProfileModel : PageModel
         ApplicationUser user = await GetUserAsync();
         KeepValidationFor(nameof(ProfileInput));
 
-        if (ProfileInput.AssistancePrograms.Count > 0)
         {
             try { ProfileIntakeChoices.NormalizePrograms(ProfileInput.AssistancePrograms); }
             catch (ArgumentException exception) { ModelState.AddModelError("ProfileInput.AssistancePrograms", exception.Message); }
         }
-        if (ProfileInput.VictimCircumstances.Count > 0)
         {
             try { QuickIntakeVictimCircumstances.Normalize(ProfileInput.VictimCircumstances); }
             catch (ArgumentException exception) { ModelState.AddModelError("ProfileInput.VictimCircumstances", exception.Message); }

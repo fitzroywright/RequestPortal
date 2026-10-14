@@ -285,7 +285,7 @@
                             <span asp-validation-for="ProfileInput.HasDisabilityOrSeriousMedicalCondition" class="validation"></span>
                         </div>
                         <fieldset class="profile-intake-choices">
-                            <legend>Do you currently participate in any of the following programs? Select all that apply.</legend>
+                            <legend>Do you currently participate in any of the following programs? Select all that apply. *</legend>
                             @foreach (string program in RequestPortal.Application.Requests.ProfileIntakeChoices.Programs)
                             {
                                 <label><input type="checkbox" name="ProfileInput.AssistancePrograms" value="@program" checked="@Model.ProfileInput.AssistancePrograms.Contains(program)" /> @program</label>
@@ -293,7 +293,7 @@
                             <span asp-validation-for="ProfileInput.AssistancePrograms" class="validation"></span>
                         </fieldset>
                         <fieldset class="profile-intake-choices">
-                            <legend>Are you a victim of any of the following? Select all that apply.</legend>
+                            <legend>Are you a victim of any of the following? Select all that apply. *</legend>
                             @foreach (string circumstance in RequestPortal.Application.Requests.QuickIntakeVictimCircumstances.Options)
                             {
                                 <label><input type="checkbox" name="ProfileInput.VictimCircumstances" value="@circumstance" checked="@Model.ProfileInput.VictimCircumstances.Contains(circumstance)" /> @circumstance</label>
@@ -504,3 +504,4 @@
 .profile-photo-remove{margin-top:2px}
 @@media(max-width:620px){.profile-photo-row{grid-template-columns:68px minmax(0,1fr)}.profile-photo-preview{width:68px;height:68px}.profile-photo-actions{align-items:stretch;flex-direction:column}.profile-photo-actions .button{align-self:start}}
 </style>
+<script src="~/js/intake-exclusive-none.js" asp-append-version="true" defer></script>
