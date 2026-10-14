@@ -19,7 +19,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
 {
     private static readonly HashSet<string> AllowedGenders = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Male", "Female", "Prefer not to say"
+        "Male", "Female", "Prefer not to Say"
     };
 
     private static readonly HashSet<string> AllowedMaritalStatuses = new(StringComparer.OrdinalIgnoreCase)

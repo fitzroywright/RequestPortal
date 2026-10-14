@@ -46,7 +46,7 @@ public sealed class QuickIntakeModel : PageModel
         Input.LastName = name.Length > 1 ? name[1] : "";
         Input.DateOfBirth = user.DateOfBirth;
         Input.Gender = string.Equals(user.Gender, "Non-Binary", StringComparison.OrdinalIgnoreCase)
-            ? "Prefer not to say" : user.Gender ?? "";
+            ? "Prefer not to Say" : user.Gender ?? "";
         Input.MaritalStatus = user.MaritalStatus ?? "";
         Input.Telephone = user.PhoneNumber ?? "";
         Input.Email = user.Email;
@@ -216,7 +216,7 @@ public sealed class QuickIntakeModel : PageModel
 
         public DateOnly? DateOfBirth { get; set; }
 
-        [Required, RegularExpression("Male|Female|Prefer not to say")]
+        [Required, RegularExpression("Male|Female|Prefer not to Say")]
         public string Gender { get; set; } = string.Empty;
 
         [Required, RegularExpression("Single|Married|Divorced|Widowed")]
