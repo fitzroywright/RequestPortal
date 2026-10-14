@@ -132,3 +132,9 @@ public sealed record PortalMessageNotificationRequestedMessage(
     string SenderName,
     string Subject,
     IReadOnlyCollection<Guid> RecipientUserIds) : IMessage;
+
+public sealed record QuickIntakeFfpEmailRequestedMessage(
+    Guid MessageId,
+    DateTimeOffset OccurredUtc,
+    Guid RequestId,
+    string ApplicationNumber) : IMessage;

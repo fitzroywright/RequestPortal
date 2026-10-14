@@ -278,6 +278,101 @@ public sealed class NotificationWorkflowTests
             history.Select(item => item.Destination).ToArray());
     }
 
+    [Theory]
+    [InlineData("KIN/26/GR/1234", true)]
+    [InlineData("RP-26-00123", false)]
+    [InlineData(null, false)]
+    public async Task QuickIntake_FfpEmailWaitsForFfpReference_AndUsesSeparateOutbox(
+        string? applicationNumber, bool hasFfpReference)
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(token);
+        ApplicationUser applicant = CreateUser("applicant@example.com");
+        database.Db.Users.Add(applicant);
+        Organization organization = CreateApprovedOrganization(applicant.Id, "Quick Intake - Test Applicant");
+        database.Db.Organizations.Add(organization);
+        AssistanceRequest request = new(Guid.NewGuid(), "RP-26-00123", organization.Id, applicant.Id, Now);
+        request.SetSummary("Food");
+        request.Submit(applicant.Id, Now);
+        database.Db.AssistanceRequests.Add(request);
+        database.Db.QuickIntakes.Add(new QuickIntakeRecord(
+            Guid.NewGuid(), request.Id, applicant.Id, organization.Id,
+            "Test", "Applicant", new DateOnly(1980, 1, 1), "Male", "Single",
+            "+18765550123", null, "1 Test Road", "Kingston", "Kingston",
+            "Unemployed", 0, false, false, "None", "Food", Now));
+        FfpManagerSubmissionRequestedMessage submission = new(Guid.NewGuid(), Now, request.Id);
+        database.Db.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = submission.MessageId,
+            MessageType = typeof(FfpManagerSubmissionRequestedMessage).FullName!,
+            Payload = JsonSerializer.Serialize(submission),
+            OccurredUtc = Now
+        });
+        await database.Db.SaveChangesAsync(token);
+
+        RecordingNotificationSender sender = new();
+        NotificationOptions options = new() { Enabled = true, FfpEmailAddress = "intake@example.com" };
+        OutboxDispatcher dispatcher = new(
+            database.Db, sender, new DisabledFfpManagerIntegrationService
+            {
+                SubmissionReference = new ExternalApplicationReference("1234", applicationNumber, Now)
+            },
+            Options.Create(new FfpManagerBridgeOptions { Enabled = true }),
+            Options.Create(options), NullLogger<OutboxDispatcher>.Instance,
+            new NullOperationsFlowPublisher(),
+            new RequestPortal.Infrastructure.Messages.PortalMessageService(
+                database.Db, new NullRealtimeNotifier(), new DisabledBridgeClient(),
+                Options.Create(new FfpManagerBridgeOptions { Enabled = false })));
+
+        int processed = await dispatcher.DispatchBatchAsync(cancellationToken: token);
+        Assert.Empty(sender.Notifications);
+        if (!hasFfpReference)
+        {
+            Assert.Equal(0, processed);
+            Assert.Null(database.Db.OutboxMessages.Single().ProcessedUtc);
+            Assert.Contains("waiting for the reference number", database.Db.OutboxMessages.Single().LastError);
+            return;
+        }
+
+        Assert.Equal(1, processed);
+        OutboxMessage emailOutbox = Assert.Single(database.Db.OutboxMessages,
+            item => item.MessageType.EndsWith(nameof(QuickIntakeFfpEmailRequestedMessage)));
+        Assert.Null(emailOutbox.ProcessedUtc);
+
+        // Missing mailbox remains retryable; it must not repeat the bridge operation.
+        options.FfpEmailAddress = "";
+        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Empty(sender.Notifications);
+        Assert.Null(emailOutbox.ProcessedUtc);
+        Assert.Contains("Notifications:FfpEmailAddress", emailOutbox.LastError);
+
+        options.FfpEmailAddress = "intake@example.com";
+        emailOutbox.AttemptCount = 0;
+        emailOutbox.LastError = null;
+        await database.Db.SaveChangesAsync(token);
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        NotificationEnvelope email = Assert.Single(sender.Notifications);
+        Assert.Equal("intake@example.com", email.Recipient);
+        Assert.Equal(NotificationTransport.Email, email.Transport);
+        Assert.Contains(applicationNumber!, email.Subject);
+        Assert.Contains($"FFP Manager reference number: {applicationNumber}", email.Body);
+        Assert.Contains($"Request Portal reference: {request.PublicReference}", email.Body);
+        Assert.Contains("Test Applicant", email.Body);
+        Assert.Equal(NotificationDeliveryStatus.Sent, Assert.Single(database.Db.NotificationHistory).Status);
+        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Single(sender.Notifications);
+    }
+
+    private sealed class RecordingNotificationSender : RequestPortal.Common.Messaging.INotificationSender
+    {
+        public List<NotificationEnvelope> Notifications { get; } = [];
+        public Task SendAsync(NotificationEnvelope notification, CancellationToken cancellationToken = default)
+        {
+            Notifications.Add(notification);
+            return Task.CompletedTask;
+        }
+    }
+
     private static NotificationPreferenceService CreatePreferenceService(
         RequestPortalDbContext dbContext)
     {
@@ -387,10 +482,13 @@ public sealed class NotificationWorkflowTests
 
     private sealed class DisabledFfpManagerIntegrationService : IExternalApplicationIntegrationService
     {
+        public ExternalApplicationReference? SubmissionReference { get; init; }
         public Task<ExternalApplicationReference> SubmitRequestAsync(
             Guid requestId,
             CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("FFP Manager is disabled for this test.");
+            => SubmissionReference is not null
+                ? Task.FromResult(SubmissionReference)
+                : throw new InvalidOperationException("FFP Manager is disabled for this test.");
 
         public Task<ExternalApplicationStatus?> RefreshStatusAsync(
             Guid requestId,
