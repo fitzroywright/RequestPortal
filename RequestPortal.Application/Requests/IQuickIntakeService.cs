@@ -22,7 +22,8 @@ public sealed record QuickIntakeSubmission(
     bool HasDisabilityOrSeriousMedicalCondition,
     IReadOnlyList<string> AssistancePrograms,
     string HelpCategory,
-    string? SecondaryTelephone = null);
+    string? SecondaryTelephone = null,
+    IReadOnlyList<string>? VictimCircumstances = null);
 
 public sealed record QuickIntakeResult(
     Guid RequestId,

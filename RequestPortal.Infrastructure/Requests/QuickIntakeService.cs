@@ -135,6 +135,9 @@ public sealed class QuickIntakeService : IQuickIntakeService
         if (submission.MonthlyIncome < 0)
             throw new ArgumentException("Monthly income cannot be negative.");
 
+        string? victimCircumstances = submission.VictimCircumstances is null
+            ? null
+            : QuickIntakeVictimCircumstances.Normalize(submission.VictimCircumstances);
         string programs = NormalizePrograms(submission.AssistancePrograms);
         string helpCategory = RequireAllowed(submission.HelpCategory, "What do you need help with today", AllowedHelpCategories);
         string displayName = $"{firstName} {lastName}";
@@ -210,7 +213,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
             null,
             RequestPriority.Normal,
             location,
-            $"Submitted through anonymous Quick Intake. Current programmes: {programs}. Applicant is being tracked by telephone until converted to a normal Individual account.");
+            $"Submitted through anonymous Quick Intake. Current programmes: {programs}. Victim circumstances: {victimCircumstances ?? "(not captured)"}. Applicant is being tracked by telephone until converted to a normal Individual account.");
 
         var unit = await dbContext.UnitsOfMeasure
             .AsNoTracking()

@@ -53,6 +53,11 @@ public sealed class QuickIntakeModel : PageModel
         if (files.Length > 5 || files.Any(file => file.Length > 10 * 1024 * 1024))
             ModelState.AddModelError(nameof(Attachments), "Attach up to 5 files, each no larger than 10 MB.");
 
+        try { QuickIntakeVictimCircumstances.Normalize(Input.VictimCircumstances); }
+        catch (ArgumentException exception)
+        {
+            ModelState.AddModelError("Input.VictimCircumstances", exception.Message);
+        }
         if (!ModelState.IsValid)
             return Page();
 
@@ -75,7 +80,7 @@ public sealed class QuickIntakeModel : PageModel
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms,
-                    Input.HelpCategory, Input.SecondaryTelephone),
+                    Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
                 HttpContext.RequestAborted);
 
             RequestReference = result.PublicReference;
@@ -122,6 +127,11 @@ public sealed class QuickIntakeModel : PageModel
         if (Input.AssistancePrograms.Count == 0 ||
             (Input.AssistancePrograms.Contains("None", StringComparer.OrdinalIgnoreCase) && Input.AssistancePrograms.Count > 1))
             ModelState.AddModelError("Input.AssistancePrograms", "Choose valid assistance programmes.");
+        try { QuickIntakeVictimCircumstances.Normalize(Input.VictimCircumstances); }
+        catch (ArgumentException exception)
+        {
+            ModelState.AddModelError("Input.VictimCircumstances", exception.Message);
+        }
         if (!ModelState.IsValid)
             return BadRequest(new { error = "Please correct the required fields." });
         try
@@ -133,7 +143,7 @@ public sealed class QuickIntakeModel : PageModel
                     Input.EmploymentStatus, Input.MonthlyIncome,
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
-                    Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone),
+                    Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
                 HttpContext.RequestAborted, SubmissionId);
             return new JsonResult(new { requestId = result.RequestId, reference = result.PublicReference });
         }
@@ -210,6 +220,8 @@ public sealed class QuickIntakeModel : PageModel
 
         [Required, RegularExpression("Yes|No")]
         public string HasDisabilityOrSeriousMedicalCondition { get; set; } = string.Empty;
+
+        public List<string> VictimCircumstances { get; set; } = new();
 
         public List<string> AssistancePrograms { get; set; } = new();
 
