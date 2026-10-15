@@ -15,7 +15,7 @@ public sealed class QuickIntakeVictimCircumstancesTests
     [Fact]
     public void None_IsAnExplicitAnswer()
     {
-        Assert.Equal("None of the above",
+        Assert.Equal("None of the Above",
             QuickIntakeVictimCircumstances.Normalize(["None of the above"]));
     }
 
