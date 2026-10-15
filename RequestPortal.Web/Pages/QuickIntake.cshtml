@@ -64,7 +64,7 @@
                     <div class="quick-intake-row">
                         <label><span>Email <em>(Optional)</em></span><input asp-for="Input.Email" type="email" autocomplete="email" /><span asp-validation-for="Input.Email"></span></label>
                     </div>
-                    <label><span>Street Address <b>*</b></span><input asp-for="Input.StreetAddress" autocomplete="street-address" /><span asp-validation-for="Input.StreetAddress"></span></label>
+                    <label><span>Address <b>*</b></span><input asp-for="Input.StreetAddress" autocomplete="street-address" /><span asp-validation-for="Input.StreetAddress"></span></label>
                     <div class="quick-intake-row">
                         <label><span>Community/District <b>*</b></span><input asp-for="Input.CommunityDistrict" autocomplete="address-level2" /><span asp-validation-for="Input.CommunityDistrict"></span></label>
                         <label><span>Parish <b>*</b></span>
@@ -98,7 +98,7 @@
 
                     <fieldset class="choice-group">
                         <legend>Are you a victim of any of the following? <b>*</b></legend>
-                        <p>Select all that apply, or select None of the above.</p>
+                        <p>Select all that apply, or select None of the Above.</p>
                         @foreach (string circumstance in RequestPortal.Application.Requests.QuickIntakeVictimCircumstances.Options)
                         {
                             <label class="check-option"><input type="checkbox" name="Input.VictimCircumstances" value="@circumstance" checked="@Model.Input.VictimCircumstances.Contains(circumstance)" /><span>@circumstance</span></label>
@@ -109,7 +109,7 @@
                     <h2>Current Assistance</h2>
                     <fieldset class="choice-group">
                         <legend>Do you currently participate in any of the following programs? Select all that apply. <b>*</b></legend>
-                        @foreach (string program in new[] { "None", "PATH", "Poor Relief Dole", "Rehabilitation Programme", "Solidarity Program", "CARE" })
+                        @foreach (string program in RequestPortal.Application.Requests.ProfileIntakeChoices.Programs)
                         {
                             <label class="check-option"><input type="checkbox" name="Input.AssistancePrograms" value="@program" checked="@Model.Input.AssistancePrograms.Contains(program)" /><span>@program</span></label>
                         }
@@ -191,6 +191,14 @@
 (() => {
     const form = document.getElementById('quickIntakeForm');
     if (!form) return;
+    for (const field of ['Input.VictimCircumstances', 'Input.AssistancePrograms']) {
+        const boxes = Array.from(form.querySelectorAll('input[type="checkbox"]')).filter(box => box.name === field);
+        boxes.forEach(box => box.addEventListener('change', () => {
+            if (!box.checked) return;
+            if (box.value === 'None of the Above') boxes.filter(other => other !== box).forEach(other => other.checked = false);
+            else boxes.filter(other => other.value === 'None of the Above').forEach(other => other.checked = false);
+        }));
+    }
     const button = document.getElementById('quickIntakeSubmit');
     const label = document.getElementById('quickIntakeSubmitLabel');
     const status = document.getElementById('quickIntakeSubmitStatus');
