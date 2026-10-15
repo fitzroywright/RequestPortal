@@ -34,7 +34,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
 
     private static readonly HashSet<string> AllowedPrograms = new(StringComparer.OrdinalIgnoreCase)
     {
-        "None", "PATH", "Poor Relief Dole", "Rehabilitation Programme", "Solidarity Program", "CARE"
+        "None", "None of the Above", "PATH", "Poor Relief Dole", "Rehabilitation Programme", "Solidarity Program", "CARE"
     };
 
     private static readonly HashSet<string> AllowedHelpCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -468,14 +468,14 @@ public sealed class QuickIntakeService : IQuickIntakeService
         if (normalized.Count == 0)
             throw new ArgumentException("Select at least one programme or None.");
 
-        if (normalized.Contains("None", StringComparer.OrdinalIgnoreCase) && normalized.Count > 1)
+        if (normalized.Any(value => value is "None" or "None of the Above") && normalized.Count > 1)
             throw new ArgumentException("None cannot be selected with another programme.");
 
-        return string.Join("|", normalized);
+        return string.Join("|", normalized.Select(value => string.Equals(value, "None", StringComparison.OrdinalIgnoreCase) ? "None of the Above" : value));
     }
 
     private static IReadOnlyList<string> ParsePrograms(string value) =>
-        value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(item => string.Equals(item, "None", StringComparison.OrdinalIgnoreCase) ? "None of the Above" : item).ToArray();
 
     private static string HelpCategoryDescription(string category) => category switch
     {
