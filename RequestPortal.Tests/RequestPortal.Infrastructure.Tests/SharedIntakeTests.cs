@@ -50,7 +50,7 @@ public sealed class SharedIntakeTests
         Assert.Equal("+18765550124", profile.AlternativePhoneNumber);
         Assert.False(profile.HasChildrenUnder18LivingFullTime);
         Assert.False(profile.HasDisabilityOrSeriousMedicalCondition);
-        Assert.Equal("None", profile.AssistancePrograms);
+        Assert.Equal("None of the Above", profile.AssistancePrograms);
         Assert.Equal("House Fire; Flooding", profile.VictimCircumstances);
         Assert.Equal("House Fire; Flooding", intake.VictimCircumstances);
         Assert.Equal(1, await database.Db.Users.CountAsync(token));
