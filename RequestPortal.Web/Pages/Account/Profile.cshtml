@@ -50,7 +50,7 @@
                     </div>
                 </div>
 
-                <form method="post" asp-page-handler="Profile" class="profile-compact-form individual-intake-form">
+                <form method="post" asp-page-handler="Profile" class="profile-compact-form individual-intake-form" id="individualIntakeProfileForm">
                     <input type="hidden" asp-for="ReturnUrl" />
 
                     <div class="profile-intake-section">
@@ -135,7 +135,7 @@
                             <strong>Home address</strong>
                         </div>
                         <div class="field">
-                            <label asp-for="ProfileInput.HomeAddress">Address line 1</label>
+                            <label asp-for="ProfileInput.HomeAddress">Address</label>
                             <input asp-for="ProfileInput.HomeAddress" />
                             <span asp-validation-for="ProfileInput.HomeAddress" class="validation"></span>
                         </div>
@@ -505,3 +505,18 @@
 @@media(max-width:620px){.profile-photo-row{grid-template-columns:68px minmax(0,1fr)}.profile-photo-preview{width:68px;height:68px}.profile-photo-actions{align-items:stretch;flex-direction:column}.profile-photo-actions .button{align-self:start}}
 </style>
 <script src="~/js/intake-exclusive-none.js" asp-append-version="true" defer></script>
+
+<script>
+(() => {
+    const form = document.getElementById('individualIntakeProfileForm');
+    if (!form) return;
+    for (const name of ['ProfileInput.AssistancePrograms', 'ProfileInput.VictimCircumstances']) {
+        const boxes = Array.from(form.querySelectorAll('input[type="checkbox"]')).filter(box => box.name === name);
+        boxes.forEach(box => box.addEventListener('change', () => {
+            if (!box.checked) return;
+            if (box.value === 'None of the Above') boxes.filter(other => other !== box).forEach(other => other.checked = false);
+            else boxes.filter(other => other.value === 'None of the Above').forEach(other => other.checked = false);
+        }));
+    }
+})();
+</script>
