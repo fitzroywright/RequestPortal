@@ -81,11 +81,11 @@ public sealed class QuickIntakeModel : PageModel
             ModelState.AddModelError("Input.DateOfBirth", "Date of birth is required.");
 
         if (Input.AssistancePrograms.Count == 0)
-            ModelState.AddModelError("Input.AssistancePrograms", "Select at least one programme or None.");
+            ModelState.AddModelError("Input.AssistancePrograms", "Select at least one programme or None of the Above.");
 
-        if (Input.AssistancePrograms.Contains("None", StringComparer.OrdinalIgnoreCase) &&
+        if (Input.AssistancePrograms.Contains("None of the Above", StringComparer.OrdinalIgnoreCase) &&
             Input.AssistancePrograms.Count > 1)
-            ModelState.AddModelError("Input.AssistancePrograms", "None cannot be selected with another programme.");
+            ModelState.AddModelError("Input.AssistancePrograms", "None of the Above cannot be selected with another programme.");
 
         var files = Attachments.Concat(CameraPhotos).Where(file => file.Length > 0).ToArray();
         if (files.Length > 5 || files.Any(file => file.Length > 10 * 1024 * 1024))
@@ -163,7 +163,7 @@ public sealed class QuickIntakeModel : PageModel
         if (Input.DateOfBirth is null)
             ModelState.AddModelError("Input.DateOfBirth", "Date of birth is required.");
         if (Input.AssistancePrograms.Count == 0 ||
-            (Input.AssistancePrograms.Contains("None", StringComparer.OrdinalIgnoreCase) && Input.AssistancePrograms.Count > 1))
+            (Input.AssistancePrograms.Contains("None of the Above", StringComparer.OrdinalIgnoreCase) && Input.AssistancePrograms.Count > 1))
             ModelState.AddModelError("Input.AssistancePrograms", "Choose valid assistance programmes.");
         try { QuickIntakeVictimCircumstances.Normalize(Input.VictimCircumstances); }
         catch (ArgumentException exception)
