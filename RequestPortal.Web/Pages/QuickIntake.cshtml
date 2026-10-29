@@ -85,7 +85,7 @@
                             <select asp-for="Input.EmploymentStatus"><option value="">Select</option><option>Employed</option><option>Self Employed</option><option>Unemployed</option><option>Student</option></select>
                             <span asp-validation-for="Input.EmploymentStatus"></span>
                         </label>
-                        <label><span>Monthly Income <b>*</b></span><input asp-for="Input.MonthlyIncome" type="number" min="0" step="0.01" inputmode="decimal" /><span asp-validation-for="Input.MonthlyIncome"></span></label>
+                        <label><span>Weekly Income <b>*</b></span><input asp-for="Input.MonthlyIncome" type="text" inputmode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?" title="Enter a non-negative amount without leading zeros (for example, 0 or 1250.50)." maxlength="15" required /><span asp-validation-for="Input.MonthlyIncome"></span></label>
                     </div>
                     <label><span>Do you have any children under 18 years of age that live with you full time? <b>*</b></span>
                         <select asp-for="Input.HasChildrenUnder18LivingFullTime"><option value="">Select</option><option>Yes</option><option>No</option></select>
