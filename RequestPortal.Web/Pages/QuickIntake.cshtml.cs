@@ -55,7 +55,7 @@ public sealed class QuickIntakeModel : PageModel
         Input.CommunityDistrict = user.DistrictArea ?? user.Town ?? "";
         Input.Parish = user.Parish ?? "";
         Input.EmploymentStatus = user.EmploymentStatus ?? "";
-        Input.MonthlyIncome = user.MonthlyHouseholdIncome ?? 0;
+        Input.MonthlyIncome = user.MonthlyHouseholdIncome.HasValue ? decimal.Round(user.MonthlyHouseholdIncome.Value * 12m / 52m, 2) : 0;
         Input.HasChildrenUnder18LivingFullTime = user.HasChildrenUnder18LivingFullTime.HasValue
             ? (user.HasChildrenUnder18LivingFullTime.Value ? "Yes" : "No") : "";
         Input.HasDisabilityOrSeriousMedicalCondition = user.HasDisabilityOrSeriousMedicalCondition.HasValue
@@ -72,11 +72,19 @@ public sealed class QuickIntakeModel : PageModel
         return user.Id;
     }
 
+    private void ValidateWeeklyIncome()
+    {
+        string raw = Request.Form["Input.MonthlyIncome"].ToString();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(raw, @"^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?$"))
+            ModelState.AddModelError("Input.MonthlyIncome", "Enter weekly income without leading zeros (for example, 0 or 1250.50).");
+    }
+
     public async Task<IActionResult> OnPostAsync()
     {
         if (!string.IsNullOrWhiteSpace(Input.Website))
             return Page();
 
+        ValidateWeeklyIncome();
         if (Input.DateOfBirth is null)
             ModelState.AddModelError("Input.DateOfBirth", "Date of birth is required.");
 
@@ -114,7 +122,7 @@ public sealed class QuickIntakeModel : PageModel
                     Input.CommunityDistrict,
                     Input.Parish,
                     Input.EmploymentStatus,
-                    Input.MonthlyIncome,
+                    decimal.Round(Input.MonthlyIncome * 52m / 12m, 2),
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms,
@@ -178,7 +186,7 @@ public sealed class QuickIntakeModel : PageModel
                 new QuickIntakeSubmission(Input.FirstName, Input.LastName, Input.DateOfBirth!.Value,
                     Input.Gender, Input.MaritalStatus, Input.Telephone, Input.Email,
                     Input.StreetAddress, Input.CommunityDistrict, Input.Parish,
-                    Input.EmploymentStatus, Input.MonthlyIncome,
+                    Input.EmploymentStatus, decimal.Round(Input.MonthlyIncome * 52m / 12m, 2),
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
