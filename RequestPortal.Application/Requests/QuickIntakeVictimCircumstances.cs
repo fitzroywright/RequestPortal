@@ -10,7 +10,7 @@ public static class QuickIntakeVictimCircumstances
     public static IReadOnlyList<string> Options { get; } = Array.AsReadOnly(new[]
     {
         "House Fire", "Flooding", "Natural Disaster",
-        "Displacement due to civil unrest or safety", "Domestic Abuse", None
+        "Displacement due to civil unrest or safety", "Abuse (Physical, Emotional, Sexual, Verbal, or Substance)", None
     });
 
     public static string Normalize(IReadOnlyList<string>? values)
@@ -18,7 +18,7 @@ public static class QuickIntakeVictimCircumstances
         if (values is null || values.Count == 0)
             throw new ArgumentException("Select at least one victim circumstance or None of the Above.");
         List<string> selected = values.Select(value =>
-            Options.FirstOrDefault(option => string.Equals(option, value?.Trim(), StringComparison.OrdinalIgnoreCase))
+            Options.FirstOrDefault(option => string.Equals(option, string.Equals(value?.Trim(), "Domestic Abuse", StringComparison.OrdinalIgnoreCase) ? "Abuse (Physical, Emotional, Sexual, Verbal, or Substance)" : value?.Trim(), StringComparison.OrdinalIgnoreCase))
                 ?? throw new ArgumentException("Victim circumstances contain an invalid selection."))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (selected.Contains(None) && selected.Count > 1)
