@@ -20,6 +20,22 @@ public sealed class QuickIntakeVictimCircumstancesTests
     }
 
     [Fact]
+    public void LegacyDomesticAbuse_MapsToNewAbuseOption()
+    {
+        Assert.Equal("Abuse (Physical, Emotional, Sexual, Verbal, or Substance)",
+            QuickIntakeVictimCircumstances.Normalize(["Domestic Abuse"]));
+    }
+
+    [Fact]
+    public void SocialPension_ReplacesSolidarityAndPreservesLegacyValues()
+    {
+        Assert.Contains("Social Pension", ProfileIntakeChoices.Programs);
+        Assert.DoesNotContain("Solidarity Program", ProfileIntakeChoices.Programs);
+        Assert.Equal("Social Pension", ProfileIntakeChoices.NormalizePrograms(["Solidarity Program"]));
+        Assert.Equal(["Social Pension"], ProfileIntakeChoices.Parse("Solidarity Program", '|'));
+    }
+
+    [Fact]
     public void ContradictoryOrUnknownOrMissingAnswers_AreRejected()
     {
         Assert.Throws<ArgumentException>(() =>
