@@ -18,6 +18,8 @@ internal static class AuthenticationServiceRegistration
         AuthenticationBuilder authentication =
             builder.Services.AddAuthentication();
 
+        authentication.AddPolicyScheme(PortalMessageAuthentication.Scheme,null,options=>
+            options.ForwardDefaultSelector=PortalMessageAuthentication.SelectScheme);
         AddStaffCookie(authentication);
         AddExternalReviewerCookie(authentication);
 

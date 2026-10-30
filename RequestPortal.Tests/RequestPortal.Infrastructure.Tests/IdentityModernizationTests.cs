@@ -15,6 +15,16 @@ namespace RequestPortal.Infrastructure.Tests;
 
 public sealed class IdentityModernizationTests
 {
+    [Fact]
+    public void MessagePolicyKeepsTheCurrentApplicantAndStaffPrincipalSeparate()
+    {
+        var context=new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.User=new ClaimsPrincipal(new ClaimsIdentity(new[]{new Claim(ClaimTypes.NameIdentifier,"applicant-id")},IdentityConstants.ApplicationScheme));
+        Assert.Equal(IdentityConstants.ApplicationScheme,PortalMessageAuthentication.SelectScheme(context));
+        context.User=new ClaimsPrincipal(new ClaimsIdentity(new[]{new Claim(ClaimTypes.NameIdentifier,"staff-id"),new Claim(StaffOidcOptions.StaffSurfaceClaim,StaffOidcOptions.StaffSurfaceValue)},StaffOidcOptions.StaffCookieScheme));
+        Assert.Equal(StaffOidcOptions.StaffCookieScheme,PortalMessageAuthentication.SelectScheme(context));
+    }
+
     [Theory]
     [InlineData("Microsoft")]
     [InlineData("Google")]
