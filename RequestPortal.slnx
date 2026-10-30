@@ -8,6 +8,7 @@
   <Project Path="RequestPortal.Tests/RequestPortal.Domain.Tests/RequestPortal.Domain.Tests.csproj" />
   <Project Path="RequestPortal.Tests/RequestPortal.Infrastructure.Tests/RequestPortal.Infrastructure.Tests.csproj" />
   <Project Path="../Common/Common.Security/Common.Security.csproj" />
+  <Project Path="../Common/Common.Security/Common.Security.Hosting/Common.Security.Hosting.csproj" />
   <Project Path="../Common/Common.Secrets/Common.Secrets.csproj" />
   <Project Path="../Common/Common.Messaging/Common.Messaging.csproj" />
   <Project Path="../Common/Common.Storage/Common.Storage.csproj" />
