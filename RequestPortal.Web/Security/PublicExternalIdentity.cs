@@ -13,12 +13,7 @@ public static class PublicExternalIdentity
     /// <summary>Input is obtained only from SignInManager's protected, correlated external callback cookie.</summary>
     public static VerifiedIdentity FromCallback(ExternalLoginInfo info)
     {
-        if(info.Principal.Identity?.IsAuthenticated!=true) throw new InvalidOperationException("Unauthenticated external callback.");
-        string? email=info.Principal.FindFirstValue(ClaimTypes.Email);
-        string display=info.Principal.FindFirstValue(ClaimTypes.Name) ?? email ?? info.ProviderKey;
-        var contact=string.IsNullOrWhiteSpace(email) ? new Dictionary<string,string>() : new Dictionary<string,string>{{"contact_email",email}};
-        return new(new ExternalIdentityKey(info.LoginProvider,Scope(info.LoginProvider),info.ProviderKey),AuthenticationProviderKind.External,
-            email ?? info.ProviderKey,display,DateTimeOffset.UtcNow,"validated-oauth-callback",
-            info.Principal.FindFirstValue("email_verified")=="true" ? email : null,claims:contact);
+        return global::Common.Security.Integration.VerifiedExternalIdentityFactory.FromValidatedOAuthPrincipal(info.Principal,
+            new ExternalIdentityKey(info.LoginProvider,Scope(info.LoginProvider),info.ProviderKey));
     }
 }

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "candidate-not-approved-for-production",
   "commonLibraries": {
-    "Common.Security": "dbce3c78bd6925a0a5692126b3e265aa36bbb400",
+    "Common.Security": "67c7451641a67f21b7ef157d4363e55f2b777cb3",
     "Common.Diagnostics": "4f90c9fd31aaa16ffbada97e33084a5356a45859",
     "Common.Secrets": "0e081a55d5885a148decb0c86c1baad263448948",
     "Common.Messaging": "cc015e8fcd9ea0c163859b3ed094243e4cddfbf4",

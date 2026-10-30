@@ -17,7 +17,6 @@ public sealed class StaffOidcOptions
     public string ClientId { get; set; } = string.Empty;
     public string? ClientSecret { get; set; }
     public string CallbackPath { get; set; } = "/signin-ffp-staff";
-    public bool RequireHttpsMetadata { get; set; } = true;
     public string UserNameClaim { get; set; } = "preferred_username";
     public string DisplayNameClaim { get; set; } = "name";
     public string EmailClaim { get; set; } = "email";

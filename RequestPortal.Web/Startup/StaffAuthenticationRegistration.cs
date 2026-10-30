@@ -27,7 +27,7 @@ internal static class StaffAuthenticationRegistration
         var identity = new global::Common.Security.Integration.ExternalIdentityRegistration(options.ProviderId,
             string.IsNullOrWhiteSpace(options.Issuer) ? options.Authority.TrimEnd('/') : options.Issuer,
             options.AllowedTenantIds.Length > 0 ? global::Common.Security.Models.AuthenticationProviderKind.EntraId : global::Common.Security.Models.AuthenticationProviderKind.External,
-            options.AllowedTenantIds);
+            options.AllowedTenantIds,options.UserNameClaim,options.DisplayNameClaim,options.EmailClaim,options.GroupClaimTypes);
         authentication.AddCommonOpenIdConnect(new CommonOpenIdConnectOptions(StaffOidcOptions.Scheme,
             options.Authority, options.ClientId, clientSecret ?? throw new InvalidOperationException("Staff OIDC client secret is required."),
             options.CallbackPath, StaffOidcOptions.StaffCookieScheme, identity), async (context, proof) =>

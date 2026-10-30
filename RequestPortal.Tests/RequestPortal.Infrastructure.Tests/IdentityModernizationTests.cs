@@ -21,11 +21,12 @@ public sealed class IdentityModernizationTests
     [InlineData("Yahoo")]
     public void ProtectedExternalCallbackUsesProviderSubjectInsteadOfEmail(string provider)
     {
-        var principal=new ClaimsPrincipal(new ClaimsIdentity(new[] {new Claim(ClaimTypes.Email,"contact@example.test"),new Claim(ClaimTypes.Name,"Applicant")},provider));
+        var principal=new ClaimsPrincipal(new ClaimsIdentity(new[] {new Claim(ClaimTypes.NameIdentifier,"stable-subject"),new Claim(ClaimTypes.Email,"contact@example.test"),new Claim(ClaimTypes.Name,"Applicant")},provider));
         var proof=PublicExternalIdentity.FromCallback(new ExternalLoginInfo(principal,provider,"stable-subject",provider));
         Assert.Equal("stable-subject",proof.Key.SubjectId);Assert.Equal(provider,proof.Key.ProviderId);
         Assert.Null(proof.VerifiedEmail);Assert.Equal("contact@example.test",proof.Claims["contact_email"]);
-        var another=PublicExternalIdentity.FromCallback(new ExternalLoginInfo(principal,provider,"different-subject",provider));
+        var anotherPrincipal=new ClaimsPrincipal(new ClaimsIdentity(new[]{new Claim(ClaimTypes.NameIdentifier,"different-subject"),new Claim(ClaimTypes.Email,"contact@example.test")},provider));
+        var another=PublicExternalIdentity.FromCallback(new ExternalLoginInfo(anotherPrincipal,provider,"different-subject",provider));
         Assert.NotEqual(proof.Key,another.Key);
     }
     [Fact]
