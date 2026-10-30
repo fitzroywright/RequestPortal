@@ -69,11 +69,10 @@ internal static class AuthorizationServiceRegistration
                 "PortalMessages"
                 , policy =>
                 {
-                    policy.AuthenticationSchemes.Add(
-                        IdentityConstants.ApplicationScheme);
-                    policy.AuthenticationSchemes.Add(
-                        StaffOidcOptions.StaffCookieScheme);
+                    policy.AuthenticationSchemes.Add(PortalMessageAuthentication.Scheme);
                     policy.RequireAuthenticatedUser();
+                    policy.RequireAssertion(context => !context.User.HasClaim(StaffOidcOptions.StaffSurfaceClaim,StaffOidcOptions.StaffSurfaceValue) ||
+                        context.User.HasClaim(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.Access));
                 });
         });
 

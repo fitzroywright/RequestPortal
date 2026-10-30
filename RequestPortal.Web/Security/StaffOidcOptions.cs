@@ -9,12 +9,14 @@ public sealed class StaffOidcOptions
     public const string StaffSurfaceValue = "ffp_staff";
     public const string PermissionClaim = "requestportal_permission";
 
+    public string ProviderId { get; set; } = "requestportal-staff";
+    public string Issuer { get; set; } = string.Empty;
+    public string[] AllowedTenantIds { get; set; } = [];
     public bool Enabled { get; set; }
     public string Authority { get; set; } = string.Empty;
     public string ClientId { get; set; } = string.Empty;
     public string? ClientSecret { get; set; }
     public string CallbackPath { get; set; } = "/signin-ffp-staff";
-    public bool RequireHttpsMetadata { get; set; } = true;
     public string UserNameClaim { get; set; } = "preferred_username";
     public string DisplayNameClaim { get; set; } = "name";
     public string EmailClaim { get; set; } = "email";

@@ -37,7 +37,7 @@ public sealed class DemoDatabaseBootstrapper
             return;
         }
 
-        if (environment.IsProduction())
+        if (!global::Common.Security.Authenticators.MockEnvironmentPolicy.IsPermitted(true, environment.EnvironmentName, configuration.GetValue("Demo:IsolationConfirmed",false)))
         {
             throw new InvalidOperationException(
                 "RP-PROD-DEMO-001: Demo mode is forbidden in Production. Disable Demo:Enabled and restart Request Portal.");

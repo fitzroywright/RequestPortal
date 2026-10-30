@@ -39,36 +39,42 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Diagnostics
+          ref: 4f90c9fd31aaa16ffbada97e33084a5356a45859
           path: Common/Common.Diagnostics
 
       - name: Checkout Common.Security
         uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Security
+          ref: 12247599fe75d6aeb0a2e4ff58c66349fe976e63
           path: Common/Common.Security
 
       - name: Checkout Common.Secrets
         uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Secrets
+          ref: 0e081a55d5885a148decb0c86c1baad263448948
           path: Common/Common.Secrets
 
       - name: Checkout Common.Messaging
         uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Messaging
+          ref: cc015e8fcd9ea0c163859b3ed094243e4cddfbf4
           path: Common/Common.Messaging
 
       - name: Checkout Common.Storage
         uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Storage
+          ref: bface4498b63f6e0b9dae1228bd9234a3a94b4d7
           path: Common/Common.Storage
 
       - name: Checkout Common.Registration
         uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Registration
+          ref: e673815b7e1f29ac1c713e849762e1af522a784d
           path: Common/Common.Registration
 
       - name: Mirror sibling Common layout
