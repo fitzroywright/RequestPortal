@@ -46,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Security
-          ref: 67c7451641a67f21b7ef157d4363e55f2b777cb3
+          ref: 3d7cd6238427fb6897425415baabe2443c8c5b99
           path: Common/Common.Security
 
       - name: Checkout Common.Secrets

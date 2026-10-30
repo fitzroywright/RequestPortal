@@ -7,6 +7,9 @@ permissions:
 jobs:
   security-regression:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: RequestPortal
     services:
       postgres:
         image: postgres:16
@@ -23,10 +26,12 @@ jobs:
       STUDIO_TEST_POSTGRES: Host=localhost;Port=5432;Database=security_tests;Username=security_tests;Password=isolated_ci_only
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: RequestPortal
       - uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Security
-          ref: 67c7451641a67f21b7ef157d4363e55f2b777cb3
+          ref: 3d7cd6238427fb6897425415baabe2443c8c5b99
           path: Common/Common.Security
       - uses: actions/checkout@v4
         with:
@@ -57,7 +62,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Verify shared source revisions
-        run: python3 Common/Common.Security/scripts/verify-source-baseline.py security-baseline.json --common-root Common
+        run: python3 ../Common/Common.Security/scripts/verify-source-baseline.py security-baseline.json --common-root ../Common
       - name: Test application security and business regressions
         run: |
           dotnet test RequestPortal.Tests/RequestPortal.Domain.Tests/RequestPortal.Domain.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --logger trx --results-directory TestResults
@@ -84,4 +89,4 @@ jobs:
         if: always()
         with:
           name: security-regression-evidence
-          path: TestResults
+          path: RequestPortal/TestResults
