@@ -9,6 +9,9 @@ public sealed class StaffOidcOptions
     public const string StaffSurfaceValue = "ffp_staff";
     public const string PermissionClaim = "requestportal_permission";
 
+    public string ProviderId { get; set; } = "requestportal-staff";
+    public string Issuer { get; set; } = string.Empty;
+    public string[] AllowedTenantIds { get; set; } = [];
     public bool Enabled { get; set; }
     public string Authority { get; set; } = string.Empty;
     public string ClientId { get; set; } = string.Empty;

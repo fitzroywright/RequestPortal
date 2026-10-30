@@ -1,0 +1,87 @@
+name: Coordinated security regression
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security-regression:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: security_tests
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: security_tests
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U security_tests -d security_tests"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      REQUESTPORTAL_POSTGRES: Host=localhost;Port=5432;Database=security_tests;Username=security_tests;Password=isolated_ci_only
+      STUDIO_TEST_POSTGRES: Host=localhost;Port=5432;Database=security_tests;Username=security_tests;Password=isolated_ci_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Security
+          ref: dbce3c78bd6925a0a5692126b3e265aa36bbb400
+          path: Common/Common.Security
+      - uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Diagnostics
+          ref: 4f90c9fd31aaa16ffbada97e33084a5356a45859
+          path: Common/Common.Diagnostics
+      - uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Secrets
+          ref: 0e081a55d5885a148decb0c86c1baad263448948
+          path: Common/Common.Secrets
+      - uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Messaging
+          ref: cc015e8fcd9ea0c163859b3ed094243e4cddfbf4
+          path: Common/Common.Messaging
+      - uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Storage
+          ref: bface4498b63f6e0b9dae1228bd9234a3a94b4d7
+          path: Common/Common.Storage
+      - uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Registration
+          ref: e673815b7e1f29ac1c713e849762e1af522a784d
+          path: Common/Common.Registration
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Verify shared source revisions
+        run: python3 Common/Common.Security/scripts/verify-source-baseline.py security-baseline.json --common-root Common
+      - name: Test application security and business regressions
+        run: |
+          dotnet test RequestPortal.Tests/RequestPortal.Domain.Tests/RequestPortal.Domain.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --logger trx --results-directory TestResults
+          dotnet test RequestPortal.Tests/RequestPortal.Infrastructure.Tests/RequestPortal.Infrastructure.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --logger trx --results-directory TestResults
+      - name: Build protected identity migration tool
+        run: dotnet build RequestPortal.SecurityMigration/RequestPortal.SecurityMigration.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common"
+      - name: Reject skipped or empty test evidence
+        if: always()
+        run: |
+          python3 - <<'PYGATE'
+          import pathlib,sys,xml.etree.ElementTree as ET
+          files=list(pathlib.Path('TestResults').glob('*.trx'))
+          failures=[]
+          if not files: failures.append('No test evidence was produced.')
+          for file in files:
+              root=ET.parse(file).getroot()
+              counters=root.find('.//{*}Counters')
+              if counters is None or int(counters.get('total','0'))==0 or int(counters.get('passed','0'))!=int(counters.get('total','0')):
+                  failures.append(str(file)+': failed, skipped or empty results block release.')
+          print('\n'.join(failures) if failures else 'All recorded tests passed without skips.')
+          sys.exit(bool(failures))
+          PYGATE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-regression-evidence
+          path: TestResults

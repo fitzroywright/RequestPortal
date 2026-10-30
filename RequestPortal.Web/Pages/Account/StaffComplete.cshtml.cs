@@ -9,7 +9,7 @@ using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Pages.Account;
 
-[Authorize(Policy = PortalPolicies.FfpStaff)]
+[Authorize(AuthenticationSchemes = StaffOidcOptions.StaffCookieScheme)]
 public sealed class StaffCompleteModel : PageModel
 {
     private readonly IBusinessAuditWriter auditWriter;
@@ -21,6 +21,8 @@ public sealed class StaffCompleteModel : PageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
+        if(!User.HasClaim(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.Access))
+            return RedirectToPage("/Account/StaffAccessDenied",new {reason="pending"});
         Guid actor = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out Guid id) ? id : Guid.Empty;
         await auditWriter.WriteAsync(
             actor,

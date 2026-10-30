@@ -80,6 +80,7 @@ WebApplication app = builder.Build();
 app.MapDiagnosticLevelRuntime();
 
 await StartupTasks.ApplyDatabaseMigrationsAsync(app);
+app.Services.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().EnsureSchema();
 
 ApplicationPipeline.Configure(app);
 EndpointRegistration.Map(app);

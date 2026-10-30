@@ -74,6 +74,8 @@ internal static class AuthorizationServiceRegistration
                     policy.AuthenticationSchemes.Add(
                         StaffOidcOptions.StaffCookieScheme);
                     policy.RequireAuthenticatedUser();
+                    policy.RequireAssertion(context => !context.User.HasClaim(StaffOidcOptions.StaffSurfaceClaim,StaffOidcOptions.StaffSurfaceValue) ||
+                        context.User.HasClaim(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.Access));
                 });
         });
 

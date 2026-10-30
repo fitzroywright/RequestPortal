@@ -1,3 +1,4 @@
+using Common.Security.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using RequestPortal.Web.Security;
@@ -23,140 +24,44 @@ internal static class StaffAuthenticationRegistration
             return;
         }
 
-        authentication.AddOpenIdConnect(
-            StaffOidcOptions.Scheme
-            , oidc =>
+        var identity = new global::Common.Security.Integration.ExternalIdentityRegistration(options.ProviderId,
+            string.IsNullOrWhiteSpace(options.Issuer) ? options.Authority.TrimEnd('/') : options.Issuer,
+            options.AllowedTenantIds.Length > 0 ? global::Common.Security.Models.AuthenticationProviderKind.EntraId : global::Common.Security.Models.AuthenticationProviderKind.External,
+            options.AllowedTenantIds);
+        authentication.AddCommonOpenIdConnect(new CommonOpenIdConnectOptions(StaffOidcOptions.Scheme,
+            options.Authority, options.ClientId, clientSecret ?? throw new InvalidOperationException("Staff OIDC client secret is required."),
+            options.CallbackPath, StaffOidcOptions.StaffCookieScheme, identity), async (context, proof) =>
             {
-                oidc.SignInScheme =
-                    StaffOidcOptions.StaffCookieScheme;
-                oidc.Authority = options.Authority;
-                oidc.ClientId = options.ClientId;
-                oidc.ClientSecret = options.ClientSecret;
-                oidc.CallbackPath = options.CallbackPath;
-                oidc.ResponseType = "code";
-                oidc.UsePkce = true;
-                oidc.RequireHttpsMetadata =
-                    options.RequireHttpsMetadata;
-                oidc.SaveTokens = false;
-                oidc.GetClaimsFromUserInfoEndpoint = true;
-                oidc.Scope.Clear();
-                oidc.Scope.Add("openid");
-                oidc.Scope.Add("profile");
-                oidc.Scope.Add("email");
-                oidc.Events = BuildEvents();
+                var flows=context.HttpContext.RequestServices.GetRequiredService<RequestPortalOperationsFlowPublisher>();
+                string correlation=GetCorrelationId(context.Properties);
+                flows.TryEnqueueAuthentication(correlation,"Claims");
+                var result=await context.HttpContext.RequestServices.GetRequiredService<StaffOidcPrincipalService>()
+                    .BuildPrincipalAsync(proof,context.HttpContext.RequestAborted);
+                if(!result.Allowed || result.Principal is null) { context.Fail(result.FailureCode ?? "Staff access denied."); return; }
+                context.Principal=result.Principal;
+                flows.TryEnqueueAuthentication(correlation,"Session");
             });
-    }
-
-    private static OpenIdConnectEvents BuildEvents()
-    {
-        return new OpenIdConnectEvents
+        authentication.Services.PostConfigure<OpenIdConnectOptions>(StaffOidcOptions.Scheme, oidc =>
         {
-            OnRedirectToIdentityProvider = context =>
+            var redirect=oidc.Events.OnRedirectToIdentityProvider;
+            oidc.Events.OnRedirectToIdentityProvider=async context =>
             {
-                context.ProtocolMessage.Prompt = "login";
-
-                string correlationId =
-                    Guid.NewGuid().ToString("N");
-
-                context.Properties.Items[
-                    "aegis.auth.correlation"] =
-                    correlationId;
-
-                RequestPortalOperationsFlowPublisher flows =
-                    context.HttpContext.RequestServices
-                        .GetRequiredService<
-                            RequestPortalOperationsFlowPublisher>();
-
-                flows.TryEnqueueAuthentication(
-                    correlationId
-                    , "IdentityProvider");
-
+                await redirect(context);
+                context.ProtocolMessage.Prompt="login";
+                var correlation=Guid.NewGuid().ToString("N");
+                context.Properties.Items["aegis.auth.correlation"]=correlation;
+                context.HttpContext.RequestServices.GetRequiredService<RequestPortalOperationsFlowPublisher>()
+                    .TryEnqueueAuthentication(correlation,"IdentityProvider");
+            };
+            oidc.Events.OnRemoteFailure=context =>
+            {
+                context.HttpContext.RequestServices.GetRequiredService<RequestPortalOperationsFlowPublisher>()
+                    .TryEnqueueAuthentication(GetCorrelationId(context.Properties),"Callback","Remote authentication failed.",failed:true);
+                context.HandleResponse(); context.Response.Redirect("/Account/StaffAccessDenied");
                 return Task.CompletedTask;
-            }
-            , OnTokenValidated = async context =>
-            {
-                string correlationId =
-                    GetCorrelationId(context.Properties);
-
-                RequestPortalOperationsFlowPublisher flows =
-                    context.HttpContext.RequestServices
-                        .GetRequiredService<
-                            RequestPortalOperationsFlowPublisher>();
-
-                if (context.Principal is null)
-                {
-                    flows.TryEnqueueAuthentication(
-                        correlationId
-                        , "Callback"
-                        , "Identity provider callback returned no principal."
-                        , failed: true);
-
-                    context.Fail(
-                        "The staff identity provider returned no principal.");
-                    return;
-                }
-
-                flows.TryEnqueueAuthentication(
-                    correlationId
-                    , "Claims");
-
-                StaffOidcPrincipalService service =
-                    context.HttpContext.RequestServices
-                        .GetRequiredService<
-                            StaffOidcPrincipalService>();
-
-                StaffOidcPrincipalResult result =
-                    await service.BuildPrincipalAsync(
-                        context.Principal
-                        , context.HttpContext.RequestAborted);
-
-                if (!result.Allowed ||
-                    result.Principal is null)
-                {
-                    flows.TryEnqueueAuthentication(
-                        correlationId
-                        , "Authorization"
-                        , result.FailureCode
-                            ?? "Staff authorization denied."
-                        , failed: true);
-
-                    context.Fail(
-                        result.FailureCode
-                            ?? "FFP staff access denied.");
-                    return;
-                }
-
-                context.Principal = result.Principal;
-
-                flows.TryEnqueueAuthentication(
-                    correlationId
-                    , "Session");
-            }
-            , OnRemoteFailure = context =>
-            {
-                string correlationId =
-                    GetCorrelationId(context.Properties);
-
-                RequestPortalOperationsFlowPublisher flows =
-                    context.HttpContext.RequestServices
-                        .GetRequiredService<
-                            RequestPortalOperationsFlowPublisher>();
-
-                flows.TryEnqueueAuthentication(
-                    correlationId
-                    , "Callback"
-                    , "Remote authentication failed before a session was established."
-                    , failed: true);
-
-                context.HandleResponse();
-                context.Response.Redirect(
-                    "/Account/StaffAccessDenied");
-
-                return Task.CompletedTask;
-            }
-        };
+            };
+        });
     }
-
     private static string GetCorrelationId(
         AuthenticationProperties? properties)
     {

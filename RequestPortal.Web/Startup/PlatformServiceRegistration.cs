@@ -22,6 +22,11 @@ internal static class PlatformServiceRegistration
         , string connectionString)
     {
         AddUploadLimits(builder);
+        builder.Services.AddSingleton(new RequestPortal.Web.Security.RequestPortalAccounts(connectionString));
+        builder.Services.AddSingleton<global::Common.Security.Abstractions.ILocalCredentialStore>(sp => sp.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().Staff);
+        builder.Services.AddSingleton(sp=>new global::Common.Security.Services.AccountProvisioningService(sp.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().Staff));
+        global::Common.Security.Hosting.AccountSecurityHosting.AddCommonAuthenticationRateLimiting(builder.Services);
+        builder.Services.AddSingleton<global::Common.Security.Abstractions.IAccountStore>(sp => sp.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().Staff);
 
         builder.Services.AddDbContext<RequestPortalDbContext>(
             options => options.UseNpgsql(connectionString));

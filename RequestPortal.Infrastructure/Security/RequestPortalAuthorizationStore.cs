@@ -48,8 +48,7 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
             FROM "AspNetUsers" u
             INNER JOIN "AspNetUserRoles" ur ON ur."UserId" = u."Id"
             INNER JOIN "AspNetRoles" r ON r."Id" = ur."RoleId"
-            WHERE lower(u."Email") = lower(@subject)
-               OR lower(u."UserName") = lower(@subject)
+            WHERE u."Id"::text = @subject
             ORDER BY r."Name";
             """;
 

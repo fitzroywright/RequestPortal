@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Common.Security.Hosting;
 using Microsoft.AspNetCore.Identity;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Security;
@@ -58,6 +59,14 @@ internal static class AuthenticationServiceRegistration
 
         builder.Services.ConfigureApplicationCookie(options =>
         {
+            var stampValidation=options.Events.OnValidatePrincipal;
+            options.Events.OnValidatePrincipal=async context =>
+            {
+                await stampValidation(context);
+                if(context.Principal is null) return;
+                await AccountSecurityHosting.ValidateCookieAsync(context,
+                    context.HttpContext.RequestServices.GetRequiredService<RequestPortalAccounts>().Public);
+            };
             options.LoginPath = "/Account/Login";
             options.AccessDeniedPath = "/Account/AccessDenied";
             options.Cookie.Name = "RequestPortal.Auth";
@@ -79,6 +88,8 @@ internal static class AuthenticationServiceRegistration
             StaffOidcOptions.StaffCookieScheme
             , options =>
             {
+                options.Events.OnValidatePrincipal=context => context.HttpContext.RequestServices
+                    .GetRequiredService<StaffOidcPrincipalService>().ValidateCookieAsync(context);
                 options.LoginPath = "/Account/StaffLogin";
                 options.AccessDeniedPath =
                     "/Account/StaffAccessDenied";
