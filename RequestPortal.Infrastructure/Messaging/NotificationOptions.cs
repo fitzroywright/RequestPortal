@@ -6,6 +6,8 @@ public sealed class NotificationOptions
 
     public bool Enabled { get; set; }
 
+    public string FfpEmailAddress { get; set; } = string.Empty;
+
     public bool WhatsAppEnabled { get; set; }
 
     public string SmtpHost { get; set; } = string.Empty;

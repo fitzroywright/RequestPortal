@@ -67,7 +67,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 item.RegistrationNumber,
                 item.Address,
                 item.Phone,
-                item.Email
+                item.Email,
+                item.Parish
             })
             .SingleAsync(cancellationToken);
 
@@ -107,6 +108,11 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 .Select(ToArtifactDescriptor)
                 .ToList();
 
+            var intake = await dbContext.QuickIntakes.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.RequestId == request.Id, cancellationToken);
+            string? applicantParish = await dbContext.Users.AsNoTracking()
+                .Where(item => item.Id == (request.SubmittedByUserId ?? request.CreatedByUserId))
+                .Select(item => item.Parish).SingleOrDefaultAsync(cancellationToken);
             ExternalApplicationSubmission submission = new(
                 link.Id,
                 request.Id,
@@ -128,9 +134,15 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 request.Location,
                 request.Circumstances,
                 items,
-                artifacts);
+                artifacts,
+                intake?.Parish ?? (string.IsNullOrWhiteSpace(organization.Parish) ? applicantParish : organization.Parish),
+                intake is null ? "Request Portal" : "Request Portal - Quick Intake");
 
             ExternalApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(reference.ApplicationNumber) ||
+                string.Equals(reference.ApplicationNumber, request.PublicReference, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("FFP Manager did not return a generated ReferenceNo. Notifications remain pending.");
 
             Guid documentAccessUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
             foreach (StoredDocument document in documents)
@@ -153,7 +165,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                     cancellationToken);
             }
 
-            link.MarkSynchronized(reference.ApplicationId, clock.UtcNow);
+            link.MarkSynchronized(reference.ApplicationId, clock.UtcNow, reference.ApplicationNumber);
+            await EnsureReferenceNotificationsQueuedAsync(request.Id, reference.ApplicationNumber!, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             return reference;
         }
@@ -162,6 +175,23 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             link.MarkFailed(clock.UtcNow, exception.Message);
             await dbContext.SaveChangesAsync(cancellationToken);
             throw;
+        }
+    }
+
+    private async Task EnsureReferenceNotificationsQueuedAsync(Guid requestId, string applicationNumber, CancellationToken token)
+    {
+        foreach (string purpose in new[] { "FfpManagerClientConfirmation", "FfpManagerStaffEmail" })
+        {
+            byte[] bytes = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes($"{requestId:D}|{purpose}"));
+            Guid id = new(bytes.AsSpan(0, 16));
+            if (dbContext.OutboxMessages.Local.Any(item => item.Id == id) ||
+                await dbContext.OutboxMessages.AsNoTracking().AnyAsync(item => item.Id == id, token))
+                continue;
+            if (purpose == "FfpManagerClientConfirmation")
+                AddOutbox(new FfpManagerClientConfirmationRequestedMessage(id, clock.UtcNow, requestId, applicationNumber));
+            else
+                AddOutbox(new FfpManagerStaffEmailRequestedMessage(id, clock.UtcNow, requestId, applicationNumber));
         }
     }
 
