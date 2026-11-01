@@ -289,6 +289,7 @@ public sealed class NotificationWorkflowTests
         Organization organization = CreateApprovedOrganization(applicant.Id, "Client");
         database.Db.Organizations.Add(organization);
         AssistanceRequest request = new(Guid.NewGuid(), "RP-TEST-FFP", organization.Id, applicant.Id, Now);
+        request.SetKind(RequestKind.Project);
         request.SetSummary("Food");
         request.Submit(applicant.Id, Now);
         database.Db.AssistanceRequests.Add(request);
