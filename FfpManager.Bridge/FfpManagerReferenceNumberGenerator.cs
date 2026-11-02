@@ -14,7 +14,7 @@ public static class FfpManagerReferenceNumberGenerator
     {
         if (string.IsNullOrWhiteSpace(parishCode) || parishCode.Contains('/') || number < 1)
             throw new ArgumentException("A valid parish code and positive sequence number are required.");
-        return $"{parishCode.Trim()}/{createdUtc:yy}/GR/{number.ToString("D4", CultureInfo.InvariantCulture)}";
+        return $"{parishCode.Trim()}/{JamaicaBusinessTime.ToLocal(createdUtc):yy}/GR/{number.ToString("D4", CultureInfo.InvariantCulture)}";
     }
 
     public static async Task<string> EnsureExistingAsync(
@@ -27,8 +27,9 @@ public static class FfpManagerReferenceNumberGenerator
             return referenceNo;
         var generated = await GenerateAsync(connection, transaction, submission.Parish, createdUtc, cancellationToken);
         await using SqlCommand update = new(
-            "UPDATE dbo.ApplicationLetters SET Code=@Code,ReferenceNo=@ReferenceNo,Parish=@Parish,DocumentSource=@Source,DateUpdated=GETUTCDATE() WHERE ID=@ID AND ExternalRequestId=@RequestId",
+            "UPDATE dbo.ApplicationLetters SET Code=@Code,ReferenceNo=@ReferenceNo,Parish=@Parish,DocumentSource=@Source,DateUpdated=@DateUpdated WHERE ID=@ID AND ExternalRequestId=@RequestId",
             connection, transaction);
+        update.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(DateTimeOffset.UtcNow);
         update.Parameters.Add("@ID", SqlDbType.BigInt).Value = applicationId;
         update.Parameters.Add("@RequestId", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
         update.Parameters.Add("@Code", SqlDbType.NVarChar, 500).Value = submission.PublicReference;

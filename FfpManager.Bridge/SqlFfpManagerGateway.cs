@@ -67,15 +67,15 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@FirstName", submission.FirstName, SqlDbType.NVarChar, 200);
         AddNullable(command, "@LastName", submission.LastName, SqlDbType.NVarChar, 100);
         AddNullable(command, "@MainContactNo", submission.OrganizationPhone, SqlDbType.NVarChar, 255);
-        command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
-        command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
+        command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
+        command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         AddNullable(command, "@Comments", CombineComments(submission), SqlDbType.NVarChar, 2500);
         AddNullable(command, "@Programme", submission.ProgramCategory, SqlDbType.NVarChar, 255);
         AddNullable(command, "@Requirements", CombineRequirements(submission), SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationStatus", SqlDbType.BigInt).Value = statusId.HasValue ? statusId.Value : DBNull.Value;
         AddNullable(command, "@UserName", options.UserName, SqlDbType.NVarChar, 50);
-        command.Parameters.Add("@DateCreated", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
-        command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
+        command.Parameters.Add("@DateCreated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
+        command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         AddNullable(command, "@AuditID", $"RequestPortal:{submission.PortalRequestId:D}", SqlDbType.NVarChar, 100);
         AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
         command.Parameters.Add("@ExternalRequestId", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
@@ -178,11 +178,11 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             AddNullable(command, "@DocumentNo", $"ApplicationLetter-{id}", SqlDbType.NVarChar, 100);
             command.Parameters.Add("@DocumentType", SqlDbType.BigInt).Value = documentTypeId;
             AddNullable(command, "@Description", descriptor.DocumentType, SqlDbType.NVarChar, 100);
-            command.Parameters.Add("@DateCreated", SqlDbType.DateTime).Value = descriptor.UploadedUtc.UtcDateTime;
-            command.Parameters.Add("@DateSubmitted", SqlDbType.DateTime).Value = descriptor.UploadedUtc.UtcDateTime;
+            command.Parameters.Add("@DateCreated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(descriptor.UploadedUtc);
+            command.Parameters.Add("@DateSubmitted", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(descriptor.UploadedUtc);
             AddNullable(command, "@SubmittedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
             AddNullable(command, "@UserName", options.UserName, SqlDbType.NVarChar, 50);
-            command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = DateTime.UtcNow;
+            command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(DateTimeOffset.UtcNow);
             AddNullable(command, "@FileName", managerPath, SqlDbType.NVarChar, 1024);
             AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
             await command.ExecuteNonQueryAsync(cancellationToken);
@@ -227,12 +227,12 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         string rawCode = reader.IsDBNull(3) ? "RECEIVED" : reader.GetString(3);
         string statusText = reader.IsDBNull(4) ? rawCode : reader.GetString(4);
         string canonical = MapStatus(rawCode, statusText);
-        DateTime changed = !reader.IsDBNull(2)
+        DateTime? changed = !reader.IsDBNull(2)
             ? reader.GetDateTime(2)
-            : !reader.IsDBNull(1) ? reader.GetDateTime(1) : DateTime.UtcNow;
+            : !reader.IsDBNull(1) ? reader.GetDateTime(1) : null;
         string? detail = reader.IsDBNull(5) ? null : reader.GetString(5);
         bool terminal = canonical is "REJECTED" or "DECLINED" or "CLOSED";
-        return new ExternalApplicationStatus(id.ToString(), canonical, statusText, new DateTimeOffset(DateTime.SpecifyKind(changed, DateTimeKind.Utc)), detail, terminal);
+        return new ExternalApplicationStatus(id.ToString(), canonical, statusText, changed.HasValue ? JamaicaBusinessTime.ToUtc(changed.Value) : DateTimeOffset.UtcNow, detail, terminal);
     }
 
     public async Task SaveInformationResponseAsync(
@@ -271,8 +271,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@Name", "RequestPortal response", SqlDbType.NVarChar, 255);
         AddNullable(command, "@Description", response.Message, SqlDbType.NVarChar, -1);
         AddNullable(command, "@UserName", options.UserName, SqlDbType.NVarChar, 50);
-        command.Parameters.Add("@DateCreated", SqlDbType.DateTime).Value = response.RespondedUtc.UtcDateTime;
-        command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = response.RespondedUtc.UtcDateTime;
+        command.Parameters.Add("@DateCreated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(response.RespondedUtc);
+        command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(response.RespondedUtc);
         AddNullable(command, "@NoteType", options.InformationResponseNoteType, SqlDbType.NVarChar, 500);
         AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -304,9 +304,9 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             : reader.GetString(1);
         string organizationName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
         string? phone = reader.IsDBNull(4) ? null : reader.GetString(4);
-        DateTime submitted = !reader.IsDBNull(5)
+        DateTime? submitted = !reader.IsDBNull(5)
             ? reader.GetDateTime(5)
-            : !reader.IsDBNull(6) ? reader.GetDateTime(6) : DateTime.UtcNow;
+            : !reader.IsDBNull(6) ? reader.GetDateTime(6) : null;
         string? comments = reader.IsDBNull(7) ? null : reader.GetString(7);
         string? programme = reader.IsDBNull(8) ? null : reader.GetString(8);
         string? requirements = reader.IsDBNull(9) ? null : reader.GetString(9);
@@ -324,7 +324,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             phone,
             null,
             Guid.Empty,
-            new DateTimeOffset(DateTime.SpecifyKind(submitted, DateTimeKind.Utc)),
+            submitted.HasValue ? JamaicaBusinessTime.ToUtc(submitted.Value) : DateTimeOffset.UtcNow,
             "Unknown",
             "Normal",
             comments,
@@ -357,7 +357,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         const string sql = "UPDATE dbo.ApplicationLetters SET ApplicationStatus = @Status, DateUpdated = @DateUpdated WHERE ID = @ID;";
         await using SqlCommand command = new(sql, connection, transaction);
         command.Parameters.Add("@Status", SqlDbType.BigInt).Value = statusId;
-        command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = DateTime.UtcNow;
+        command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(DateTimeOffset.UtcNow);
         command.Parameters.Add("@ID", SqlDbType.BigInt).Value = id;
         int affected = await command.ExecuteNonQueryAsync(cancellationToken);
         if (affected != 1)
@@ -401,8 +401,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@Name", Truncate(item.Description, 255), SqlDbType.NVarChar, 255);
         AddNullable(command, "@Description", item.Description, SqlDbType.NVarChar, 500);
         AddNullable(command, "@UserName", options.UserName, SqlDbType.NVarChar, 50);
-        command.Parameters.Add("@DateCreated", SqlDbType.DateTime).Value = submittedUtc.UtcDateTime;
-        command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = submittedUtc.UtcDateTime;
+        command.Parameters.Add("@DateCreated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submittedUtc);
+        command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submittedUtc);
         command.Parameters.Add("@Quantity", SqlDbType.Int).Value = decimal.ToInt32(item.Quantity);
         command.Parameters.Add("@ApplicationLetterID", SqlDbType.BigInt).Value = applicationId;
         command.Parameters.Add("@UnitOfMeasure", SqlDbType.BigInt).Value = unitId;
@@ -509,7 +509,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             reader.GetInt64(0),
             reader.IsDBNull(1) ? null : reader.GetString(1),
             reader.IsDBNull(2) ? null : reader.GetString(2),
-            reader.IsDBNull(3) ? null : new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(3), DateTimeKind.Utc)));
+            reader.IsDBNull(3) ? null : JamaicaBusinessTime.ToUtc(reader.GetDateTime(3)));
     }
 
     private async Task<SqlConnection> OpenConnectionAsync(CancellationToken cancellationToken)
