@@ -133,8 +133,6 @@ public sealed class FfpManagerReferenceDataCatalog : IFfpManagerReferenceDataCat
             throw new InvalidOperationException("Bridge:SqlConnectionString is required when Bridge:Gateway is Sql.");
         }
 
-        SqlConnection connection = new(options.SqlConnectionString);
-        await connection.OpenAsync(cancellationToken);
-        return connection;
+        return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, cancellationToken);
     }
 }

@@ -106,6 +106,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         if (string.IsNullOrWhiteSpace(options.SupportingDocumentRoot)) throw new InvalidOperationException("Bridge:SupportingDocumentRoot is required.");
         string safeName = SanitizeFileName(descriptor.FileName);
         string finalPath = Path.Combine(options.SupportingDocumentRoot, $"ApplicationLetter-{id}-{descriptor.PortalDocumentId:N}-{safeName}");
+        string managerPath = BridgeDocumentPath.ForManager(options, finalPath);
         Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         string tempPath = finalPath + ".tmp-" + Guid.NewGuid().ToString("N");
         await using (FileStream file = new(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan))
@@ -138,7 +139,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@SubmittedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
         AddNullable(command, "@UserName", options.UserName, SqlDbType.NVarChar, 50);
         command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = DateTime.UtcNow;
-        AddNullable(command, "@FileName", finalPath, SqlDbType.NVarChar, 1024);
+        AddNullable(command, "@FileName", managerPath, SqlDbType.NVarChar, 1024);
         AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -199,14 +200,12 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
     private async Task<SqlConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(options.SqlConnectionString)) throw new InvalidOperationException("Bridge:SqlConnectionString is required when Bridge:Gateway is Sql.");
-        SqlConnection connection = new(options.SqlConnectionString);
-        await connection.OpenAsync(cancellationToken);
-        return connection;
+        return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, cancellationToken);
     }
 
     private static string NormalizeStatus(string value) => value.Trim().Replace('-', '_').Replace(' ', '_').ToUpperInvariant();
     private static long ParseApplicationId(string value) => long.TryParse(value, out long id) && id > 0 ? id : throw new ArgumentException($"'{value}' is not a valid FFP Manager ApplicationLetters.ID.");
-    private static string SanitizeFileName(string value) { string name = Path.GetFileName(value); foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_'); return string.IsNullOrWhiteSpace(name) ? "document.bin" : name; }
+    private static string SanitizeFileName(string value) => BridgeDocumentPath.SafeFileName(value);
     private static string? Truncate(string? value, int max) => string.IsNullOrWhiteSpace(value) ? null : value.Length <= max ? value : value[..max];
     private static string? CombineComments(ExternalApplicationSubmission s) => Truncate(string.Join(Environment.NewLine, new[] { s.Summary, s.Circumstances, s.OrganizationAddress, s.OrganizationEmail }.Where(x => !string.IsNullOrWhiteSpace(x))), 2500);
     private static string? CombineRequirements(ExternalApplicationSubmission s) => Truncate(string.Join(" / ", new[] { s.Category, s.Subcategory }.Where(x => !string.IsNullOrWhiteSpace(x))), 255);

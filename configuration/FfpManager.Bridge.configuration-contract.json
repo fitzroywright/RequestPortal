@@ -86,6 +86,15 @@
       "purpose": "Restricts production host names accepted by the bridge.",
       "configurationKey": "AllowedHosts",
       "isConfigured": false
+    },
+    {
+      "id": "document-manager-root",
+      "displayName": "FFP Manager supporting document UNC directory",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Windows-visible path to the same NAS directory mounted by the Linux bridge.",
+      "configurationKey": "Bridge:SupportingDocumentManagerRoot",
+      "isConfigured": false
     }
   ],
   "runbookReference": "docs/FFP-MANAGER-INTEGRATION-COMMISSIONING.md",

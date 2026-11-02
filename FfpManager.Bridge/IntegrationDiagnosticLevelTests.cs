@@ -97,8 +97,7 @@ public sealed class BridgeSqlAndOutboxDiagnosticLevelTest(
                     , "FFP Manager SQL secret is unavailable.");
             }
 
-            await using SqlConnection connection = new(connectionString);
-            await connection.OpenAsync(cancellationToken);
+            await using SqlConnection connection = await FfpSqlConnection.OpenAsync(connectionString, cancellationToken);
 
             bool schema = await outbox.SchemaExistsAsync(cancellationToken);
             if (!schema)

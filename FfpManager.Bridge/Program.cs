@@ -15,26 +15,8 @@ await using CommonSecretsBootstrapRuntime secretsRuntime =
     CommonSecretsBootstrapRuntime.Create(builder.Configuration);
 secretsRuntime.Register(builder.Services);
 
-string sharedSecretName =
-    builder.Configuration["Bridge:SharedSecretSecretName"]?.Trim()
-    ?? "FfpManagerIntegration:SharedSecret";
-string sqlConnectionSecretName =
-    builder.Configuration["Bridge:SqlConnectionStringSecretName"]?.Trim()
-    ?? "FfpManagerBridge:SqlConnectionString";
-
-string? resolvedSharedSecret =
-    await secretsRuntime.Provider.GetAsync(sharedSecretName);
-string? resolvedSqlConnection =
-    await secretsRuntime.Provider.GetAsync(sqlConnectionSecretName);
-
-if (!builder.Environment.IsProduction())
-{
-    resolvedSharedSecret ??= builder.Configuration["Bridge:SharedSecret"];
-    resolvedSqlConnection ??= builder.Configuration["Bridge:SqlConnectionString"];
-}
-
-builder.Configuration["Bridge:SharedSecret"] = resolvedSharedSecret ?? string.Empty;
-builder.Configuration["Bridge:SqlConnectionString"] = resolvedSqlConnection ?? string.Empty;
+await BridgeStartupConfiguration.ResolveAndValidateAsync(
+    builder.Configuration, secretsRuntime.Provider, builder.Environment.IsProduction());
 
 builder.Services.Configure<JsonOptions>(
     options => options.SerializerOptions.PropertyNamingPolicy =
@@ -74,11 +56,6 @@ builder.Services.AddDiagnosticLevelTest<BridgeCallbackDiagnosticLevelTest>();
 builder.Services.AddDiagnosticLevelTest<BridgeRecoveryDiagnosticLevelTest>();
 
 string gatewayMode = (builder.Configuration["Bridge:Gateway"] ?? "Fake").Trim();
-if (!gatewayMode.Equals("Fake", StringComparison.OrdinalIgnoreCase) &&
-    !gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
-{
-    throw new InvalidOperationException("Bridge:Gateway must be either 'Fake' or 'Sql'.");
-}
 
 builder.Services.AddSingleton<FakeFfpManagerGateway>();
 builder.Services.AddSingleton<SqlFfpManagerGateway>();
@@ -105,24 +82,6 @@ string sharedSecret = builder.Configuration["Bridge:SharedSecret"] ?? string.Emp
 long maxArtifactBytes = Math.Max(
     1,
     builder.Configuration.GetValue<long?>("Bridge:MaxArtifactBytes") ?? 25L * 1024L * 1024L);
-
-if (gatewayMode.Equals("Sql", StringComparison.OrdinalIgnoreCase))
-{
-    if (string.IsNullOrWhiteSpace(builder.Configuration["Bridge:SqlConnectionString"]))
-    {
-        throw new InvalidOperationException("Bridge:SqlConnectionString is required when Bridge:Gateway is Sql.");
-    }
-
-    if (string.IsNullOrWhiteSpace(builder.Configuration["Bridge:SupportingDocumentRoot"]))
-    {
-        throw new InvalidOperationException("Bridge:SupportingDocumentRoot is required when Bridge:Gateway is Sql so RequestPortal artifacts can be stored for FFP Manager.");
-    }
-
-    if (string.IsNullOrWhiteSpace(builder.Configuration["Bridge:InitialApplicationStatus"]))
-    {
-        throw new InvalidOperationException("Bridge:InitialApplicationStatus is required when Bridge:Gateway is Sql.");
-    }
-}
 
 if (builder.Environment.IsProduction())
 {
@@ -155,6 +114,8 @@ if (builder.Environment.IsProduction())
     BridgeOptions productionOptions = builder.Configuration
         .GetSection(BridgeOptions.SectionName)
         .Get<BridgeOptions>() ?? new BridgeOptions();
+    FfpSqlConnection.ValidateTarget(productionOptions.SqlConnectionString);
+    _ = BridgeDocumentPath.ForManager(productionOptions, "startup-check.pdf");
     if (!productionOptions.EnableOutboxDispatch)
     {
         throw new InvalidOperationException("Bridge:EnableOutboxDispatch must be enabled in production.");
@@ -474,6 +435,7 @@ public sealed class BridgeOptions
     public string Gateway { get; set; } = "Fake";
     public string SqlConnectionString { get; set; } = string.Empty;
     public string SupportingDocumentRoot { get; set; } = string.Empty;
+    public string SupportingDocumentManagerRoot { get; set; } = string.Empty;
     public string UserName { get; set; } = "RequestPortal";
     public string CreatedBy { get; set; } = "RequestPortal";
     public string InitialApplicationStatus { get; set; } = string.Empty;

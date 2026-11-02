@@ -44,6 +44,7 @@ public sealed class ParishSubmissionPersistenceTests
         foreach (ExternalApplicationSubmission submission in bridge.Submissions)
         {
             Assert.Equal(requestId, submission.PortalRequestId);
+            Assert.Equal("Test Applicant", submission.OrganizationName);
             Assert.Equal("Kingston", submission.Parish);
             Assert.Equal("Request Portal - Quick Intake", submission.DocumentSource);
             ExternalApplicationItem item = Assert.Single(submission.Items);
@@ -59,6 +60,38 @@ public sealed class ParishSubmissionPersistenceTests
         // Submission does not replace or duplicate the existing queued event.
         Assert.Single(await database.Db.OutboxMessages.ToListAsync(token));
         Assert.Equal("Kingston", (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).Parish);
+    }
+
+    [Fact]
+    public async Task OrganizationRequest_PreservesOrganizationNameAndExplicitParish()
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(token);
+        await CreateIntakeAsync(database, token);
+        var organization = await database.Db.Organizations.SingleAsync(token);
+        organization.Rename("Community Support Foundation");
+        database.Db.Entry(organization).Property(item => item.OrganizationType).CurrentValue = "Charity";
+        var original = await database.Db.AssistanceRequests.SingleAsync(token);
+        var request = new RequestPortal.Domain.Requests.AssistanceRequest(
+            Guid.NewGuid(), "RP-ORG-TEST", organization.Id, original.CreatedByUserId, DateTimeOffset.UtcNow);
+        request.SetSummary("Organization request");
+        request.AddItem(new RequestPortal.Domain.Requests.AssistanceRequestItem(
+            Guid.NewGuid(), request.Id, "Food parcels", 2, original.Items.Single().UnitOfMeasureId));
+        request.AddItem(new RequestPortal.Domain.Requests.AssistanceRequestItem(
+            Guid.NewGuid(), request.Id, "Food parcels", 2, original.Items.Single().UnitOfMeasureId));
+        request.Submit(original.CreatedByUserId, DateTimeOffset.UtcNow);
+        database.Db.AssistanceRequests.Add(request);
+        await database.Db.SaveChangesAsync(token);
+        database.Db.ChangeTracker.Clear();
+        CapturingBridge bridge = new();
+
+        await Service(database, bridge).SubmitRequestAsync(request.Id, token);
+
+        ExternalApplicationSubmission submission = Assert.Single(bridge.Submissions);
+        Assert.Equal("Community Support Foundation", submission.OrganizationName);
+        Assert.Equal("Clarendon", submission.Parish);
+        Assert.NotEqual("Request Portal - Quick Intake", submission.DocumentSource);
+        Assert.Equal("Test", (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).FirstName);
     }
 
     [Theory]

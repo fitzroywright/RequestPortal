@@ -111,6 +111,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         string finalPath = Path.Combine(
             options.SupportingDocumentRoot,
             $"ApplicationLetter-{id}-{descriptor.PortalDocumentId:N}-{safeName}");
+        string managerPath = BridgeDocumentPath.ForManager(options, finalPath);
         string? directory = Path.GetDirectoryName(finalPath);
         if (!string.IsNullOrWhiteSpace(directory))
         {
@@ -179,7 +180,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             AddNullable(command, "@SubmittedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
             AddNullable(command, "@UserName", options.UserName, SqlDbType.NVarChar, 50);
             command.Parameters.Add("@DateUpdated", SqlDbType.DateTime).Value = DateTime.UtcNow;
-            AddNullable(command, "@FileName", finalPath, SqlDbType.NVarChar, 1024);
+            AddNullable(command, "@FileName", managerPath, SqlDbType.NVarChar, 1024);
             AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
             await command.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -514,9 +515,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         {
             throw new InvalidOperationException("Bridge:SqlConnectionString is required when Bridge:Gateway is Sql.");
         }
-        SqlConnection connection = new(options.SqlConnectionString);
-        await connection.OpenAsync(cancellationToken);
-        return connection;
+        return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, cancellationToken);
     }
 
     private string MapStatus(string rawCode, string rawName)
@@ -540,15 +539,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             ? id
             : throw new ArgumentException($"'{applicationId}' is not a valid FFP Manager ApplicationLetters.ID.", nameof(applicationId));
 
-    private static string SanitizeFileName(string value)
-    {
-        string name = Path.GetFileName(value);
-        foreach (char invalid in Path.GetInvalidFileNameChars())
-        {
-            name = name.Replace(invalid, '_');
-        }
-        return string.IsNullOrWhiteSpace(name) ? "document.bin" : name;
-    }
+    private static string SanitizeFileName(string value) => BridgeDocumentPath.SafeFileName(value);
 
     private static string? CombineComments(ExternalApplicationSubmission submission)
     {

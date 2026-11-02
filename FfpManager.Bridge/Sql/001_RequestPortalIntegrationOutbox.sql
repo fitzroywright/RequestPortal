@@ -1,3 +1,7 @@
+IF DB_NAME() <> N'FFP' OR UPPER(CONVERT(nvarchar(128), SERVERPROPERTY('MachineName'))) <> N'JMDB01'
+    THROW 51050, 'STOP: Only JMDB01/FFP is authorized.', 1;
+GO
+
 /*
 Request Portal integration outbox for FFP Manager.
 

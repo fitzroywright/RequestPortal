@@ -253,9 +253,7 @@ public sealed class SqlIntegrationOutboxStore : IIntegrationOutboxStore
                 "FFP Manager SQL connection string is unavailable.");
         }
 
-        SqlConnection connection = new(options.SqlConnectionString);
-        await connection.OpenAsync(cancellationToken);
-        return connection;
+        return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, cancellationToken);
     }
 
     private int CalculateRetryDelaySeconds(int attemptCount)
