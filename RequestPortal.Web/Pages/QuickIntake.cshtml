@@ -21,7 +21,7 @@
                     <p class="quick-intake-errors" role="alert">@Model.AttachmentWarning</p>
                 }
                 <p class="quick-intake-muted">We may use <strong>@Model.Telephone</strong> to contact you about this request.</p>
-                <a class="quick-intake-primary" asp-page="/Index">Return to Request Portal</a>
+                <a class="quick-intake-primary" asp-page="/QuickIntakeWelcome">Return to Get Help</a>
             </section>
         }
         else
@@ -183,6 +183,7 @@
 .help-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.help-card{grid-template-columns:auto 1fr!important;align-items:start!important;padding:12px;border:1px solid #dbe5ec;border-radius:10px;cursor:pointer}.help-card:has(input:checked){border-color:#f36c21;background:#fff7f1}.help-card input{width:18px;height:18px;min-height:18px;margin-top:2px}.help-card strong,.help-card small{display:block}.help-card small{margin-top:3px;color:#65788b;font-weight:500;line-height:1.35}
 .quick-intake-attachments{border:1px solid #dbe5ec;border-radius:10px;overflow:hidden}.quick-intake-attachments summary{padding:12px 14px;cursor:pointer;font-size:.9rem;font-weight:800;color:#173b60}.quick-intake-attachments summary:focus-visible{outline:3px solid #f36c21}.quick-intake-attachment-body{padding:0 14px 14px;display:grid;gap:12px}.quick-intake-attachment-body p{font-size:.85rem;color:#5b6f83;margin:0}.quick-intake-primary{min-height:52px;border:0;border-radius:9px;background:#f36c21;color:#fff;font:inherit;font-weight:900;cursor:pointer}.quick-intake-errors,.field-validation-error{color:#a32920;font-size:.82rem}.quick-intake-trap{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important}
 .quick-intake-upload-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}.quick-intake-camera,.quick-intake-file-picker{display:grid;gap:7px;min-width:0}.quick-intake-upload-actions .quick-intake-camera-button{min-height:60px;text-align:center;line-height:1.2}.quick-intake-upload-actions .quick-intake-muted{font-size:.78rem;overflow-wrap:anywhere}.quick-intake-camera-button{display:flex!important;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:8px 14px;border:1px solid #cbd8e2;border-radius:10px;background:#edf5fb;color:#173b60;cursor:pointer;font-weight:800}.quick-intake-camera-button:hover{background:#e0effa}.quick-intake-form input.quick-intake-camera-input{position:absolute;width:1px;height:1px;min-height:0;padding:0;opacity:0;overflow:hidden}.quick-intake-camera:focus-within .quick-intake-camera-button,.quick-intake-file-picker:focus-within .quick-intake-camera-button{outline:3px solid rgba(243,108,33,.35)}.quick-intake-submit-status{text-align:center;color:#173b60;font-size:.9rem;font-weight:700;margin:0}.quick-intake-primary:disabled{opacity:.8;cursor:wait}.quick-intake-spinner{display:none;width:17px;height:17px;border:2px solid rgba(255,255,255,.5);border-top-color:white;border-radius:50%;animation:quick-intake-spin .8s linear infinite;margin-left:9px;vertical-align:middle}.quick-intake-primary:disabled .quick-intake-spinner{display:inline-block}@@keyframes quick-intake-spin{to{transform:rotate(360deg)}}
+a.quick-intake-primary{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;max-width:100%;padding:12px 20px;text-align:center;text-decoration:none}a.quick-intake-primary:focus-visible{outline:3px solid #14324d;outline-offset:3px}
 .quick-intake-complete{padding:30px 24px;text-align:center}.quick-intake-complete-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 14px;border-radius:50%;background:#eaf8ef;color:#21834c;font-size:1.7rem;font-weight:900}.quick-intake-reference{display:grid;gap:3px;margin:20px 0;padding:16px;border:1px solid #dce7ee;border-radius:12px;background:#f7fafc}.quick-intake-reference strong{font-size:1.4rem}.quick-intake-muted{color:#617488}
 @@media(max-width:620px){.quick-intake-page{padding:8px}.quick-intake-card{border-radius:12px}.quick-intake-form{padding:16px}.quick-intake-row,.help-grid{grid-template-columns:1fr}.quick-intake-form input,.quick-intake-form select{font-size:16px}}
 </style>
@@ -295,7 +296,11 @@
             heading.textContent = 'Request received';
             const reference = document.createElement('p');
             reference.textContent = 'Your request reference: ' + saved.reference;
-            resultBox.append(heading, reference);
+            const returnLink = document.createElement('a');
+            returnLink.className = 'quick-intake-primary';
+            returnLink.href = '@Url.Page("/QuickIntakeWelcome")';
+            returnLink.textContent = 'Return to Get Help';
+            resultBox.append(heading, reference, returnLink);
             form.parentNode.appendChild(resultBox);
             sessionStorage.removeItem(key);
         } catch (error) {
