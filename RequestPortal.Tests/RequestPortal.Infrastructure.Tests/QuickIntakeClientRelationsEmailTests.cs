@@ -111,7 +111,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
         Assert.Contains("review this request in Request Portal", sent.Body);
         Assert.Equal(QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(result.RequestId), sent.DeliveryId);
         Assert.Equal(NotificationTransport.Email, sent.Transport);
-        Assert.Equal(2, await database.Db.OutboxMessages.CountAsync(token));
+        Assert.Equal(3, await database.Db.OutboxMessages.CountAsync(token));
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
         Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token));
         Assert.Single(sender.Sent);
         Assert.NotNull((await Email(database, result.RequestId, token)).ProcessedUtc);
-        Assert.Equal(2, await database.Db.OutboxMessages.CountAsync(token));
+        Assert.Equal(3, await database.Db.OutboxMessages.CountAsync(token));
         Assert.Equal(1, await database.Db.AssistanceRequests.CountAsync(token));
     }
 
@@ -207,6 +207,10 @@ public sealed class QuickIntakeClientRelationsEmailTests
     {
         var original = await db.Db.OutboxMessages.SingleAsync(m => m.MessageType == typeof(RequestSubmittedMessage).FullName, token);
         original.ProcessedUtc = DateTimeOffset.UtcNow;
+        // These tests isolate staff delivery; applicant delivery is covered separately.
+        var confirmation = await db.Db.OutboxMessages.SingleOrDefaultAsync(
+            m => m.MessageType == typeof(FfpManagerClientConfirmationRequestedMessage).FullName, token);
+        if (confirmation is not null) confirmation.ProcessedUtc = DateTimeOffset.UtcNow;
         await db.Db.SaveChangesAsync(token);
     }
     private static FfpManagerIntegrationService Integration(PostgreSqlTestDatabase db, BridgeClient bridge) =>

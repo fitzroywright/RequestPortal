@@ -163,6 +163,11 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
 
             ExternalApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
 
+            string? applicationNumber = reference.ApplicationNumber?.Trim();
+            if (string.IsNullOrWhiteSpace(applicationNumber) ||
+                string.Equals(applicationNumber, request.PublicReference, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("FFP Manager did not return a generated ReferenceNo. Notifications remain pending.");
+
             Guid documentAccessUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
             foreach (StoredDocument document in documents)
             {
@@ -184,17 +189,19 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                     cancellationToken);
             }
 
-            link.MarkSynchronized(reference.ApplicationId, clock.UtcNow);
+            link.MarkSynchronized(reference.ApplicationId, clock.UtcNow, applicationNumber);
+            Guid confirmationId = FfpManagerClientConfirmationRequestedMessage.IdForRequest(request.Id);
+            if (!dbContext.OutboxMessages.Local.Any(item => item.Id == confirmationId) &&
+                !await dbContext.OutboxMessages.AsNoTracking().AnyAsync(item => item.Id == confirmationId, cancellationToken))
+                AddOutbox(new FfpManagerClientConfirmationRequestedMessage(confirmationId, clock.UtcNow, request.Id, applicationNumber));
             Guid emailId = QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(request.Id);
             OutboxMessage? email = await dbContext.OutboxMessages.SingleOrDefaultAsync(item => item.Id == emailId, cancellationToken);
             if (email is not null && email.ProcessedUtc is null &&
-                email.MessageType == QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType &&
-                !string.IsNullOrWhiteSpace(reference.ApplicationNumber) &&
-                !string.Equals(reference.ApplicationNumber, request.PublicReference, StringComparison.OrdinalIgnoreCase))
+                email.MessageType == QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType)
             {
                 var notification = JsonSerializer.Deserialize<QuickIntakeClientRelationsEmailRequestedMessage>(email.Payload)
                     ?? throw new InvalidOperationException("Invalid Client Relations outbox payload.");
-                email.Payload = JsonSerializer.Serialize(notification with { FfpManagerReference = reference.ApplicationNumber });
+                email.Payload = JsonSerializer.Serialize(notification with { FfpManagerReference = applicationNumber });
                 email.MessageType = typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName!;
             }
             await dbContext.SaveChangesAsync(cancellationToken);

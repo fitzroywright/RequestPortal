@@ -64,8 +64,9 @@ public sealed class ParishSubmissionPersistenceTests
         var link = await database.Db.IntegrationLinks.SingleAsync(token);
         Assert.Equal(SynchronizationStatus.Synchronized, link.Status);
         Assert.Equal(first.ApplicationId, link.ExternalReference);
-        // The original submission and Client Relations events remain queued once each.
-        Assert.Equal(2, await database.Db.OutboxMessages.CountAsync(token));
+        Assert.Equal(first.ApplicationNumber, link.ApplicationNumber);
+        // Submission, Client Relations email and applicant confirmation are each queued once.
+        Assert.Equal(3, await database.Db.OutboxMessages.CountAsync(token));
         Assert.Equal("Kingston", (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).Parish);
     }
 
@@ -135,6 +136,65 @@ public sealed class ParishSubmissionPersistenceTests
         Assert.Equal("St. Andrew", (await database.Db.Users.AsNoTracking().SingleAsync(token)).Parish);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("portal-code")]
+    public async Task InvalidFfpReferenceKeepsNotificationsPending_AndRetryPersistsGenuineNumber(string? invalid)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid requestId = await CreateIntakeAsync(database, token);
+        var request = await database.Db.AssistanceRequests.SingleAsync(token);
+        var bridge = new CapturingBridge { ApplicationNumber = invalid == "portal-code" ? request.PublicReference : invalid };
+        var service = Service(database, bridge);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SubmitRequestAsync(requestId, token));
+        var link = await database.Db.IntegrationLinks.SingleAsync(token);
+        Assert.Equal(SynchronizationStatus.Failed, link.Status);
+        Assert.Null(link.ApplicationNumber);
+        Assert.Null(link.ExternalReference);
+        Assert.False(await database.Db.OutboxMessages.AnyAsync(
+            item => item.MessageType == typeof(FfpManagerClientConfirmationRequestedMessage).FullName, token));
+        var staff = await database.Db.OutboxMessages.SingleAsync(
+            item => item.Id == QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(requestId), token);
+        Assert.Equal(QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType, staff.MessageType);
+        Assert.Equal(0, staff.AttemptCount);
+        bridge.ApplicationNumber = "KGN/26/GR/0042";
+        await service.SubmitRequestAsync(requestId, token);
+        await service.SubmitRequestAsync(requestId, token);
+        Assert.Equal("KGN/26/GR/0042", link.ApplicationNumber);
+        Assert.Equal("123", link.ExternalReference);
+        Assert.Single(await database.Db.OutboxMessages.Where(
+            item => item.MessageType == typeof(FfpManagerClientConfirmationRequestedMessage).FullName).ToListAsync(token));
+        Assert.Equal(typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName, staff.MessageType);
+    }
+
+    [Fact]
+    public async Task ArtifactFailureDoesNotMarkSynchronizedOrReleaseNotifications()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid requestId = await CreateIntakeAsync(database, token);
+        var request = await database.Db.AssistanceRequests.SingleAsync(token);
+        database.Db.Documents.Add(new StoredDocument(Guid.NewGuid(), DocumentOwnerType.AssistanceRequest,
+            requestId, request.OrganizationId, DocumentType.RequestSupport, "support.txt", "text/plain", 7,
+            "test/support.txt", request.CreatedByUserId, DateTimeOffset.UtcNow));
+        await database.Db.SaveChangesAsync(token);
+        var bridge = new CapturingBridge { FailArtifactTransfer = true };
+        var service = Service(database, bridge);
+        await Assert.ThrowsAsync<IOException>(() => service.SubmitRequestAsync(requestId, token));
+        var link = await database.Db.IntegrationLinks.SingleAsync(token);
+        Assert.Equal(SynchronizationStatus.Failed, link.Status);
+        Assert.Null(link.ApplicationNumber);
+        Assert.False(await database.Db.OutboxMessages.AnyAsync(
+            item => item.MessageType == typeof(FfpManagerClientConfirmationRequestedMessage).FullName, token));
+        bridge.FailArtifactTransfer = false;
+        await service.SubmitRequestAsync(requestId, token);
+        Assert.Equal(SynchronizationStatus.Synchronized, link.Status);
+        Assert.Equal("KIN/26/GR/0042", link.ApplicationNumber);
+    }
+
     private static async Task<Guid> CreateIntakeAsync(PostgreSqlTestDatabase database, CancellationToken token)
     {
         database.Db.UnitsOfMeasure.Add(new UnitOfMeasure(Guid.NewGuid(), "EA", "Each"));
@@ -157,6 +217,8 @@ public sealed class ParishSubmissionPersistenceTests
 
     private sealed class CapturingBridge : IExternalApplicationBridgeClient
     {
+        public string? ApplicationNumber { get; set; } = "KIN/26/GR/0042";
+        public bool FailArtifactTransfer { get; set; }
         public List<ExternalApplicationSubmission> Submissions { get; } = [];
         public Dictionary<Guid, byte[]> Artifacts { get; } = [];
 
@@ -166,11 +228,12 @@ public sealed class ParishSubmissionPersistenceTests
             JsonSerializerOptions json = new(JsonSerializerDefaults.Web);
             submission = JsonSerializer.Deserialize<ExternalApplicationSubmission>(JsonSerializer.Serialize(submission, json), json)!;
             Submissions.Add(submission);
-            return Task.FromResult(new ExternalApplicationReference("123", "KIN/26/GR/0042", submission.SubmittedUtc, Submissions.Count > 1));
+            return Task.FromResult(new ExternalApplicationReference("123", ApplicationNumber, submission.SubmittedUtc, Submissions.Count > 1));
         }
 
         public async Task UploadArtifactAsync(string applicationId, ExternalArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default)
         {
+            if (FailArtifactTransfer) throw new IOException("Synthetic artifact outage");
             Assert.Equal("123", applicationId);
             using MemoryStream bytes = new();
             await content.CopyToAsync(bytes, cancellationToken);
