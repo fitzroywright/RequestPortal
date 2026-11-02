@@ -40,7 +40,8 @@ public sealed class FfpManagerBusinessDateSqlTests
             Guid.NewGuid(), "Timezone Regression", null, null, null, null, Guid.NewGuid(), submitted,
             "Individual", "Normal", "Synthetic timezone regression only", "Food", null, null, null, null,
             [new(Guid.NewGuid(), "Timezone verification only", 1, snapshot.UnitsOfMeasure.First().Name)], [], "Kingston",
-            "Request Portal - Timezone Test", "Timezone", "Regression");
+            "Request Portal - Timezone Test", "Timezone", "Regression",
+            StreetAddress: "42 Separate Street", CommunityDistrict: "Separate District");
         try
         {
             var accepted = await gateway.CreateApplicationAsync(submission, token);
@@ -50,7 +51,10 @@ public sealed class FfpManagerBusinessDateSqlTests
             Assert.True(repeated.AlreadyExisted);
             Assert.Equal(accepted.ApplicationId, repeated.ApplicationId);
             Assert.Equal(submitted, repeated.AcceptedUtc);
-            Assert.Equal(submitted, (await gateway.GetApplicationAsync(accepted.ApplicationId, token))!.SubmittedUtc);
+            var saved = (await gateway.GetApplicationAsync(accepted.ApplicationId, token))!;
+            Assert.Equal(submitted, saved.SubmittedUtc);
+            Assert.Equal(submission.StreetAddress,saved.StreetAddress);
+            Assert.Equal(submission.CommunityDistrict,saved.CommunityDistrict);
             Assert.Equal(submitted, (await gateway.GetStatusAsync(accepted.ApplicationId, token))!.ChangedUtc);
 
             await using var connection = await FfpSqlConnection.OpenAsync(sql!, "Rehearsal", token);

@@ -190,6 +190,45 @@ public sealed class FfpManagerBridgeTests
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SqlGatewaysRejectOversizedStreetOrTownBeforeConnecting(bool synced)
+    {
+        IFfpManagerGateway gateway = synced
+            ? new SyncedSqlFfpManagerGateway(Options.Create(new BridgeOptions()), null!)
+            : new SqlFfpManagerGateway(Options.Create(new BridgeOptions()));
+        foreach (var submission in new[] {
+            CreateSubmission(Guid.NewGuid()) with { StreetAddress = new string('x',501) },
+            CreateSubmission(Guid.NewGuid()) with { CommunityDistrict = new string('y',501) } })
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                gateway.CreateApplicationAsync(submission, TestContext.Current.CancellationToken));
+            Assert.Contains("Street and Town", error.Message);
+        }
+    }
+
+    [Fact]
+    public void AddressContractKeepsStreetTownAndParishIndependent_AndAcceptsLegacyPayloads()
+    {
+        var value = CreateSubmission(Guid.NewGuid()) with {
+            StreetAddress = new string('x',500), CommunityDistrict = "Separate district", Parish = "Kingston",
+            ApplicantAddress = "Legacy address remains independent", ApplicantGender = "Female",
+            ApplicantEmploymentStatus = "Employed", ApplicantEmail = "test@example.invalid" };
+        BridgeApplicantAddress.Validate(value);
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        var payload = System.Text.Json.JsonSerializer.Serialize(value,options);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<ExternalApplicationSubmission>(payload,options)!;
+        Assert.Equal(value,restored with { Items=value.Items, Artifacts=value.Artifacts });
+        var legacyJson = System.Text.Json.Nodes.JsonNode.Parse(payload)!;
+        legacyJson.AsObject().Remove("streetAddress");
+        legacyJson.AsObject().Remove("communityDistrict");
+        var legacy = System.Text.Json.JsonSerializer.Deserialize<ExternalApplicationSubmission>(legacyJson.ToJsonString(),options)!;
+        Assert.Null(legacy.StreetAddress);
+        Assert.Null(legacy.CommunityDistrict);
+        Assert.Equal(value.OrganizationName,legacy.OrganizationName);
+    }
+
     private static ExternalApplicationSubmission CreateSubmission(Guid correlationId) => new(
         correlationId,
         Guid.NewGuid(),

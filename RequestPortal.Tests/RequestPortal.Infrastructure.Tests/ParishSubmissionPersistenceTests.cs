@@ -48,7 +48,9 @@ public sealed class ParishSubmissionPersistenceTests
             Assert.Equal("Test Applicant", submission.OrganizationName);
             Assert.Equal("Test", submission.FirstName);
             Assert.Equal("Applicant", submission.LastName);
-            Assert.Equal("Clarendon Road, St. Andrew District, Kingston", submission.ApplicantAddress);
+            Assert.Equal("Clarendon Road", submission.ApplicantAddress);
+            Assert.Equal("Clarendon Road", submission.StreetAddress);
+            Assert.Equal("St. Andrew District", submission.CommunityDistrict);
             Assert.Null(submission.ApplicantEmail);
             Assert.Equal("Male", submission.ApplicantGender);
             Assert.Equal("Unemployed", submission.ApplicantEmploymentStatus);
@@ -70,15 +72,17 @@ public sealed class ParishSubmissionPersistenceTests
         Assert.Equal("Kingston", (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).Parish);
     }
 
-    [Fact]
-    public async Task OrganizationRequest_PreservesOrganizationNameAndExplicitParish()
+    [Theory]
+    [InlineData("Charity", "Clarendon")]
+    [InlineData("IndividualContext", "St. Andrew")]
+    public async Task RegularRequest_PreservesOrganizationNameAndExplicitParish(string organizationType, string expectedParish)
     {
         CancellationToken token = TestContext.Current.CancellationToken;
         await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(token);
         await CreateIntakeAsync(database, token);
         var organization = await database.Db.Organizations.SingleAsync(token);
         organization.Rename("Community Support Foundation");
-        database.Db.Entry(organization).Property(item => item.OrganizationType).CurrentValue = "Charity";
+        database.Db.Entry(organization).Property(item => item.OrganizationType).CurrentValue = organizationType;
         var original = await database.Db.AssistanceRequests.SingleAsync(token);
         var request = new RequestPortal.Domain.Requests.AssistanceRequest(
             Guid.NewGuid(), "RP-ORG-TEST", organization.Id, original.CreatedByUserId, DateTimeOffset.UtcNow);
@@ -98,10 +102,12 @@ public sealed class ParishSubmissionPersistenceTests
         Assert.Null(submission.FirstName);
         Assert.Null(submission.LastName);
         Assert.Null(submission.ApplicantAddress);
+        Assert.Null(submission.StreetAddress);
+        Assert.Null(submission.CommunityDistrict);
         Assert.Null(submission.ApplicantEmail);
         Assert.Null(submission.ApplicantGender);
         Assert.Null(submission.ApplicantEmploymentStatus);
-        Assert.Equal("Clarendon", submission.Parish);
+        Assert.Equal(expectedParish, submission.Parish);
         Assert.NotEqual("Request Portal - Quick Intake", submission.DocumentSource);
         Assert.Equal("Test", (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).FirstName);
     }
@@ -195,14 +201,38 @@ public sealed class ParishSubmissionPersistenceTests
         Assert.Equal("KIN/26/GR/0042", link.ApplicationNumber);
     }
 
-    private static async Task<Guid> CreateIntakeAsync(PostgreSqlTestDatabase database, CancellationToken token)
+    [Fact]
+    public async Task SeparateAddressMappingPreservesOtherCapturedApplicantValues()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid requestId = await CreateIntakeAsync(database, token, "applicant@example.invalid", "+18765550124");
+        var captured = await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token);
+        var organization = await database.Db.Organizations.AsNoTracking().SingleAsync(token);
+        var bridge = new CapturingBridge();
+        await Service(database,bridge).SubmitRequestAsync(requestId,token);
+        var submission = Assert.Single(bridge.Submissions);
+        Assert.Equal(captured.StreetAddress,submission.StreetAddress);
+        Assert.Equal(captured.CommunityDistrict,submission.CommunityDistrict);
+        Assert.Equal(captured.Parish,submission.Parish);
+        Assert.Equal(captured.Gender,submission.ApplicantGender);
+        Assert.Equal(captured.EmploymentStatus,submission.ApplicantEmploymentStatus);
+        Assert.Equal(captured.Email,submission.ApplicantEmail);
+        Assert.Equal(organization.Phone,submission.OrganizationPhone);
+        var unchanged = await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token);
+        Assert.Equal(captured.DateOfBirth,unchanged.DateOfBirth);
+        Assert.Equal(captured.MobileNumber,unchanged.MobileNumber);
+        Assert.Equal(captured.SecondaryTelephone,unchanged.SecondaryTelephone);
+    }
+
+    private static async Task<Guid> CreateIntakeAsync(PostgreSqlTestDatabase database, CancellationToken token, string? email = null, string? secondary = null)
     {
         database.Db.UnitsOfMeasure.Add(new UnitOfMeasure(Guid.NewGuid(), "EA", "Each"));
         await database.Db.SaveChangesAsync(token);
         QuickIntakeResult result = await new QuickIntakeService(database.Db).CreateAsync(new QuickIntakeSubmission(
-            "Test", "Applicant", new DateOnly(1980, 1, 1), "Male", "Single", "8765550123", null,
+            "Test", "Applicant", new DateOnly(1980, 1, 1), "Male", "Single", "8765550123", email,
             "Clarendon Road", "St. Andrew District", "Kingston", "Unemployed", 0, false, false,
-            ["None"], "Food"), token);
+            ["None"], "Food", SecondaryTelephone: secondary), token);
         // Conflicting explicit profiles must not replace this intake's answer.
         (await database.Db.Users.SingleAsync(token)).Parish = "St. Andrew";
         var organization = await database.Db.Organizations.SingleAsync(token);

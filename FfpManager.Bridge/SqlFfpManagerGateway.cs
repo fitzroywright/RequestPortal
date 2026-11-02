@@ -19,6 +19,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         CancellationToken cancellationToken = default)
     {
         BridgeApplicantName.Validate(submission);
+        BridgeApplicantAddress.Validate(submission);
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         await using SqlTransaction transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
@@ -46,14 +47,14 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         const string insertApplication = """
             INSERT INTO dbo.ApplicationLetters
             (
-                Code, ReferenceNo, Name, ContactPerson, FirstName, LastName, MainContactNo, ApplicationDate, DateReceived,
+                Code, ReferenceNo, Name, ContactPerson, FirstName, LastName, Street, Town, MainContactNo, ApplicationDate, DateReceived,
                 Comments, Programme, Requirements, ApplicationStatus, UserName, DateCreated, DateUpdated,
                 AuditID, CreatedBy, ExternalRequestId, Parish, DocumentSource
             )
             OUTPUT INSERTED.ID
             VALUES
             (
-                @Code, @ReferenceNo, @Name, @ContactPerson, @FirstName, @LastName, @MainContactNo, @ApplicationDate, @DateReceived,
+                @Code, @ReferenceNo, @Name, @ContactPerson, @FirstName, @LastName, @Street, @Town, @MainContactNo, @ApplicationDate, @DateReceived,
                 @Comments, @Programme, @Requirements, @ApplicationStatus, @UserName, @DateCreated, @DateUpdated,
                 @AuditID, @CreatedBy, @ExternalRequestId, @Parish, @DocumentSource
             );
@@ -66,6 +67,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@ContactPerson", submission.OrganizationName, SqlDbType.NVarChar, 255);
         AddNullable(command, "@FirstName", submission.FirstName, SqlDbType.NVarChar, 200);
         AddNullable(command, "@LastName", submission.LastName, SqlDbType.NVarChar, 100);
+        AddNullable(command, "@Street", submission.StreetAddress, SqlDbType.NVarChar, 500);
+        AddNullable(command, "@Town", submission.CommunityDistrict, SqlDbType.NVarChar, 500);
         AddNullable(command, "@MainContactNo", submission.OrganizationPhone, SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
@@ -286,7 +289,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         const string sql = """
             SELECT ID, Code, ReferenceNo, Name, MainContactNo, ApplicationDate, DateCreated,
-                   Comments, Programme, Requirements, ExternalRequestId
+                   Comments, Programme, Requirements, ExternalRequestId, Street, Town
             FROM dbo.ApplicationLetters
             WHERE ID = @ID AND GCRecord IS NULL;
             """;
@@ -310,6 +313,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         string? comments = reader.IsDBNull(7) ? null : reader.GetString(7);
         string? programme = reader.IsDBNull(8) ? null : reader.GetString(8);
         string? requirements = reader.IsDBNull(9) ? null : reader.GetString(9);
+        string? streetAddress = reader.IsDBNull(11) ? null : reader.GetString(11);
+        string? communityDistrict = reader.IsDBNull(12) ? null : reader.GetString(12);
         await reader.CloseAsync();
 
         List<ExternalApplicationItem> items = await ReadItemsAsync(connection, id, cancellationToken);
@@ -334,7 +339,9 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             null,
             comments,
             items,
-            []);
+            [],
+            StreetAddress: streetAddress,
+            CommunityDistrict: communityDistrict);
     }
 
     public async Task<ExternalApplicationStatus> SetStatusAsync(
