@@ -67,7 +67,9 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 item.RegistrationNumber,
                 item.Address,
                 item.Phone,
-                item.Email
+                item.Email,
+                item.OrganizationType,
+                item.Parish
             })
             .SingleAsync(cancellationToken);
 
@@ -107,6 +109,13 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 .Select(ToArtifactDescriptor)
                 .ToList();
 
+            var intake = await dbContext.QuickIntakes.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.RequestId == request.Id, cancellationToken);
+            string? applicantParish = await dbContext.Users.AsNoTracking()
+                .Where(item => item.Id == (request.SubmittedByUserId ?? request.CreatedByUserId))
+                .Select(item => item.Parish).SingleOrDefaultAsync(cancellationToken);
+            string parish = FfpManagerSubmissionParish.Resolve(
+                request.PublicReference, intake, organization.OrganizationType, organization.Parish, applicantParish);
             ExternalApplicationSubmission submission = new(
                 link.Id,
                 request.Id,
@@ -128,7 +137,9 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 request.Location,
                 request.Circumstances,
                 items,
-                artifacts);
+                artifacts,
+                parish,
+                intake is null ? "Request Portal" : "Request Portal - Quick Intake");
 
             ExternalApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
 

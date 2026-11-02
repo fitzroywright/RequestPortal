@@ -34,28 +34,31 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
             if (await reader.ReadAsync(cancellationToken))
             {
                 long id = reader.GetInt64(0);
-                string? code = reader.IsDBNull(1) ? null : reader.GetString(1);
                 string? referenceNo = reader.IsDBNull(2) ? null : reader.GetString(2);
                 DateTimeOffset accepted = reader.IsDBNull(3)
                     ? submission.SubmittedUtc
                     : new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(3), DateTimeKind.Utc));
                 await reader.CloseAsync();
+                string existingReference = await FfpManagerReferenceNumberGenerator.EnsureExistingAsync(
+                    connection, transaction, id, referenceNo, accepted, submission, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return new ExternalApplicationReference(id.ToString(), referenceNo ?? code ?? id.ToString(), accepted, true);
+                return new ExternalApplicationReference(id.ToString(), existingReference, accepted, true);
             }
         }
 
+        var generatedReference = await FfpManagerReferenceNumberGenerator.GenerateAsync(
+            connection, transaction, submission.Parish, submission.SubmittedUtc, cancellationToken);
         long statusId = await referenceData.ResolveApplicationStatusIdAsync(options.InitialApplicationStatus, cancellationToken);
         const string insert = """
             INSERT INTO dbo.ApplicationLetters
-            (Code,ReferenceNo,Name,ContactPerson,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId)
+            (Code,ReferenceNo,Name,ContactPerson,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource)
             OUTPUT INSERTED.ID
             VALUES
-            (@Code,@ReferenceNo,@Name,@ContactPerson,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId);
+            (@Code,@ReferenceNo,@Name,@ContactPerson,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource);
             """;
         await using SqlCommand command = new(insert, connection, transaction);
         AddNullable(command, "@Code", submission.PublicReference, SqlDbType.NVarChar, 500);
-        AddNullable(command, "@ReferenceNo", submission.PublicReference, SqlDbType.NVarChar, 500);
+        AddNullable(command, "@ReferenceNo", generatedReference.ReferenceNo, SqlDbType.NVarChar, 500);
         AddNullable(command, "@Name", submission.OrganizationName, SqlDbType.VarChar, 400);
         AddNullable(command, "@ContactPerson", submission.OrganizationName, SqlDbType.NVarChar, 255);
         AddNullable(command, "@MainContactNo", submission.OrganizationPhone, SqlDbType.NVarChar, 255);
@@ -71,6 +74,8 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@AuditID", $"RequestPortal:{submission.PortalRequestId:D}", SqlDbType.NVarChar, 100);
         AddNullable(command, "@CreatedBy", options.CreatedBy, SqlDbType.NVarChar, 100);
         command.Parameters.Add("@ExternalRequestId", SqlDbType.UniqueIdentifier).Value = submission.PortalRequestId;
+        command.Parameters.Add("@Parish", SqlDbType.BigInt).Value = generatedReference.ParishId;
+        AddNullable(command, "@DocumentSource", submission.DocumentSource, SqlDbType.NVarChar, 255);
         long applicationId = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
 
         foreach (ExternalApplicationItem item in submission.Items)
@@ -92,7 +97,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         }
 
         await transaction.CommitAsync(cancellationToken);
-        return new ExternalApplicationReference(applicationId.ToString(), submission.PublicReference, submission.SubmittedUtc, false);
+        return new ExternalApplicationReference(applicationId.ToString(), generatedReference.ReferenceNo, submission.SubmittedUtc, false);
     }
 
     public async Task SaveArtifactAsync(string applicationId, ExternalArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default)

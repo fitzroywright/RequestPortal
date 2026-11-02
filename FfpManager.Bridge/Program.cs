@@ -289,14 +289,7 @@ api.MapPost("/reference-data/refresh", async (
     return Results.Ok(await catalog.GetSnapshotAsync(cancellationToken));
 });
 
-api.MapPost("/applications", async (
-    ExternalApplicationSubmission submission,
-    IFfpManagerGateway gateway,
-    CancellationToken cancellationToken) =>
-{
-    ExternalApplicationReference reference = await gateway.CreateApplicationAsync(submission, cancellationToken);
-    return Results.Ok(reference);
-});
+api.MapPost("/applications", ApplicationSubmissionEndpoint.HandleAsync);
 
 api.MapPut("/applications/{applicationId}/artifacts/{documentId:guid}", async (
     string applicationId,
