@@ -40,7 +40,10 @@ public sealed record ExternalApplicationSubmission(
     string? ApplicantGender = null,
     string? ApplicantEmploymentStatus = null,
     string? StreetAddress = null,
-    string? CommunityDistrict = null);
+    string? CommunityDistrict = null,
+    string? PrimaryTelephone = null,
+    string? SecondaryTelephone = null,
+    DateOnly? DateOfBirth = null);
 
 public sealed record ExternalApplicationReference(string ApplicationId, string? ApplicationNumber, DateTimeOffset AcceptedUtc, bool AlreadyExisted = false);
 public sealed record ExternalApplicationStatus(string ApplicationId, string StatusCode, string StatusText, DateTimeOffset ChangedUtc, string? Detail = null, bool IsTerminal = false);

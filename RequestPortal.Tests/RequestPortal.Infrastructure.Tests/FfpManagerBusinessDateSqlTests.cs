@@ -41,7 +41,8 @@ public sealed class FfpManagerBusinessDateSqlTests
             "Individual", "Normal", "Synthetic timezone regression only", "Food", null, null, null, null,
             [new(Guid.NewGuid(), "Timezone verification only", 1, snapshot.UnitsOfMeasure.First().Name)], [], "Kingston",
             "Request Portal - Timezone Test", "Timezone", "Regression",
-            StreetAddress: "42 Separate Street", CommunityDistrict: "Separate District");
+            StreetAddress: "42 Separate Street", CommunityDistrict: "Separate District", PrimaryTelephone: "8762101234", SecondaryTelephone: "8762101235",
+            DateOfBirth: new DateOnly(1980,2,3), ApplicantGender: "Female", ApplicantEmail: "mapping@example.invalid");
         try
         {
             var accepted = await gateway.CreateApplicationAsync(submission, token);
@@ -55,9 +56,19 @@ public sealed class FfpManagerBusinessDateSqlTests
             Assert.Equal(submitted, saved.SubmittedUtc);
             Assert.Equal(submission.StreetAddress,saved.StreetAddress);
             Assert.Equal(submission.CommunityDistrict,saved.CommunityDistrict);
+            Assert.Equal(submission.DateOfBirth,saved.DateOfBirth);
+            Assert.Equal("Female",saved.ApplicantGender);
+            Assert.Equal("+18762101234",saved.PrimaryTelephone);
+            Assert.Equal("+18762101235",saved.SecondaryTelephone);
+            Assert.Equal(submission.ApplicantEmail,saved.ApplicantEmail);
             Assert.Equal(submitted, (await gateway.GetStatusAsync(accepted.ApplicationId, token))!.ChangedUtc);
 
             await using var connection = await FfpSqlConnection.OpenAsync(sql!, "Rehearsal", token);
+            await using (var count = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.PhoneNumbers WHERE ApplicationLetter=@ID AND GCRecord IS NULL;",connection))
+            {
+                count.Parameters.Add("@ID",SqlDbType.BigInt).Value=long.Parse(accepted.ApplicationId);
+                Assert.Equal(2L,(long)(await count.ExecuteScalarAsync(token))!);
+            }
             async Task AssertDates(string query, DateTime expected)
             {
                 await using var command = new SqlCommand(query, connection);

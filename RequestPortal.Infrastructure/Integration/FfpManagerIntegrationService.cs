@@ -161,7 +161,10 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 intake?.Gender,
                 intake?.EmploymentStatus,
                 intake?.StreetAddress,
-                intake?.CommunityDistrict);
+                intake?.CommunityDistrict,
+                intake?.MobileNumber,
+                intake?.SecondaryTelephone,
+                intake?.DateOfBirth);
 
             ExternalApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
 

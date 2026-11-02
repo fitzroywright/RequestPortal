@@ -20,6 +20,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
     {
         BridgeApplicantName.Validate(submission);
         BridgeApplicantAddress.Validate(submission);
+        BridgeApplicantProfile.Validate(submission);
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         await using SqlTransaction transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
@@ -37,6 +38,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
                 AlreadyExisted: true);
         }
 
+        var applicantProfile = await BridgeApplicantProfile.PrepareAsync(connection, transaction, submission, cancellationToken);
+
         var generatedReference = await FfpManagerReferenceNumberGenerator.GenerateAsync(
             connection, transaction, submission.Parish, submission.SubmittedUtc, cancellationToken);
 
@@ -47,14 +50,14 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         const string insertApplication = """
             INSERT INTO dbo.ApplicationLetters
             (
-                Code, ReferenceNo, Name, ContactPerson, FirstName, LastName, Street, Town, MainContactNo, ApplicationDate, DateReceived,
+                Code, ReferenceNo, Name, ContactPerson, FirstName, LastName, Street, Town, DateOfBirth, Gender, MainContactNo, ApplicationDate, DateReceived,
                 Comments, Programme, Requirements, ApplicationStatus, UserName, DateCreated, DateUpdated,
                 AuditID, CreatedBy, ExternalRequestId, Parish, DocumentSource
             )
             OUTPUT INSERTED.ID
             VALUES
             (
-                @Code, @ReferenceNo, @Name, @ContactPerson, @FirstName, @LastName, @Street, @Town, @MainContactNo, @ApplicationDate, @DateReceived,
+                @Code, @ReferenceNo, @Name, @ContactPerson, @FirstName, @LastName, @Street, @Town, @DateOfBirth, @Gender, @MainContactNo, @ApplicationDate, @DateReceived,
                 @Comments, @Programme, @Requirements, @ApplicationStatus, @UserName, @DateCreated, @DateUpdated,
                 @AuditID, @CreatedBy, @ExternalRequestId, @Parish, @DocumentSource
             );
@@ -69,7 +72,9 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@LastName", submission.LastName, SqlDbType.NVarChar, 100);
         AddNullable(command, "@Street", submission.StreetAddress, SqlDbType.NVarChar, 500);
         AddNullable(command, "@Town", submission.CommunityDistrict, SqlDbType.NVarChar, 500);
-        AddNullable(command, "@MainContactNo", submission.OrganizationPhone, SqlDbType.NVarChar, 255);
+        command.Parameters.Add("@DateOfBirth", SqlDbType.DateTime).Value = submission.DateOfBirth is { } birth ? birth.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+        command.Parameters.Add("@Gender", SqlDbType.Int).Value = BridgeApplicantProfile.Gender(submission.ApplicantGender) is { } gender ? gender : DBNull.Value;
+        AddNullable(command, "@MainContactNo", BridgeApplicantProfile.MainContact(submission), SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         AddNullable(command, "@Comments", CombineComments(submission), SqlDbType.NVarChar, 2500);
@@ -87,6 +92,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@DocumentSource", submission.DocumentSource, SqlDbType.NVarChar, 255);
         object? inserted = await command.ExecuteScalarAsync(cancellationToken);
         long applicationId = Convert.ToInt64(inserted, System.Globalization.CultureInfo.InvariantCulture);
+
+        await BridgeApplicantProfile.InsertChildrenAsync(connection, transaction, applicationId, applicantProfile, submission, options, cancellationToken);
 
         foreach (ExternalApplicationItem item in submission.Items)
         {
@@ -289,7 +296,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         const string sql = """
             SELECT ID, Code, ReferenceNo, Name, MainContactNo, ApplicationDate, DateCreated,
-                   Comments, Programme, Requirements, ExternalRequestId, Street, Town
+                   Comments, Programme, Requirements, ExternalRequestId, Street, Town, FirstName, LastName, DateOfBirth, Gender
             FROM dbo.ApplicationLetters
             WHERE ID = @ID AND GCRecord IS NULL;
             """;
@@ -315,7 +322,25 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         string? requirements = reader.IsDBNull(9) ? null : reader.GetString(9);
         string? streetAddress = reader.IsDBNull(11) ? null : reader.GetString(11);
         string? communityDistrict = reader.IsDBNull(12) ? null : reader.GetString(12);
+        string? firstName = reader.IsDBNull(13) ? null : reader.GetString(13);
+        string? lastName = reader.IsDBNull(14) ? null : reader.GetString(14);
+        DateOnly? birth = reader.IsDBNull(15) ? null : DateOnly.FromDateTime(reader.GetDateTime(15));
+        string? gender = reader.IsDBNull(16) ? null : reader.GetInt32(16) switch { 1 => "Male", 2 => "Female", 0 => "Unspecified", _ => null };
         await reader.CloseAsync();
+        string? primary = null, secondary = null, email = null;
+        await using (var children = new SqlCommand("SELECT NumberType,Number FROM dbo.PhoneNumbers WHERE ApplicationLetter=@ID AND GCRecord IS NULL AND NumberType IN (93,83) ORDER BY OID; SELECT TOP (1) MailboxName FROM dbo.EmailAddresses WHERE ApplicationLetter=@ID AND GCRecord IS NULL AND AddressType=93 ORDER BY OID;", connection))
+        {
+            children.Parameters.Add("@ID", SqlDbType.BigInt).Value = id;
+            await using var childReader = await children.ExecuteReaderAsync(cancellationToken);
+            while (await childReader.ReadAsync(cancellationToken))
+            {
+                if (childReader.IsDBNull(1)) continue;
+                if (childReader.GetInt64(0) == 93) primary ??= childReader.GetString(1);
+                else secondary ??= childReader.GetString(1);
+            }
+            await childReader.NextResultAsync(cancellationToken);
+            if (await childReader.ReadAsync(cancellationToken) && !childReader.IsDBNull(0)) email = childReader.GetString(0);
+        }
 
         List<ExternalApplicationItem> items = await ReadItemsAsync(connection, id, cancellationToken);
         return new ExternalApplicationSubmission(
@@ -341,7 +366,14 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             items,
             [],
             StreetAddress: streetAddress,
-            CommunityDistrict: communityDistrict);
+            CommunityDistrict: communityDistrict,
+            FirstName: firstName,
+            LastName: lastName,
+            ApplicantEmail: email,
+            ApplicantGender: gender,
+            PrimaryTelephone: primary,
+            SecondaryTelephone: secondary,
+            DateOfBirth: birth);
     }
 
     public async Task<ExternalApplicationStatus> SetStatusAsync(
