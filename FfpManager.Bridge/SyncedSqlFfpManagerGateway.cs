@@ -25,6 +25,8 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         ValidateSubmission(submission);
 
         BridgeApplicantName.Validate(submission);
+        BridgeApplicantAddress.Validate(submission);
+        BridgeApplicantProfile.Validate(submission);
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         await using SqlTransaction transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
@@ -47,15 +49,17 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
             }
         }
 
+        var applicantProfile = await BridgeApplicantProfile.PrepareAsync(connection, transaction, submission, cancellationToken);
+
         var generatedReference = await FfpManagerReferenceNumberGenerator.GenerateAsync(
             connection, transaction, submission.Parish, submission.SubmittedUtc, cancellationToken);
         long statusId = await referenceData.ResolveApplicationStatusIdAsync(options.InitialApplicationStatus, cancellationToken);
         const string insert = """
             INSERT INTO dbo.ApplicationLetters
-            (Code,ReferenceNo,Name,ContactPerson,FirstName,LastName,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource)
+            (Code,ReferenceNo,Name,ContactPerson,FirstName,LastName,Street,Town,DateOfBirth,Gender,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource)
             OUTPUT INSERTED.ID
             VALUES
-            (@Code,@ReferenceNo,@Name,@ContactPerson,@FirstName,@LastName,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource);
+            (@Code,@ReferenceNo,@Name,@ContactPerson,@FirstName,@LastName,@Street,@Town,@DateOfBirth,@Gender,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource);
             """;
         await using SqlCommand command = new(insert, connection, transaction);
         AddNullable(command, "@Code", submission.PublicReference, SqlDbType.NVarChar, 500);
@@ -64,7 +68,11 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@ContactPerson", submission.OrganizationName, SqlDbType.NVarChar, 255);
         AddNullable(command, "@FirstName", submission.FirstName, SqlDbType.NVarChar, 200);
         AddNullable(command, "@LastName", submission.LastName, SqlDbType.NVarChar, 100);
-        AddNullable(command, "@MainContactNo", submission.OrganizationPhone, SqlDbType.NVarChar, 255);
+        AddNullable(command, "@Street", submission.StreetAddress, SqlDbType.NVarChar, 500);
+        AddNullable(command, "@Town", submission.CommunityDistrict, SqlDbType.NVarChar, 500);
+        command.Parameters.Add("@DateOfBirth", SqlDbType.DateTime).Value = submission.DateOfBirth is { } birth ? birth.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+        command.Parameters.Add("@Gender", SqlDbType.Int).Value = BridgeApplicantProfile.Gender(submission.ApplicantGender) is { } gender ? gender : DBNull.Value;
+        AddNullable(command, "@MainContactNo", BridgeApplicantProfile.MainContact(submission), SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         AddNullable(command, "@Comments", CombineComments(submission), SqlDbType.NVarChar, 2500);
@@ -80,6 +88,8 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         command.Parameters.Add("@Parish", SqlDbType.BigInt).Value = generatedReference.ParishId;
         AddNullable(command, "@DocumentSource", submission.DocumentSource, SqlDbType.NVarChar, 255);
         long applicationId = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
+
+        await BridgeApplicantProfile.InsertChildrenAsync(connection, transaction, applicationId, applicantProfile, submission, options, cancellationToken);
 
         foreach (ExternalApplicationItem item in submission.Items)
         {

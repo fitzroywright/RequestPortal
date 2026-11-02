@@ -156,10 +156,15 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 intake is null ? "Request Portal" : "Request Portal - Quick Intake",
                 intake?.FirstName,
                 intake?.LastName,
-                intake is null ? null : string.Join(", ", new[] { intake.StreetAddress, intake.CommunityDistrict, intake.Parish }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                intake?.StreetAddress,
                 intake?.Email,
                 intake?.Gender,
-                intake?.EmploymentStatus);
+                intake?.EmploymentStatus,
+                intake?.StreetAddress,
+                intake?.CommunityDistrict,
+                intake?.MobileNumber,
+                intake?.SecondaryTelephone,
+                intake?.DateOfBirth);
 
             ExternalApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
 
