@@ -97,6 +97,10 @@
                             {
                                 <a asp-page="/Management/Index">Management</a>
                             }
+                            @if (User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ManageSecurity))
+                            {
+                                <a asp-page="/Administration/Staff">Administration → Staff &amp; Roles</a>
+                            }
                             <a asp-page="/Staff/Reviewers">Reviewers</a>
                         }
                         else

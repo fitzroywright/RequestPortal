@@ -1,7 +1,4 @@
 using RequestPortal.Web.Security;
-using Common.Security.Hosting;
-using Common.Security.Abstractions;
-using Common.Security.Models;
 using System.Security.Claims;
 using RequestPortal.Application.Messages;
 using RequestPortal.Web.Messaging;
@@ -14,10 +11,13 @@ internal static class EndpointRegistration
     public static void Map(WebApplication app)
     {
         app.MapRazorPages();
-        string provider=app.Configuration["Authentication:StaffOidc:ProviderId"] ?? "requestportal-staff";
-        app.MapCommonAccountAdministration("/api/staff/security/accounts",AccountPopulation.Staff,
-            new Dictionary<AuthenticationProviderKind,string>{{AuthenticationProviderKind.External,provider},{AuthenticationProviderKind.EntraId,provider}},
-            http=>http.User.HasClaim(StaffOidcOptions.PermissionClaim,"security.manage"));
+        // Staff lifecycle writes go through the audited, confirmed Razor workflow.
+        // The generic account API cannot enforce application last-administrator rules.
+        app.MapGet("/api/staff/security/accounts", async (HttpContext http, StaffAdministrationService administration) =>
+        {
+            try { return Results.Ok(await administration.DirectoryAsync(http.User)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization("StaffAdministration");
 
         app.MapHub<PortalMessageHub>("/hubs/messages")
             .RequireAuthorization("PortalMessages");

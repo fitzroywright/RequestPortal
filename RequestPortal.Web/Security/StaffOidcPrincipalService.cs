@@ -20,6 +20,7 @@ public sealed class StaffOidcPrincipalService(RequestPortalAccounts accounts, IP
             .Provision(proof, AccountPopulation.Staff, true).Account;
         if (account.Status is SecurityAccountStatus.Disabled or SecurityAccountStatus.Suspended)
             return new(false,null,"ACCOUNT_DISABLED");
+        accounts.RecordStaffSignIn(account, proof);
         List<Claim> claims = [new(ClaimTypes.NameIdentifier,account.Id), new(ClaimTypes.Name,account.DisplayName),
             new(StaffOidcOptions.StaffSurfaceClaim,StaffOidcOptions.StaffSurfaceValue)];
         claims.AddRange(AccountSecurityHosting.SessionClaims(account,proof));

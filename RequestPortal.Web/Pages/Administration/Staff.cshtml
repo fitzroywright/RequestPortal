@@ -1,0 +1,59 @@
+@page
+@model RequestPortal.Web.Pages.Administration.StaffModel
+@using Common.Security.Abstractions
+@{ ViewData["Title"] = "Staff & Roles"; }
+<section class="section"><div class="shell">
+<div class="eyebrow">Administration</div><h1>Staff &amp; Roles</h1>
+<p><a asp-page="Staff">All staff</a> · <a asp-page="Staff" asp-route-Status="PendingAccess">Pending Access (@Model.PendingCount)</a> · <a href="#roles">Roles &amp; permissions</a></p>
+@if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. Use the documented offline provisioning command with an approved staff identity.</p> }
+<div asp-validation-summary="All" class="flash error"></div>
+@if (Model.Selected is { } staff)
+{
+<div class="card">
+<h2>@staff.Account.DisplayName</h2>
+<dl><dt>Account ID</dt><dd>@staff.Account.Id</dd><dt>Username</dt><dd>@staff.Account.LoginName</dd><dt>Email</dt><dd>@(staff.Email ?? "Not supplied by provider")</dd><dt>Status</dt><dd>@staff.Account.Status</dd><dt>Authentication provider</dt><dd>@staff.Account.ProviderKind</dd><dt>Registered</dt><dd>@staff.Registered</dd><dt>Last sign-in</dt><dd>@staff.LastSignIn</dd></dl>
+<h3>Verified authentication identities</h3>
+@foreach (var identity in staff.Identities) { <p>Provider: @identity.Key.ProviderId · Scope: @identity.Key.ScopeId · Subject: @identity.Key.SubjectId</p> }
+<h3>Effective permissions</h3><p>@(Model.Permissions.Count == 0 ? "No active permissions." : string.Join(", ",Model.Permissions))</p>
+<p class="muted">Permissions include the latest verified directory group claims; changes at the identity provider require a fresh sign-in. The role catalog below shows configured role permissions; inactive accounts receive no permissions.</p>
+<form method="post">
+<input type="hidden" asp-for="Id"/><input type="hidden" asp-for="Version"/>
+<label asp-for="DisplayName">Staff name</label><input asp-for="DisplayName" maxlength="200" required/>
+<label asp-for="Email">Contact email</label><input asp-for="Email" type="email" maxlength="256"/>
+<p class="muted">Changing contact information does not change the verified authentication identity.</p>
+<fieldset><legend>Assigned roles</legend>
+@foreach (var role in Model.Roles) {
+<label><input type="checkbox" name="SelectedRoles" value="@role.Key" checked="@(Model.SelectedRoles.Contains(role.Key))"/> @role.Name — @string.Join(", ",role.Permissions)</label>
+}
+</fieldset>
+<label asp-for="Reason">Administrative decision</label><textarea asp-for="Reason" maxlength="1000" required></textarea>
+<label><input asp-for="Confirmed" required/> I confirm the selected roles and access decision for @staff.Account.LoginName.</label>
+<div class="action-row">
+<button class="button" name="operation" value="Save">Save</button><a class="button button-outline" asp-page="Staff">Cancel</a>
+@if (staff.Account.Status == SecurityAccountStatus.PendingAccess) {
+<button class="button" name="operation" value="Approve">Approve &amp; Activate</button><button class="button button-outline" name="operation" value="Reject">Reject</button>
+} else if (staff.Account.Status != SecurityAccountStatus.Active) {
+<button class="button" name="operation" value="Activate">Activate</button>
+} else { <button class="button button-outline" name="operation" value="Suspend">Suspend</button> }
+<button class="button button-outline" name="operation" value="Revoke">Revoke Access</button>
+</div></form>
+<h3>Access &amp; administrative audit history</h3>
+<table><thead><tr><th>When</th><th>Actor</th><th>Event / decision</th></tr></thead><tbody>
+@foreach (var entry in Model.History) { <tr><td>@entry.Time</td><td>@entry.Actor</td><td>@entry.Action</td></tr> }
+</tbody></table>
+</div>
+}
+<form method="get" class="card">
+<label asp-for="Search">Search staff</label><input asp-for="Search"/>
+<label asp-for="Status">Account status</label><select asp-for="Status"><option value="">All statuses</option>@foreach(var status in Enum.GetNames<SecurityAccountStatus>()) { <option value="@status">@status</option> }</select>
+<label asp-for="Role">Role</label><select asp-for="Role"><option value="">All roles</option>@foreach(var role in Model.Roles) { <option value="@role.Key">@role.Name</option> }</select>
+<label asp-for="Sort">Sort by</label><select asp-for="Sort"><option value="name">Name</option><option value="username">Username</option><option value="email">Email</option><option value="provider">Provider</option><option value="status">Status</option><option value="last">Last sign-in</option><option value="registered">Date registered</option></select><button class="button">Apply</button>
+</form>
+<div class="card"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Provider</th><th>Status</th><th>Roles</th><th>Last sign-in</th><th>Registered</th></tr></thead><tbody>
+@foreach(var entry in Model.Entries) {
+<tr><td><a asp-page="Staff" asp-route-Id="@entry.Account.Id">@entry.Account.DisplayName</a></td><td>@entry.Account.LoginName</td><td>@entry.Email</td><td>@string.Join(", ",entry.Identities.Select(x=>x.Key.ProviderId))</td><td>@entry.Account.Status</td><td>@string.Join(", ",entry.Roles)</td><td>@entry.LastSignIn</td><td>@entry.Registered</td></tr>
+}
+</tbody></table>@if (Model.Entries.Count == 0) { <p>No staff match these filters.</p> }</div>
+<div class="card" id="roles"><h2>Common.Security roles</h2><p>These are the existing application roles. Custom role editing is not exposed by the current authorization adapter.</p>
+@foreach(var role in Model.Roles) { <h3><a asp-page="Staff" asp-route-Role="@role.Key">@role.Name — view staff members</a></h3><p>Permissions: @string.Join(", ",role.Permissions)</p> }
+</div></div></section>

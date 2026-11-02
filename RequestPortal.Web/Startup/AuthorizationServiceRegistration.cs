@@ -13,6 +13,13 @@ internal static class AuthorizationServiceRegistration
     {
         builder.Services.AddAuthorization(options =>
         {
+            options.AddPolicy("StaffAdministration", policy => {
+                policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue);
+                policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.Access);
+                policy.RequireClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ManageSecurity);
+            });
             options.AddPolicy(
                 "PortalRepresentative"
                 , policy =>
@@ -81,6 +88,7 @@ internal static class AuthorizationServiceRegistration
             options.Conventions.AuthorizeFolder(
                 "/Dashboard"
                 , "PortalRepresentative");
+            options.Conventions.AuthorizeFolder("/Administration", "StaffAdministration");
             options.Conventions.AuthorizeFolder(
                 "/Staff"
                 , PortalPolicies.FfpStaff);
