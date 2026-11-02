@@ -77,8 +77,6 @@ public sealed class ParishSubmissionPersistenceTests
         request.SetSummary("Organization request");
         request.AddItem(new RequestPortal.Domain.Requests.AssistanceRequestItem(
             Guid.NewGuid(), request.Id, "Food parcels", 2, original.Items.Single().UnitOfMeasureId));
-        request.AddItem(new RequestPortal.Domain.Requests.AssistanceRequestItem(
-            Guid.NewGuid(), request.Id, "Food parcels", 2, original.Items.Single().UnitOfMeasureId));
         request.Submit(original.CreatedByUserId, DateTimeOffset.UtcNow);
         database.Db.AssistanceRequests.Add(request);
         await database.Db.SaveChangesAsync(token);
