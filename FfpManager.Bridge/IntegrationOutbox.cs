@@ -107,6 +107,9 @@ public sealed class SqlIntegrationOutboxStore : IIntegrationOutboxStore
         await using SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
+            // SQL Server requires the reader to be closed before committing,
+            // including when the outbox is empty.
+            await reader.CloseAsync();
             await transaction.CommitAsync(cancellationToken);
             return null;
         }
