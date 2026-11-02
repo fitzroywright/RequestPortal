@@ -112,6 +112,10 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         if (initialized) return;
 
         const string schemaSql = """
+            CREATE TABLE IF NOT EXISTS requestportal_staff_provisioning (
+                singleton integer PRIMARY KEY CHECK(singleton=1),
+                account_id text NOT NULL, actor_id text NOT NULL, completed_at timestamptz NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS requestportal_permissions (
                 permission_key text PRIMARY KEY,
                 description text NOT NULL

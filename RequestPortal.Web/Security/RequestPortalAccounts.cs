@@ -16,10 +16,39 @@ public sealed class RequestPortalAccounts
     public RelationalAccountStore Public { get; }
     public RequestPortalAccounts(string connectionString)
     {
+        connectionStringForMetadata = connectionString;
         Staff = new(() => new NpgsqlConnection(connectionString), "RequestPortal.Staff", provisionApplicationRecord: Project);
         Public = new(() => new NpgsqlConnection(connectionString), "RequestPortal.Public", provisionApplicationRecord: Project);
     }
-    public void EnsureSchema() { Staff.EnsureSchema(); Public.EnsureSchema(); }
+    public void EnsureSchema()
+    {
+        Staff.EnsureSchema(); Public.EnsureSchema();
+        using var connection = new NpgsqlConnection(connectionStringForMetadata);
+        connection.Open();
+        using var command = new NpgsqlCommand("CREATE TABLE IF NOT EXISTS requestportal_staff_signins(account_id text PRIMARY KEY, groups text[] NOT NULL, last_sign_in timestamptz NOT NULL)",connection);
+        command.ExecuteNonQuery();
+    }
+    private readonly string connectionStringForMetadata;
+    public void RecordStaffSignIn(SecurityAccount account, VerifiedIdentity proof)
+    {
+        using var connection = new NpgsqlConnection(connectionStringForMetadata); connection.Open();
+        using var transaction = connection.BeginTransaction();
+        using var command = new NpgsqlCommand("""
+            UPDATE "AspNetUsers" SET "LastSignInUtc"=@now, "Email"=COALESCE(@email,"Email") WHERE "Id"=@id AND "IsInternalStaff";
+            INSERT INTO requestportal_staff_signins(account_id,groups,last_sign_in) VALUES(@account,@groups,@now)
+            ON CONFLICT(account_id) DO UPDATE SET groups=EXCLUDED.groups,last_sign_in=EXCLUDED.last_sign_in;
+            INSERT INTO common_security_account_events(application_id,event_id,account_id,actor_id,action,occurred_at)
+            VALUES('RequestPortal.Staff',@event,@account,@account,'StaffAuthenticated',@time);
+            """,connection,transaction);
+        command.Parameters.AddWithValue("now",DateTimeOffset.UtcNow);
+        command.Parameters.AddWithValue("email",NpgsqlTypes.NpgsqlDbType.Text,(object?)proof.VerifiedEmail ?? DBNull.Value);
+        command.Parameters.AddWithValue("id",Guid.Parse(account.Id));
+        command.Parameters.AddWithValue("account",account.Id);
+        command.Parameters.AddWithValue("groups",proof.GroupNames.ToArray());
+        command.Parameters.AddWithValue("event",Guid.NewGuid().ToString());
+        command.Parameters.AddWithValue("time",DateTimeOffset.UtcNow.ToString("O"));
+        command.ExecuteNonQuery(); transaction.Commit();
+    }
     private static void Project(DbConnection connection, DbTransaction transaction, SecurityAccount account, VerifiedIdentity? proof)
     {
         using var db = new RequestPortalDbContext(new DbContextOptionsBuilder<RequestPortalDbContext>()

@@ -41,7 +41,10 @@ internal sealed class PostgreSqlTestDatabase : IAsyncDisposable
 
         NpgsqlConnectionStringBuilder builder = new(baseConnectionString)
         {
-            SearchPath = schemaName
+            SearchPath = schemaName,
+            // Every test uses a unique schema/connection string. Retaining a pool per
+            // schema exhausts PostgreSQL connections as the integration suite grows.
+            Pooling = false
         };
 
         DbContextOptions<RequestPortalDbContext> options =

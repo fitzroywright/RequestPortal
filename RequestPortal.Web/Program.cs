@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Common.Diagnostics;
 using Common.Secrets;
 using RequestPortal.Common.Configuration;
@@ -5,7 +6,7 @@ using RequestPortal.Web.Configuration;
 using RequestPortal.Web.Startup;
 
 WebApplicationBuilder builder =
-    WebApplication.CreateBuilder(args);
+    WebApplication.CreateBuilder(args.FirstOrDefault() == "provision-staff" ? [] : args);
 
 string operationsLogInstanceId =
     OperationsServiceRegistration.Add(builder);
@@ -20,6 +21,20 @@ RuntimeSecrets runtimeSecrets =
     await ProductionCommissioning.LoadRuntimeSecretsAsync(
         secretsRuntime.Provider
         , builder.Configuration);
+
+if (args.Length > 0 && args[0] == "provision-staff")
+{
+    if (args.Length != 7) throw new ArgumentException("provision-staff ACCOUNT_ID PROVIDER SCOPE SUBJECT AUTHORITY REASON requires six explicit values.");
+    string protectedConnection = runtimeSecrets.ConnectionString ?? throw new InvalidOperationException("Protected PostgreSQL configuration is required.");
+    using var db = new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(
+        new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>().UseNpgsql(protectedConnection).Options);
+    var accounts = new RequestPortal.Web.Security.RequestPortalAccounts(protectedConnection); accounts.EnsureSchema();
+    var roleStore = new RequestPortal.Infrastructure.Security.RequestPortalAuthorizationStore(db, Microsoft.Extensions.Options.Options.Create(new RequestPortal.Infrastructure.Security.ActiveDirectoryOptions()));
+    var service = new RequestPortal.Web.Security.StaffAdministrationService(accounts,db,roleStore,new global::Common.Security.Authorization.PermissionAuthorizer(roleStore));
+    await service.BootstrapAsync(args[1],args[2],args[3],args[4],args[5],args[6]);
+    Console.WriteLine("Administrator provisioning persistence and security.manage permission verified.");
+    return;
+}
 
 DiagnosticsServiceRegistration.Add(
     builder
@@ -81,6 +96,13 @@ app.MapDiagnosticLevelRuntime();
 
 await StartupTasks.ApplyDatabaseMigrationsAsync(app);
 app.Services.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().EnsureSchema();
+
+await using (var administrationScope = app.Services.CreateAsyncScope())
+{
+    var administration = administrationScope.ServiceProvider.GetRequiredService<RequestPortal.Web.Security.StaffAdministrationService>();
+    if (!await administration.HasAdministratorAsync())
+        app.Logger.LogWarning("RP-STAFF-BOOTSTRAP-001: No active staff Administrator exists. Use the protected offline provision-staff command with an explicitly verified immutable staff identity. See docs/STAFF-ADMINISTRATION.md.");
+}
 
 ApplicationPipeline.Configure(app);
 EndpointRegistration.Map(app);

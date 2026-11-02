@@ -8,6 +8,20 @@ using RequestPortal.Web.Security;
 
 try
 {
+    if (args.Length > 0 && args[0] == "bootstrap-staff")
+    {
+        if (args.Length != 7) throw new ArgumentException("bootstrap-staff ACCOUNT_ID PROVIDER SCOPE SUBJECT AUTHORITY REASON requires all six explicit values.");
+        string protectedConnection = Environment.GetEnvironmentVariable("REQUESTPORTAL_MIGRATION_POSTGRES") ?? throw new ArgumentException("Protected PostgreSQL authority is required.");
+        using var bootstrapDb = new RequestPortalDbContext(new DbContextOptionsBuilder<RequestPortalDbContext>().UseNpgsql(protectedConnection).Options);
+        var accountStores = new RequestPortalAccounts(protectedConnection);
+        accountStores.EnsureSchema();
+        var roleStore = new RequestPortal.Infrastructure.Security.RequestPortalAuthorizationStore(bootstrapDb,
+            Microsoft.Extensions.Options.Options.Create(new RequestPortal.Infrastructure.Security.ActiveDirectoryOptions()));
+        var administration = new StaffAdministrationService(accountStores, bootstrapDb, roleStore, new global::Common.Security.Authorization.PermissionAuthorizer(roleStore));
+        await administration.BootstrapAsync(args[1], args[2], args[3], args[4], args[5], args[6]);
+        Console.WriteLine("Administrator provisioning verified. Existing staff identity retained; normal authorization remains enforced.");
+        return 0;
+    }
     if(args.Length<2 || args[0] is not ("export-public" or "apply-public" or "apply-staff"))
     {Console.WriteLine("export-public OUTPUT_JSON | apply-public APPROVED_JSON | apply-staff APPROVED_JSON. Uses REQUESTPORTAL_MIGRATION_POSTGRES. Export changes no database records. Review and protect the manifest before apply. Never links by email.");return 0;}
     string connection=Environment.GetEnvironmentVariable("REQUESTPORTAL_MIGRATION_POSTGRES") ?? throw new ArgumentException("Protected migration connection is required.");

@@ -22,6 +22,7 @@ internal static class PlatformServiceRegistration
         , string connectionString)
     {
         AddUploadLimits(builder);
+        builder.Services.AddScoped<RequestPortal.Web.Security.StaffAdministrationService>();
         builder.Services.AddSingleton(new RequestPortal.Web.Security.RequestPortalAccounts(connectionString));
         builder.Services.AddSingleton<global::Common.Security.Abstractions.ILocalCredentialStore>(sp => sp.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().Staff);
         builder.Services.AddSingleton(sp=>new global::Common.Security.Services.AccountProvisioningService(sp.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().Staff));
