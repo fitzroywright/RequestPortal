@@ -153,7 +153,9 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 items,
                 artifacts,
                 parish,
-                intake is null ? "Request Portal" : "Request Portal - Quick Intake");
+                intake is null ? "Request Portal" : "Request Portal - Quick Intake",
+                intake?.FirstName,
+                intake?.LastName);
 
             ExternalApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
 
