@@ -18,6 +18,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         ExternalApplicationSubmission submission,
         CancellationToken cancellationToken = default)
     {
+        BridgeApplicantName.Validate(submission);
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         await using SqlTransaction transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
@@ -45,14 +46,14 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         const string insertApplication = """
             INSERT INTO dbo.ApplicationLetters
             (
-                Code, ReferenceNo, Name, ContactPerson, MainContactNo, ApplicationDate, DateReceived,
+                Code, ReferenceNo, Name, ContactPerson, FirstName, LastName, MainContactNo, ApplicationDate, DateReceived,
                 Comments, Programme, Requirements, ApplicationStatus, UserName, DateCreated, DateUpdated,
                 AuditID, CreatedBy, ExternalRequestId, Parish, DocumentSource
             )
             OUTPUT INSERTED.ID
             VALUES
             (
-                @Code, @ReferenceNo, @Name, @ContactPerson, @MainContactNo, @ApplicationDate, @DateReceived,
+                @Code, @ReferenceNo, @Name, @ContactPerson, @FirstName, @LastName, @MainContactNo, @ApplicationDate, @DateReceived,
                 @Comments, @Programme, @Requirements, @ApplicationStatus, @UserName, @DateCreated, @DateUpdated,
                 @AuditID, @CreatedBy, @ExternalRequestId, @Parish, @DocumentSource
             );
@@ -63,6 +64,8 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@ReferenceNo", generatedReference.ReferenceNo, SqlDbType.NVarChar, 500);
         AddNullable(command, "@Name", submission.OrganizationName, SqlDbType.VarChar, 400);
         AddNullable(command, "@ContactPerson", submission.OrganizationName, SqlDbType.NVarChar, 255);
+        AddNullable(command, "@FirstName", submission.FirstName, SqlDbType.NVarChar, 200);
+        AddNullable(command, "@LastName", submission.LastName, SqlDbType.NVarChar, 100);
         AddNullable(command, "@MainContactNo", submission.OrganizationPhone, SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
         command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
@@ -515,7 +518,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         {
             throw new InvalidOperationException("Bridge:SqlConnectionString is required when Bridge:Gateway is Sql.");
         }
-        return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, cancellationToken);
+        return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, options.SqlTarget, cancellationToken);
     }
 
     private string MapStatus(string rawCode, string rawName)

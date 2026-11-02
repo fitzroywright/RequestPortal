@@ -171,6 +171,25 @@ public sealed class FfpManagerBridgeTests
         Assert.Contains("SqlConnectionString", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SqlGatewaysRejectOversizedApplicantNamesBeforeConnecting(bool synced)
+    {
+        IFfpManagerGateway gateway = synced
+            ? new SyncedSqlFfpManagerGateway(Options.Create(new BridgeOptions()), null!)
+            : new SqlFfpManagerGateway(Options.Create(new BridgeOptions()));
+        foreach (var submission in new[] {
+            CreateSubmission(Guid.NewGuid()) with { FirstName = new string('x',201) },
+            CreateSubmission(Guid.NewGuid()) with { LastName = new string('y',101) } })
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                gateway.CreateApplicationAsync(submission, TestContext.Current.CancellationToken));
+            Assert.Contains("200 characters", error.Message);
+            Assert.DoesNotContain("SqlConnectionString", error.Message);
+        }
+    }
+
     private static ExternalApplicationSubmission CreateSubmission(Guid correlationId) => new(
         correlationId,
         Guid.NewGuid(),

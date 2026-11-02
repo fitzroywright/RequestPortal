@@ -23,6 +23,39 @@ public sealed class FfpBridgeCommissioningTests
     }
 
     [Theory]
+    [InlineData("Production", "FFPJM")]
+    [InlineData("Rehearsal", "FFP")]
+    public void ExplicitTargetAcceptsOnlyItsOwnDatabase(string target, string database)
+    {
+        FfpSqlConnection.ValidateTarget($"Server=JMDB01;Database={database};Integrated Security=true;Encrypt=true", target);
+        string other = database == "FFP" ? "FFPJM" : "FFP";
+        Assert.Throws<InvalidOperationException>(() => FfpSqlConnection.ValidateTarget(
+            $"Server=JMDB01;Database={other};Integrated Security=true;Encrypt=true", target));
+    }
+
+    [Theory]
+    [InlineData("Server=OTHER;Database=FFPJM;Integrated Security=true;Encrypt=true")]
+    [InlineData("Server=JMDB01;Database=FFPJM;Integrated Security=true;Encrypt=false")]
+    [InlineData("Server=JMDB01;Database=FFPJM;User ID=synthetic;Password=synthetic;Encrypt=true")]
+    [InlineData("Server=JMDB01;Database=FFPJM;Integrated Security=true;Failover Partner=OTHER;Encrypt=true")]
+    [InlineData("Server=JMDB01;Database=FFPJM;Integrated Security=true;Server SPN=MSSQLSvc/OTHER;Encrypt=true")]
+    [InlineData("Server=JMDB01;Database=FFPJM;Integrated Security=true;ApplicationIntent=ReadOnly;Encrypt=true")]
+    [InlineData("Server=JMDB01;Database=FFPJM;Integrated Security=true;AttachDBFilename=other.mdf;Encrypt=true")]
+    public async Task ProductionRejectsUnsafeSettingsBeforeOpening(string connection)
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() => FfpSqlConnection.OpenAsync(
+            connection, "Production", TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("production")]
+    [InlineData("Other")]
+    public void MissingOrUnknownTargetFailsClosed(string target) =>
+        Assert.Throws<InvalidOperationException>(() => FfpSqlConnection.ValidateTarget(
+            "Server=JMDB01;Database=FFPJM;Integrated Security=true;Encrypt=true", target));
+
+    [Theory]
     [InlineData(@"C:\uploads\bad:name?.pdf", "bad_name_.pdf")]
     [InlineData("NUL.txt", "_NUL.txt")]
     [InlineData("...", "document.bin")]

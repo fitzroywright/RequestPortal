@@ -24,6 +24,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
     {
         ValidateSubmission(submission);
 
+        BridgeApplicantName.Validate(submission);
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
         await using SqlTransaction transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
@@ -61,8 +62,8 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@ReferenceNo", generatedReference.ReferenceNo, SqlDbType.NVarChar, 500);
         AddNullable(command, "@Name", submission.OrganizationName, SqlDbType.VarChar, 400);
         AddNullable(command, "@ContactPerson", submission.OrganizationName, SqlDbType.NVarChar, 255);
-        AddNullable(command, "@FirstName", submission.FirstName, SqlDbType.NVarChar, 255);
-        AddNullable(command, "@LastName", submission.LastName, SqlDbType.NVarChar, 255);
+        AddNullable(command, "@FirstName", submission.FirstName, SqlDbType.NVarChar, 200);
+        AddNullable(command, "@LastName", submission.LastName, SqlDbType.NVarChar, 100);
         AddNullable(command, "@MainContactNo", submission.OrganizationPhone, SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
         command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = submission.SubmittedUtc.UtcDateTime;
@@ -202,7 +203,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
     private async Task<SqlConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(options.SqlConnectionString)) throw new InvalidOperationException("Bridge:SqlConnectionString is required when Bridge:Gateway is Sql.");
-        return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, cancellationToken);
+        return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, options.SqlTarget, cancellationToken);
     }
 
     private static string NormalizeStatus(string value) => value.Trim().Replace('-', '_').Replace(' ', '_').ToUpperInvariant();

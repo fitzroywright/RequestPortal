@@ -45,6 +45,8 @@ public sealed class ParishSubmissionPersistenceTests
         {
             Assert.Equal(requestId, submission.PortalRequestId);
             Assert.Equal("Test Applicant", submission.OrganizationName);
+            Assert.Equal("Test", submission.FirstName);
+            Assert.Equal("Applicant", submission.LastName);
             Assert.Equal("Kingston", submission.Parish);
             Assert.Equal("Request Portal - Quick Intake", submission.DocumentSource);
             ExternalApplicationItem item = Assert.Single(submission.Items);
@@ -87,6 +89,8 @@ public sealed class ParishSubmissionPersistenceTests
 
         ExternalApplicationSubmission submission = Assert.Single(bridge.Submissions);
         Assert.Equal("Community Support Foundation", submission.OrganizationName);
+        Assert.Null(submission.FirstName);
+        Assert.Null(submission.LastName);
         Assert.Equal("Clarendon", submission.Parish);
         Assert.NotEqual("Request Portal - Quick Intake", submission.DocumentSource);
         Assert.Equal("Test", (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).FirstName);

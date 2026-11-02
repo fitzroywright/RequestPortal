@@ -113,6 +113,28 @@ public sealed class BridgeStartupConfigurationTests
         Assert.Contains("CustomBridge:SqlConnectionString", provider.Requests);
     }
 
+    [Fact]
+    public async Task ProductionTargetRejectsRehearsalSecretDuringStartup()
+    {
+        var configuration = CreateConfiguration();
+        configuration["Bridge:SqlTarget"] = "Production";
+        var provider = new DeferredProvider(Task.FromResult<string?>(TestConnection));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            BridgeStartupConfiguration.ResolveAndValidateAsync(configuration, provider, true, TestContext.Current.CancellationToken));
+        Assert.Contains("JMDB01/FFPJM", error.Message);
+        Assert.DoesNotContain("Integrated Security", error.Message);
+    }
+
+    [Fact]
+    public async Task ProductionTargetAcceptsOnlyProtectedProductionConnection()
+    {
+        var configuration = CreateConfiguration();
+        configuration["Bridge:SqlTarget"] = "Production";
+        var provider = new DeferredProvider(Task.FromResult<string?>(TestConnection.Replace("Database=FFP;", "Database=FFPJM;")));
+        await BridgeStartupConfiguration.ResolveAndValidateAsync(configuration, provider, true, TestContext.Current.CancellationToken);
+        FfpSqlConnection.ValidateTarget(configuration["Bridge:SqlConnectionString"]!, "Production");
+    }
+
     private static ConfigurationManager CreateConfiguration()
     {
         ConfigurationManager configuration = new();
@@ -120,6 +142,7 @@ public sealed class BridgeStartupConfigurationTests
         {
             // Same normalized keys produced by Bridge__... environment settings.
             ["Bridge:Gateway"] = "Sql",
+            ["Bridge:SqlTarget"] = "Rehearsal",
             ["Bridge:SqlConnectionStringSecretName"] = "FfpManagerBridge:SqlConnectionString",
             ["Bridge:SupportingDocumentRoot"] = "/synthetic-test-documents",
             ["Bridge:InitialApplicationStatus"] = "Pending_Investigation"

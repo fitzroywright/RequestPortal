@@ -5,17 +5,21 @@ namespace RequestPortal.Infrastructure.Tests;
 
 public sealed class FfpManagerRealDatabaseContractTests
 {
-    private static string? ConnectionString =>
-        Environment.GetEnvironmentVariable("FFPMANAGER_TEST");
+    private static string ConnectionString
+    {
+        get
+        {
+            string? connection = Environment.GetEnvironmentVariable("FFPMANAGER_TEST");
+            if (string.IsNullOrWhiteSpace(connection))
+                Assert.Skip("FFPMANAGER_TEST is unavailable; live rehearsal SQL contract was not verified.");
+            FfpManager.Bridge.FfpSqlConnection.ValidateTarget(connection!, "Rehearsal");
+            return connection!;
+        }
+    }
 
     [Fact]
     public async Task FfpManager_test_database_contains_RequestPortal_integration_schema()
     {
-        if (string.IsNullOrWhiteSpace(ConnectionString))
-        {
-            return;
-        }
-
         await using SqlConnection connection = new(ConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
@@ -71,11 +75,6 @@ public sealed class FfpManagerRealDatabaseContractTests
     [Fact]
     public async Task FfpManager_test_database_has_required_reference_data()
     {
-        if (string.IsNullOrWhiteSpace(ConnectionString))
-        {
-            return;
-        }
-
         await using SqlConnection connection = new(ConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
@@ -100,11 +99,6 @@ public sealed class FfpManagerRealDatabaseContractTests
     [Fact]
     public async Task FfpManager_test_database_outbox_procedures_exist()
     {
-        if (string.IsNullOrWhiteSpace(ConnectionString))
-        {
-            return;
-        }
-
         await using SqlConnection connection = new(ConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 

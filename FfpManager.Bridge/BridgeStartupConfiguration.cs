@@ -42,6 +42,8 @@ public static class BridgeStartupConfiguration
                 "Common.Secrets did not resolve Bridge:SqlConnectionStringSecretName into Bridge:SqlConnectionString. " +
                 "Verify the configured OpenBao provider, MountPath, BasePath and KV v2 data.data.value. SQL gateway startup is blocked.");
 
+        FfpSqlConnection.ValidateTarget(sqlConnection, configuration["Bridge:SqlTarget"] ?? string.Empty);
+
         if (string.IsNullOrWhiteSpace(configuration["Bridge:SupportingDocumentRoot"]))
             throw new InvalidOperationException("Bridge:SupportingDocumentRoot is required when Bridge:Gateway is Sql so RequestPortal artifacts can be stored for FFP Manager.");
 

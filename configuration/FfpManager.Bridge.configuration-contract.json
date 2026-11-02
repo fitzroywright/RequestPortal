@@ -95,6 +95,15 @@
       "purpose": "Windows-visible path to the same NAS directory mounted by the Linux bridge.",
       "configurationKey": "Bridge:SupportingDocumentManagerRoot",
       "isConfigured": false
+    },
+    {
+      "id": "sql-target",
+      "displayName": "Explicit SQL target",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Production selects only JMDB01/FFPJM; Rehearsal selects only JMDB01/FFP.",
+      "configurationKey": "Bridge:SqlTarget",
+      "isConfigured": false
     }
   ],
   "runbookReference": "docs/FFP-MANAGER-INTEGRATION-COMMISSIONING.md",

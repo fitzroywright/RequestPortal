@@ -114,7 +114,7 @@ if (builder.Environment.IsProduction())
     BridgeOptions productionOptions = builder.Configuration
         .GetSection(BridgeOptions.SectionName)
         .Get<BridgeOptions>() ?? new BridgeOptions();
-    FfpSqlConnection.ValidateTarget(productionOptions.SqlConnectionString);
+    FfpSqlConnection.ValidateTarget(productionOptions.SqlConnectionString, productionOptions.SqlTarget);
     _ = BridgeDocumentPath.ForManager(productionOptions, "startup-check.pdf");
     if (!productionOptions.EnableOutboxDispatch)
     {
@@ -433,6 +433,7 @@ public sealed class BridgeOptions
     public int CallbackTimeoutSeconds { get; set; } = 30;
     public long MaxArtifactBytes { get; set; } = 25L * 1024L * 1024L;
     public string Gateway { get; set; } = "Fake";
+    public string SqlTarget { get; set; } = string.Empty;
     public string SqlConnectionString { get; set; } = string.Empty;
     public string SupportingDocumentRoot { get; set; } = string.Empty;
     public string SupportingDocumentManagerRoot { get; set; } = string.Empty;
