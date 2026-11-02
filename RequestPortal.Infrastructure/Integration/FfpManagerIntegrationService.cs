@@ -73,6 +73,20 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             })
             .SingleAsync(cancellationToken);
 
+        // Quick Intake belongs to an individual. Use the captured applicant name
+        // rather than the synthetic organization name in the FFP application fields.
+        var quickIntakeApplicant = await dbContext.QuickIntakes
+            .AsNoTracking()
+            .Where(item => item.RequestId == request.Id)
+            .Select(item => new { item.FirstName, item.LastName })
+            .SingleOrDefaultAsync(cancellationToken);
+        string applicationName = quickIntakeApplicant is null
+            ? organization.Name
+            : string.Join(" ", new[] { quickIntakeApplicant.FirstName, quickIntakeApplicant.LastName }
+                .Where(value => !string.IsNullOrWhiteSpace(value))).Trim();
+        if (string.IsNullOrWhiteSpace(applicationName))
+            throw new InvalidOperationException("Quick Intake applicant first and last name are required for FFP Manager.");
+
         IntegrationLink link = await GetOrCreateLinkAsync(request.Id, cancellationToken);
         link.MarkPending(clock.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -121,7 +135,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 request.Id,
                 request.PublicReference,
                 organization.Id,
-                organization.Name,
+                applicationName,
                 organization.RegistrationNumber,
                 organization.Address,
                 organization.Phone,
