@@ -8,6 +8,7 @@ using Xunit;
 
 namespace RequestPortal.Infrastructure.Tests;
 
+[Trait("Category", "LiveFfpSql")]
 public sealed class FfpManagerBusinessDateSqlTests
 {
     // Opt-in rehearsal only. Each case creates its own marked application and document;

@@ -46,3 +46,11 @@ connection, and report a skip when unavailable. They must never be pointed at
 production; their synthetic fixture cleanup is limited to the generated request
 identity, and the counter-only test rolls back without rewinding the counter.
 A skipped SQL test is not live database acceptance evidence.
+
+The hosted coordinated security workflow runs the portable suite with
+`--filter "Category!=LiveFfpSql"` and retains its strict no-skipped/no-empty-results
+gate. Only the eight explicitly opt-in JMDB01 SQL cases carry this category;
+connection-guard unit tests remain in the required portable suite. Standard CI
+continues to discover and explicitly report unavailable live SQL tests as skips.
+Neither CI result substitutes for separately commissioned live SQL acceptance or
+changes the security baseline's production-approval status.

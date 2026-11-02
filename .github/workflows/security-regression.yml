@@ -66,7 +66,10 @@ jobs:
       - name: Test application security and business regressions
         run: |
           dotnet test RequestPortal.Tests/RequestPortal.Domain.Tests/RequestPortal.Domain.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --logger trx --results-directory TestResults
-          dotnet test RequestPortal.Tests/RequestPortal.Infrastructure.Tests/RequestPortal.Infrastructure.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --logger trx --results-directory TestResults
+          # LiveFfpSql is an explicit opt-in rehearsal category requiring JMDB01/Kerberos.
+          # Standard CI reports those unavailable tests as skips; this portable security
+          # gate still requires every selected security/business test to pass without skips.
+          dotnet test RequestPortal.Tests/RequestPortal.Infrastructure.Tests/RequestPortal.Infrastructure.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --filter "Category!=LiveFfpSql" --logger trx --results-directory TestResults
       - name: Build protected identity migration tool
         run: dotnet build RequestPortal.SecurityMigration/RequestPortal.SecurityMigration.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common"
       - name: Reject skipped or empty test evidence

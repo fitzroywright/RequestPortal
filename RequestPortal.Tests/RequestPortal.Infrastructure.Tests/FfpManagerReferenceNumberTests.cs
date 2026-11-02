@@ -16,6 +16,7 @@ public sealed class FfpManagerReferenceNumberTests
     public void Format_UsesFfpParishYearAndSharedSequence(string parish, long number, string expected) =>
         Assert.Equal(expected, FfpManagerReferenceNumberGenerator.Format(parish, new DateTimeOffset(2026, 10, 14, 0, 0, 0, TimeSpan.Zero), number));
 
+    [Trait("Category", "LiveFfpSql")]
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -118,6 +119,7 @@ public sealed class FfpManagerReferenceNumberTests
         }
     }
 
+    [Trait("Category", "LiveFfpSql")]
     [Fact]
     public async Task SharedCounter_OnFfpTestDatabase_AllocatesDistinctNumbers_AndRollsBack()
     {
