@@ -32,7 +32,8 @@ public sealed record NotificationEnvelope(
     string? CorrelationId = null,
     string? WhatsAppTemplateName = null,
     string? WhatsAppTemplateLanguage = null,
-    IReadOnlyList<string>? WhatsAppTemplateParameters = null);
+    IReadOnlyList<string>? WhatsAppTemplateParameters = null,
+    Guid? DeliveryId = null);
 
 public interface INotificationSender
 {

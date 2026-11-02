@@ -303,6 +303,16 @@ public sealed class QuickIntakeService : IQuickIntakeService
             AttemptCount = 0
         });
 
+        QuickIntakeClientRelationsEmailRequestedMessage clientRelations = new(
+            QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(request.Id), now, request.Id, publicReference);
+        dbContext.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = clientRelations.MessageId,
+            MessageType = QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType,
+            Payload = JsonSerializer.Serialize(clientRelations),
+            OccurredUtc = now
+        });
+
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 

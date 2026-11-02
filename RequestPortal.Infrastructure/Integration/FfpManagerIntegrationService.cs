@@ -181,6 +181,18 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             }
 
             link.MarkSynchronized(reference.ApplicationId, clock.UtcNow);
+            Guid emailId = QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(request.Id);
+            OutboxMessage? email = await dbContext.OutboxMessages.SingleOrDefaultAsync(item => item.Id == emailId, cancellationToken);
+            if (email is not null && email.ProcessedUtc is null &&
+                email.MessageType == QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType &&
+                !string.IsNullOrWhiteSpace(reference.ApplicationNumber) &&
+                !string.Equals(reference.ApplicationNumber, request.PublicReference, StringComparison.OrdinalIgnoreCase))
+            {
+                var notification = JsonSerializer.Deserialize<QuickIntakeClientRelationsEmailRequestedMessage>(email.Payload)
+                    ?? throw new InvalidOperationException("Invalid Client Relations outbox payload.");
+                email.Payload = JsonSerializer.Serialize(notification with { FfpManagerReference = reference.ApplicationNumber });
+                email.MessageType = typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName!;
+            }
             await dbContext.SaveChangesAsync(cancellationToken);
             return reference;
         }

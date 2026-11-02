@@ -59,7 +59,8 @@ public sealed class OutboxDispatcher
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         List<OutboxMessage> candidates = await dbContext.OutboxMessages
-            .Where(message => message.ProcessedUtc == null && message.AttemptCount < MaxAttempts)
+            .Where(message => message.ProcessedUtc == null && message.AttemptCount < MaxAttempts &&
+                message.MessageType != QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType)
             .OrderBy(message => message.OccurredUtc)
             .Take(Math.Max(batchSize * 4, batchSize))
             .ToListAsync(cancellationToken);
@@ -119,6 +120,12 @@ public sealed class OutboxDispatcher
 
     private async Task DispatchAsync(OutboxMessage outbox, CancellationToken cancellationToken)
     {
+        if (outbox.MessageType == typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName)
+        {
+            await SendQuickIntakeClientRelationsEmailAsync(
+                Deserialize<QuickIntakeClientRelationsEmailRequestedMessage>(outbox.Payload), cancellationToken);
+            return;
+        }
         if (outbox.MessageType.EndsWith(nameof(OrganizationApprovedMessage), StringComparison.Ordinal))
         {
             await SendOrganizationApprovedAsync(Deserialize<OrganizationApprovedMessage>(outbox.Payload), cancellationToken);
@@ -468,6 +475,28 @@ public sealed class OutboxDispatcher
             $"Request submitted: {request.PublicReference}",
             body,
             cancellationToken);
+    }
+
+    private async Task SendQuickIntakeClientRelationsEmailAsync(
+        QuickIntakeClientRelationsEmailRequestedMessage message, CancellationToken cancellationToken)
+    {
+        if (!notificationOptions.Enabled)
+            throw new InvalidOperationException("Client Relations email is pending because notification delivery is disabled.");
+        if (string.IsNullOrWhiteSpace(message.FfpManagerReference) ||
+            string.Equals(message.FfpManagerReference, message.PublicReference, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Client Relations email requires the FFP Manager reference.");
+        if (!await dbContext.QuickIntakes.AsNoTracking().AnyAsync(item => item.RequestId == message.RequestId, cancellationToken))
+            throw new InvalidOperationException("Client Relations notification requires a Quick Intake request.");
+
+        string recipient = new System.Net.Mail.MailAddress(notificationOptions.QuickIntakeClientRelationsEmail.Trim()).Address;
+        // This is a durable handoff. Common.Messaging owns transport retries and
+        // provider-completion receipts; outbox completion alone is not delivery.
+        await notificationSender.SendAsync(new NotificationEnvelope(
+            recipient,
+            $"New Quick Intake Request — {message.PublicReference}",
+            $"A new Quick Intake request has been submitted.\n\nRequest Portal reference: {message.PublicReference}\n" +
+            $"FFP Manager reference: {message.FfpManagerReference}\n\nPlease review this request in Request Portal.",
+            CorrelationId: message.MessageId.ToString("D"), DeliveryId: message.MessageId), cancellationToken);
     }
 
     private async Task SendRequestStatusChangedAsync(RequestStatusChangedMessage message, CancellationToken cancellationToken)

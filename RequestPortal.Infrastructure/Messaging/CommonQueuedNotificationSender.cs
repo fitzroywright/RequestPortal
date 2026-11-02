@@ -34,7 +34,7 @@ public sealed class CommonQueuedNotificationSender : RequestPortal.Common.Messag
             _ => throw new InvalidOperationException($"Unsupported notification transport '{notification.Transport}'.")
         };
 
-        Guid notificationId = Guid.NewGuid();
+        Guid notificationId = notification.DeliveryId ?? Guid.NewGuid();
         bool usesMobile = channel == MessageChannel.WhatsApp;
         RecipientSnapshot recipient = new(
             notification.Recipient,

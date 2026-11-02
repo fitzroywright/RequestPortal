@@ -6,6 +6,7 @@ using RequestPortal.Application.Documents;
 using RequestPortal.Application.Integration;
 using RequestPortal.Application.Requests;
 using RequestPortal.Common.Time;
+using RequestPortal.Common.Messaging;
 using RequestPortal.Domain.Documents;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Domain.ReferenceData;
@@ -59,8 +60,8 @@ public sealed class ParishSubmissionPersistenceTests
         var link = await database.Db.IntegrationLinks.SingleAsync(token);
         Assert.Equal(SynchronizationStatus.Synchronized, link.Status);
         Assert.Equal(first.ApplicationId, link.ExternalReference);
-        // Submission does not replace or duplicate the existing queued event.
-        Assert.Single(await database.Db.OutboxMessages.ToListAsync(token));
+        // The original submission and Client Relations events remain queued once each.
+        Assert.Equal(2, await database.Db.OutboxMessages.CountAsync(token));
         Assert.Equal("Kingston", (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).Parish);
     }
 
@@ -107,7 +108,7 @@ public sealed class ParishSubmissionPersistenceTests
         await database.Db.QuickIntakes.Where(item => item.RequestId == requestId)
             .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Parish, parish), token);
         database.Db.ChangeTracker.Clear();
-        string originalPayload = (await database.Db.OutboxMessages.AsNoTracking().SingleAsync(token)).Payload;
+        string originalPayload = (await database.Db.OutboxMessages.AsNoTracking().SingleAsync(item => item.MessageType == typeof(RequestSubmittedMessage).FullName, token)).Payload;
         CapturingBridge bridge = new();
 
         ExternalApplicationValidationException error = await Assert.ThrowsAsync<ExternalApplicationValidationException>(() =>
@@ -119,7 +120,7 @@ public sealed class ParishSubmissionPersistenceTests
         var link = await database.Db.IntegrationLinks.AsNoTracking().SingleAsync(token);
         Assert.Equal(SynchronizationStatus.Failed, link.Status);
         Assert.Equal(error.Message, link.LastError);
-        var queued = await database.Db.OutboxMessages.AsNoTracking().SingleAsync(token);
+        var queued = await database.Db.OutboxMessages.AsNoTracking().SingleAsync(item => item.MessageType == typeof(RequestSubmittedMessage).FullName, token);
         Assert.Equal(originalPayload, queued.Payload);
         Assert.Equal(0, queued.AttemptCount);
         Assert.Equal(parish, (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).Parish);
