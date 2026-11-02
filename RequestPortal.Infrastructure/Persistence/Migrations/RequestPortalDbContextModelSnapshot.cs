@@ -739,6 +739,8 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RequestPortal.Domain.Integration.IntegrationLink", b =>
                 {
+                    b.Property<string>("ApplicationNumber").HasColumnType("text");
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");

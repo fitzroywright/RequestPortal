@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Common.Messaging;
 using Microsoft.Extensions.Configuration;
@@ -276,6 +277,103 @@ public sealed class NotificationWorkflowTests
         Assert.Equal(
             ["manager@example.com", "representative@example.com"],
             history.Select(item => item.Destination).ToArray());
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    public async Task ReferenceConfirmationUsesConsentedChannels_IndependentlyOfStaffEmailFailure(bool whatsApp, bool consent)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        database.Db.UnitsOfMeasure.Add(new RequestPortal.Domain.ReferenceData.UnitOfMeasure(Guid.NewGuid(), "EA", "Each"));
+        await database.Db.SaveChangesAsync(token);
+        var created = await new RequestPortal.Infrastructure.Requests.QuickIntakeService(database.Db).CreateAsync(
+            new RequestPortal.Application.Requests.QuickIntakeSubmission("Test", "Applicant", new DateOnly(1980,1,1),
+                "Male", "Single", "8765550123", "client@example.com", "Test road", "Test community", "Kingston",
+                "Unemployed", 0, false, false, ["None"], "Food"), token);
+        var request = await database.Db.AssistanceRequests.SingleAsync(token);
+        var applicant = await database.Db.Users.SingleAsync(token);
+        var whatsAppPreference = await database.Db.NotificationPreferences.SingleAsync(
+            item => item.UserId == applicant.Id && item.Channel == NotificationChannel.WhatsApp, token);
+        whatsAppPreference.Update("+18765550123", consent);
+        var original = await database.Db.OutboxMessages.SingleAsync(m => m.MessageType == typeof(RequestSubmittedMessage).FullName, token);
+        original.ProcessedUtc = DateTimeOffset.UtcNow;
+        var staff = await database.Db.OutboxMessages.SingleAsync(m => m.Id == QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(request.Id), token);
+        staff.Payload = JsonSerializer.Serialize(new QuickIntakeClientRelationsEmailRequestedMessage(
+            staff.Id, staff.OccurredUtc, request.Id, request.PublicReference, "KGN/26/GR/0042"));
+        staff.MessageType = typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName!;
+        var client = new FfpManagerClientConfirmationRequestedMessage(
+            FfpManagerClientConfirmationRequestedMessage.IdForRequest(request.Id), Now, request.Id, "KGN/26/GR/0042");
+        database.Db.OutboxMessages.Add(new OutboxMessage { Id=client.MessageId, OccurredUtc=client.OccurredUtc,
+            MessageType=typeof(FfpManagerClientConfirmationRequestedMessage).FullName!, Payload=JsonSerializer.Serialize(client) });
+        await database.Db.SaveChangesAsync(token);
+        var sender = new RecordingReferenceSender();
+        var options = new NotificationOptions { Enabled=true, WhatsAppEnabled=whatsApp, QuickIntakeClientRelationsEmail="" };
+        var dispatcher = new OutboxDispatcher(database.Db, sender, new DisabledFfpManagerIntegrationService(),
+            Options.Create(new FfpManagerBridgeOptions { Enabled=true }), Options.Create(options),
+            NullLogger<OutboxDispatcher>.Instance, new NullOperationsFlowPublisher(),
+            new RequestPortal.Infrastructure.Messages.PortalMessageService(database.Db, new NullRealtimeNotifier(),
+                new DisabledBridgeClient(), Options.Create(new FfpManagerBridgeOptions { Enabled=false })));
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.NotNull(database.Db.OutboxMessages.Single(m=>m.Id==client.MessageId).ProcessedUtc);
+        Assert.Null(staff.ProcessedUtc);
+        var email = Assert.Single(sender.Notifications, m=>m.Transport==NotificationTransport.Email);
+        Assert.Equal("client@example.com", email.Recipient);
+        Assert.Contains("KGN/26/GR/0042", email.Body);
+        Assert.Contains(request.PublicReference, email.Body);
+        Assert.NotNull(email.DeliveryId);
+        Assert.Equal(whatsApp && consent ? 1 : 0, sender.Notifications.Count(m=>m.Transport==NotificationTransport.WhatsApp));
+        if (whatsApp && consent)
+            Assert.Equal("request_portal_request_update", Assert.Single(sender.Notifications, m=>m.Transport==NotificationTransport.WhatsApp).WhatsAppTemplateName);
+        options.QuickIntakeClientRelationsEmail="clientrelations@example.com";
+        staff.AttemptCount=0; staff.LastError=null;
+        await database.Db.SaveChangesAsync(token);
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Single(sender.Notifications, m=>m.Recipient=="clientrelations@example.com");
+        // Replaying a handoff retains stable delivery identities for provider deduplication.
+        var before = sender.Notifications.Where(m=>m.Recipient!="clientrelations@example.com").Select(m=>m.DeliveryId).ToArray();
+        database.Db.OutboxMessages.Single(m=>m.Id==client.MessageId).ProcessedUtc=null;
+        await database.Db.SaveChangesAsync(token);
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(before, sender.Notifications.Where(m=>m.Recipient!="clientrelations@example.com").Skip(before.Length).Select(m=>m.DeliveryId).ToArray());
+        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+    }
+
+    [Fact]
+    public async Task RequestSubmitted_WhenBridgeEnabled_DoesNotSendPrematureConfirmation()
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(token);
+        RequestSubmittedMessage message = new(Guid.NewGuid(), Now, Guid.NewGuid(), Guid.NewGuid());
+        database.Db.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = message.MessageId, OccurredUtc = message.OccurredUtc,
+            MessageType = typeof(RequestSubmittedMessage).FullName!, Payload = JsonSerializer.Serialize(message)
+        });
+        await database.Db.SaveChangesAsync(token);
+        RecordingReferenceSender sender = new();
+        OutboxDispatcher dispatcher = new(database.Db, sender, new DisabledFfpManagerIntegrationService(),
+            Options.Create(new FfpManagerBridgeOptions { Enabled = true }),
+            Options.Create(new NotificationOptions { Enabled = true, WhatsAppEnabled = true }),
+            NullLogger<OutboxDispatcher>.Instance, new NullOperationsFlowPublisher(),
+            new RequestPortal.Infrastructure.Messages.PortalMessageService(database.Db, new NullRealtimeNotifier(),
+                new DisabledBridgeClient(), Options.Create(new FfpManagerBridgeOptions { Enabled = false })));
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Empty(sender.Notifications);
+        Assert.Single(database.Db.OutboxMessages,
+            item => item.MessageType.EndsWith(nameof(FfpManagerSubmissionRequestedMessage)));
+    }
+
+    private sealed class RecordingReferenceSender : RequestPortal.Common.Messaging.INotificationSender
+    {
+        public List<NotificationEnvelope> Notifications { get; } = [];
+        public Task SendAsync(NotificationEnvelope notification, CancellationToken cancellationToken = default)
+        {
+            Notifications.Add(notification);
+            return Task.CompletedTask;
+        }
     }
 
     private static NotificationPreferenceService CreatePreferenceService(

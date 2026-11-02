@@ -31,6 +31,8 @@ public sealed class IntegrationLink
 
     public string SystemName { get; private set; } = string.Empty;
 
+    public string? ApplicationNumber { get; private set; }
+
     public string? ExternalReference { get; private set; }
 
     public SynchronizationStatus Status { get; private set; }
@@ -50,9 +52,11 @@ public sealed class IntegrationLink
         LastError = null;
     }
 
-    public void MarkSynchronized(string externalReference, DateTimeOffset synchronizedUtc)
+    public void MarkSynchronized(string externalReference, DateTimeOffset synchronizedUtc, string? applicationNumber = null)
     {
         ExternalReference = externalReference.Trim();
+        if (!string.IsNullOrWhiteSpace(applicationNumber))
+            ApplicationNumber = applicationNumber.Trim();
         Status = SynchronizationStatus.Synchronized;
         LastAttemptUtc = synchronizedUtc;
         SynchronizedUtc = synchronizedUtc;

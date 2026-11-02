@@ -3,6 +3,7 @@ using Xunit;
 
 namespace RequestPortal.Infrastructure.Tests;
 
+[Trait("Category", "LiveFfpSql")]
 public sealed class FfpManagerRealDatabaseContractTests
 {
     private static string ConnectionString
