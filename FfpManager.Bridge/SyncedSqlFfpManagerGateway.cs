@@ -210,7 +210,15 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
     private static long ParseApplicationId(string value) => long.TryParse(value, out long id) && id > 0 ? id : throw new ArgumentException($"'{value}' is not a valid FFP Manager ApplicationLetters.ID.");
     private static string SanitizeFileName(string value) => BridgeDocumentPath.SafeFileName(value);
     private static string? Truncate(string? value, int max) => string.IsNullOrWhiteSpace(value) ? null : value.Length <= max ? value : value[..max];
-    private static string? CombineComments(ExternalApplicationSubmission s) => Truncate(string.Join(Environment.NewLine, new[] { s.Summary, s.Circumstances, s.OrganizationAddress, s.OrganizationEmail }.Where(x => !string.IsNullOrWhiteSpace(x))), 2500);
+    private static string? CombineComments(ExternalApplicationSubmission s) => Truncate(string.Join(Environment.NewLine, new[]
+    {
+        s.Summary,
+        s.Circumstances,
+        s.ApplicantAddress is null ? s.OrganizationAddress : $"Applicant address: {s.ApplicantAddress}",
+        s.ApplicantEmail is null ? s.OrganizationEmail : $"Applicant email: {s.ApplicantEmail}",
+        s.ApplicantGender is null ? null : $"Applicant gender: {s.ApplicantGender}",
+        s.ApplicantEmploymentStatus is null ? null : $"Applicant employment status: {s.ApplicantEmploymentStatus}"
+    }.Where(x => !string.IsNullOrWhiteSpace(x))), 2500);
     private static string? CombineRequirements(ExternalApplicationSubmission s) => Truncate(string.Join(" / ", new[] { s.Category, s.Subcategory }.Where(x => !string.IsNullOrWhiteSpace(x))), 255);
     private static void AddNullable(SqlCommand command, string name, string? value, SqlDbType type, int size) { SqlParameter p = size == -1 ? command.Parameters.Add(name, type, -1) : command.Parameters.Add(name, type, size); p.Value = string.IsNullOrWhiteSpace(value) ? DBNull.Value : value; }
 }
