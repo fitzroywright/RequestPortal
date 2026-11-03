@@ -6,7 +6,13 @@ using RequestPortal.Web.Configuration;
 using RequestPortal.Web.Startup;
 
 WebApplicationBuilder builder =
-    WebApplication.CreateBuilder(args.FirstOrDefault() == "provision-staff" ? [] : args);
+    WebApplication.CreateBuilder(args.FirstOrDefault() is "provision-staff" or "inspect-staff-directory" or "verify-staff-directory" ? [] : args);
+
+if (args.Length == 1 && args[0] is "inspect-staff-directory" or "verify-staff-directory")
+{
+    Environment.ExitCode = await RequestPortal.Web.Security.StaffDirectoryCommissioningCommand.RunAsync(builder, args[0] == "verify-staff-directory");
+    return;
+}
 
 string operationsLogInstanceId =
     OperationsServiceRegistration.Add(builder);

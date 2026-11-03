@@ -29,6 +29,19 @@ public sealed class RequestPortalAccounts
         command.ExecuteNonQuery();
     }
     private readonly string connectionStringForMetadata;
+    public string? FindStaffBinding(ExternalIdentityKey key)
+    {
+        using var connection = new NpgsqlConnection(connectionStringForMetadata);
+        connection.Open();
+        using var command = new NpgsqlCommand("""
+            SELECT account_id FROM common_security_identities
+            WHERE application_id='RequestPortal.Staff' AND provider_id=@provider AND scope_id=@scope AND subject_id=@subject
+            """, connection);
+        command.Parameters.AddWithValue("provider", key.ProviderId);
+        command.Parameters.AddWithValue("scope", key.ScopeId);
+        command.Parameters.AddWithValue("subject", key.SubjectId);
+        return command.ExecuteScalar() as string;
+    }
     public void RecordStaffSignIn(SecurityAccount account, VerifiedIdentity proof)
     {
         using var connection = new NpgsqlConnection(connectionStringForMetadata); connection.Open();

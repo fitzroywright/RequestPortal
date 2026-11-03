@@ -35,6 +35,16 @@ internal static class StaffAuthenticationRegistration
                 var flows=context.HttpContext.RequestServices.GetRequiredService<RequestPortalOperationsFlowPublisher>();
                 string correlation=GetCorrelationId(context.Properties);
                 flows.TryEnqueueAuthentication(correlation,"Claims");
+                try
+                {
+                    proof = StaffSignInIdentityCompatibility.Select(context.Principal!, identity, proof,
+                        context.HttpContext.RequestServices.GetRequiredService<RequestPortalAccounts>());
+                }
+                catch (InvalidOperationException)
+                {
+                    context.Fail("Staff identity binding requires administrative review.");
+                    return;
+                }
                 var result=await context.HttpContext.RequestServices.GetRequiredService<StaffOidcPrincipalService>()
                     .BuildPrincipalAsync(proof,context.HttpContext.RequestAborted);
                 if(!result.Allowed || result.Principal is null) { context.Fail(result.FailureCode ?? "Staff access denied."); return; }
