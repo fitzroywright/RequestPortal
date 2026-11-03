@@ -26,6 +26,9 @@ public sealed class ParishSubmissionPersistenceTests
         DateTimeOffset beforeReceipt = DateTimeOffset.UtcNow;
         Guid requestId = await CreateIntakeAsync(database, token);
         DateTimeOffset afterReceipt = DateTimeOffset.UtcNow;
+        // Compare persisted PostgreSQL microsecond precision, not the tracked
+        // .NET value that can retain finer ticks on Linux.
+        database.Db.ChangeTracker.Clear();
         var request = await database.Db.AssistanceRequests.SingleAsync(x => x.Id == requestId, token);
         DateTimeOffset received = request.SubmittedUtc!.Value;
         Assert.InRange(received, beforeReceipt, afterReceipt);
