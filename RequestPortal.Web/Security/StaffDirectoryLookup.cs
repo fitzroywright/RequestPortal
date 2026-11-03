@@ -17,8 +17,6 @@ public sealed class StaffDirectoryOptions
     public string ClientId { get; set; } = "";
     public string ClientSecretName { get; set; } = "Authentication:StaffDirectory:ClientSecret";
     public string TenantId { get; set; } = "";
-    // Operator attests that Keycloak's OIDC sub is the UserRepresentation.id, with no pairwise/custom subject mapper.
-    public bool KeycloakSubjectMappingVerified { get; set; }
 }
 
 public sealed record DirectoryStaffIdentity(string Id, string UserName, string DisplayName, string? Email,
@@ -40,7 +38,7 @@ public sealed class HttpStaffDirectoryLookup(HttpClient http, IOptions<StaffDire
     private readonly StaffOidcOptions staff = staffOptions.Value;
     private string Issuer => (string.IsNullOrWhiteSpace(staff.Issuer) ? staff.Authority : staff.Issuer).TrimEnd('/');
     public string ConfigurationKey => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new {
-        options.Enabled, options.Provider, options.ClientId, options.ClientSecretName, options.TenantId, options.KeycloakSubjectMappingVerified,
+        options.Enabled, options.Provider, options.ClientId, options.ClientSecretName, options.TenantId,
         StaffSignInEnabled=staff.Enabled, staff.ProviderId, staff.Authority, Issuer, staff.AllowedTenantIds }))));
 
     public string? UnavailableReason
@@ -50,18 +48,12 @@ public sealed class HttpStaffDirectoryLookup(HttpClient http, IOptions<StaffDire
             if (!staff.Enabled || string.IsNullOrWhiteSpace(staff.ProviderId) || string.IsNullOrWhiteSpace(options.ClientId) || string.IsNullOrWhiteSpace(options.ClientSecretName))
                 return "Directory pre-provisioning requires staff sign-in and a read-only directory client.";
             if (!Https(Issuer) || !Https(staff.Authority)) return "The staff identity provider must use HTTPS.";
-            if (options.Provider == "Keycloak") {
-                var marker = Issuer.LastIndexOf("/realms/", StringComparison.Ordinal);
-                if (staff.AllowedTenantIds.Length != 0 || !options.KeycloakSubjectMappingVerified || marker < 8 ||
-                    Issuer != staff.Authority.TrimEnd('/') || Issuer[(marker+8)..].Any(c => c is '/' or '?' or '#'))
-                    return "Keycloak pre-provisioning requires the configured realm issuer and a verified user-ID to OIDC-sub mapping.";
-            }
-            else if (options.Provider == "Entra") {
+            if (options.Provider == "Entra") {
                 if (!Guid.TryParse(options.TenantId, out var tenant) || !staff.AllowedTenantIds.Any(x => Guid.TryParse(x,out var allowed) && allowed == tenant) ||
                     !EntraAuthority(staff.Authority, tenant) || !EntraAuthority(Issuer, tenant))
                     return "Entra pre-provisioning requires an explicitly allowed tenant matching the staff sign-in authority and issuer.";
             }
-            else return "Choose an approved Keycloak or Entra directory connection.";
+            else return "Choose an approved Entra directory connection.";
             return null;
         }
     }
@@ -71,16 +63,14 @@ public sealed class HttpStaffDirectoryLookup(HttpClient http, IOptions<StaffDire
         RequireConfigured();
         query = query.Trim();
         if (query.Length is < 3 or > 100 || query.Any(char.IsControl)) throw new InvalidOperationException("Enter 3–100 characters to search the directory.");
-        string url;
-        if (options.Provider == "Keycloak") url = UsersUrl + "?max=21&briefRepresentation=true&search=" + Uri.EscapeDataString(query);
-        else {
-            string literal = query.Replace("'", "''", StringComparison.Ordinal);
-            string filter = $"startswith(displayName,'{literal}') or startswith(userPrincipalName,'{literal}') or startswith(mail,'{literal}')";
-            url = UsersUrl + "?$select=" + GraphFields + "&$top=21&$filter=" + Uri.EscapeDataString(filter);
-        }
+        string literal = query.Replace("'", "''", StringComparison.Ordinal);
+        string filter = $"startswith(displayName,'{literal}') or startswith(userPrincipalName,'{literal}') or startswith(mail,'{literal}')";
+        string url = UsersUrl + "?$select=" + GraphFields + "&$top=21&$filter=" + Uri.EscapeDataString(filter);
         using var json = await GetAsync(url, cancellationToken);
         if (json is null) return [];
-        var rows = options.Provider == "Keycloak" ? json.RootElement : json.RootElement.GetProperty("value");
+        if (json.RootElement.ValueKind != JsonValueKind.Object ||
+            !json.RootElement.TryGetProperty("value", out var rows) || rows.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException("The directory returned an invalid response. No staff account was changed.");
         return rows.EnumerateArray().Select(Parse).Take(21).ToArray();
     }
 
@@ -89,14 +79,13 @@ public sealed class HttpStaffDirectoryLookup(HttpClient http, IOptions<StaffDire
         RequireConfigured();
         if (string.IsNullOrWhiteSpace(id) || id.Length > 500 || id is "." or ".." || id.Any(c => char.IsControl(c) || c is '/' or '\\'))
             throw new InvalidOperationException("Invalid directory selection. Search again.");
-        if (options.Provider == "Entra" && !Guid.TryParse(id,out _)) throw new InvalidOperationException("Invalid Entra identity.");
-        using var json = await GetAsync(UsersUrl + "/" + Uri.EscapeDataString(id) + (options.Provider == "Entra" ? "?$select=" + GraphFields : ""), cancellationToken);
+        if (!Guid.TryParse(id,out _)) throw new InvalidOperationException("Invalid Entra identity.");
+        using var json = await GetAsync(UsersUrl + "/" + Uri.EscapeDataString(id) + ("?$select=" + GraphFields), cancellationToken);
         return json is null ? null : Parse(json.RootElement);
     }
 
     private const string GraphFields = "id,displayName,userPrincipalName,mail,accountEnabled";
-    private string UsersUrl => options.Provider == "Entra" ? "https://graph.microsoft.com/v1.0/users"
-        : Issuer[..Issuer.LastIndexOf("/realms/",StringComparison.Ordinal)] + "/admin" + Issuer[Issuer.LastIndexOf("/realms/",StringComparison.Ordinal)..] + "/users";
+    private const string UsersUrl = "https://graph.microsoft.com/v1.0/users";
     private void RequireConfigured() { if (UnavailableReason is { } reason) throw new InvalidOperationException(reason); }
     private static bool Https(string value) => Uri.TryCreate(value,UriKind.Absolute,out var uri) && uri.Scheme == "https" && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment);
     private static bool EntraAuthority(string value, Guid tenant) => Https(value) && Uri.TryCreate(value,UriKind.Absolute,out var uri) && uri.Host == "login.microsoftonline.com" && uri.IsDefaultPort &&
@@ -109,14 +98,17 @@ public sealed class HttpStaffDirectoryLookup(HttpClient http, IOptions<StaffDire
             try { secret = await secrets.GetRequiredAsync(options.ClientSecretName,cancellationToken); }
             catch (OperationCanceledException) { throw; }
             catch (Exception) { throw new InvalidOperationException("The directory client credential is unavailable. An operator must check its Common.Secrets reference."); }
-            string tokenUrl = options.Provider == "Entra"
-                ? $"https://login.microsoftonline.com/{Guid.Parse(options.TenantId):D}/oauth2/v2.0/token" : Issuer + "/protocol/openid-connect/token";
-            var fields = new Dictionary<string,string> { ["grant_type"]="client_credentials", ["client_id"]=options.ClientId, ["client_secret"]=secret };
-            if (options.Provider == "Entra") fields["scope"]="https://graph.microsoft.com/.default";
+            string tokenUrl = $"https://login.microsoftonline.com/{Guid.Parse(options.TenantId):D}/oauth2/v2.0/token";
+            var fields = new Dictionary<string,string> { ["grant_type"]="client_credentials", ["client_id"]=options.ClientId, ["client_secret"]=secret,
+                ["scope"]="https://graph.microsoft.com/.default" };
             using var response = await http.PostAsync(tokenUrl,new FormUrlEncodedContent(fields),cancellationToken);
             EnsureSuccess(response);
             using var tokenJson = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-            string token = tokenJson.RootElement.GetProperty("access_token").GetString() ?? throw new InvalidOperationException("The directory did not supply an access token.");
+            if (tokenJson.RootElement.ValueKind != JsonValueKind.Object ||
+                !tokenJson.RootElement.TryGetProperty("access_token", out var accessToken) || accessToken.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(accessToken.GetString()))
+                throw new InvalidOperationException("The directory did not supply an access token.");
+            string token = accessToken.GetString()!;
             using var request = new HttpRequestMessage(HttpMethod.Get,url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer",token);
             using var result = await http.SendAsync(request,cancellationToken);
@@ -135,19 +127,20 @@ public sealed class HttpStaffDirectoryLookup(HttpClient http, IOptions<StaffDire
     }
     private DirectoryStaffIdentity Parse(JsonElement row)
     {
+        if (row.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("The directory returned an invalid identity. No staff account was changed.");
         static string? Text(JsonElement row,string field) => row.TryGetProperty(field,out var value) && value.ValueKind==JsonValueKind.String ? value.GetString() : null;
-        bool entra = options.Provider == "Entra";
         string id = Text(row,"id") ?? throw new InvalidOperationException("The directory returned no stable user identity.");
-        if (entra) id = Guid.TryParse(id,out var guid) ? guid.ToString("D") : throw new InvalidOperationException("The directory returned an invalid Entra identity.");
-        string username = Text(row,entra?"userPrincipalName":"username") ?? "";
-        string displayName = entra ? Text(row,"displayName") ?? username : string.Join(" ",new[]{Text(row,"firstName"),Text(row,"lastName")}.Where(x=>!string.IsNullOrWhiteSpace(x)));
+        id = Guid.TryParse(id,out var guid) ? guid.ToString("D") : throw new InvalidOperationException("The directory returned an invalid Entra identity.");
+        string username = Text(row,"userPrincipalName") ?? "";
+        string displayName = Text(row,"displayName") ?? username;
         if (string.IsNullOrWhiteSpace(displayName)) displayName=username;
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(id) || username.Length>500 || displayName.Length>200)
             throw new InvalidOperationException("The directory identity is incomplete or exceeds the supported field lengths.");
-        string? email = Text(row,entra?"mail":"email");
+        string? email = Text(row,"mail");
         if (email is not null && (email.Length>256 || !System.Net.Mail.MailAddress.TryCreate(email,out var address) || address.Address!=email)) email=null;
-        bool enabled = row.TryGetProperty(entra?"accountEnabled":"enabled",out var active) && active.ValueKind == JsonValueKind.True;
-        return new(id,username,displayName,email,enabled,new ExternalIdentityKey(staff.ProviderId,entra?Guid.Parse(options.TenantId).ToString("D"):Issuer,id),
-            entra?AuthenticationProviderKind.EntraId:AuthenticationProviderKind.External);
+        bool enabled = row.TryGetProperty("accountEnabled",out var active) && active.ValueKind == JsonValueKind.True;
+        return new(id,username,displayName,email,enabled,new ExternalIdentityKey(staff.ProviderId,Guid.Parse(options.TenantId).ToString("D"),id),
+            AuthenticationProviderKind.EntraId);
     }
 }
