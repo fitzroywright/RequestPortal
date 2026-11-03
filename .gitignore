@@ -30,3 +30,7 @@ requestportal-test.tgz
 
 # Local IDE/generated personalization state
 .cr/
+
+# Python commissioning test artifacts
+__pycache__/
+*.pyc
