@@ -14,15 +14,15 @@ namespace RequestPortal.Infrastructure.Tests;
 
 public sealed class StaffPreProvisioningTests
 {
-    private const string Scope="https://identity.example/realms/staff";
-    private static VerifiedIdentity Proof(string id,string? login=null,string? email=null) => new(new("staff",Scope,id),AuthenticationProviderKind.External,login??id,id,DateTimeOffset.UtcNow,"validated-oidc",email);
+    private const string Scope="99d3b4fe-13c0-4901-a1a5-a382c4a99432";
+    private static VerifiedIdentity Proof(string id,string? login=null,string? email=null) => new(new("staff",Scope,id),AuthenticationProviderKind.EntraId,login??id,id,DateTimeOffset.UtcNow,"validated-oidc",email);
     private static ClaimsPrincipal Actor(SecurityAccount account,bool staff=true) => new(new ClaimsIdentity(staff
         ? [new Claim(ClaimTypes.NameIdentifier,account.Id),new Claim(StaffOidcOptions.StaffSurfaceClaim,StaffOidcOptions.StaffSurfaceValue)]
         : [new Claim(ClaimTypes.NameIdentifier,account.Id)],"test"));
     private sealed class Clock : TimeProvider { public DateTimeOffset Now=DateTimeOffset.UtcNow; public override DateTimeOffset GetUtcNow()=>Now; }
     private sealed class Directory : IStaffDirectoryLookup
     {
-        public DirectoryStaffIdentity? Identity=new("directory-user","new.user","New User","new.user@example.org",true,new("staff",Scope,"directory-user"),AuthenticationProviderKind.External);
+        public DirectoryStaffIdentity? Identity=new("5c6e1d4e-a815-4c8e-bcd4-c7bf6902f6f7","new.user","New User","new.user@example.org",true,new("staff",Scope,"5c6e1d4e-a815-4c8e-bcd4-c7bf6902f6f7"),AuthenticationProviderKind.EntraId);
         public string? UnavailableReason {get;set;}
         public string ConfigurationKey {get;set;}="configuration-1";
         public int Searches,Reads;
@@ -78,8 +78,8 @@ public sealed class StaffPreProvisioningTests
         var audit=Assert.Single(await f.Administration.HistoryAsync(f.Principal,account.Id),x=>x.Action=="PreProvisioned");
         Assert.Equal("admin",audit.Actor);
         Assert.Empty(audit.PreviousRoles!); Assert.Equal([role],audit.NewRoles!);
-        Assert.Contains("directory-user",audit.Detail);
-        var signIn=await new StaffOidcPrincipalService(f.Accounts,f.Authorizer).BuildPrincipalAsync(Proof("directory-user","new.user"),TestContext.Current.CancellationToken);
+        Assert.Contains("5c6e1d4e-a815-4c8e-bcd4-c7bf6902f6f7",audit.Detail);
+        var signIn=await new StaffOidcPrincipalService(f.Accounts,f.Authorizer).BuildPrincipalAsync(Proof("5c6e1d4e-a815-4c8e-bcd4-c7bf6902f6f7","new.user"),TestContext.Current.CancellationToken);
         Assert.True(signIn.Allowed);
         Assert.Equal(account.Id,signIn.Principal!.FindFirstValue(ClaimTypes.NameIdentifier));
         Assert.Equal(2,f.Accounts.Staff.List().Count);
@@ -199,7 +199,7 @@ public sealed class StaffPreProvisioningTests
     public async Task RevokedIdentityCannotBeReenrolledThroughPreProvisioning()
     {
         await using var f=await Setup();
-        await f.Database.Db.Database.ExecuteSqlRawAsync("INSERT INTO common_security_revoked_identities VALUES('RequestPortal.Staff','staff',{0},'directory-user')",[Scope],TestContext.Current.CancellationToken);
+        await f.Database.Db.Database.ExecuteSqlRawAsync("INSERT INTO common_security_revoked_identities VALUES('RequestPortal.Staff','staff',{0},'5c6e1d4e-a815-4c8e-bcd4-c7bf6902f6f7')",[Scope],TestContext.Current.CancellationToken);
         await Assert.ThrowsAsync<InvalidOperationException>(async ()=>await f.Provision(await f.Selection()));
         Assert.Single(f.Accounts.Staff.List());
     }

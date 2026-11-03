@@ -4,38 +4,31 @@ Administration → Staff & Roles → Add Staff lets an existing authorized staff
 
 The feature defaults to disabled. Request Portal previously had no directory lookup connection. An approved read-only directory client and its secret must be commissioned before enabling this feature. Missing configuration or provider read permissions result in an unavailable/error message; no unverified/manual identity entry is offered. Do not reuse a SharePoint, messaging, broad directory administrator or staff password credential.
 
-## Configure the existing AD federation (Keycloak)
+## Configure Microsoft Entra directory access
 
-Use the Keycloak realm used by `Authentication:StaffOidc:Authority` and `Issuer`. A realm directory search includes users exposed by its configured AD/LDAP federation; Request Portal makes no LDAP bind. The directory must expose the intended user before their first portal sign-in.
+The supported production architecture is **Microsoft Entra ID → Request Portal → Common.Security**. Staff authenticate directly with Entra. Directory lookup uses a separate, dedicated read-only application identity in the existing tenant `257d294c-c8a7-4b86-b791-6755edc4fe0a`.
 
-Have the identity-provider owner register an approved confidential service client with client-credentials enabled and only the user query/view privileges required by GET `/admin/realms/{realm}/users` and GET `/users/{id}`. No manage-users, password-reset, role-management or realm-administration grants are needed. Use the provider's supported least-privilege user-view authorization model, and test search/detail with the actual account. The identity-provider owner must verify that this portal client's validated OIDC `sub` is the same immutable `UserRepresentation.id` returned by the user API. Pairwise/custom subject mappers are not supported by this adapter; never substitute the underlying LDAP objectGUID or email.
+An Entra administrator must register/approve this dedicated application, grant Microsoft Graph **application** permission `User.Read.All`, grant tenant administrator consent, and issue its credential through the approved secret-handling process. Do not request directory write permissions or reuse messaging, SharePoint, staff sign-in or unrelated application identities. If consent or credentials are unavailable, leave directory provisioning disabled and continue independent deployment/testing work. Never invent credentials.
 
-Using the existing protected configuration and OpenBao/Common.Secrets process, set:
+Store the credential as `Authentication:StaffDirectory:ClientSecret` in the existing production OpenBao/Common.Secrets namespace. Do not put the credential in environment files, source control, command arguments, logs or reports. Only its reference and public application ID belong in configuration. Use the existing protected credential provisioning process; preserve OpenBao authentication and database settings.
 
-```
+After validating the dedicated application and its consent, configure:
+
+```ini
 Authentication__StaffDirectory__Enabled=true
-Authentication__StaffDirectory__Provider=Keycloak
-Authentication__StaffDirectory__ClientId=<approved-read-only-client>
-Authentication__StaffDirectory__ClientSecretName=Authentication:StaffDirectory:ClientSecret
-Authentication__StaffDirectory__KeycloakSubjectMappingVerified=true
-```
-
-`KeycloakSubjectMappingVerified` is an operator attestation after checking the provider's subject mapper, not a user-submitted field. Realm URLs derive from the existing configured HTTPS issuer, which must equal Authority. Request Portal cannot safely provision a subject that the provider cannot authoritatively return before sign-in.
-
-API reference: https://www.keycloak.org/docs-api/latest/rest-api/index.html#_users
-
-## Configure direct Microsoft Entra OIDC
-
-This mode is for staff who sign in directly through the configured Entra provider. It must not be used to bind an Entra object ID to a federated Keycloak issuer. Register an approved read-only application client in an explicitly allowed tenant with Microsoft Graph application `User.Read.All`, with the tenant administrator's consent. This adapter reads `id`, `userPrincipalName`, `displayName`, `mail`, `accountEnabled`. It never requests write permissions or modifies Microsoft Graph users. In addition to Enabled, ClientId and ClientSecretName above, set:
-
-```
 Authentication__StaffDirectory__Provider=Entra
-Authentication__StaffDirectory__TenantId=<approved-tenant-GUID>
+Authentication__StaffDirectory__TenantId=257d294c-c8a7-4b86-b791-6755edc4fe0a
+Authentication__StaffDirectory__ClientId=<approved-application-id>
+Authentication__StaffDirectory__ClientSecretName=Authentication:StaffDirectory:ClientSecret
 ```
 
-`StaffOidc:AllowedTenantIds` must include that tenant; Authority and Issuer must identify that tenant at `https://login.microsoftonline.com/{tenant}` or `.../{tenant}/v2.0`, as applicable to the configured OIDC issuer. The identity key uses the tenant GUID and object GUID, exactly as Common.Security validates `tid` and `oid`; it never uses Entra's pairwise `sub`. The adapter currently searches one configured tenant. Other allowed sign-in tenants are unchanged.
+Verify `Authentication:StaffOidc:AllowedTenantIds` includes `257d294c-c8a7-4b86-b791-6755edc4fe0a`, and both Authority and Issuer match `https://login.microsoftonline.com/257d294c-c8a7-4b86-b791-6755edc4fe0a/v2.0`. Preserve the existing staff sign-in application and its secret. Generic OIDC remains reusable; the directory adapter supports Entra only and rejects other provider configurations before requesting credentials.
 
-API/permission reference: https://learn.microsoft.com/en-us/graph/api/user-list?view=graph-rest-1.0
+The immutable identity key uses provider ID, tenant GUID and object GUID, exactly as Common.Security validates `tid` and `oid`; it never uses Entra's pairwise `sub`, email or username for linking. Directory lookup searches one configured tenant and does not change other allowed sign-in tenants.
+
+The adapter requests a client-credentials token with scope `https://graph.microsoft.com/.default`, then calls only GET `https://graph.microsoft.com/v1.0/users` and GET `/users/{object-id}`. It selects `id`, `userPrincipalName`, `displayName`, `mail`, `accountEnabled`; absent/false accountEnabled cannot be provisioned. Search escapes OData string literals and caps results. Missing consent, invalid credentials, deleted users and malformed responses never authorize provisioning.
+
+Microsoft references: [list users](https://learn.microsoft.com/en-us/graph/api/user-list?view=graph-rest-1.0), [get user](https://learn.microsoft.com/en-us/graph/api/user-get?view=graph-rest-1.0).
 
 ## Security and persistence
 

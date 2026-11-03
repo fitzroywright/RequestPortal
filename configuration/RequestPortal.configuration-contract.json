@@ -18,7 +18,7 @@
       "displayName": "Read-only staff directory client credential",
       "kind": "Secret",
       "required": false,
-      "purpose": "Read-only Keycloak or Entra directory access for verified pre-provisioning. The secret reference is configurable; it is separate from sign-in and storage credentials.",
+      "purpose": "Read-only Microsoft Entra directory access for verified pre-provisioning. The secret reference is configurable; it is separate from sign-in and storage credentials.",
       "secretName": "Authentication:StaffDirectory:ClientSecret",
       "isConfigured": false,
       "sensitive": true
