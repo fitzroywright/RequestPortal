@@ -11,10 +11,9 @@ public sealed class FfpManagerApplicationNumberMigrationTests
     public async Task ApprovedMigrationAddsOnlyNullableApplicationNumberAndHistoryEntry()
     {
         var token=TestContext.Current.CancellationToken;
-        await using var database=await PostgreSqlTestDatabase.CreateAsync(token);
+        await using var database=await PostgreSqlTestDatabase.CreateAsync(token,"20261014170000_AddIntakeApplicantProfileFields");
         var migrator=database.Db.GetService<IMigrator>();
-        await migrator.MigrateAsync("20261014170000_AddIntakeApplicantProfileFields",token);
-        Assert.Equal(["20261014190000_AddFfpManagerApplicationNumber"],await database.Db.Database.GetPendingMigrationsAsync(token));
+        Assert.Contains("20261014190000_AddFfpManagerApplicationNumber",await database.Db.Database.GetPendingMigrationsAsync(token));
         await database.Db.Database.OpenConnectionAsync(token);
         async Task<List<string>> Snapshot()
         {
@@ -33,10 +32,10 @@ public sealed class FfpManagerApplicationNumberMigrationTests
             var rows=new List<string>();while(await reader.ReadAsync(token))rows.Add(reader.GetString(0));return rows;
         }
         var before=await Snapshot();
-        await migrator.MigrateAsync(cancellationToken:token);
+        await migrator.MigrateAsync("20261014190000_AddFfpManagerApplicationNumber",token);
         var after=await Snapshot();
         Assert.Empty(before.Except(after));
         Assert.Equal(["COLUMN:integration_links:ApplicationNumber:text:YES"],after.Except(before));
-        Assert.Empty(await database.Db.Database.GetPendingMigrationsAsync(token));
+        Assert.DoesNotContain("20261014190000_AddFfpManagerApplicationNumber",await database.Db.Database.GetPendingMigrationsAsync(token));
     }
 }

@@ -53,7 +53,7 @@ public sealed class DemoReadinessValidator
         if (staff is not null)
         {
             Require(
-                await userManager.IsInRoleAsync(staff, PortalRoles.FfpReviewer),
+                await userManager.IsInRoleAsync(staff, PortalRoles.Reviewer),
                 "FFP demo staff is not assigned the reviewer role.",
                 failures);
         }

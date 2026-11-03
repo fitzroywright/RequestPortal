@@ -1,3 +1,4 @@
+using RequestPortal.Common.Security;
 using System.Security.Claims;
 using Common.Security.Abstractions;
 using Common.Security.Authorization;
@@ -39,7 +40,7 @@ public sealed class StaffAdministrationTests
             Assert.True((await auth.AuthorizeAsync(AuthorizationSubject.Create(admin.Id),permission,TestContext.Current.CancellationToken)).Allowed);
         Assert.Equal(SecurityAccountStatus.Active,accounts.Staff.Find(admin.Id)!.Status);
         Assert.Single((await service.DirectoryAsync(Actor(admin))).Single().Roles);
-        Assert.Contains(await service.HistoryAsync(Actor(admin),admin.Id),x=>x.Action.StartsWith("Bootstrap:"));
+        Assert.Contains(await service.HistoryAsync(Actor(admin),admin.Id),x=>x.Action=="Bootstrap");
         var other = accounts.Staff.Resolve(Proof("other"),AccountPopulation.Staff,true).Account;
         await Assert.ThrowsAsync<InvalidOperationException>(()=>Bootstrap(service,other,"other"));
     }
@@ -51,18 +52,18 @@ public sealed class StaffAdministrationTests
         var admin = accounts.Staff.Resolve(Proof("admin"),AccountPopulation.Staff,true).Account; await Bootstrap(service,admin,"admin");
         var pending = accounts.Staff.Resolve(Proof("reviewer"),AccountPopulation.Staff,true).Account;
         Assert.Empty(await service.PermissionsAsync(Actor(admin),pending.Id));
-        await service.ChangeAsync(Actor(admin),pending.Id,"Approve","approved reviewer",[RequestPortalRoles.Reviewer],pending.SessionVersion,true);
+        await service.ChangeAsync(Actor(admin),pending.Id,"Approve",[PortalRoles.Reviewer],pending.SessionVersion,true);
         Assert.Equal(SecurityAccountStatus.Active,accounts.Staff.Find(pending.Id)!.Status);
         Assert.Contains(RequestPortalPermissions.Access,await service.PermissionsAsync(Actor(admin),pending.Id));
         Assert.False((await auth.AuthorizeAsync(AuthorizationSubject.Create(pending.Id),RequestPortalPermissions.ManageSecurity,TestContext.Current.CancellationToken)).Allowed);
-        await service.ChangeAsync(Actor(admin),pending.Id,"Suspend","leave",[RequestPortalRoles.Reviewer],accounts.Staff.Find(pending.Id)!.SessionVersion,true);
+        await service.ChangeAsync(Actor(admin),pending.Id,"Suspend",[PortalRoles.Reviewer],accounts.Staff.Find(pending.Id)!.SessionVersion,true);
         Assert.Empty(await service.PermissionsAsync(Actor(admin),pending.Id));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(()=>service.DirectoryAsync(Actor(pending)));
-        await service.ChangeAsync(Actor(admin),pending.Id,"Activate","return",[RequestPortalRoles.Reviewer],accounts.Staff.Find(pending.Id)!.SessionVersion,true);
-        await service.ChangeAsync(Actor(admin),pending.Id,"Revoke","access ended",[],accounts.Staff.Find(pending.Id)!.SessionVersion,true);
+        await service.ChangeAsync(Actor(admin),pending.Id,"Activate",[PortalRoles.Reviewer],accounts.Staff.Find(pending.Id)!.SessionVersion,true);
+        await service.ChangeAsync(Actor(admin),pending.Id,"Revoke",[],accounts.Staff.Find(pending.Id)!.SessionVersion,true);
         Assert.Empty((await service.DirectoryAsync(Actor(admin))).Single(x=>x.Account.Id==pending.Id).Roles);
         var history = await service.HistoryAsync(Actor(admin),pending.Id);
-        foreach(var action in new[]{"Approve:","Suspend:","Activate:","Revoke:"}) Assert.Contains(history,x=>x.Action.StartsWith(action));
+        foreach(var action in new[]{"Approve","Suspend","Activate","Revoke"}) Assert.Contains(history,x=>x.Action==action);
     }
 
     [Theory]
@@ -73,9 +74,9 @@ public sealed class StaffAdministrationTests
     {
         await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken); var (accounts,service,_) = Setup(database);
         var admin = accounts.Staff.Resolve(Proof("admin"),AccountPopulation.Staff,true).Account; await Bootstrap(service,admin,"admin");
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ChangeAsync(Actor(admin),admin.Id,action,"mistake",[RequestPortalRoles.Reviewer],accounts.Staff.Find(admin.Id)!.SessionVersion,true));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ChangeAsync(Actor(admin),admin.Id,action,[PortalRoles.Reviewer],accounts.Staff.Find(admin.Id)!.SessionVersion,true));
         Assert.Equal(SecurityAccountStatus.Active,accounts.Staff.Find(admin.Id)!.Status);
-        Assert.Contains(RequestPortalRoles.Administrator,(await service.DirectoryAsync(Actor(admin))).Single().Roles);
+        Assert.Contains(PortalRoles.Administrator,(await service.DirectoryAsync(Actor(admin))).Single().Roles);
     }
 
     [Fact]
@@ -91,8 +92,8 @@ public sealed class StaffAdministrationTests
         var manager = accounts.Public.Resolve(publicProof,AccountPopulation.PublicApplicant,true).Account;
         await Assert.ThrowsAsync<UnauthorizedAccessException>(()=>service.DirectoryAsync(Actor(manager)));
         await Assert.ThrowsAsync<InvalidOperationException>(()=>Bootstrap(service,manager,"org-manager"));
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ChangeAsync(Actor(admin),manager.Id,"Approve","wrong population",[RequestPortalRoles.Administrator],manager.SessionVersion,true));
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ChangeAsync(Actor(admin),pending.Id,"Approve","no confirmation",[RequestPortalRoles.Reviewer],pending.SessionVersion,false));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ChangeAsync(Actor(admin),manager.Id,"Approve",[PortalRoles.Administrator],manager.SessionVersion,true));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ChangeAsync(Actor(admin),pending.Id,"Suspend",[PortalRoles.Reviewer],pending.SessionVersion,false));
         Assert.Equal(SecurityAccountStatus.Active,accounts.Public.Find(manager.Id)!.Status);
     }
     [Fact]
@@ -106,8 +107,8 @@ public sealed class StaffAdministrationTests
         await Bootstrap(service,first,"first");
         Assert.Equal(version,accounts.Staff.Find(first.Id)!.SessionVersion);
         var second = accounts.Staff.Resolve(Proof("second"),AccountPopulation.Staff,true).Account;
-        await service.ChangeAsync(Actor(first),second.Id,"Approve","backup administrator",[RequestPortalRoles.Administrator],second.SessionVersion,true);
-        await service.ChangeAsync(Actor(second),first.Id,"Suspend","approved leave",[RequestPortalRoles.Administrator],version,true);
+        await service.ChangeAsync(Actor(first),second.Id,"Approve",[PortalRoles.Administrator],second.SessionVersion,true);
+        await service.ChangeAsync(Actor(second),first.Id,"Suspend",[PortalRoles.Administrator],version,true);
         await Assert.ThrowsAsync<InvalidOperationException>(()=>Bootstrap(service,first,"first"));
         Assert.Equal(SecurityAccountStatus.Suspended,accounts.Staff.Find(first.Id)!.Status);
         Assert.True(await service.IsProvisionedAsync());
@@ -124,7 +125,7 @@ public sealed class StaffAdministrationTests
         var pendingResult = await signIn.BuildPrincipalAsync(Proof("reviewer"),TestContext.Current.CancellationToken);
         Assert.False(pendingResult.Principal!.HasClaim(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.Access));
         var reviewer = accounts.Staff.List().Single(x=>x.LoginName=="reviewer");
-        await service.ChangeAsync(Actor(admin),reviewer.Id,"Approve","approved",[RequestPortalRoles.Reviewer],reviewer.SessionVersion,true,"Updated Reviewer","reviewer@example.test");
+        await service.ChangeAsync(Actor(admin),reviewer.Id,"Approve",[PortalRoles.Reviewer],reviewer.SessionVersion,true,"Updated Reviewer","reviewer@example.test");
         var approved = await signIn.BuildPrincipalAsync(Proof("reviewer"),TestContext.Current.CancellationToken);
         Assert.True(approved.Principal!.HasClaim(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.Access));
         Assert.False(approved.Principal.HasClaim(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.ManageSecurity));
@@ -132,7 +133,7 @@ public sealed class StaffAdministrationTests
         Assert.Equal("Updated Reviewer",entry.Account.DisplayName); Assert.Equal("reviewer@example.test",entry.Email);
         Assert.NotNull(entry.LastSignIn);
         Assert.Contains(await service.HistoryAsync(Actor(admin),reviewer.Id),x=>x.Action=="StaffAuthenticated");
-        await service.ChangeAsync(Actor(admin),reviewer.Id,"Suspend","leave",[RequestPortalRoles.Reviewer],accounts.Staff.Find(reviewer.Id)!.SessionVersion,true);
+        await service.ChangeAsync(Actor(admin),reviewer.Id,"Suspend",[PortalRoles.Reviewer],accounts.Staff.Find(reviewer.Id)!.SessionVersion,true);
         Assert.False((await signIn.BuildPrincipalAsync(Proof("reviewer"),TestContext.Current.CancellationToken)).Allowed);
     }
 
@@ -144,11 +145,11 @@ public sealed class StaffAdministrationTests
         var admin = accounts.Staff.Resolve(Proof("admin"),AccountPopulation.Staff,true).Account;
         await Bootstrap(service,admin,"admin");
         var pending = accounts.Staff.Resolve(Proof("pending"),AccountPopulation.Staff,true).Account;
-        await service.ChangeAsync(Actor(admin),pending.Id,"Reject","not authorized",[],pending.SessionVersion,true);
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ChangeAsync(Actor(admin),pending.Id,"Activate","stale",[RequestPortalRoles.Administrator],pending.SessionVersion,true));
+        await service.ChangeAsync(Actor(admin),pending.Id,"Reject",[],pending.SessionVersion,true);
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ChangeAsync(Actor(admin),pending.Id,"Activate",[PortalRoles.Administrator],pending.SessionVersion,true));
         Assert.Equal(SecurityAccountStatus.Disabled,accounts.Staff.Find(pending.Id)!.Status);
         Assert.Empty((await service.DirectoryAsync(Actor(admin))).Single(x=>x.Account.Id==pending.Id).Roles);
-        Assert.Contains(await service.HistoryAsync(Actor(admin),pending.Id),x=>x.Action.StartsWith("Reject:"));
+        Assert.Contains(await service.HistoryAsync(Actor(admin),pending.Id),x=>x.Action=="Reject");
     }
 
     [Fact]
@@ -159,9 +160,9 @@ public sealed class StaffAdministrationTests
         var admin = accounts.Staff.Resolve(Proof("admin"),AccountPopulation.Staff,true).Account;
         await Bootstrap(service,admin,"admin");
         var staff = accounts.Staff.Resolve(Proof("staff"),AccountPopulation.Staff,true).Account;
-        await service.ChangeAsync(Actor(admin),staff.Id,"Approve","both roles",[RequestPortalRoles.Administrator,RequestPortalRoles.Reviewer,RequestPortalRoles.Reviewer],staff.SessionVersion,true);
+        await service.ChangeAsync(Actor(admin),staff.Id,"Approve",[PortalRoles.Administrator,PortalRoles.Reviewer,PortalRoles.Reviewer],staff.SessionVersion,true);
         Assert.Equal(2,(await service.DirectoryAsync(Actor(admin))).Single(x=>x.Account.Id==staff.Id).Roles.Count);
-        await service.ChangeAsync(Actor(admin),staff.Id,"Save","revoke administrator only",[RequestPortalRoles.Reviewer],accounts.Staff.Find(staff.Id)!.SessionVersion,true);
+        await service.ChangeAsync(Actor(admin),staff.Id,"Save",[PortalRoles.Reviewer],accounts.Staff.Find(staff.Id)!.SessionVersion,true);
         var permissions = await service.PermissionsAsync(Actor(admin),staff.Id);
         Assert.Contains(RequestPortalPermissions.Access,permissions);
         Assert.DoesNotContain(RequestPortalPermissions.ManageSecurity,permissions);
@@ -176,7 +177,7 @@ public sealed class StaffAdministrationTests
         var first = accounts.Staff.Resolve(Proof("first"),AccountPopulation.Staff,true).Account;
         await Bootstrap(service,first,"first");
         var second = accounts.Staff.Resolve(Proof("second"),AccountPopulation.Staff,true).Account;
-        await service.ChangeAsync(Actor(first),second.Id,"Approve","second administrator",[RequestPortalRoles.Administrator],second.SessionVersion,true);
+        await service.ChangeAsync(Actor(first),second.Id,"Approve",[PortalRoles.Administrator],second.SessionVersion,true);
         var connection = database.Db.Database.GetConnectionString()!;
         async Task<bool> SuspendSelf(string id)
         {
@@ -186,7 +187,7 @@ public sealed class StaffAdministrationTests
             await roleStore.EnsureInitializedAsync(TestContext.Current.CancellationToken);
             var administration = new StaffAdministrationService(stores,db,roleStore,new PermissionAuthorizer(roleStore));
             var account = stores.Staff.Find(id)!;
-            try { await administration.ChangeAsync(Actor(account),id,"Suspend","concurrent leave",[RequestPortalRoles.Administrator],account.SessionVersion,true); return true; }
+            try { await administration.ChangeAsync(Actor(account),id,"Suspend",[PortalRoles.Administrator],account.SessionVersion,true); return true; }
             catch (InvalidOperationException) { return false; }
         }
         var outcomes = await Task.WhenAll(Task.Run(()=>SuspendSelf(first.Id),TestContext.Current.CancellationToken),Task.Run(()=>SuspendSelf(second.Id),TestContext.Current.CancellationToken));
