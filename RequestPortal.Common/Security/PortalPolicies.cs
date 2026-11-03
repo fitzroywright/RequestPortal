@@ -10,6 +10,6 @@ public static class PortalPolicies
 
 public static class PortalRoles
 {
-    public const string FfpAdministrator = "FfpAdministrator";
-    public const string FfpReviewer = "FfpReviewer";
+    public const string Administrator = "Administrator";
+    public const string Reviewer = "Reviewer";
 }

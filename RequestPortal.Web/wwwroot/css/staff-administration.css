@@ -1,0 +1,30 @@
+.staff-administration .staff-back{display:inline-block;margin-bottom:1rem}
+.staff-details-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:1.25rem;align-items:start}
+.staff-details-grid .card{margin:0;min-width:0}
+.staff-details-grid h2{margin-top:0}
+.staff-fields{display:grid;gap:1rem;margin-bottom:1rem}
+.staff-fields input{width:100%;box-sizing:border-box}
+.staff-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.25rem 0}
+.staff-facts dt{font-size:.85rem;color:var(--muted);margin-bottom:.25rem}
+.staff-facts dd{margin:0;overflow-wrap:anywhere}
+.staff-status{font-weight:600}
+.staff-role-options{border:0;margin:0;padding:0;display:grid;gap:.75rem}
+.staff-role{display:flex;gap:.75rem;align-items:flex-start;cursor:pointer;padding:.75rem;border:1px solid var(--border);border-radius:.5rem}
+.staff-role input{flex:none;margin-top:.25rem;width:auto}
+.staff-role small{display:block;color:var(--muted);font-weight:400;line-height:1.5;margin-top:.25rem}
+.staff-permission-summary{margin-top:1.25rem}
+.staff-permission-summary h3{font-size:1rem;margin-bottom:.35rem}
+.staff-permission-summary p{color:var(--muted)}
+.staff-disclosure{border-top:1px solid var(--border);padding-top:1rem;margin-top:1.25rem}
+.staff-disclosure summary{cursor:pointer;font-weight:600}
+.staff-disclosure dd{margin:.25rem 0 1rem;overflow-wrap:anywhere}
+.staff-disclosure code{overflow-wrap:anywhere}
+.staff-controls{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:1.25rem 0}
+.staff-controls .action-row{flex-wrap:wrap;margin:0}
+.staff-controls .staff-danger{color:var(--danger)}
+.staff-audit{margin-top:1.5rem}
+.staff-table-scroll{max-width:100%;overflow-x:auto}
+.staff-table-scroll th,.staff-table-scroll td{vertical-align:top}
+.staff-directory-filters{display:grid;grid-template-columns:minmax(180px,2fr) repeat(3,minmax(120px,1fr)) auto;gap:1rem;align-items:end}
+@media(max-width:800px){.staff-details-grid{grid-template-columns:minmax(0,1fr)}.staff-directory-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.staff-facts,.staff-directory-filters{grid-template-columns:minmax(0,1fr)}.staff-controls{flex-direction:column}.staff-controls .action-row .button{flex:1;text-align:center}}

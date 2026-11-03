@@ -63,10 +63,10 @@ public sealed class DemoDataSeeder
         ApplicationUser representative = await EnsureUserAsync(RepresentativeEmail, "Michael Campbell", false);
         ApplicationUser pendingRepresentative = await EnsureUserAsync(PendingRepresentativeEmail, "Keisha Morgan", false);
 
-        await EnsureRoleAsync(PortalRoles.FfpReviewer);
-        await EnsureRoleAsync(PortalRoles.FfpAdministrator);
-        await EnsureUserRoleAsync(staff, PortalRoles.FfpReviewer);
-        await EnsureUserRoleAsync(staff, PortalRoles.FfpAdministrator);
+        await EnsureRoleAsync(PortalRoles.Reviewer);
+        await EnsureRoleAsync(PortalRoles.Administrator);
+        await EnsureUserRoleAsync(staff, PortalRoles.Reviewer);
+        await EnsureUserRoleAsync(staff, PortalRoles.Administrator);
 
         Organization organization = await EnsureApprovedOrganizationAsync(
             staff,

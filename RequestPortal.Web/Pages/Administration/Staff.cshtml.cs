@@ -13,7 +13,6 @@ public sealed class StaffModel(StaffAdministrationService service) : PageModel
     [BindProperty(SupportsGet=true)] public string? Sort { get; set; }
     [BindProperty(SupportsGet=true)] public string? Id { get; set; }
     [BindProperty] public string[] SelectedRoles { get; set; } = [];
-    [BindProperty] public string Reason { get; set; } = "";
     [BindProperty] public long Version { get; set; }
     [BindProperty] public string DisplayName { get; set; } = "";
     [BindProperty] public string? Email { get; set; }
@@ -33,16 +32,44 @@ public sealed class StaffModel(StaffAdministrationService service) : PageModel
     }
     public async Task<IActionResult> OnPostAsync(string operation)
     {
-        if (!ModelState.IsValid) { await LoadAsync(); return Page(); }
         try {
+            if (!ModelState.IsValid) { await LoadAsync(); return Page(); }
             if (Id is null) return BadRequest();
-            await service.ChangeAsync(User, Id, operation, Reason, SelectedRoles, Version, Confirmed, DisplayName, Email);
+            await service.ChangeAsync(User, Id, operation, SelectedRoles, Version, Confirmed, DisplayName, Email);
             TempData["Success"] = "Staff access decision saved and audited.";
             return RedirectToPage(new { Id });
         }
         catch (UnauthorizedAccessException) { return Forbid(); }
         catch (InvalidOperationException exception) { ModelState.AddModelError("",exception.Message); await LoadAsync(); return Page(); }
     }
+    public static string DisplayTime(DateTimeOffset? value) => value.HasValue
+        ? TimeZoneInfo.ConvertTime(value.Value,TimeZoneInfo.FindSystemTimeZoneById("America/Jamaica")).ToString("dd MMM yyyy, h:mm tt",System.Globalization.CultureInfo.InvariantCulture) : "—";
+    public static string DisplayAuditTime(string value) => DateTimeOffset.TryParse(value,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.AssumeUniversal,out var time) ? DisplayTime(time) : "Unknown time";
+    public static string StatusLabel(global::Common.Security.Abstractions.SecurityAccountStatus value) => value switch {
+        global::Common.Security.Abstractions.SecurityAccountStatus.PendingAccess => "Pending access",
+        global::Common.Security.Abstractions.SecurityAccountStatus.Disabled => "Access revoked", _ => value.ToString() };
+    public static string ActionLabel(string value) => value.Split(':',2)[0] switch {
+        "Save" => "Staff details or roles updated", "Approve" => "Access approved", "Activate" => "Access activated",
+        "Suspend" => "Account suspended", "Revoke" => "Access revoked", "Reject" => "Access rejected",
+        "Bootstrap" => "Initial administrator provisioned", "RolesConsolidated" => "Legacy roles consolidated",
+        "StaffAuthenticated" => "Signed in", "ApplicationAuthorizationChanged" => "Authorization refreshed",
+        "AccountStatus" => "Account status changed", "SessionsRevoked" => "Sessions revoked",
+        "AccountAdministrativelyProvisioned" => "Staff account provisioned", "ApprovedIdentityMigrationImported" => "Verified identity imported",
+        "IdentityLinked" => "Sign-in method linked", "IdentityUnlinked" => "Sign-in method removed",
+        "AccountAutomaticallyProvisioned" => "Staff account registered", _ => value };
+    public string PermissionSummary
+    {
+        get {
+            if (Selected?.Account.Status != global::Common.Security.Abstractions.SecurityAccountStatus.Active) return "No active access.";
+            var abilities = new List<string>();
+            if (Permissions.Contains(RequestPortal.Infrastructure.Security.RequestPortalPermissions.ManageSecurity)) abilities.Add("manage staff access");
+            if (Permissions.Contains(RequestPortal.Infrastructure.Security.RequestPortalPermissions.ReviewRequests)) abilities.Add("review requests");
+            if (Permissions.Contains(RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard)) abilities.Add("view management dashboards");
+            if (abilities.Count==0 && Permissions.Contains(RequestPortal.Infrastructure.Security.RequestPortalPermissions.Access)) abilities.Add("access the staff workspace");
+            return abilities.Count==0 ? (Permissions.Count==0?"No active permissions.":"Has additional assigned permissions.") : "Can "+string.Join(", ",abilities)+".";
+        }
+    }
+
     private async Task LoadAsync()
     {
         var all = await service.DirectoryAsync(User);

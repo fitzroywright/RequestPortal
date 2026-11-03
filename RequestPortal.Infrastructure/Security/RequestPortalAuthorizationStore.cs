@@ -1,3 +1,4 @@
+using RequestPortal.Common.Security;
 using System.Data;
 using Common.Security.Abstractions;
 using Common.Security.Authorization;
@@ -7,12 +8,6 @@ using Npgsql;
 using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Security;
-
-public static class RequestPortalRoles
-{
-    public const string Reviewer = "Reviewer";
-    public const string Administrator = "Administrator";
-}
 
 public static class RequestPortalPermissions
 {
@@ -136,23 +131,23 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
 
         await dbContext.Database.ExecuteSqlRawAsync(schemaSql, cancellationToken);
 
-        await EnsureRoleAsync(RequestPortalRoles.Reviewer, cancellationToken);
-        await EnsureRoleAsync(RequestPortalRoles.Administrator, cancellationToken);
+        await EnsureRoleAsync(PortalRoles.Reviewer, cancellationToken);
+        await EnsureRoleAsync(PortalRoles.Administrator, cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.Access, "Access the Request Portal staff experience.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ReviewRequests, "Review and process assistance requests.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ViewManagementDashboard, "View management dashboards and organization-wide service metrics.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ManageSecurity, "Manage Request Portal roles and security policy.", cancellationToken);
 
-        await EnsureRolePermissionAsync(RequestPortalRoles.Reviewer, RequestPortalPermissions.Access, cancellationToken);
-        await EnsureRolePermissionAsync(RequestPortalRoles.Reviewer, RequestPortalPermissions.ReviewRequests, cancellationToken);
-        await EnsureRolePermissionAsync(RequestPortalRoles.Reviewer, RequestPortalPermissions.ViewManagementDashboard, cancellationToken);
-        await EnsureRolePermissionAsync(RequestPortalRoles.Administrator, PermissionAuthorizer.AllPermissions, cancellationToken, definePermission: true);
+        await EnsureRolePermissionAsync(PortalRoles.Reviewer, RequestPortalPermissions.Access, cancellationToken);
+        await EnsureRolePermissionAsync(PortalRoles.Reviewer, RequestPortalPermissions.ReviewRequests, cancellationToken);
+        await EnsureRolePermissionAsync(PortalRoles.Reviewer, RequestPortalPermissions.ViewManagementDashboard, cancellationToken);
+        await EnsureRolePermissionAsync(PortalRoles.Administrator, PermissionAuthorizer.AllPermissions, cancellationToken, definePermission: true);
 
         foreach (string group in directoryOptions.ReviewerGroups.Where(group => !string.IsNullOrWhiteSpace(group)))
-            await EnsureGroupRoleMappingAsync(group, RequestPortalRoles.Reviewer, cancellationToken);
+            await EnsureGroupRoleMappingAsync(group, PortalRoles.Reviewer, cancellationToken);
 
         foreach (string group in directoryOptions.AdministratorGroups.Where(group => !string.IsNullOrWhiteSpace(group)))
-            await EnsureGroupRoleMappingAsync(group, RequestPortalRoles.Administrator, cancellationToken);
+            await EnsureGroupRoleMappingAsync(group, PortalRoles.Administrator, cancellationToken);
 
         initialized = true;
     }

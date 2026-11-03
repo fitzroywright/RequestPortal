@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using RequestPortal.Infrastructure.Persistence;
 
@@ -22,7 +24,7 @@ internal sealed class PostgreSqlTestDatabase : IAsyncDisposable
     public RequestPortalDbContext Db { get; }
 
     public static async Task<PostgreSqlTestDatabase> CreateAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, string? targetMigration = null)
     {
         string baseConnectionString =
             Environment.GetEnvironmentVariable("REQUESTPORTAL_POSTGRES")
@@ -53,7 +55,7 @@ internal sealed class PostgreSqlTestDatabase : IAsyncDisposable
                 .Options;
 
         RequestPortalDbContext db = new(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.GetService<IMigrator>().MigrateAsync(targetMigration,cancellationToken);
 
         return new PostgreSqlTestDatabase(
             baseConnectionString,
