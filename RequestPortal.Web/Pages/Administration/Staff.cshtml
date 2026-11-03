@@ -22,7 +22,7 @@
 <dl class="staff-facts"><div><dt>Account status</dt><dd><span class="staff-status">@StaffModel.StatusLabel(staff.Account.Status)</span></dd></div>
 <div><dt>Authentication provider</dt><dd>@(staff.Account.ProviderKind switch { AuthenticationProviderKind.EntraId => "Microsoft Entra ID", AuthenticationProviderKind.ActiveDirectory => "Active Directory", AuthenticationProviderKind.External => "Staff identity provider", AuthenticationProviderKind.Mock => "Demo identity", _ => "Local account" })</dd></div>
 <div><dt>Date registered</dt><dd>@StaffModel.DisplayTime(staff.Registered)</dd></div>
-<div><dt>Last sign-in</dt><dd>@StaffModel.DisplayTime(staff.LastSignIn)</dd></div></dl>
+<div><dt>Last sign-in</dt><dd>@(staff.LastSignIn.HasValue ? StaffModel.DisplayTime(staff.LastSignIn) : "Never signed in")</dd></div></dl>
 <details class="staff-disclosure" data-authentication-details><summary>Authentication Details</summary>
 <dl><dt>Account ID</dt><dd>@staff.Account.Id</dd><dt>Username</dt><dd>@staff.Account.LoginName</dd></dl>
 @foreach (var identity in staff.Identities) { <dl><dt>Provider</dt><dd>@identity.Key.ProviderId</dd><dt>Scope</dt><dd>@identity.Key.ScopeId</dd><dt>Provider subject</dt><dd>@identity.Key.SubjectId</dd></dl> }
@@ -60,6 +60,7 @@ else { <details><summary>Details</summary><p>@entry.Action</p></details> }
 }
 else
 {
+<p><a class="button button-small" asp-page="AddStaff">Add Staff</a></p>
 <p><a asp-page="Staff">All staff</a> · <a asp-page="Staff" asp-route-Status="PendingAccess">Pending Access (@Model.PendingCount)</a> · <a href="#roles">Roles</a></p>
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
 <form method="get" class="card staff-directory-filters">
@@ -70,7 +71,7 @@ else
 </form>
 <div class="card staff-table-scroll"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Provider</th><th>Status</th><th>Roles</th><th>Last sign-in</th><th>Registered</th><th>Actions</th></tr></thead><tbody>
 @foreach(var entry in Model.Entries) {
-<tr><td><a asp-page="Staff" asp-route-Id="@entry.Account.Id">@entry.Account.DisplayName</a></td><td>@entry.Account.LoginName</td><td>@entry.Email</td><td>@string.Join(", ",entry.Identities.Select(x=>x.Key.ProviderId))</td><td>@StaffModel.StatusLabel(entry.Account.Status)</td><td>@string.Join(", ",entry.Roles.Where(x=>x==PortalRoles.Administrator||x==PortalRoles.Reviewer))</td><td>@StaffModel.DisplayTime(entry.LastSignIn)</td><td>@StaffModel.DisplayTime(entry.Registered)</td><td><a class="button button-small @(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "" : "button-outline")" asp-page="Staff" asp-route-Id="@entry.Account.Id">@(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "Review access" : "Manage")</a></td></tr>
+<tr><td><a asp-page="Staff" asp-route-Id="@entry.Account.Id">@entry.Account.DisplayName</a></td><td>@entry.Account.LoginName</td><td>@entry.Email</td><td>@string.Join(", ",entry.Identities.Select(x=>x.Key.ProviderId))</td><td>@StaffModel.StatusLabel(entry.Account.Status)</td><td>@string.Join(", ",entry.Roles.Where(x=>x==PortalRoles.Administrator||x==PortalRoles.Reviewer))</td><td>@(entry.LastSignIn.HasValue ? StaffModel.DisplayTime(entry.LastSignIn) : "Never signed in")</td><td>@StaffModel.DisplayTime(entry.Registered)</td><td><a class="button button-small @(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "" : "button-outline")" asp-page="Staff" asp-route-Id="@entry.Account.Id">@(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "Review access" : "Manage")</a></td></tr>
 }
 </tbody></table>@if (Model.Entries.Count == 0) { <p>No staff match these filters.</p> }</div>
 <section class="card" id="roles"><h2>Roles</h2>

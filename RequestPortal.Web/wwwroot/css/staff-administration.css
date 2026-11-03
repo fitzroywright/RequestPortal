@@ -28,3 +28,7 @@
 .staff-directory-filters{display:grid;grid-template-columns:minmax(180px,2fr) repeat(3,minmax(120px,1fr)) auto;gap:1rem;align-items:end}
 @media(max-width:800px){.staff-details-grid{grid-template-columns:minmax(0,1fr)}.staff-directory-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.staff-facts,.staff-directory-filters{grid-template-columns:minmax(0,1fr)}.staff-controls{flex-direction:column}.staff-controls .action-row .button{flex:1;text-align:center}}
+.staff-administration .staff-directory-search { display: flex; align-items: end; gap: 1rem; margin-block: 1rem; }
+.staff-administration .staff-directory-search .field { flex: 1; min-width: 0; }
+.staff-administration .staff-directory-search input { width: 100%; }
+@media (max-width: 640px) { .staff-administration .staff-directory-search { align-items: stretch; flex-direction: column; } }

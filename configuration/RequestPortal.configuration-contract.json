@@ -1,9 +1,28 @@
 {
   "applicationId": "RequestPortal",
   "displayName": "Request Portal",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Public request intake, document collection, staff review, and requester communications.",
   "requirements": [
+    {
+      "id": "staff-directory-enabled",
+      "displayName": "Staff directory pre-provisioning",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Enable staff pre-provisioning only after the read-only directory client and immutable OIDC identity mapping have been commissioned.",
+      "configurationKey": "Authentication:StaffDirectory:Enabled",
+      "isConfigured": false
+    },
+    {
+      "id": "staff-directory-client-secret",
+      "displayName": "Read-only staff directory client credential",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Read-only Keycloak or Entra directory access for verified pre-provisioning. The secret reference is configurable; it is separate from sign-in and storage credentials.",
+      "secretName": "Authentication:StaffDirectory:ClientSecret",
+      "isConfigured": false,
+      "sensitive": true
+    },
     {
       "id": "public-url",
       "displayName": "Public Service URL",

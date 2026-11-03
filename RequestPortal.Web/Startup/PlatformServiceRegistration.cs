@@ -23,6 +23,14 @@ internal static class PlatformServiceRegistration
     {
         AddUploadLimits(builder);
         builder.Services.AddScoped<RequestPortal.Web.Security.StaffAdministrationService>();
+        builder.Services.AddScoped<RequestPortal.Web.Security.StaffPreProvisioningService>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.Configure<RequestPortal.Web.Security.StaffDirectoryOptions>(
+            builder.Configuration.GetSection(RequestPortal.Web.Security.StaffDirectoryOptions.SectionName));
+        builder.Services.AddHttpClient<RequestPortal.Web.Security.IStaffDirectoryLookup, RequestPortal.Web.Security.HttpStaffDirectoryLookup>(client => {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.MaxResponseContentBufferSize = 1024 * 1024;
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         builder.Services.AddSingleton(new RequestPortal.Web.Security.RequestPortalAccounts(connectionString));
         builder.Services.AddSingleton<global::Common.Security.Abstractions.ILocalCredentialStore>(sp => sp.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().Staff);
         builder.Services.AddSingleton(sp=>new global::Common.Security.Services.AccountProvisioningService(sp.GetRequiredService<RequestPortal.Web.Security.RequestPortalAccounts>().Staff));

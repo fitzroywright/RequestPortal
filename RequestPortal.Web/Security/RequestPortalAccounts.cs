@@ -49,6 +49,19 @@ public sealed class RequestPortalAccounts
         command.Parameters.AddWithValue("time",DateTimeOffset.UtcNow.ToString("O"));
         command.ExecuteNonQuery(); transaction.Commit();
     }
+    // Common.Security owns identity uniqueness, business projection and the atomic creation transaction.
+    public SecurityAccount CreateStaff(AccountCreation creation, string actor,
+        Action<DbConnection, DbTransaction, SecurityAccount> finalize)
+    {
+        if (creation.Population != AccountPopulation.Staff) throw new InvalidOperationException("Staff provisioning only.");
+        var store = new RelationalAccountStore(() => new NpgsqlConnection(connectionStringForMetadata), "RequestPortal.Staff",
+            provisionApplicationRecord: (connection, transaction, account, proof) => {
+                Project(connection, transaction, account, proof);
+                finalize(connection, transaction, account);
+            });
+        return store.Create(creation, actor);
+    }
+
     private static void Project(DbConnection connection, DbTransaction transaction, SecurityAccount account, VerifiedIdentity? proof)
     {
         using var db = new RequestPortalDbContext(new DbContextOptionsBuilder<RequestPortalDbContext>()
@@ -75,7 +88,7 @@ public sealed class RequestPortalAccounts
             NormalizedEmail=staff ? null : email!.ToUpperInvariant(), EmailConfirmed=proof?.VerifiedEmail is not null,
             SecurityStamp=Guid.NewGuid().ToString("N"), ConcurrencyStamp=Guid.NewGuid().ToString("N"),
             DisplayName=account.DisplayName, IsInternalStaff=staff, DirectoryUserName=staff ? account.LoginName : null,
-            CreatedUtc=now, LastSignInUtc=now, IndividualProfileUpdateRequired=!staff,
+            CreatedUtc=now, LastSignInUtc=proof is null ? null : now, IndividualProfileUpdateRequired=!staff,
             IndividualProfileUpdateRequiredUtc=staff ? null : now
         });
         db.SaveChanges();
