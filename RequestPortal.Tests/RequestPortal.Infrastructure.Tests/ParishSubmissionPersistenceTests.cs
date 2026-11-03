@@ -19,6 +19,27 @@ namespace RequestPortal.Infrastructure.Tests;
 public sealed class ParishSubmissionPersistenceTests
 {
     [Fact]
+    public async Task QuickIntakeReceiptTimestampSurvivesDelayedBridgeSubmissionAndRetries()
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        DateTimeOffset beforeReceipt = DateTimeOffset.UtcNow;
+        Guid requestId = await CreateIntakeAsync(database, token);
+        DateTimeOffset afterReceipt = DateTimeOffset.UtcNow;
+        var request = await database.Db.AssistanceRequests.SingleAsync(x => x.Id == requestId, token);
+        DateTimeOffset received = request.SubmittedUtc!.Value;
+        Assert.InRange(received, beforeReceipt, afterReceipt);
+        Assert.Equal(received, (await database.Db.QuickIntakes.SingleAsync(token)).CreatedUtc);
+        var bridge = new CapturingBridge();
+        var service = Service(database, bridge, new DelayedClock(received.AddDays(7)));
+        await service.SubmitRequestAsync(requestId, token);
+        await service.SubmitRequestAsync(requestId, token);
+        Assert.Equal(2, bridge.Submissions.Count);
+        Assert.All(bridge.Submissions, submission => Assert.Equal(received, submission.SubmittedUtc));
+        Assert.Equal(received, (await database.Db.AssistanceRequests.AsNoTracking().SingleAsync(x => x.Id == requestId, token)).SubmittedUtc);
+    }
+
+    [Fact]
     public async Task PersistedQuickIntake_MapsParishItemsAndDocuments_AndRetryReusesIdentity()
     {
         CancellationToken token = TestContext.Current.CancellationToken;
@@ -250,9 +271,11 @@ public sealed class ParishSubmissionPersistenceTests
         return result.RequestId;
     }
 
-    private static FfpManagerIntegrationService Service(PostgreSqlTestDatabase database, CapturingBridge bridge) => new(
+    private static FfpManagerIntegrationService Service(PostgreSqlTestDatabase database, CapturingBridge bridge, IClock? clock = null) => new(
         database.Db, new DocumentStub(), bridge, Options.Create(new FfpManagerBridgeOptions { Enabled = true }),
-        new SystemClock(), null!); // Submission only queues notifications; it does not send Portal messages here.
+        clock ?? new SystemClock(), null!); // Submission only queues notifications; it does not send Portal messages here.
+
+    private sealed record DelayedClock(DateTimeOffset UtcNow) : IClock;
 
     private sealed class CapturingBridge : IExternalApplicationBridgeClient
     {
