@@ -14,9 +14,11 @@ public sealed class FfpManagerBusinessDateSqlTests
     // Opt-in rehearsal only. Each case creates its own marked application and document;
     // existing applications, schema and reference data are never changed.
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task SubmissionUploadAndStatusDatesRoundTrip(bool synced)
+    [InlineData(false, "Employed")]
+    [InlineData(true, "Self Employed")]
+    [InlineData(false, null)]
+    [InlineData(true, null)]
+    public async Task SubmissionUploadAndStatusDatesRoundTrip(bool synced, string? employmentStatus)
     {
         string? sql = Environment.GetEnvironmentVariable("FFPMANAGER_TEST");
         if (string.IsNullOrWhiteSpace(sql)) Assert.Skip("FFPMANAGER_TEST is unavailable; SQL business-date regression requires the rehearsal database.");
@@ -42,13 +44,13 @@ public sealed class FfpManagerBusinessDateSqlTests
             [new(Guid.NewGuid(), "Timezone verification only", 1, snapshot.UnitsOfMeasure.First().Name)], [], "Kingston",
             "Request Portal - Timezone Test", "Timezone", "Regression",
             StreetAddress: "42 Separate Street", CommunityDistrict: "Separate District", PrimaryTelephone: "8762101234", SecondaryTelephone: "8762101235",
-            DateOfBirth: new DateOnly(1980,2,3), ApplicantGender: "Female", ApplicantEmail: "mapping@example.invalid");
+            DateOfBirth: new DateOnly(1980,2,3), ApplicantGender: "Female", ApplicantEmail: "mapping@example.invalid", ApplicantEmploymentStatus: employmentStatus);
         try
         {
             var accepted = await gateway.CreateApplicationAsync(submission, token);
             Assert.Contains("/26/GR/", accepted.ApplicationNumber);
             Assert.Equal(submitted, accepted.AcceptedUtc);
-            var repeated = await gateway.CreateApplicationAsync(submission, token);
+            var repeated = await gateway.CreateApplicationAsync(submission with { SubmittedUtc = submitted.AddDays(2), ApplicantEmploymentStatus = "Student" }, token);
             Assert.True(repeated.AlreadyExisted);
             Assert.Equal(accepted.ApplicationId, repeated.ApplicationId);
             Assert.Equal(submitted, repeated.AcceptedUtc);
@@ -61,6 +63,7 @@ public sealed class FfpManagerBusinessDateSqlTests
             Assert.Equal("+18762101234",saved.PrimaryTelephone);
             Assert.Equal("+18762101235",saved.SecondaryTelephone);
             Assert.Equal(submission.ApplicantEmail,saved.ApplicantEmail);
+            Assert.Equal(employmentStatus, saved.ApplicantEmploymentStatus);
             Assert.Equal(submitted, (await gateway.GetStatusAsync(accepted.ApplicationId, token))!.ChangedUtc);
 
             await using var connection = await FfpSqlConnection.OpenAsync(sql!, "Rehearsal", token);
@@ -78,7 +81,13 @@ public sealed class FfpManagerBusinessDateSqlTests
                 for (int i = 0; i < reader.FieldCount; i++) Assert.Equal(expected, reader.GetDateTime(i));
                 Assert.False(await reader.ReadAsync(token));
             }
-            await AssertDates("SELECT ApplicationDate,DateReceived,DateCreated,DateUpdated FROM dbo.ApplicationLetters WHERE ID=@ID", new DateTime(2026, 12, 31, 21, 30, 0));
+            await AssertDates("SELECT ApplicationDate FROM dbo.ApplicationLetters WHERE ID=@ID", new DateTime(2026, 12, 31));
+            await AssertDates("SELECT DateReceived,DateCreated,DateUpdated FROM dbo.ApplicationLetters WHERE ID=@ID", new DateTime(2026, 12, 31, 21, 30, 0));
+            await using (var occupation = new SqlCommand("SELECT Occupation FROM dbo.ApplicationLetters WHERE ID=@ID", connection))
+            {
+                occupation.Parameters.Add("@ID", SqlDbType.BigInt).Value = long.Parse(accepted.ApplicationId);
+                Assert.Equal((object?)employmentStatus ?? DBNull.Value, await occupation.ExecuteScalarAsync(token));
+            }
             await AssertDates("SELECT DateCreated,DateUpdated FROM dbo.ItemsRequested WHERE ApplicationLetterID=@ID", new DateTime(2026, 12, 31, 21, 30, 0));
 
             byte[] bytes = Encoding.UTF8.GetBytes("Timezone verification only");

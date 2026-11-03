@@ -73,6 +73,7 @@ public static class BridgeApplicantProfile
 
     public static void Validate(ExternalApplicationSubmission submission)
     {
+        BridgeApplicationReceipt.Validate(submission.ApplicantEmploymentStatus);
         _ = Phones(submission);
         if (submission.DateOfBirth is { } date && date.Year < 1753)
             throw new InvalidOperationException("Date of birth is outside the SQL datetime range.");

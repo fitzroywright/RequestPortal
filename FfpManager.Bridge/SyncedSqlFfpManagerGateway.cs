@@ -56,10 +56,10 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         long statusId = await referenceData.ResolveApplicationStatusIdAsync(options.InitialApplicationStatus, cancellationToken);
         const string insert = """
             INSERT INTO dbo.ApplicationLetters
-            (Code,ReferenceNo,Name,ContactPerson,FirstName,LastName,Street,Town,DateOfBirth,Gender,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource)
+            (Code,ReferenceNo,Name,ContactPerson,FirstName,LastName,Street,Town,DateOfBirth,Gender,Occupation,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource)
             OUTPUT INSERTED.ID
             VALUES
-            (@Code,@ReferenceNo,@Name,@ContactPerson,@FirstName,@LastName,@Street,@Town,@DateOfBirth,@Gender,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource);
+            (@Code,@ReferenceNo,@Name,@ContactPerson,@FirstName,@LastName,@Street,@Town,@DateOfBirth,@Gender,@Occupation,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource);
             """;
         await using SqlCommand command = new(insert, connection, transaction);
         AddNullable(command, "@Code", submission.PublicReference, SqlDbType.NVarChar, 500);
@@ -72,9 +72,8 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@Town", submission.CommunityDistrict, SqlDbType.NVarChar, 500);
         command.Parameters.Add("@DateOfBirth", SqlDbType.DateTime).Value = submission.DateOfBirth is { } birth ? birth.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
         command.Parameters.Add("@Gender", SqlDbType.Int).Value = BridgeApplicantProfile.Gender(submission.ApplicantGender) is { } gender ? gender : DBNull.Value;
+        BridgeApplicationReceipt.AddParameters(command, submission);
         AddNullable(command, "@MainContactNo", BridgeApplicantProfile.MainContact(submission), SqlDbType.NVarChar, 255);
-        command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
-        command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         AddNullable(command, "@Comments", CombineComments(submission), SqlDbType.NVarChar, 2500);
         AddNullable(command, "@Programme", submission.ProgramCategory, SqlDbType.NVarChar, 255);
         AddNullable(command, "@Requirements", CombineRequirements(submission), SqlDbType.NVarChar, 255);
@@ -226,8 +225,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         s.Circumstances,
         s.ApplicantAddress is null ? s.OrganizationAddress : $"Applicant address: {s.ApplicantAddress}",
         s.ApplicantEmail is null ? s.OrganizationEmail : $"Applicant email: {s.ApplicantEmail}",
-        s.ApplicantGender is null ? null : $"Applicant gender: {s.ApplicantGender}",
-        s.ApplicantEmploymentStatus is null ? null : $"Applicant employment status: {s.ApplicantEmploymentStatus}"
+        s.ApplicantGender is null ? null : $"Applicant gender: {s.ApplicantGender}"
     }.Where(x => !string.IsNullOrWhiteSpace(x))), 2500);
     private static string? CombineRequirements(ExternalApplicationSubmission s) => Truncate(string.Join(" / ", new[] { s.Category, s.Subcategory }.Where(x => !string.IsNullOrWhiteSpace(x))), 255);
     private static void AddNullable(SqlCommand command, string name, string? value, SqlDbType type, int size) { SqlParameter p = size == -1 ? command.Parameters.Add(name, type, -1) : command.Parameters.Add(name, type, size); p.Value = string.IsNullOrWhiteSpace(value) ? DBNull.Value : value; }
