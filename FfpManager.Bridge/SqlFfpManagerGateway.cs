@@ -50,14 +50,14 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         const string insertApplication = """
             INSERT INTO dbo.ApplicationLetters
             (
-                Code, ReferenceNo, Name, ContactPerson, FirstName, LastName, Street, Town, DateOfBirth, Gender, MainContactNo, ApplicationDate, DateReceived,
+                Code, ReferenceNo, Name, ContactPerson, FirstName, LastName, Street, Town, DateOfBirth, Gender, Occupation, MainContactNo, ApplicationDate, DateReceived,
                 Comments, Programme, Requirements, ApplicationStatus, UserName, DateCreated, DateUpdated,
                 AuditID, CreatedBy, ExternalRequestId, Parish, DocumentSource
             )
             OUTPUT INSERTED.ID
             VALUES
             (
-                @Code, @ReferenceNo, @Name, @ContactPerson, @FirstName, @LastName, @Street, @Town, @DateOfBirth, @Gender, @MainContactNo, @ApplicationDate, @DateReceived,
+                @Code, @ReferenceNo, @Name, @ContactPerson, @FirstName, @LastName, @Street, @Town, @DateOfBirth, @Gender, @Occupation, @MainContactNo, @ApplicationDate, @DateReceived,
                 @Comments, @Programme, @Requirements, @ApplicationStatus, @UserName, @DateCreated, @DateUpdated,
                 @AuditID, @CreatedBy, @ExternalRequestId, @Parish, @DocumentSource
             );
@@ -74,8 +74,9 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         AddNullable(command, "@Town", submission.CommunityDistrict, SqlDbType.NVarChar, 500);
         command.Parameters.Add("@DateOfBirth", SqlDbType.DateTime).Value = submission.DateOfBirth is { } birth ? birth.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
         command.Parameters.Add("@Gender", SqlDbType.Int).Value = BridgeApplicantProfile.Gender(submission.ApplicantGender) is { } gender ? gender : DBNull.Value;
+        AddNullable(command, "@Occupation", submission.ApplicantEmploymentStatus, SqlDbType.NVarChar, 255);
         AddNullable(command, "@MainContactNo", BridgeApplicantProfile.MainContact(submission), SqlDbType.NVarChar, 255);
-        command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
+        command.Parameters.Add("@ApplicationDate", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc).Date;
         command.Parameters.Add("@DateReceived", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(submission.SubmittedUtc);
         AddNullable(command, "@Comments", CombineComments(submission), SqlDbType.NVarChar, 2500);
         AddNullable(command, "@Programme", submission.ProgramCategory, SqlDbType.NVarChar, 255);
