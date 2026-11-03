@@ -68,7 +68,10 @@ public static class StaffRoleConsolidation
                     coalesce(array_agg(DISTINCT lower(p.permission_key) ORDER BY lower(p.permission_key)),ARRAY[]::text[]) END grants
                     FROM requestportal_role_permissions p WHERE lower(p.role_key)=lower(m.new_name)) target
                 WHERE old.grants IS DISTINCT FROM target.grants
-                  AND (EXISTS(SELECT 1 FROM requestportal_directory_group_roles g WHERE lower(btrim(g.role_key))=lower(m.old_name))
+                  AND (EXISTS(SELECT 1 FROM requestportal_directory_group_roles g WHERE lower(btrim(g.role_key))=lower(m.old_name)
+                        AND NOT (EXISTS(SELECT 1 FROM requestportal_directory_group_roles existing
+                            WHERE lower(existing.group_name)=lower(g.group_name) AND lower(btrim(existing.role_key))=lower(m.new_name))
+                            AND (old.grants <@ target.grants OR '*'=ANY(target.grants))))
                     OR cardinality(old.grants)>0 AND EXISTS(SELECT 1 FROM "AspNetUserRoles" u WHERE u."RoleId"=m.old_id))) THEN
                 RAISE EXCEPTION 'RP-ROLE-002: Legacy role grants differ from the canonical role. No assignments changed; reconcile the policy without broadening permissions.';
             END IF;

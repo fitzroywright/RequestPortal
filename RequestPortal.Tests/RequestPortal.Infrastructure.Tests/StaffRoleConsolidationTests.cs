@@ -211,6 +211,22 @@ public sealed class StaffRoleConsolidationTests
         Assert.Equal(1,await Count(fixture,"SELECT count(*) FROM \"AspNetRoles\" WHERE \"Name\"='FfpReviewer'"));
     }
 
+    [Fact]
+    public async Task RedundantDirectoryAliasCanBeRemovedWhenCanonicalBindingAlreadyCoversItsGrants()
+    {
+        await using var fixture=await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await LegacyRole(fixture,"FfpReviewer",null);
+        await Sql(fixture,"INSERT INTO requestportal_directory_group_roles VALUES('directory-reviewers','FfpReviewer'),('directory-reviewers','Reviewer')");
+        var authorizer=new PermissionAuthorizer(Store(fixture));
+        var subject=AuthorizationSubject.Create("directory-member",new[]{"directory-reviewers"});
+        Assert.True((await authorizer.AuthorizeAsync(subject,RequestPortalPermissions.ReviewRequests,TestContext.Current.CancellationToken)).Allowed);
+        await StaffRoleConsolidation.ApplyAsync(fixture.Db,TestContext.Current.CancellationToken);
+        await StaffRoleConsolidation.ApplyAsync(fixture.Db,TestContext.Current.CancellationToken);
+        Assert.Equal(1,await Count(fixture,"SELECT count(*) FROM requestportal_directory_group_roles WHERE group_name='directory-reviewers'"));
+        Assert.True((await authorizer.AuthorizeAsync(subject,RequestPortalPermissions.ReviewRequests,TestContext.Current.CancellationToken)).Allowed);
+        Assert.False((await authorizer.AuthorizeAsync(subject,RequestPortalPermissions.ManageSecurity,TestContext.Current.CancellationToken)).Allowed);
+    }
+
     private static RequestPortalAccounts Accounts(PostgreSqlTestDatabase fixture){var stores=new RequestPortalAccounts(fixture.Db.Database.GetConnectionString()!);stores.EnsureSchema();return stores;}
     private static VerifiedIdentity Proof(string name)=>new(new ExternalIdentityKey("staff-oidc","tenant",name),AuthenticationProviderKind.EntraId,name,name,DateTimeOffset.UtcNow,"verified-fixture");
     private static SecurityAccount Staff(RequestPortalAccounts accounts,string name)=>accounts.Staff.Resolve(Proof(name),AccountPopulation.Staff,true).Account;
