@@ -66,3 +66,7 @@ Build against the exact shared-library revisions in `security-baseline.json`. Ru
 After deployment, check systemd startup, `/health` with `Host: requestportal.ffpja.org`, unauthenticated rejection of `/Administration/Staff`, public sign-in entry points, and an actual approved staff session. Complete live provider callbacks and authorized UI acceptance with the relevant identity owner; route availability alone does not prove successful provider authentication.
 
 The current details layout, role-consolidation safety checks and migration procedure are documented in [STAFF-ROLE-CONSOLIDATION.md](STAFF-ROLE-CONSOLIDATION.md).
+
+## Add staff before first sign-in
+
+Authorized administrators can use Staff & Roles → Add Staff once the approved read-only directory connection is commissioned. Search the configured provider, review the verified identity, choose canonical roles and Pending Access or Approve & Activate. Existing identities are never duplicated or silently reactivated. See [staff pre-provisioning](STAFF-PREPROVISIONING.md) for provider-specific identity matching, required read-only permissions, secret references and verification.

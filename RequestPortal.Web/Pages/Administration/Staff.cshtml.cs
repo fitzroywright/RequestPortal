@@ -51,6 +51,7 @@ public sealed class StaffModel(StaffAdministrationService service) : PageModel
     public static string ActionLabel(string value) => value.Split(':',2)[0] switch {
         "Save" => "Staff details or roles updated", "Approve" => "Access approved", "Activate" => "Access activated",
         "Suspend" => "Account suspended", "Revoke" => "Access revoked", "Reject" => "Access rejected",
+        "PreProvisioned" => "Staff provisioned before first sign-in",
         "Bootstrap" => "Initial administrator provisioned", "RolesConsolidated" => "Legacy roles consolidated",
         "StaffAuthenticated" => "Signed in", "ApplicationAuthorizationChanged" => "Authorization refreshed",
         "AccountStatus" => "Account status changed", "SessionsRevoked" => "Sessions revoked",

@@ -1,0 +1,53 @@
+@page
+@model RequestPortal.Web.Pages.Administration.AddStaffModel
+@using RequestPortal.Common.Security
+@{ ViewData["Title"] = "Add Staff"; }
+@section Styles { <link rel="stylesheet" href="~/css/staff-administration.css" asp-append-version="true"/> }
+<section class="section staff-administration"><div class="shell">
+<div class="eyebrow">Administration</div><h1>Add Staff</h1>
+<a class="staff-back" asp-page="Staff">← Staff &amp; Roles</a>
+@if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" class="flash error" role="alert"></div> }
+@if (Model.UnavailableReason is { } reason) { <p class="flash" role="status">@reason</p> }
+else if (Model.Preview is { } identity)
+{
+<form method="post" asp-page-handler="Provision" class="staff-details">
+<input type="hidden" asp-for="Selection"/>
+<div class="staff-details-grid">
+<section class="card staff-information"><h2>Verified directory user</h2>
+<dl class="staff-facts"><div><dt>Staff name</dt><dd>@identity.DisplayName</dd></div><div><dt>Username</dt><dd>@identity.UserName</dd></div>
+<div><dt>Contact email</dt><dd>@(identity.Email ?? "—")</dd></div><div><dt>Directory status</dt><dd>Enabled</dd></div></dl>
+<details class="staff-disclosure"><summary>Authentication Details</summary><dl><dt>Provider</dt><dd>@identity.Key.ProviderId</dd><dt>Scope</dt><dd>@identity.Key.ScopeId</dd><dt>Provider subject</dt><dd>@identity.Key.SubjectId</dd></dl></details>
+</section>
+<section class="card staff-access"><h2>Access &amp; Roles</h2>
+<fieldset class="staff-role-options"><legend>Assign roles</legend>
+@foreach (var role in Model.Roles) {
+<label class="staff-role"><input type="checkbox" name="SelectedRoles" value="@role.Key" checked="@(Model.SelectedRoles.Contains(role.Key))"/><span><strong>@role.Name</strong><small>@(role.Key==PortalRoles.Administrator?"Manage staff access and administer the portal.":"Review requests and view management dashboards.")</small></span></label>
+}
+</fieldset>
+<fieldset class="staff-role-options"><legend>Account access</legend>
+<label class="staff-role"><input type="radio" asp-for="Activate" value="false"/><span><strong>Pending Access</strong><small>Require approval before granting access.</small></span></label>
+<label class="staff-role"><input type="radio" asp-for="Activate" value="true"/><span><strong>Approve &amp; Activate</strong><small>Allow the selected access on the first successful staff sign-in.</small></span></label>
+</fieldset>
+</section></div>
+<div class="staff-controls action-row"><button class="button">Provision Staff</button><a class="button button-outline" asp-page="AddStaff">Back to search</a><a class="button button-outline" asp-page="Staff">Cancel</a></div>
+</form>
+}
+else
+{
+<p>Find a user in the configured staff directory, then choose their portal access.</p>
+<form method="post" asp-page-handler="Search" class="card staff-directory-search">
+<div class="field"><label asp-for="Query">Name, username or email</label><input asp-for="Query" minlength="3" maxlength="100" required autocomplete="off"/></div>
+<button class="button">Search Directory</button>
+</form>
+@if (Model.Searched) {
+@if (Model.Matches.Count>20) { <p role="status">Showing the first 20 matches. Refine your search to find another user.</p> }
+<div class="card staff-table-scroll"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Directory status</th><th>Actions</th></tr></thead><tbody>
+@foreach (var match in Model.Matches.Take(20)) {
+<tr><td>@match.Identity.DisplayName</td><td>@match.Identity.UserName</td><td>@(match.Identity.Email ?? "—")</td><td>@(match.Identity.Enabled?"Enabled":"Disabled")</td><td>
+@if (match.Identity.Enabled) { <form method="post" asp-page-handler="Review"><input type="hidden" name="Selection" value="@match.Selection"/><button class="button button-small">Review user</button></form> }
+</td></tr>
+}
+</tbody></table>@if (Model.Matches.Count==0) { <p>No directory users match this search.</p> }</div>
+}
+}
+</div></section>
