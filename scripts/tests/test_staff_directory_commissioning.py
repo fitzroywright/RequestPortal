@@ -43,6 +43,13 @@ class ConfigurationTests(unittest.TestCase):
             with self.assertRaises(commission.CommissioningError):
                 commission.quote_environment(invalid)
 
+    def test_empty_unprintable_systemd_properties_are_checked_as_typed_collections(self):
+        unit = {"type": "o", "data": ["/org/freedesktop/systemd1/unit/aegis_2drequestportal_2eservice"]}
+        for configured in (False, True):
+            responses = [json.dumps(unit)] + [json.dumps({"type": "a(ss)", "data": [["credential", "/protected/source"]] if configured and index == 0 else []}) for index in range(4)]
+            with patch.object(commission, "native", side_effect=responses):
+                self.assertEqual(configured, commission.has_systemd_credentials())
+
 
 class ProcedureTests(unittest.TestCase):
     def run_procedure(self, health_failure=False, mismatch=False):
@@ -74,6 +81,10 @@ class ProcedureTests(unittest.TestCase):
 
             def fake_native(arguments, timeout=30):
                 operations.append(arguments)
+                if arguments[0] == "/usr/bin/busctl":
+                    if "GetUnit" in arguments:
+                        return json.dumps({"type": "o", "data": ["/org/freedesktop/systemd1/unit/aegis_2drequestportal_2eservice"]})
+                    return json.dumps({"type": "a(ss)", "data": []})
                 if arguments[0] == "/usr/bin/systemd-run":
                     mode = arguments[-1]
                     if mode == "verify-staff-directory":

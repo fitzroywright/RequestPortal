@@ -100,6 +100,25 @@ def property_value(name):
     return native(["/usr/bin/systemctl", "show", SERVICE, "--property=" + name, "--value"])
 
 
+def has_systemd_credentials():
+    # systemctl prints even empty credential arrays as "[unprintable]". Inspect
+    # their typed D-Bus collections instead; never print literal credential data.
+    bus = ["/usr/bin/busctl", "--json=short"]
+    unit = json.loads(native(bus + ["call", "org.freedesktop.systemd1", "/org/freedesktop/systemd1",
+                                   "org.freedesktop.systemd1.Manager", "GetUnit", "s", SERVICE + ".service"]))
+    path = unit.get("data", [None])[0]
+    if not isinstance(path, str) or not path.startswith("/org/freedesktop/systemd1/unit/"):
+        raise CommissioningError("Cannot determine the protected service credential context.")
+    present = False
+    for name in ("LoadCredential", "LoadCredentialEncrypted", "SetCredential", "SetCredentialEncrypted"):
+        result = json.loads(native(bus + ["get-property", "org.freedesktop.systemd1", path,
+                                          "org.freedesktop.systemd1.Service", name]))
+        if result.get("type") not in ("a(ss)", "a(say)") or not isinstance(result.get("data"), list):
+            raise CommissioningError("Unsupported structured service credential metadata.")
+        present = present or bool(result["data"])
+    return present
+
+
 def atomic_environment(content, metadata):
     temporary = ENVIRONMENT.with_name(".requestportal.env." + uuid.uuid4().hex)
     try:
@@ -165,7 +184,7 @@ def main():
         raise CommissioningError("Unexpected Request Portal service definition.")
     if property_value("EnvironmentFiles") != str(ENVIRONMENT) + " (ignore_errors=no)":
         raise CommissioningError("Unexpected environment-file composition; no changes made.")
-    if any(property_value(name) for name in ("LoadCredential", "LoadCredentialEncrypted", "SetCredential")):
+    if has_systemd_credentials():
         raise CommissioningError("Service uses systemd credentials; faithful diagnostic credential handling needs review.")
     user = property_value("User")
     group = property_value("Group") or user
