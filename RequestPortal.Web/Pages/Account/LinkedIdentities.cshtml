@@ -2,7 +2,8 @@
 @model RequestPortal.Web.Pages.Account.LinkedIdentitiesModel
 @{ViewData["Title"]="Sign-in methods";}
 <section class="section"><div class="shell"><div class="card">
-<h1>Sign-in methods</h1><p>Link another provider while signed in to your existing account. A matching email address does not link accounts.</p>
+<h1>Sign-in methods</h1>
+<p>To remove a sign-in method, first sign in using the linked provider you will keep. Fresh proof of that remaining identity is required.</p><p>Link another provider while signed in to your existing account. A matching email address does not link accounts.</p>
 @if(TempData["Error"] is string error){<p role="alert">@error</p>}
 @foreach(var identity in Model.Identities){<form method="post" asp-page-handler="Unlink"><strong>@identity.Key.ProviderId</strong>
 <input type="hidden" name="providerId" value="@identity.Key.ProviderId"/><input type="hidden" name="scopeId" value="@identity.Key.ScopeId"/><input type="hidden" name="subjectId" value="@identity.Key.SubjectId"/>

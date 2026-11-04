@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Common.Security.Hosting;
 using System.Data.Common;
 using Common.Security.Abstractions;
 using Common.Security.Integration;
@@ -62,6 +64,37 @@ public sealed class RequestPortalAccounts
         command.Parameters.AddWithValue("time",DateTimeOffset.UtcNow.ToString("O"));
         command.ExecuteNonQuery(); transaction.Commit();
     }
+    /// <summary>Serialize application unlink decisions so concurrent requests cannot remove the final configured provider.</summary>
+    public async Task UnlinkPublicIdentityAsync(ClaimsPrincipal applicant, ExternalIdentityKey identity, IReadOnlyCollection<string> configuredProviders, CancellationToken cancellationToken = default)
+    {
+        string? accountId = applicant.FindFirstValue(AccountSecurityHosting.AccountIdClaim);
+        string? authenticatedBinding = applicant.FindFirstValue(PublicExternalIdentity.BindingClaim);
+        if (applicant.Identity?.IsAuthenticated != true || accountId is null || authenticatedBinding is null ||
+            applicant.FindFirstValue(ClaimTypes.NameIdentifier) != accountId ||
+            applicant.HasClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue) ||
+            !long.TryParse(applicant.FindFirstValue(AccountSecurityHosting.AuthenticationTimeClaim), out long seconds) ||
+            seconds < DateTimeOffset.UtcNow.AddMinutes(-10).ToUnixTimeSeconds() || seconds > DateTimeOffset.UtcNow.AddMinutes(2).ToUnixTimeSeconds())
+            throw new UnauthorizedAccessException("Sign in again using the verified provider you will keep before unlinking an identity.");
+        using var connection = new NpgsqlConnection(connectionStringForMetadata);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var guard = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended(@key,0))", connection, transaction))
+        {
+            guard.Parameters.AddWithValue("key", "RequestPortal.Public.Unlink:" + accountId);
+            await guard.ExecuteNonQueryAsync(cancellationToken);
+        }
+        var account = Public.Find(accountId);
+        if (account is not { Status: SecurityAccountStatus.Active, Population: AccountPopulation.PublicApplicant } ||
+            !long.TryParse(applicant.FindFirstValue(AccountSecurityHosting.SessionVersionClaim), out long version) || version != account.SessionVersion)
+            throw new UnauthorizedAccessException("Sign in again before changing linked identities.");
+        var identities = Public.GetIdentities(accountId);
+        if (!identities.Any(item => item.Key == identity)) throw new InvalidOperationException("The linked identity was not found on this account.");
+        if (!identities.Any(item => item.Key != identity && configuredProviders.Contains(item.Key.ProviderId) && PublicExternalIdentity.BindingFingerprint(item.Key) == authenticatedBinding))
+            throw new InvalidOperationException("Sign in using the verified provider you will keep before removing this identity.");
+        Public.Unlink(accountId, identity, accountId);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     // Common.Security owns identity uniqueness, business projection and the atomic creation transaction.
     public SecurityAccount CreateStaff(AccountCreation creation, string actor,
         Action<DbConnection, DbTransaction, SecurityAccount> finalize)

@@ -50,7 +50,7 @@ public sealed class IdentityRecoveryModel(ApplicantIdentityAdministration recove
             if(account is null) return Forbid();
             user.LastSignInUtc=DateTimeOffset.UtcNow;
             if(!(await users.UpdateAsync(user)).Succeeded) throw new InvalidOperationException("The sign-in record could not be updated.");
-            await signIn.SignInWithClaimsAsync(user,false,AccountSecurityHosting.SessionClaims(account,proof));
+            await signIn.SignInWithClaimsAsync(user,false,PublicExternalIdentity.SessionClaims(account,proof));
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
             TempData["Success"]="Your verified sign-in method is now linked to your existing account.";
             return RedirectToPage("/Dashboard/Index");

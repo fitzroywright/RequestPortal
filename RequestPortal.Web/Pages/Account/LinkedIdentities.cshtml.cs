@@ -38,15 +38,17 @@ public sealed class LinkedIdentitiesModel(RequestPortalAccounts accounts,SignInM
         catch(IdentityAlreadyLinkedException) {TempData["Error"]="This identity already belongs to another account.";return RedirectToPage();}
         var account=accounts.Public.Find(id)!;var user=await users.FindByIdAsync(id);
         if(user is null || user.IsInternalStaff || account.Status!=SecurityAccountStatus.Active)return Forbid();
-        await signIn.SignInWithClaimsAsync(user,false,AccountSecurityHosting.SessionClaims(account,proof));
+        await signIn.SignInWithClaimsAsync(user,false,PublicExternalIdentity.SessionClaims(account,proof));
         await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
         return RedirectToPage();
     }
     public async Task<IActionResult> OnPostUnlinkAsync(string providerId,string scopeId,string subjectId)
     {
         if(!Fresh())return BadRequest("Sign in again before changing linked identities.");
-        string id=AccountId();if(accounts.Public.GetIdentities(id).Count<=1)return BadRequest("Keep at least one verified sign-in method.");
-        accounts.Public.Unlink(id,new global::Common.Security.Models.ExternalIdentityKey(providerId,scopeId,subjectId),id);
+        string id=AccountId();
+        string[] configured=(await schemes.GetAllSchemesAsync()).Where(x=>new[]{"Google","Microsoft","Yahoo","Apple","Facebook"}.Contains(x.Name)).Select(x=>x.Name).ToArray();
+        try { await accounts.UnlinkPublicIdentityAsync(User,new global::Common.Security.Models.ExternalIdentityKey(providerId,scopeId,subjectId),configured,HttpContext.RequestAborted); }
+        catch(Exception error) when(error is InvalidOperationException or UnauthorizedAccessException) { return BadRequest(error.Message); }
         await signIn.SignOutAsync();return RedirectToPage("/Account/Login");
     }
     private string AccountId()=>User.FindFirstValue(AccountSecurityHosting.AccountIdClaim) ?? throw new InvalidOperationException("An applicant identity is required.");

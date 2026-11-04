@@ -141,7 +141,7 @@ public sealed class LoginModel : PageModel
             var updated=await userManager.UpdateAsync(user);
             if(!updated.Succeeded) throw new InvalidOperationException("Unable to update the applicant sign-in record.");
             await notificationPreferences.EnsureDefaultEmailPreferenceAsync(user.Id,user.Email,HttpContext.RequestAborted);
-            var claims=AccountSecurityHosting.SessionClaims(account,proof).Concat(new[] {
+            var claims=PublicExternalIdentity.SessionClaims(account,proof).Concat(new[] {
                 new Claim(ClaimTypes.Name,user.DisplayName),new Claim(ClaimTypes.GivenName,user.DisplayName) });
             await signInManager.SignInWithClaimsAsync(user,false,claims);
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
@@ -192,7 +192,7 @@ public sealed class LoginModel : PageModel
         await signInManager.SignInWithClaimsAsync(
             user,
             isPersistent: false,
-            AccountSecurityHosting.SessionClaims(account,proof).Concat(new[]
+            PublicExternalIdentity.SessionClaims(account,proof).Concat(new[]
             {
                 new Claim(ClaimTypes.Name, user.DisplayName ?? "User"),
                 new Claim(ClaimTypes.GivenName, user.DisplayName ?? "User")

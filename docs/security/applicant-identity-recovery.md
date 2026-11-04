@@ -37,7 +37,13 @@ attestation, not automatic proof of ownership; do not approve an unverified real
 8. The existing outbox queues a notification to the registered applicant email.
 
 Recovery only **adds** verified sign-in methods. It provides no administrator
-impersonation or identity-removal facility and cannot remove a final usable provider.
+impersonation or identity-removal facility and cannot remove a final usable provider. Self-service unlink decisions are serialized
+per account with a PostgreSQL advisory transaction lock, and must leave a verified
+identity whose provider is still configured, with fresh applicant authentication
+using that exact remaining identity. An opaque fingerprint in the protected applicant
+cookie identifies the verified binding without exposing its provider subject. Existing
+sessions without that proof must sign in again before unlinking. Common.Security retains its atomic
+removal, revocation tombstone, audit, and session-invalidation behavior.
 A registered contact email is required for recovery security notifications; missing
 contact information must go through the approved contact-verification process first.
 Inactive applicants cannot be activated by recovery. Initiator and approver must still

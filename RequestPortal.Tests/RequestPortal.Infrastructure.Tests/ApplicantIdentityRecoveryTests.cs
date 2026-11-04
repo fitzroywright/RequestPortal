@@ -238,7 +238,8 @@ public sealed class ApplicantIdentityRecoveryTests
         using var oauth=await web.Send("/signin-google?code=fixture-code&state="+Uri.EscapeDataString(state),"anonymous");Assert.Equal(System.Net.HttpStatusCode.Redirect,oauth.StatusCode);
         using var completed=await web.Send(oauth.Headers.Location!.OriginalString,"anonymous");Assert.True(completed.StatusCode==System.Net.HttpStatusCode.Redirect,"Callback returned "+completed.StatusCode+"; safe diagnostic="+System.Text.RegularExpressions.Regex.Match(await completed.Content.ReadAsStringAsync(Ct),"RP-RECOVERY-[A-Z]+").Value+"; recovery state="+string.Join(",",(await f.Service.DetailsAsync(f.Actor(f.First),f.Applicant.Id,Ct))!.Recoveries.Select(r=>r.Status)));Assert.StartsWith("/Dashboard",completed.Headers.Location!.OriginalString);
         var proof=Proof(subject:"controlled-google-subject");Assert.Equal(f.Applicant.Id.ToString(),f.Accounts.Public.Resolve(proof,AccountPopulation.PublicApplicant,true).Account.Id);Assert.Null(await f.Service.InvitationAsync(token,Ct));
-        using var linked=await web.Send("/Account/LinkedIdentities","anonymous");Assert.Equal(System.Net.HttpStatusCode.OK,linked.StatusCode);Assert.Contains("Google",await linked.Content.ReadAsStringAsync(Ct));
+        using var linked=await web.Send("/Account/LinkedIdentities","anonymous");Assert.Equal(System.Net.HttpStatusCode.OK,linked.StatusCode);string linkedHtml=await linked.Content.ReadAsStringAsync(Ct);Assert.Contains("Google",linkedHtml);
+        using var finalMethod=await web.Send("/Account/LinkedIdentities?handler=Unlink","anonymous",new(){["__RequestVerificationToken"]=Antiforgery(linkedHtml),["providerId"]="Google",["scopeId"]=PublicExternalIdentity.Scope("Google"),["subjectId"]="controlled-google-subject"});Assert.Equal(System.Net.HttpStatusCode.BadRequest,finalMethod.StatusCode);Assert.Single(f.Accounts.Public.GetIdentities(f.Applicant.Id.ToString()));
         // The normal login path now resolves the same immutable provider binding, without a recovery token.
         using var loginPage=await web.Send("/Account/IdentityRecovery","anonymous");string loginToken=Antiforgery(await loginPage.Content.ReadAsStringAsync(Ct));
         using var normal=await web.Send("/Account/Login?handler=External","anonymous",new(){["__RequestVerificationToken"]=loginToken,["provider"]="Google",["returnUrl"]="/Account/LinkedIdentities"});Assert.Equal(System.Net.HttpStatusCode.Redirect,normal.StatusCode);
@@ -346,5 +347,32 @@ public sealed class ApplicantIdentityRecoveryTests
         await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Service.InitiateAsync(f.Actor(f.First),f.Applicant.Id,"Google","Support case lacks verified contact",Ct));
         Assert.Empty((await f.Service.DetailsAsync(f.Actor(f.First),f.Applicant.Id,Ct))!.Recoveries);
         Assert.Empty(await f.Database.Db.OutboxMessages.ToListAsync(Ct));
+    }
+    [Fact]
+    public async Task ConcurrentUnlinkingNeverRemovesTheFinalConfiguredIdentity()
+    {
+        await using var f=await Setup(true);var google=Proof();f.Accounts.Public.Link(f.Applicant.Id.ToString(),google,f.Applicant.Id.ToString());
+        var identities=f.Accounts.Public.GetIdentities(f.Applicant.Id.ToString());Assert.Equal(2,identities.Count);
+        ClaimsPrincipal Owner(ExternalIdentityKey key) => new(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier,f.Applicant.Id.ToString()) }.Concat(PublicExternalIdentity.SessionClaims(f.Accounts.Public.Find(f.Applicant.Id.ToString())!,Proof(key.ProviderId,key.SubjectId))),"fixture"));
+        async Task<bool> Remove(ExternalIdentityKey key)
+        {
+            var accounts=new RequestPortalAccounts(f.Database.Db.Database.GetConnectionString()!);
+            try { await accounts.UnlinkPublicIdentityAsync(Owner(identities.Single(i=>i.Key!=key).Key),key,["Google","Microsoft"],Ct);return true; }
+            catch(Exception error) when(error is InvalidOperationException or UnauthorizedAccessException){return false;}
+        }
+        var results=await Task.WhenAll(identities.Select(identity=>Remove(identity.Key)));Assert.Single(results,r=>r);
+        var remaining=Assert.Single(f.Accounts.Public.GetIdentities(f.Applicant.Id.ToString()));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Accounts.UnlinkPublicIdentityAsync(Owner(remaining.Key),remaining.Key,["Google","Microsoft"],Ct));
+        Assert.Single(f.Accounts.Public.GetIdentities(f.Applicant.Id.ToString()));
+    }
+    [Fact]
+    public async Task AnUnconfiguredProviderDoesNotCountAsAUsableReplacement()
+    {
+        await using var f=await Setup(true);var google=Proof();f.Accounts.Public.Link(f.Applicant.Id.ToString(),google,f.Applicant.Id.ToString());
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Accounts.UnlinkPublicIdentityAsync(new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier,f.Applicant.Id.ToString()) }.Concat(PublicExternalIdentity.SessionClaims(f.Accounts.Public.Find(f.Applicant.Id.ToString())!,Proof("Microsoft","old-identity"))),"fixture")),google.Key,["Google"],Ct));
+        Assert.Equal(2,f.Accounts.Public.GetIdentities(f.Applicant.Id.ToString()).Count);
+        var signedInWithGoogle=new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier,f.Applicant.Id.ToString()) }.Concat(PublicExternalIdentity.SessionClaims(f.Accounts.Public.Find(f.Applicant.Id.ToString())!,google)),"fixture"));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Accounts.UnlinkPublicIdentityAsync(signedInWithGoogle,google.Key,["Google","Microsoft"],Ct));
+        Assert.Equal(2,f.Accounts.Public.GetIdentities(f.Applicant.Id.ToString()).Count);
     }
 }
