@@ -29,7 +29,9 @@ public sealed class QuickIntakeRecord
         string helpCategory,
         DateTimeOffset createdUtc,
         string? secondaryTelephone = null,
-        string? victimCircumstances = null)
+        string? victimCircumstances = null,
+        string? originalTelephone = null,
+        string? originalSecondaryTelephone = null)
     {
         if (id == Guid.Empty) throw new ArgumentException("Quick intake id is required.", nameof(id));
         if (requestId == Guid.Empty) throw new ArgumentException("Request id is required.", nameof(requestId));
@@ -58,6 +60,8 @@ public sealed class QuickIntakeRecord
         Gender = gender.Trim();
         MaritalStatus = maritalStatus.Trim();
         MobileNumber = mobileNumber.Trim();
+        OriginalTelephone = originalTelephone;
+        OriginalSecondaryTelephone = originalSecondaryTelephone;
         SecondaryTelephone = Normalize(secondaryTelephone);
         VictimCircumstances = Normalize(victimCircumstances);
         Email = Normalize(email);
@@ -83,6 +87,9 @@ public sealed class QuickIntakeRecord
     public string Gender { get; private set; } = string.Empty;
     public string MaritalStatus { get; private set; } = string.Empty;
     public string MobileNumber { get; private set; } = string.Empty;
+    // Source values are retained privately; historical originals cannot be reconstructed.
+    public string? OriginalTelephone { get; private set; }
+    public string? OriginalSecondaryTelephone { get; private set; }
     public string? VictimCircumstances { get; private set; }
     public string? SecondaryTelephone { get; private set; }
     public string? Email { get; private set; }

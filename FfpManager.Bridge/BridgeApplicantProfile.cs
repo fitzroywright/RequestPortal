@@ -23,28 +23,8 @@ public static class BridgeApplicantProfile
 
     public static string? Normalize(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        value = value.Trim();
-        if (value.Any(c => !char.IsAsciiDigit(c) && c is not ('+' or '(' or ')' or '-' or '.' or ' ')))
-            throw new InvalidOperationException("Applicant telephone contains unsupported characters or an extension.");
-        string number = new(value.Where(c => char.IsAsciiDigit(c) || c == '+').ToArray());
-        if (number.Length == 0 || number.Count(c => c == '+') > 1 || number.LastIndexOf('+') > 0)
-            throw new InvalidOperationException("Applicant telephone must contain digits with at most one leading plus.");
-        // E.164 canonicalization also deduplicates equivalent local/international forms.
-        var util = PhoneNumberUtil.GetInstance();
-        try
-        {
-            var parsed = util.Parse(number, "JM");
-            if (parsed.HasExtension) throw new InvalidOperationException("Applicant telephone extensions are unsupported.");
-            number = util.Format(parsed, PhoneNumberFormat.E164);
-        }
-        catch (NumberParseException)
-        {
-            throw new InvalidOperationException("Applicant telephone could not be parsed.");
-        }
-        if (number.Length > 15)
-            throw new InvalidOperationException("FFP Manager PhoneNumbers.Number permits at most 15 characters, including the plus.");
-        return number;
+        try { return RequestPortal.Common.Contacts.ApplicantTelephone.Normalize(value); }
+        catch (ArgumentException exception) { throw new InvalidOperationException(exception.Message); }
     }
 
     public static IReadOnlyList<ApplicantPhone> Phones(ExternalApplicationSubmission submission)
@@ -56,7 +36,14 @@ public static class BridgeApplicantProfile
 
         void Add(string? value, long numberType)
         {
-            string? number = Normalize(value);
+            string? number;
+            try { number = Normalize(value); }
+            catch (InvalidOperationException)
+            {
+                throw new ExternalApplicationValidationException(
+                    numberType == ApplicantNumberType ? "PrimaryTelephone" : "SecondaryTelephone",
+                    "The applicant telephone requires correction before transfer.");
+            }
             if (number is null || result.Any(p => p.Number == number)) return;
             var util = PhoneNumberUtil.GetInstance();
             result.Add(new(number, numberType, util.GetNumberType(util.Parse(number, "JM"))));

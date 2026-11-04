@@ -74,6 +74,37 @@ public sealed class FfpManagerApplicantProfileTests
     public void UnsafeOrOversizedTelephoneFailsWithoutTruncation(string number) =>
         Assert.Throws<InvalidOperationException>(()=>BridgeApplicantProfile.Normalize(number));
 
+    [Theory]
+    [InlineData("876 523-0123", "+18765230123")]
+    [InlineData("+1 (876) 523-0123", "+18765230123")]
+    [InlineData("0018765230123", "+18765230123")]
+    [InlineData("011442079460018", "+442079460018")]
+    public void IntakeAndBridgeUseTheSameCanonicalTelephone(string input, string expected)
+    {
+        Assert.Equal(expected, RequestPortal.Common.Contacts.ApplicantTelephone.Normalize(input));
+        Assert.Equal(expected, BridgeApplicantProfile.Normalize(input));
+    }
+
+    [Theory]
+    [InlineData("+011442079460018")]
+    [InlineData("+08765230123")]
+    [InlineData("123")]
+    [InlineData("8765230123 ext 5")]
+    public void InvalidTelephoneIsRejectedWithoutGuessingOrLeakingItsValue(string input)
+    {
+        var error = Assert.Throws<ArgumentException>(() => RequestPortal.Common.Contacts.ApplicantTelephone.Normalize(input));
+        Assert.DoesNotContain(input, error.Message);
+        foreach (bool primary in new[] { true, false })
+        {
+            var submission = Submission() with {
+                PrimaryTelephone = primary ? input : "8765230123",
+                SecondaryTelephone = primary ? null : input };
+            var failure = Assert.Throws<ExternalApplicationValidationException>(() => BridgeApplicantProfile.Validate(submission));
+            Assert.Equal(primary ? "PrimaryTelephone" : "SecondaryTelephone", failure.Field);
+            Assert.DoesNotContain(input, failure.Message);
+        }
+    }
+
     [Fact]
     public void UnclassifiedOrAmbiguousLineTypeFailsWithoutGuessing()
     {

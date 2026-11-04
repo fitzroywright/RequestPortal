@@ -67,6 +67,8 @@ public sealed class IntegrationMonitoringTests
 
     [Theory]
     [InlineData("VALIDATION", "PermanentValidation", false)]
+    [InlineData("VALIDATION_PRIMARY_TELEPHONE", "PermanentValidation", false)]
+    [InlineData("VALIDATION_SECONDARY_TELEPHONE", "PermanentValidation", false)]
     [InlineData("SQL_CONSTRAINT", "PermanentSql", false)]
     [InlineData("SQL_547", "PermanentSql", false)]
     [InlineData("SQL_18456", "Authentication", false)]

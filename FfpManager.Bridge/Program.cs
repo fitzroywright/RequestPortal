@@ -228,9 +228,14 @@ api.AddEndpointFilter(async (context, next) =>
     {
         return Results.Json(exception.Failure, statusCode: 409);
     }
-    catch (ExternalApplicationValidationException)
+    catch (ExternalApplicationValidationException exception)
     {
-        return Results.Json(TransferFailures.For("Validation", "VALIDATION"), statusCode: 422);
+        string code = exception.Field switch {
+            "PrimaryTelephone" => "VALIDATION_PRIMARY_TELEPHONE",
+            "SecondaryTelephone" => "VALIDATION_SECONDARY_TELEPHONE",
+            _ => "VALIDATION"
+        };
+        return Results.Json(TransferFailures.For("Validation", code), statusCode: 422);
     }
     catch (Microsoft.Data.SqlClient.SqlException exception)
     {

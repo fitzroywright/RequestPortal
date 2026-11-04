@@ -57,6 +57,47 @@ public sealed class QuickIntakeClientRelationsEmailTests
     }
 
     [Fact]
+    public async Task IntakePreservesSubmittedTelephoneValuesWhileUsingCanonicalDestinations()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await Database(token);
+        var submission = Submission with { Telephone = " (876) 555-0199 ", SecondaryTelephone = "011442079460018" };
+        var result = await new QuickIntakeService(database.Db).CreateAsync(submission, token);
+        database.Db.ChangeTracker.Clear();
+        var intake = await database.Db.QuickIntakes.SingleAsync(item => item.RequestId == result.RequestId, token);
+        Assert.Equal(submission.Telephone, intake.OriginalTelephone);
+        Assert.Equal(submission.SecondaryTelephone, intake.OriginalSecondaryTelephone);
+        Assert.Equal("+18765550199", intake.MobileNumber);
+        Assert.Equal("+442079460018", intake.SecondaryTelephone);
+        Assert.Equal(intake.MobileNumber, result.Telephone);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InvalidTelephoneNeverCommitsAPartialIntake(bool secondary)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await Database(token);
+        var submission = secondary ? Submission with { SecondaryTelephone = "+011442079460018" }
+            : Submission with { Telephone = "+011442079460018" };
+        await Assert.ThrowsAsync<ArgumentException>(() => new QuickIntakeService(database.Db).CreateAsync(submission, token));
+        Assert.Empty(await database.Db.QuickIntakes.ToListAsync(token));
+        Assert.Empty(await database.Db.AssistanceRequests.ToListAsync(token));
+        Assert.Empty(await database.Db.OutboxMessages.ToListAsync(token));
+    }
+
+    [Fact]
+    public async Task OversizedBlankSecondaryCannotOverflowOriginalValueStorage()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await Database(token);
+        await Assert.ThrowsAsync<ArgumentException>(() => new QuickIntakeService(database.Db)
+            .CreateAsync(Submission with { SecondaryTelephone = new string(' ', 41) }, token));
+        Assert.Empty(await database.Db.QuickIntakes.ToListAsync(token));
+    }
+
+    [Fact]
     public async Task FailedCreationDoesNotCommitRequestOrEmail()
     {
         var token = TestContext.Current.CancellationToken;
