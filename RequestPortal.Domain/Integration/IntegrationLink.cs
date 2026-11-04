@@ -7,7 +7,9 @@ public enum SynchronizationStatus
     NotSent = 0,
     Pending = 1,
     Synchronized = 2,
-    Failed = 3
+    Failed = 3,
+    Retrying = 4,
+    ReconciliationRequired = 5
 }
 
 public sealed class IntegrationLink
@@ -44,6 +46,47 @@ public sealed class IntegrationLink
     public DateTimeOffset? SynchronizedUtc { get; private set; }
 
     public string? LastError { get; private set; }
+    public int AttemptCount { get; private set; }
+    public DateTimeOffset? NextRetryUtc { get; private set; }
+    public DateTimeOffset? VerifiedUtc { get; private set; }
+    public DateTimeOffset? ArtifactsSynchronizedUtc { get; private set; }
+    public string? FailureStage { get; private set; }
+    public string? FailureClassification { get; private set; }
+    public string? ErrorCode { get; private set; }
+    public string? TargetServer { get; private set; }
+    public string? TargetDatabase { get; private set; }
+    public void MarkQueued() => Status = SynchronizationStatus.Pending;
+
+    public void BeginAttempt(DateTimeOffset now)
+    {
+        AttemptCount++;
+        MarkPending(now);
+        NextRetryUtc = null;
+    }
+
+    public void RecordVerifiedDestination(string externalReference, string applicationNumber, string server, string database, DateTimeOffset now)
+    {
+        ExternalReference = externalReference;
+        ApplicationNumber = applicationNumber;
+        TargetServer = server;
+        TargetDatabase = database;
+        VerifiedUtc = now;
+    }
+
+    public void RecordFailure(DateTimeOffset now, string stage, string classification, string code, string explanation, bool transient)
+    {
+        MarkFailed(now, explanation);
+        FailureStage = stage;
+        FailureClassification = classification;
+        ErrorCode = code;
+        NextRetryUtc = transient && AttemptCount < 10 ? now.AddMinutes(Math.Pow(2, Math.Min(Math.Max(AttemptCount - 1, 0), 6))) : null;
+        // Keep persisted status values compatible with the previous release. Monitoring derives
+        // Retrying/Reconciliation Required from the durable schedule and classification.
+        Status = SynchronizationStatus.Failed;
+    }
+
+    public void RequireReconciliation(DateTimeOffset now, string code, string explanation)
+        => RecordFailure(now, "Reconciliation", "Ambiguous", code, explanation, false);
 
     public void MarkPending(DateTimeOffset attemptedUtc)
     {
@@ -58,8 +101,13 @@ public sealed class IntegrationLink
         if (!string.IsNullOrWhiteSpace(applicationNumber))
             ApplicationNumber = applicationNumber.Trim();
         Status = SynchronizationStatus.Synchronized;
-        LastAttemptUtc = synchronizedUtc;
-        SynchronizedUtc = synchronizedUtc;
+        LastAttemptUtc ??= synchronizedUtc;
+        SynchronizedUtc ??= synchronizedUtc;
+        ArtifactsSynchronizedUtc ??= synchronizedUtc;
+        NextRetryUtc = null;
+        FailureStage = null;
+        FailureClassification = null;
+        ErrorCode = null;
         LastError = null;
     }
 

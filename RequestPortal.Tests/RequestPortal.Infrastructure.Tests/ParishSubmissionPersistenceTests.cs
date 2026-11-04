@@ -37,7 +37,7 @@ public sealed class ParishSubmissionPersistenceTests
         var service = Service(database, bridge, new DelayedClock(received.AddDays(7)));
         await service.SubmitRequestAsync(requestId, token);
         await service.SubmitRequestAsync(requestId, token);
-        Assert.Equal(2, bridge.Submissions.Count);
+        Assert.Single(bridge.Submissions);
         Assert.All(bridge.Submissions, submission => Assert.Equal(received, submission.SubmittedUtc));
         Assert.Equal(received, (await database.Db.AssistanceRequests.AsNoTracking().SingleAsync(x => x.Id == requestId, token)).SubmittedUtc);
     }
@@ -64,8 +64,8 @@ public sealed class ParishSubmissionPersistenceTests
         Assert.Equal(first.ApplicationId, second.ApplicationId);
         Assert.Equal(first.ApplicationNumber, second.ApplicationNumber);
         Assert.True(second.AlreadyExisted);
-        Assert.Equal(2, bridge.Submissions.Count);
-        Assert.Equal(bridge.Submissions[0].CorrelationId, bridge.Submissions[1].CorrelationId);
+        Assert.Single(bridge.Submissions);
+        Assert.Equal(bridge.Submissions[0].CorrelationId, (await database.Db.IntegrationLinks.SingleAsync(token)).Id);
         foreach (ExternalApplicationSubmission submission in bridge.Submissions)
         {
             Assert.Equal(requestId, submission.PortalRequestId);
@@ -156,11 +156,11 @@ public sealed class ParishSubmissionPersistenceTests
         string originalPayload = (await database.Db.OutboxMessages.AsNoTracking().SingleAsync(item => item.MessageType == typeof(RequestSubmittedMessage).FullName, token)).Payload;
         CapturingBridge bridge = new();
 
-        ExternalApplicationValidationException error = await Assert.ThrowsAsync<ExternalApplicationValidationException>(() =>
+        IntegrationTransferException error = await Assert.ThrowsAsync<IntegrationTransferException>(() =>
             Service(database, bridge).SubmitRequestAsync(requestId, token));
 
-        Assert.Equal("Parish", error.Field);
-        Assert.Contains("Quick Intake record", error.Message);
+        Assert.Equal("VALIDATION_PARISH", error.Failure.Code);
+        Assert.Equal("Preparation", error.Failure.Stage);
         Assert.Empty(bridge.Submissions);
         var link = await database.Db.IntegrationLinks.AsNoTracking().SingleAsync(token);
         Assert.Equal(SynchronizationStatus.Failed, link.Status);
@@ -185,9 +185,10 @@ public sealed class ParishSubmissionPersistenceTests
         var request = await database.Db.AssistanceRequests.SingleAsync(token);
         var bridge = new CapturingBridge { ApplicationNumber = invalid == "portal-code" ? request.PublicReference : invalid };
         var service = Service(database, bridge);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SubmitRequestAsync(requestId, token));
+        await Assert.ThrowsAsync<IntegrationTransferException>(() => service.SubmitRequestAsync(requestId, token));
         var link = await database.Db.IntegrationLinks.SingleAsync(token);
         Assert.Equal(SynchronizationStatus.Failed, link.Status);
+        Assert.Equal("Ambiguous", link.FailureClassification);
         Assert.Null(link.ApplicationNumber);
         Assert.Null(link.ExternalReference);
         Assert.False(await database.Db.OutboxMessages.AnyAsync(
@@ -219,10 +220,10 @@ public sealed class ParishSubmissionPersistenceTests
         await database.Db.SaveChangesAsync(token);
         var bridge = new CapturingBridge { FailArtifactTransfer = true };
         var service = Service(database, bridge);
-        await Assert.ThrowsAsync<IOException>(() => service.SubmitRequestAsync(requestId, token));
+        await Assert.ThrowsAsync<IntegrationTransferException>(() => service.SubmitRequestAsync(requestId, token));
         var link = await database.Db.IntegrationLinks.SingleAsync(token);
         Assert.Equal(SynchronizationStatus.Failed, link.Status);
-        Assert.Null(link.ApplicationNumber);
+        Assert.Equal("KIN/26/GR/0042", link.ApplicationNumber);
         Assert.False(await database.Db.OutboxMessages.AnyAsync(
             item => item.MessageType == typeof(FfpManagerClientConfirmationRequestedMessage).FullName, token));
         bridge.FailArtifactTransfer = false;
@@ -286,6 +287,10 @@ public sealed class ParishSubmissionPersistenceTests
         public bool FailArtifactTransfer { get; set; }
         public List<ExternalApplicationSubmission> Submissions { get; } = [];
         public Dictionary<Guid, byte[]> Artifacts { get; } = [];
+
+        public Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default)
+            => Task.FromResult<ExternalApplicationReceipt?>(Submissions.Count == 0 ? null :
+                new(requestId, "123", ApplicationNumber!, Submissions[0].SubmittedUtc, "JMDB01", "FFPJM"));
 
         public Task<ExternalApplicationReference> SubmitApplicationAsync(ExternalApplicationSubmission submission, CancellationToken cancellationToken = default)
         {

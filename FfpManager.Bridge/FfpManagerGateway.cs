@@ -5,6 +5,7 @@ namespace FfpManager.Bridge;
 
 public interface IFfpManagerGateway
 {
+    Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default);
     Task<ExternalApplicationReference> CreateApplicationAsync(
         ExternalApplicationSubmission submission,
         CancellationToken cancellationToken = default);
@@ -45,6 +46,12 @@ public sealed record FakeFfpManagerApplicationSnapshot(
 
 public sealed class FakeFfpManagerGateway : IFfpManagerGateway
 {
+    public Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default)
+    {
+        var found = byApplicationId.Values.SingleOrDefault(item => item.Submission.PortalRequestId == requestId);
+        return Task.FromResult(found is null ? null : new ExternalApplicationReceipt(requestId,
+            found.Reference.ApplicationId, found.Reference.ApplicationNumber!, found.Reference.AcceptedUtc, "Fake", "Fake"));
+    }
     private sealed class FakeApplication
     {
         public FakeApplication(
@@ -67,7 +74,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
         public ExternalApplicationStatus Status { get; set; }
     }
 
-    private readonly ConcurrentDictionary<Guid, FakeApplication> byCorrelation = new();
+    private readonly ConcurrentDictionary<Guid, FakeApplication> byRequest = new();
     private readonly ConcurrentDictionary<string, FakeApplication> byApplicationId = new(StringComparer.OrdinalIgnoreCase);
     private long sequence = 1000;
 
@@ -76,7 +83,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (byCorrelation.TryGetValue(submission.CorrelationId, out FakeApplication? existing))
+        if (byRequest.TryGetValue(submission.PortalRequestId, out FakeApplication? existing))
         {
             return Task.FromResult(existing.Reference with { AlreadyExisted = true });
         }
@@ -87,7 +94,7 @@ public sealed class FakeFfpManagerGateway : IFfpManagerGateway
         ExternalApplicationReference reference = new(applicationId, applicationId, now);
         FakeApplication created = new(submission, reference);
 
-        FakeApplication actual = byCorrelation.GetOrAdd(submission.CorrelationId, created);
+        FakeApplication actual = byRequest.GetOrAdd(submission.PortalRequestId, created);
         byApplicationId.TryAdd(actual.Reference.ApplicationId, actual);
         return Task.FromResult(actual.Reference with { AlreadyExisted = !ReferenceEquals(actual, created) });
     }

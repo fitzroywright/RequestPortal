@@ -1,0 +1,327 @@
+using RequestPortal.Domain.Documents;
+using System.Net;
+using Common.Security;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using RequestPortal.Application.Documents;
+using RequestPortal.Application.Integration;
+using RequestPortal.Application.Requests;
+using RequestPortal.Common.Time;
+using RequestPortal.Domain.Integration;
+using RequestPortal.Domain.ReferenceData;
+using RequestPortal.Infrastructure.Auditing;
+using RequestPortal.Infrastructure.Integration;
+using RequestPortal.Infrastructure.Requests;
+using RequestPortal.Infrastructure.Persistence;
+using Xunit;
+using RequestPortal.Application.Messages;
+using RequestPortal.Application.Portal;
+using RequestPortal.Infrastructure.Messaging;
+using Microsoft.Extensions.Logging.Abstractions;
+using RequestPortal.Common.Messaging;
+using Proxy = RequestPortal.Infrastructure.Tests.MessageNavigationPageTests.Proxy;
+
+namespace RequestPortal.Infrastructure.Tests;
+
+public sealed class IntegrationMonitoringTests
+{
+    private static readonly FfpManagerBridgeOptions OptionsValue = new() { Enabled = true };
+    private static readonly IClock Clock = new SystemClock();
+
+    private static async Task<Guid> Intake(PostgreSqlTestDatabase database, string first = "Recovery")
+    {
+        if (!await database.Db.UnitsOfMeasure.AnyAsync(cancellationToken: TestContext.Current.CancellationToken))
+        { database.Db.UnitsOfMeasure.Add(new(Guid.NewGuid(), "EA", "Each")); await database.Db.SaveChangesAsync(cancellationToken: TestContext.Current.CancellationToken); }
+        return (await new QuickIntakeService(database.Db).CreateAsync(new QuickIntakeSubmission(
+            first, "Applicant", new(1980,1,1), "Male", "Single", "8765550199", null, "Test street", "Test community",
+            "Kingston", "Unemployed", 0, false, false, ["None"], "Food"), TestContext.Current.CancellationToken)).RequestId;
+    }
+
+    private static FfpManagerIntegrationService Submit(PostgreSqlTestDatabase database, Bridge bridge)
+        => new(database.Db, new Documents(), bridge, Options.Create(OptionsValue), Clock, null!);
+    private static IntegrationStatusService Monitor(PostgreSqlTestDatabase database, Bridge bridge, bool authorized = true)
+        => new(database.Db, Clock, Submit(database, bridge), Options.Create(OptionsValue), new BusinessAuditWriter(database.Db, Clock), bridge, new Authorization(authorized));
+
+    [Fact]
+    public async Task SubmissionAndTrackingAreAtomic_AndSuccessfulTransferIsVerifiedAndIdempotent()
+    {
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        Guid request = await Intake(database);
+        var initial = await database.Db.IntegrationLinks.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(SynchronizationStatus.Pending, initial.Status);
+        Assert.True(await database.Db.OutboxMessages.AnyAsync(item => item.RequestId == request && item.MessageType.EndsWith("RequestSubmittedMessage"), cancellationToken: TestContext.Current.CancellationToken));
+        var bridge = new Bridge(); var submit = Submit(database, bridge);
+        await submit.SubmitRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken); await submit.SubmitRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        database.Db.ChangeTracker.Clear();
+        var detail = await Monitor(database, bridge).GetRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(SynchronizationStatus.Synchronized, detail!.Transfer.Status);
+        Assert.Equal("JMDB01 / FFPJM", detail.Transfer.Target);
+        Assert.NotNull(detail.Transfer.VerifiedUtc);
+        Assert.Equal("KGN/26/GR/0100", detail.Transfer.ApplicationNumber);
+        Assert.Equal(1, bridge.Inserts);
+        Assert.Equal(2, detail.Transfer.AttemptCount);
+        Assert.Equal(2, detail.Attempts.Count);
+        Assert.All(detail.Attempts, item => Assert.True(item.Succeeded));
+        Assert.Equal(1, (await Monitor(database, bridge).SearchAsync(new(), cancellationToken: TestContext.Current.CancellationToken)).Counts.Synchronized);
+    }
+
+    [Theory]
+    [InlineData("VALIDATION", "PermanentValidation", false)]
+    [InlineData("SQL_CONSTRAINT", "PermanentSql", false)]
+    [InlineData("SQL_547", "PermanentSql", false)]
+    [InlineData("SQL_18456", "Authentication", false)]
+    [InlineData("SQL_1205", "TransientConnection", true)]
+    [InlineData("SQL_AUTH", "Authentication", false)]
+    [InlineData("BRIDGE_AUTH", "Authentication", false)]
+    [InlineData("CONNECTION", "TransientConnection", true)]
+    public async Task FailuresHaveDurableSanitizedClassificationAndBoundedRetry(string code, string classification, bool retry)
+    {
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        Guid request = await Intake(database);
+        var bridge = new Bridge { FailureCode = code };
+        await Assert.ThrowsAsync<IntegrationTransferException>(() => Submit(database, bridge).SubmitRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken));
+        database.Db.ChangeTracker.Clear();
+        var detail = (await Monitor(database, bridge).GetRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken))!;
+        Assert.Equal(code, detail.Transfer.ErrorCode);
+        Assert.Equal(classification, detail.Transfer.FailureClassification);
+        Assert.Equal(retry ? SynchronizationStatus.Retrying : SynchronizationStatus.Failed, detail.Transfer.Status);
+        Assert.Equal(retry, detail.Transfer.NextRetryUtc.HasValue);
+        var attempt = Assert.Single(detail.Attempts);
+        Assert.False(attempt.Succeeded); Assert.NotNull(attempt.CompletedUtc);
+        Assert.DoesNotContain("TOP-SECRET", attempt.Explanation ?? "");
+        if(retry)
+        {
+            for(int i=1;i<10;i++) await Assert.ThrowsAsync<IntegrationTransferException>(() => Submit(database, bridge).SubmitRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken));
+            var link = await database.Db.IntegrationLinks.SingleAsync(cancellationToken: TestContext.Current.CancellationToken); Assert.Null(link.NextRetryUtc); Assert.Equal(SynchronizationStatus.Failed,link.Status);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)] [InlineData("Not a parish")]
+    public async Task InvalidSourceMappingFailsBeforeSqlButAfterDurableAttempt(string? parish)
+    {
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        Guid request = await Intake(database);
+        var intake = await database.Db.QuickIntakes.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
+        database.Db.Entry(intake).Property(item => item.Parish).CurrentValue = parish ?? "";
+        await database.Db.SaveChangesAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var bridge = new Bridge { FailureCode = parish is null ? null : "VALIDATION" };
+        var failure = await Assert.ThrowsAsync<IntegrationTransferException>(() => Submit(database, bridge).SubmitRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(parish is null ? "VALIDATION_PARISH" : "VALIDATION", failure.Failure.Code); Assert.Equal(parish is null ? "Preparation" : "SqlSubmission", failure.Failure.Stage);
+        Assert.Equal(0, bridge.Inserts); Assert.Single(await database.Db.IntegrationAttempts.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task CommitThenLostAcknowledgementReconcilesAndRetriesWithoutDuplicateOrLostHistory()
+    {
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        Guid request = await Intake(database);
+        var bridge = new Bridge { LoseAcknowledgement = true };
+        await Assert.ThrowsAsync<IntegrationTransferException>(() => Submit(database, bridge).SubmitRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(1, bridge.Inserts);
+        var monitor = Monitor(database,bridge);
+        await monitor.ReconcileRequestAsync(Guid.NewGuid(),request, cancellationToken: TestContext.Current.CancellationToken);
+        var detail = (await monitor.GetRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken))!;
+        Assert.Equal("123",detail.Transfer.ApplicationId);
+        Assert.Equal(SynchronizationStatus.ReconciliationRequired,detail.Transfer.Status);
+        await monitor.RetryAsync(Guid.NewGuid(),detail.Transfer.LinkId!.Value, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(1,bridge.Inserts);
+        detail=(await monitor.GetRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken))!;
+        Assert.Equal(SynchronizationStatus.Synchronized,detail.Transfer.Status);
+        Assert.Contains(detail.Attempts,item=>!item.Succeeded);
+        Assert.Contains(detail.OperatorEvents,item=>item.Action=="IntegrationRetryRequested");
+        Assert.Contains(detail.OperatorEvents,item=>item.Action=="IntegrationReconciled");
+        Assert.Single(await database.Db.AssistanceRequests.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task HttpSuccessWithoutVerifiableDestinationCannotSynchronizeOrReleaseConfirmations()
+    {
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        Guid request = await Intake(database);
+        var bridge = new Bridge { HideDestination = true };
+        await Assert.ThrowsAsync<IntegrationTransferException>(()=>Submit(database,bridge).SubmitRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(SynchronizationStatus.ReconciliationRequired,(await Monitor(database,bridge).GetTransferAsync(request,TestContext.Current.CancellationToken))!.Status);
+        Assert.False(await database.Db.OutboxMessages.AnyAsync(item=>item.MessageType.EndsWith("FfpManagerClientConfirmationRequestedMessage"), cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task MissingLinksQueuesAndStalePendingAreVisibleInAccurateFilteredPaginatedTotals()
+    {
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        for(int i=0;i<27;i++) await Intake(database,i==26?"FindMe":"Common");
+        var lost=await database.Db.IntegrationLinks.FirstAsync(cancellationToken: TestContext.Current.CancellationToken); database.Db.IntegrationLinks.Remove(lost);
+        var stale=await database.Db.IntegrationLinks.FirstAsync(item=>item.Id!=lost.Id, cancellationToken: TestContext.Current.CancellationToken);
+        database.Db.Entry(stale).Property(item=>item.CreatedUtc).CurrentValue=DateTimeOffset.UtcNow.AddHours(-1);
+        database.Db.Entry(stale).Property(item=>item.LastAttemptUtc).CurrentValue=DateTimeOffset.UtcNow.AddHours(-1);
+        var requests=await database.Db.AssistanceRequests.Where(item=>item.Id==lost.RequestId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        database.Db.Entry(requests[0]).Property(item=>item.SubmittedUtc).CurrentValue=DateTimeOffset.UtcNow.AddHours(-1);
+        database.Db.OutboxMessages.RemoveRange(await database.Db.OutboxMessages.Where(item=>item.RequestId==lost.RequestId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        await database.Db.SaveChangesAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var monitor=Monitor(database,new Bridge());
+        var first=await monitor.SearchAsync(new(), cancellationToken: TestContext.Current.CancellationToken);var second=await monitor.SearchAsync(new(Page:2), cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(27,first.TotalCount);Assert.Equal(25,first.Items.Count);Assert.Equal(2,second.Items.Count);
+        Assert.Equal(27,first.Items.Concat(second.Items).Select(item=>item.RequestId).Distinct().Count());
+        Assert.Equal(2,first.Counts.ReconciliationRequired);Assert.Equal(2,await monitor.CountAttentionAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var filtered=await monitor.SearchAsync(new(Status:"ReconciliationRequired"), cancellationToken: TestContext.Current.CancellationToken);Assert.Equal(2,filtered.TotalCount);
+        Assert.Equal("MISSING_LINK",(await monitor.GetTransferAsync(lost.RequestId, cancellationToken: TestContext.Current.CancellationToken))!.ErrorCode);
+        Assert.Single((await monitor.SearchAsync(new(Search:"findme applicant"), cancellationToken: TestContext.Current.CancellationToken)).Items);
+        Assert.Empty((await monitor.SearchAsync(new(Search:"never matches"), cancellationToken: TestContext.Current.CancellationToken)).Items);
+    }
+
+    [Fact]
+    public async Task UnauthorizedOperatorsCannotReconcileRetryOrCreateLinks()
+    {
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        Guid request=await Intake(database);var bridge=new Bridge();var monitor=Monitor(database,bridge,false);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(()=>monitor.ReconcileRequestAsync(Guid.NewGuid(),request, cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(()=>monitor.RetryAsync(Guid.NewGuid(),database.Db.IntegrationLinks.Single().Id, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(0,bridge.Inserts);Assert.Empty(await database.Db.IntegrationAttempts.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ConcurrentTransferIsLockedAcrossDurableCheckpoints()
+    {
+        var token=TestContext.Current.CancellationToken;
+        await using var database=await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid request=await Intake(database);var bridge=new Bridge { Release=new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var first=Submit(database,bridge).SubmitRequestAsync(request,token);
+        try
+        {
+            await bridge.Entered.Task.WaitAsync(token);
+            await using var other=new RequestPortalDbContext(new DbContextOptionsBuilder<RequestPortalDbContext>()
+                .UseNpgsql(database.Db.Database.GetDbConnection().ConnectionString).Options);
+            var concurrent=new FfpManagerIntegrationService(other,new Documents(),bridge,Options.Create(OptionsValue),Clock,null!);
+            var error=await Assert.ThrowsAsync<IntegrationTransferException>(()=>concurrent.SubmitRequestAsync(request,token));
+            Assert.Equal("Concurrency",error.Failure.Stage);
+        }
+        finally { bridge.Release.TrySetResult(); }
+        await first;Assert.Equal(1,bridge.Inserts);
+        Assert.Single(await database.Db.IntegrationAttempts.ToListAsync(token));
+    }
+
+    [Theory]
+    [InlineData("JMDB01","FFP")][InlineData("OTHER","FFPJM")]
+    public void DestinationGuardRejectsRehearsalAndOtherServers(string server,string database)
+    {
+        var id=Guid.NewGuid();
+        var error=Assert.Throws<IntegrationTransferException>(()=>FfpManagerIntegrationService.ValidateReceipt(id,
+            new(id,"123","KGN/26/GR/0100",DateTimeOffset.UtcNow,server,database)));
+        Assert.Equal("DESTINATION_CONFLICT",error.Failure.Code);
+    }
+
+    [Fact]
+    public async Task ReturnOutboxFailuresAndRecoveryRetainSeparateDurableHistory()
+    {
+        var token=TestContext.Current.CancellationToken;
+        await using var database=await PostgreSqlTestDatabase.CreateAsync(token);
+        var bridge=new Bridge();var monitor=Monitor(database,bridge);
+        await monitor.ObserveReturnOutboxAsync(token);await monitor.ObserveReturnOutboxAsync(token);
+        Assert.Single(await monitor.GetReturnHistoryAsync(token));Assert.Equal(1,await monitor.CountAttentionAsync(token));
+        bridge.ReturnStatus=new(0,0,0,null);await monitor.ObserveReturnOutboxAsync(token);
+        var history=await monitor.GetReturnHistoryAsync(token);Assert.Equal(2,history.Count);
+        Assert.Contains(history,item=>item.Snapshot?.Failed==1);Assert.Equal(0,await monitor.CountAttentionAsync(token));
+        bridge.ReturnUnavailable=true;await monitor.ObserveReturnOutboxAsync(token);
+        Assert.Equal("RETURN_OUTBOX_UNAVAILABLE",(await monitor.GetReturnHistoryAsync(token))[0].ErrorCode);
+        Assert.Equal(1,await monitor.CountAttentionAsync(token));
+    }
+
+    [Theory][InlineData("SQL_CONSTRAINT",true)][InlineData("CONNECTION",false)]
+    public async Task SubmissionWorkerStopsPermanentFailuresAndSchedulesTransientRetriesWithoutStarvingReadyWork(string code,bool terminal)
+    {
+        var token=TestContext.Current.CancellationToken;
+        await using var database=await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid request=await Intake(database);
+        foreach(var message in await database.Db.OutboxMessages.ToListAsync(token))message.ProcessedUtc=DateTimeOffset.UtcNow;
+        for(int i=0;i<100;i++)database.Db.OutboxMessages.Add(new OutboxMessage { Id=Guid.NewGuid(),MessageType="Future work",Payload="{}",
+            OccurredUtc=DateTimeOffset.UtcNow.AddDays(-2),NextAttemptUtc=DateTimeOffset.UtcNow.AddHours(1),AttemptCount=1 });
+        var messageId=FfpManagerSubmissionRequestedMessage.IdForRequest(request);
+        var submission=new FfpManagerSubmissionRequestedMessage(messageId,DateTimeOffset.UtcNow,request);
+        var queued=new OutboxMessage { Id=messageId,RequestId=request,MessageType=typeof(FfpManagerSubmissionRequestedMessage).FullName!,
+            Payload=System.Text.Json.JsonSerializer.Serialize(submission),OccurredUtc=submission.OccurredUtc };
+        database.Db.OutboxMessages.Add(queued);await database.Db.SaveChangesAsync(token);
+        var bridge=new Bridge { FailureCode=code };
+        var dispatcher=new OutboxDispatcher(database.Db,
+            Proxy.For<INotificationSender>((method,_)=>throw new InvalidOperationException(method)),
+            Submit(database,bridge),Options.Create(OptionsValue),Options.Create(new NotificationOptions()),NullLogger<OutboxDispatcher>.Instance,
+            new Flow(),Proxy.For<IPortalMessageService>((method,_)=>throw new InvalidOperationException(method)));
+        Assert.Equal(0,await dispatcher.DispatchBatchAsync(cancellationToken:token));
+        Assert.Equal(terminal,queued.IsTerminal);Assert.Equal(1,queued.AttemptCount);
+        if(terminal) Assert.False((bool)typeof(OutboxDispatcher).GetMethod("IsDue",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static)!.Invoke(null,[queued,DateTimeOffset.UtcNow])!);
+
+        Assert.Equal(!terminal,queued.NextAttemptUtc.HasValue);
+        Assert.Equal(1,(await database.Db.IntegrationLinks.SingleAsync(token)).AttemptCount);
+        Assert.Equal(0,await dispatcher.DispatchBatchAsync(cancellationToken:token));Assert.Equal(1,queued.AttemptCount);
+        if(!terminal)
+        {
+            queued.NextAttemptUtc=DateTimeOffset.UtcNow.AddMinutes(-1);queued.LastError=$"RETRY_AT={DateTimeOffset.UtcNow.AddMinutes(-1):O}|Synthetic failure";
+            await database.Db.SaveChangesAsync(token);bridge.FailureCode=null;
+            Assert.Equal(1,await dispatcher.DispatchBatchAsync(cancellationToken:token));
+            Assert.NotNull(queued.ProcessedUtc);Assert.Equal(2,await database.Db.IntegrationAttempts.CountAsync(token));
+        }
+    }
+    private sealed class Flow : IRequestPortalOperationsFlowPublisher
+    { public bool TryEnqueue(Guid requestId,string stage,DateTimeOffset observedAtUtc,string? detail=null,bool failed=false)=>true; }
+
+    [Fact]
+    public async Task LegacyFailureEvidenceSurvivesSuccessfulRetryWithoutExposingOriginalPayload()
+    {
+        var token=TestContext.Current.CancellationToken;
+        await using var database=await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid request=await Intake(database);var link=await database.Db.IntegrationLinks.SingleAsync(token);
+        link.MarkFailed(DateTimeOffset.UtcNow.AddHours(-1),"Historical TOP-SECRET provider payload");await database.Db.SaveChangesAsync(token);
+        var bridge=new Bridge();await Submit(database,bridge).SubmitRequestAsync(request,token);
+        var detail=(await Monitor(database,bridge).GetRequestAsync(request,token))!;
+        var historical=Assert.Single(detail.Attempts,item=>item.Operation=="HistoricalFailure");
+        Assert.StartsWith("HISTORICAL_",historical.ErrorCode);Assert.DoesNotContain("TOP-SECRET",historical.Explanation);
+        Assert.Equal(SynchronizationStatus.Synchronized,detail.Transfer.Status);
+    }
+
+    private sealed class Authorization(bool allowed) : IIntegrationOperatorAuthorization
+    { public Task DemandAsync(Guid actorId,CancellationToken cancellationToken=default) => allowed?Task.CompletedTask:throw new UnauthorizedAccessException(); }
+    private sealed class Documents : IDocumentService
+    {
+        public Task<DocumentDownload?> DownloadAsync(Guid userId, Guid documentId, bool isStaff, CancellationToken cancellationToken = default) =>
+            Task.FromResult<DocumentDownload?>(new(new MemoryStream(System.Text.Encoding.UTF8.GetBytes("support")), "text/plain", "support.txt"));
+        public Task<Guid> UploadDeliveryEvidenceAsync(Guid requestId, Guid deliveryId, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Guid> UploadForRequestAsync(Guid userId, Guid requestId, DocumentType documentType, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Guid> UploadForOrganizationAsync(Guid userId, Guid organizationId, DocumentType documentType, string originalFileName, string contentType, long sizeBytes, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<DocumentSummary>> GetRequestDocumentsAsync(Guid userId, Guid requestId, bool isStaff, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<DocumentSummary>> GetOrganizationDocumentsAsync(Guid userId, Guid organizationId, bool isStaff, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task VerifyAsync(Guid staffUserId, Guid documentId, string? notes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task RejectVerificationAsync(Guid staffUserId, Guid documentId, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task SetRetentionAsync(Guid staffUserId, Guid documentId, DocumentRetentionClass retentionClass, DateTimeOffset? retainUntilUtc, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task ArchiveAsync(Guid staffUserId, Guid documentId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task RemoveRequestDocumentAsync(Guid userId, Guid requestId, Guid documentId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+    private sealed class Bridge : IExternalApplicationBridgeClient
+    {
+        public Dictionary<Guid,ExternalApplicationReceipt> Records {get;}=[];
+        public string? FailureCode {get;set;}
+        public bool LoseAcknowledgement {get;set;}
+        public bool HideDestination {get;set;}
+        public int Inserts {get;private set;}
+        public TaskCompletionSource Entered {get;} = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource? Release {get;set;}
+        public ExternalReturnOutboxStatus ReturnStatus {get;set;} = new(2,1,0,DateTimeOffset.UtcNow);
+        public bool ReturnUnavailable {get;set;}
+        public Task<ExternalReturnOutboxStatus> GetReturnOutboxAsync(CancellationToken cancellationToken=default)
+            => ReturnUnavailable ? throw new HttpRequestException("TOP-SECRET") : Task.FromResult(ReturnStatus);
+        public Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid id,CancellationToken cancellationToken=default)
+            => Task.FromResult(HideDestination?null:Records.GetValueOrDefault(id));
+        public async Task<ExternalApplicationReference> SubmitApplicationAsync(ExternalApplicationSubmission submission,CancellationToken cancellationToken=default)
+        {
+            if(FailureCode is {} code) throw new IntegrationTransferException(TransferFailures.For("SqlServer",code),new Exception("TOP-SECRET"));
+            Inserts++;
+            var receipt=new ExternalApplicationReceipt(submission.PortalRequestId,"123","KGN/26/GR/0100",submission.SubmittedUtc,"JMDB01","FFPJM");
+            Records.Add(submission.PortalRequestId,receipt);
+            Entered.TrySetResult();
+            if(Release is not null) await Release.Task.WaitAsync(cancellationToken);
+            if(LoseAcknowledgement){LoseAcknowledgement=false;throw new HttpRequestException("Connection lost after SQL commit; TOP-SECRET");}
+            return new ExternalApplicationReference(receipt.ApplicationId,receipt.ApplicationNumber,receipt.AcceptedUtc);
+        }
+        public Task UploadArtifactAsync(string applicationId,ExternalArtifactDescriptor descriptor,Stream content,CancellationToken cancellationToken=default)=>Task.CompletedTask;
+        public Task<ExternalApplicationStatus> GetStatusAsync(string applicationId,CancellationToken cancellationToken=default)=>Task.FromResult(new ExternalApplicationStatus(applicationId,"RECEIVED","Received",DateTimeOffset.UtcNow));
+        public Task SendInformationResponseAsync(ExternalInformationResponse response,CancellationToken cancellationToken=default)=>throw new NotSupportedException();
+    }
+}

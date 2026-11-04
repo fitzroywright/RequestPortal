@@ -13,7 +13,7 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
   await page.route('**/*',route=>{
    const req=route.request(),url=new URL(req.url());
    if(req.resourceType()==='document'){
-    let name=url.pathname==='/Staff/Organizations'?'organizations':url.pathname.startsWith('/Staff/Review/')?'request-document':url.pathname==='/Staff/Organization'?'organization-document':url.searchParams.has('Search')?(url.searchParams.get('PageSize')==='50'?'search-50':'search'):url.searchParams.get('PageSize')==='50'?'queue-size-50':url.searchParams.get('PageSize')==='100'?'queue-size-100':url.searchParams.get('PageNumber')==='2'?'queue-page-2':'queue';
+    let name=url.pathname==='/Staff/Integrations'?(url.searchParams.has('fixtureReviewer')?'integrations-reviewer':'integrations'):url.pathname==='/Staff/Organizations'?'organizations':url.pathname.startsWith('/Staff/Review/')?'request-document':url.pathname==='/Staff/Organization'?'organization-document':url.searchParams.has('Search')?(url.searchParams.get('PageSize')==='50'?'search-50':'search'):url.searchParams.get('PageSize')==='50'?'queue-size-50':url.searchParams.get('PageSize')==='100'?'queue-size-100':url.searchParams.get('PageNumber')==='2'?'queue-page-2':'queue';
     return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,name+'.html'))});
    }
    if(url.pathname.endsWith('/messages.js')||url.hostname==='cdnjs.cloudflare.com')return route.fulfill({contentType:'text/javascript',body:''});
@@ -64,7 +64,23 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
    }
    assert.deepEqual(errors,[]);
    await page.screenshot({path:path.join(root,`staff-documents-${width}.png`),fullPage:true});
+   for(const reviewer of [false,true]) {
+    await page.goto('http://127.0.0.1:5499/Staff/Integrations'+(reviewer?'?fixtureReviewer=true':''));
+    assert.equal(await page.getByRole('heading',{name:'Integrations',exact:true}).count(),1);
+    assert.equal(await page.getByRole('heading',{name:'Attempt history',exact:true}).count(),1);
+    assert.equal(await page.getByRole('heading',{name:'Return-event outbox',exact:true}).count(),1);
+    assert.equal(await page.getByRole('button',{name:'Verify destination and retry',exact:true}).count(),reviewer?0:1);
+    const exported=new URL(await page.getByRole('link',{name:'Export diagnostics CSV',exact:true}).getAttribute('href'),page.url());
+    assert.equal(exported.searchParams.get('Search'),'John');assert.equal(exported.searchParams.get('Status'),'Failed');
+    assert.equal(exported.searchParams.get('From'),'2026-01-01');assert.equal(exported.searchParams.get('Through'),'2026-12-31');
+    const requestLink=await page.getByRole('link',{name:'Open original request',exact:true}).getAttribute('href');
+    assert.equal(requestLink,'/Staff/Review/'+request);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Integration page-wide overflow at '+width);
+    assert.deepEqual(errors,[]);
+    await page.screenshot({path:path.join(root,`integrations-${reviewer?'reviewer':'admin'}-${width}.png`),fullPage:true});
+    cases++;
+   }
   }
-  console.log(`${cases} browser navigation cases passed at desktop/tablet/mobile: row, explicit link, and Enter activation; organization and request document anchors/highlights, search, pagination, and clear; no console errors or page-wide overflow.`);
+  console.log(`${cases} browser navigation cases passed at desktop/tablet/mobile: row, explicit link, and Enter activation; organization and request document anchors/highlights, search, pagination, integration diagnostics/exports and Administrator/Reviewer controls, and clear; no console errors or page-wide overflow.`);
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

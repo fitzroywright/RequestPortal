@@ -1,3 +1,5 @@
+using RequestPortal.Application.Integration;
+using RequestPortal.Domain.Integration;
 using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -39,6 +41,11 @@ public sealed class StaffSearchNavigationPageTests
     private sealed class State
     {
         public int Reads, Writes, Downloads;
+        public string TransferApplicant = "John Brown";
+        public IntegrationTransferRow Transfer => new(RequestId,Organization,"REQ-FIXTURE",TransferApplicant,"Quick Intake","FFPManager",
+            "JMDB01 / FFPJM",SynchronizationStatus.Failed,"SqlSubmission","PermanentSql","SQL_CONSTRAINT","SQL Server rejected a field value.",
+            DateTimeOffset.UtcNow,DateTimeOffset.UtcNow,1,null,null,null,null,null,true);
+
         public bool Archived;
         public StaffRequestSearchRow Row => new() { RequestId = RequestId, PublicReference = "REQ-FIXTURE", ApplicantName = "John Brown", OrganizationName = "Fixture organization", Category = "Food", ReceivedUtc = DateTimeOffset.UtcNow, Status = RequestStatus.Submitted };
         public IReadOnlyList<StaffRequestSearchRow> QueueRows => Enumerable.Range(0,46).Select(i=>new StaffRequestSearchRow { RequestId=i==0?RequestId:Guid.Parse($"33333333-3333-4333-8333-{i:D12}"),PublicReference=i==0?"REQ-FIXTURE":$"REQ-QUEUE-{i:D3}",ApplicantName="John Brown",OrganizationName="Fixture organization",Summary="Queue summary",ReceivedUtc=DateTimeOffset.UtcNow.AddDays(-i),CreatedUtc=DateTimeOffset.UtcNow.AddDays(-i),Status=RequestStatus.Submitted }).ToArray();
@@ -56,6 +63,7 @@ public sealed class StaffSearchNavigationPageTests
             if (actor is "anonymous" or "expired") return Task.FromResult(AuthenticateResult.NoResult());
             var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, Staff.ToString()), new(ClaimTypes.Name, "Fixture staff") };
             if (actor is "Administrator" or "Reviewer" or "no-access") claims.Add(new(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue));
+            if (actor == "Administrator") claims.Add(new(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.ManageSecurity));
             if (actor is "Administrator" or "Reviewer") claims.Add(new(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.Access));
             return Task.FromResult(AuthenticateResult.Success(new(new(new ClaimsIdentity(claims, Scheme.Name)), Scheme.Name)));
         }
@@ -136,6 +144,25 @@ public sealed class StaffSearchNavigationPageTests
         builder.Services.AddSingleton(Proxy.For<IDeliveryService>((_, _) => Task.FromResult<IReadOnlyList<DeliveryView>>([])));
         builder.Services.AddSingleton(Proxy.For<IRequestReferenceDataService>((_, _) => Task.FromResult<IReadOnlyList<UnitOfMeasureOption>>([])));
         builder.Services.AddSingleton(Proxy.For<IQuickIntakeService>((_, _) => Task.FromResult<QuickIntakeView?>(null)));
+        builder.Services.AddSingleton(Proxy.For<IIntegrationStatusService>((method,args) => {
+            data.Reads++;
+            return method switch {
+                "CountAttentionAsync" => Task.FromResult(1),
+                "GetReturnHistoryAsync" => Task.FromResult<IReadOnlyList<IntegrationReturnObservation>>([]),
+                "GetTransferAsync" => Task.FromResult<IntegrationTransferRow?>((Guid)args[0]! == RequestId ? data.Transfer : null),
+                "GetRequestAsync" => Task.FromResult<IntegrationTransferDetail?>((Guid)args[0]! == RequestId ? new(data.Transfer,
+                    [new(Guid.NewGuid(),1,"Submission",DateTimeOffset.UtcNow,DateTimeOffset.UtcNow,false,"SqlSubmission","PermanentSql","SQL_CONSTRAINT","SQL Server rejected a field value.")],[],1) : null),
+                "GetAttemptPageAsync" => Task.FromResult<IReadOnlyList<IntegrationAttemptView>>([]),
+                "SearchAsync" => Task.FromResult(new IntegrationMonitorPage([data.Transfer],1,1,25,new(1,0,0,0,0))),
+                "ReconcileRequestAsync" or "RetryAsync" => Write(),
+                _ => throw new InvalidOperationException(method)
+            };
+            Task Write(){data.Writes++;return Task.CompletedTask;}
+        }));
+        builder.Services.AddSingleton(Proxy.For<IExternalApplicationBridgeClient>((method,_)=>method=="GetReturnOutboxAsync" ? Task.FromResult(new ExternalReturnOutboxStatus(2,1,0,DateTimeOffset.UtcNow)) : throw new InvalidOperationException(method)));
+        builder.Services.AddSingleton(Proxy.For<global::Common.Storage.IFileStorage>((method,_)=>throw new InvalidOperationException(method)));
+        builder.Services.AddSingleton(Proxy.For<global::Common.Diagnostics.IDiagnosticOperationsRouter>((method,_)=>throw new InvalidOperationException(method)));
+
         builder.Services.AddSingleton(Proxy.For<IPortalMessageService>((method, _) => method == "GetUnreadCountAsync" ? Task.FromResult(0) : Task.FromResult<IReadOnlyList<MessageThreadView>>([])));
         builder.Services.AddAuthentication("fixture").AddScheme<AuthenticationSchemeOptions, Authentication>("fixture", _ => { })
             .AddScheme<AuthenticationSchemeOptions, Authentication>(StaffOidcOptions.StaffCookieScheme, _ => { })
@@ -251,13 +278,42 @@ public sealed class StaffSearchNavigationPageTests
     public async Task UnauthorizedActorsCannotSearchReadOrMutateDocuments(string actor)
     {
         await using var f = await Setup(actor);
-        foreach (string url in new[] { "/Staff?Search=John", "/Staff/Organizations", "/Staff/Organization?id=" + Organization, "/Staff/Review/" + RequestId + "?handler=Download&documentId=" + RequestDocument })
+        foreach (string url in new[] { "/Staff?Search=John", "/Staff/Integrations", "/Staff/Integrations?handler=Export", "/Staff/Organizations", "/Staff/Organization?id=" + Organization, "/Staff/Review/" + RequestId + "?handler=Download&documentId=" + RequestDocument })
         {
             using var response = await f.Get(url); Assert.Contains(response.StatusCode, new[] { HttpStatusCode.Forbidden, HttpStatusCode.Redirect });
             if (response.StatusCode == HttpStatusCode.Redirect) Assert.StartsWith("/Account/StaffLogin", response.Headers.Location!.OriginalString);
         }
         Assert.Equal(0, f.Data.Reads); Assert.Equal(0, f.Data.Writes); Assert.Equal(0, f.Data.Downloads);
     }
+    [Theory][InlineData("Administrator")][InlineData("Reviewer")]
+    public async Task IntegrationMonitoringRendersStatusDetailsHistoryExportsAndRestrictedActions(string actor)
+    {
+        await using var fixture=await Setup(actor);
+        using var response=await fixture.Get("/Staff/Integrations?RequestId="+RequestId+"&Search=John&Status=Failed&Sort=oldest&From=2026-01-01&Through=2026-12-31");
+        Assert.Equal(HttpStatusCode.OK,response.StatusCode);
+        string html=await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("JMDB01 / FFPJM",html);Assert.Contains("SQL_CONSTRAINT",html);Assert.Contains("Attempt history",html);
+        Assert.Contains("Return-event outbox",html);Assert.Contains("REQ-FIXTURE",html);
+        Assert.Equal(actor=="Administrator",html.Contains("Verify destination and retry"));
+        Snapshot(actor=="Administrator"?"integrations":"integrations-reviewer",html);
+        using var original=await fixture.Get("/Staff/Review/"+RequestId);
+        Assert.Contains("FFP Manager transfer: Failed",await original.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var queue=await fixture.Get("/Staff");Assert.Contains("Integration failures / reconciliation",await queue.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("Search=John",html);Assert.Contains("Status=Failed",html);
+        using var invalid=await fixture.Get("/Staff/Integrations?From=2026-12-31&Through=2026-01-01");Assert.Equal(HttpStatusCode.BadRequest,invalid.StatusCode);
+        string token=Token(html);
+        using var missing=await fixture.Get("/Staff/Integrations?RequestId="+Guid.NewGuid());Assert.Equal(HttpStatusCode.NotFound,missing.StatusCode);Assert.Null(missing.Headers.Location);
+        fixture.Data.TransferApplicant="=SUM(1+1)";
+        using var export=await fixture.Get("/Staff/Integrations?handler=Export&Search=John&Status=Failed");Assert.Equal(HttpStatusCode.OK,export.StatusCode);
+        Assert.Equal("text/csv",export.Content.Headers.ContentType!.MediaType);Assert.Contains("'=SUM(1+1)",await export.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        foreach(string handler in new[]{"Retry","Reconcile"})
+        {
+            using var post=await fixture.Send(new(HttpMethod.Post,"/Staff/Integrations?handler="+handler){Content=new FormUrlEncodedContent(new Dictionary<string,string>{["RequestId"]=RequestId.ToString(),["linkId"]=Organization.ToString(),["__RequestVerificationToken"]=token})});
+            Assert.Equal(actor=="Administrator"?HttpStatusCode.Redirect:HttpStatusCode.Forbidden,post.StatusCode);
+        }
+        Assert.Equal(actor=="Administrator"?2:0,fixture.Data.Writes);
+    }
+
     [Fact]
     public async Task MissingContextsAndDocumentsStayNotFoundWithoutHomeRedirect()
     {

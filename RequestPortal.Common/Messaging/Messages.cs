@@ -108,7 +108,14 @@ public sealed record RequestSubmittedMessage(
 public sealed record FfpManagerSubmissionRequestedMessage(
     Guid MessageId,
     DateTimeOffset OccurredUtc,
-    Guid RequestId) : IMessage;
+    Guid RequestId) : IMessage
+{
+    public static Guid IdForRequest(Guid requestId)
+    {
+        byte[] hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{requestId:D}|FFPManagerSubmission"));
+        return new Guid(hash.AsSpan(0,16));
+    }
+}
 
 public sealed record RequestStatusChangedMessage(
     Guid MessageId,

@@ -46,6 +46,15 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         Guid requestId,
         CancellationToken cancellationToken = default)
     {
+        await using var requestLock = await IntegrationRequestLock.AcquireAsync(dbContext, requestId, cancellationToken);
+        IntegrationLink link = await GetOrCreateLinkAsync(requestId, cancellationToken);
+        await IntegrationLegacyHistory.PreserveAsync(dbContext,link,cancellationToken);
+        link.BeginAttempt(clock.UtcNow);
+        var attempt = new IntegrationAttempt(link.Id, link.AttemptCount, clock.UtcNow);
+        dbContext.IntegrationAttempts.Add(attempt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
         EnsureEnabled();
 
         AssistanceRequest request = await dbContext.AssistanceRequests
@@ -87,12 +96,6 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         if (string.IsNullOrWhiteSpace(applicationName))
             throw new InvalidOperationException("Quick Intake applicant first and last name are required for FFP Manager.");
 
-        IntegrationLink link = await GetOrCreateLinkAsync(request.Id, cancellationToken);
-        link.MarkPending(clock.UtcNow);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        try
-        {
             Guid[] unitIds = request.Items
                 .Select(item => item.UnitOfMeasureId)
                 .Distinct()
@@ -166,7 +169,30 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 intake?.SecondaryTelephone,
                 intake?.DateOfBirth);
 
-            ExternalApplicationReference reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
+            attempt.SetStage("DestinationLookup");
+            await dbContext.SaveChangesAsync(cancellationToken);
+            var receipt = await bridgeClient.FindApplicationAsync(request.Id, cancellationToken);
+            ExternalApplicationReference reference;
+            if (receipt is null)
+            {
+                attempt.SetStage("SqlSubmission");
+                await dbContext.SaveChangesAsync(cancellationToken);
+                reference = await bridgeClient.SubmitApplicationAsync(submission, cancellationToken);
+                attempt.SetStage("AcknowledgementVerification");
+                await dbContext.SaveChangesAsync(cancellationToken);
+                receipt = await bridgeClient.FindApplicationAsync(request.Id, cancellationToken);
+                if (receipt is null || receipt.ApplicationId != reference.ApplicationId || receipt.ApplicationNumber != reference.ApplicationNumber)
+                    throw new IntegrationTransferException(TransferFailures.For(attempt.Stage, "DESTINATION_CONFLICT"));
+            }
+            else
+                reference = new(receipt.ApplicationId, receipt.ApplicationNumber, receipt.AcceptedUtc, AlreadyExisted: true);
+            ValidateReceipt(request.Id, receipt);
+            if (string.Equals(receipt.ApplicationNumber, request.PublicReference, StringComparison.OrdinalIgnoreCase))
+                throw new IntegrationTransferException(TransferFailures.For("AcknowledgementVerification", "DESTINATION_CONFLICT"));
+            link.RecordVerifiedDestination(receipt.ApplicationId, receipt.ApplicationNumber, receipt.Server, receipt.Database, clock.UtcNow);
+            attempt.SetStage("Artifacts");
+            // Persist the SQL commit identity before any document/notification failure can occur.
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             string? applicationNumber = reference.ApplicationNumber?.Trim();
             if (string.IsNullOrWhiteSpace(applicationNumber) ||
@@ -195,6 +221,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             }
 
             link.MarkSynchronized(reference.ApplicationId, clock.UtcNow, applicationNumber);
+            attempt.SetStage("Confirmation");
             Guid confirmationId = FfpManagerClientConfirmationRequestedMessage.IdForRequest(request.Id);
             if (!dbContext.OutboxMessages.Local.Any(item => item.Id == confirmationId) &&
                 !await dbContext.OutboxMessages.AsNoTracking().AnyAsync(item => item.Id == confirmationId, cancellationToken))
@@ -209,14 +236,20 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 email.Payload = JsonSerializer.Serialize(notification with { FfpManagerReference = applicationNumber });
                 email.MessageType = typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName!;
             }
+            attempt.Complete(clock.UtcNow);
             await dbContext.SaveChangesAsync(cancellationToken);
             return reference;
         }
         catch (Exception exception)
         {
-            link.MarkFailed(clock.UtcNow, exception.Message);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            throw;
+            var failure = IntegrationFailureClassifier.Classify(exception, attempt.Stage);
+            link.RecordFailure(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation, failure.Transient);
+            attempt.Fail(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation);
+            // Caller cancellation must not erase the durable failure checkpoint.
+            using var persistenceTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await dbContext.SaveChangesAsync(persistenceTimeout.Token);
+            if(exception is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
+            throw new IntegrationTransferException(failure with { Transient = failure.Transient && link.NextRetryUtc.HasValue });
         }
     }
 
@@ -235,6 +268,14 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             return null;
         }
 
+        var receipt = await bridgeClient.FindApplicationAsync(requestId, cancellationToken);
+        if (receipt is null) throw new IntegrationTransferException(TransferFailures.For("Reconciliation", "DESTINATION_CONFLICT"));
+        ValidateReceipt(requestId, receipt);
+        if (receipt.ApplicationId != link.ExternalReference ||
+            (!string.IsNullOrWhiteSpace(link.ApplicationNumber) && receipt.ApplicationNumber != link.ApplicationNumber))
+            throw new IntegrationTransferException(TransferFailures.For("Reconciliation", "DESTINATION_CONFLICT"));
+        link.RecordVerifiedDestination(receipt.ApplicationId, receipt.ApplicationNumber, receipt.Server, receipt.Database, clock.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
         return await bridgeClient.GetStatusAsync(link.ExternalReference, cancellationToken);
     }
 
@@ -422,6 +463,15 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         }
     }
 
+    public static void ValidateReceipt(Guid requestId, ExternalApplicationReceipt receipt)
+    {
+        if (receipt.PortalRequestId != requestId || string.IsNullOrWhiteSpace(receipt.ApplicationId) ||
+            string.IsNullOrWhiteSpace(receipt.ApplicationNumber) ||
+            !string.Equals(receipt.Server, "JMDB01", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(receipt.Database, "FFPJM", StringComparison.OrdinalIgnoreCase))
+            throw new IntegrationTransferException(TransferFailures.For("DestinationVerification", "DESTINATION_CONFLICT"));
+    }
+
     private async Task<IntegrationLink> GetOrCreateLinkAsync(Guid requestId, CancellationToken cancellationToken)
     {
         IntegrationLink? link = await dbContext.IntegrationLinks
@@ -542,7 +592,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
     {
         if (!options.Enabled)
         {
-            throw new InvalidOperationException("FFP Manager integration is disabled.");
+            throw new IntegrationTransferException(TransferFailures.For("Configuration", "CONFIGURATION"));
         }
     }
 }

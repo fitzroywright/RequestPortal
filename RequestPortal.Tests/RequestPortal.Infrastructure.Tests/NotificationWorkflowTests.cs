@@ -328,7 +328,7 @@ public sealed class NotificationWorkflowTests
         if (whatsApp && consent)
             Assert.Equal("request_portal_request_update", Assert.Single(sender.Notifications, m=>m.Transport==NotificationTransport.WhatsApp).WhatsAppTemplateName);
         options.QuickIntakeClientRelationsEmail="clientrelations@example.com";
-        staff.AttemptCount=0; staff.LastError=null;
+        staff.AttemptCount=0; staff.LastError=null; staff.NextAttemptUtc=null; staff.IsTerminal=false;
         await database.Db.SaveChangesAsync(token);
         Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
         Assert.Single(sender.Notifications, m=>m.Recipient=="clientrelations@example.com");

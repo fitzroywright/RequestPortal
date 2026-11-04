@@ -737,20 +737,89 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.ToTable("fulfilments", (string)null);
                 });
 
-            modelBuilder.Entity("RequestPortal.Domain.Integration.IntegrationLink", b =>
+            modelBuilder.Entity("RequestPortal.Domain.Integration.IntegrationAttempt", b =>
                 {
-                    b.Property<string>("ApplicationNumber").HasColumnType("text");
-
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Classification")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("CompletedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Explanation")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("LinkId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("StartedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId", "StartedUtc");
+
+                    b.ToTable("integration_attempts", (string)null);
+                });
+
+            modelBuilder.Entity("RequestPortal.Domain.Integration.IntegrationLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApplicationNumber")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("ArtifactsSynchronizedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset>("CreatedUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ExternalReference")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("FailureClassification")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FailureStage")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTimeOffset?>("LastAttemptUtc")
                         .HasColumnType("timestamp with time zone");
@@ -758,6 +827,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<string>("LastError")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset?>("NextRetryUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("RequestId")
                         .HasColumnType("uuid");
@@ -775,10 +847,23 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("TargetDatabase")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("TargetServer")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset?>("VerifiedUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
                     b.HasIndex("RequestId", "SystemName")
                         .IsUnique();
+
+                    b.HasIndex("Status", "NextRetryUtc");
 
                     b.ToTable("integration_links", (string)null);
                 });
@@ -1868,6 +1953,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsTerminal")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("LastError")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -1876,6 +1964,9 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("NextAttemptUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("OccurredUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1887,9 +1978,16 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ProcessedUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("RequestId");
+
                     b.HasIndex("ProcessedUtc", "OccurredUtc");
+
+                    b.HasIndex("ProcessedUtc", "NextAttemptUtc", "OccurredUtc");
 
                     b.ToTable("outbox_messages", (string)null);
                 });
@@ -2018,6 +2116,14 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("StatusHistory");
+                });
+            modelBuilder.Entity("RequestPortal.Domain.Integration.IntegrationAttempt", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Integration.IntegrationLink", null)
+                        .WithMany()
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

@@ -118,6 +118,7 @@ public sealed class ParishSubmissionTests
 
     private sealed class MissingParishGateway : IFfpManagerGateway
     {
+        public Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public async Task<ExternalApplicationReference> CreateApplicationAsync(ExternalApplicationSubmission submission, CancellationToken cancellationToken = default)
         {
             // Exercise the production generator's guard with no connection or transaction available.

@@ -46,6 +46,9 @@ public sealed record ExternalApplicationSubmission(
     DateOnly? DateOfBirth = null);
 
 public sealed record ExternalApplicationReference(string ApplicationId, string? ApplicationNumber, DateTimeOffset AcceptedUtc, bool AlreadyExisted = false);
+public sealed record ExternalApplicationReceipt(Guid PortalRequestId, string ApplicationId, string ApplicationNumber,
+    DateTimeOffset AcceptedUtc, string Server, string Database);
+public sealed record ExternalReturnOutboxStatus(int Pending, int Failed, int Locked, DateTimeOffset? OldestPendingUtc);
 public sealed record ExternalApplicationStatus(string ApplicationId, string StatusCode, string StatusText, DateTimeOffset ChangedUtc, string? Detail = null, bool IsTerminal = false);
 public sealed record ExternalInformationRequest(Guid MessageId, Guid PortalRequestId, string ApplicationId, string Message, DateTimeOffset RequestedUtc, string? RequestedBy = null, IReadOnlyList<string>? RequestedArtifacts = null, DateTimeOffset? DueUtc = null);
 public sealed record ExternalInformationResponse(Guid MessageId, Guid PortalRequestId, string ApplicationId, Guid RespondedByUserId, string Message, DateTimeOffset RespondedUtc, IReadOnlyList<ExternalArtifactDescriptor> Artifacts);
@@ -53,6 +56,10 @@ public sealed record ExternalStatusCallback(Guid MessageId, Guid PortalRequestId
 
 public interface IExternalApplicationBridgeClient
 {
+    Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("The bridge must support verified lookup by portal request ID before transfers can run.");
+    Task<ExternalReturnOutboxStatus> GetReturnOutboxAsync(CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("The bridge does not expose return-event diagnostics.");
     Task<ExternalApplicationReference> SubmitApplicationAsync(ExternalApplicationSubmission submission, CancellationToken cancellationToken = default);
     Task UploadArtifactAsync(string applicationId, ExternalArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default);
     Task<ExternalApplicationStatus> GetStatusAsync(string applicationId, CancellationToken cancellationToken = default);

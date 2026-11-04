@@ -206,6 +206,8 @@ internal static class ApplicationServiceRegistration
     private static void AddIntegrationAndRuntimeServices(
         WebApplicationBuilder builder)
     {
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddScoped<IIntegrationOperatorAuthorization, IntegrationOperatorAuthorization>();
         builder.Services.AddScoped<
             IIntegrationStatusService
             , IntegrationStatusService>();

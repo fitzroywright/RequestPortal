@@ -23,6 +23,24 @@ public sealed class FfpManagerBridgeClient : IExternalApplicationBridgeClient
         this.secrets = secrets;
     }
 
+    public async Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default)
+    {
+        using var request = await CreateRequestAsync(HttpMethod.Get, $"api/applications/by-request/{requestId:D}", cancellationToken);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        // 204 means an authoritative lookup found no record. A 404 may mean an old bridge: fail closed.
+        if (response.StatusCode == System.Net.HttpStatusCode.NoContent) return null;
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await ReadRequiredAsync<ExternalApplicationReceipt>(response, cancellationToken);
+    }
+
+    public async Task<ExternalReturnOutboxStatus> GetReturnOutboxAsync(CancellationToken cancellationToken = default)
+    {
+        using var request = await CreateRequestAsync(HttpMethod.Get, "api/integration-outbox", cancellationToken);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await ReadRequiredAsync<ExternalReturnOutboxStatus>(response, cancellationToken);
+    }
+
     public async Task<ExternalApplicationReference> SubmitApplicationAsync(
         ExternalApplicationSubmission submission,
         CancellationToken cancellationToken = default)
@@ -107,10 +125,27 @@ public sealed class FfpManagerBridgeClient : IExternalApplicationBridgeClient
             return;
         }
 
-        string detail = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new HttpRequestException(
-            $"FFP Manager bridge returned {(int)response.StatusCode} {response.ReasonPhrase}: {detail}",
-            null,
-            response.StatusCode);
+        // Do not persist or log remote exception bodies, SQL details or applicant payloads.
+        if(response.Content.Headers.ContentType?.MediaType == "application/problem+json")
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+                if(document.RootElement.TryGetProperty("errors",out var errors) && errors.TryGetProperty("Parish",out _))
+                    throw new IntegrationTransferException(TransferFailures.For("Bridge", "VALIDATION_PARISH"));
+            }
+            catch(JsonException) { }
+        }
+        if (response.Content.Headers.ContentType?.MediaType == "application/json")
+        {
+            try
+            {
+                var failure = await response.Content.ReadFromJsonAsync<TransferFailure>(cancellationToken: cancellationToken);
+                if (failure?.Code is { } code)
+                    throw new IntegrationTransferException(TransferFailures.For("Bridge", code));
+            }
+            catch (JsonException) { }
+        }
+        throw new HttpRequestException($"FFP Manager bridge returned HTTP {(int)response.StatusCode}.", null, response.StatusCode);
     }
 }

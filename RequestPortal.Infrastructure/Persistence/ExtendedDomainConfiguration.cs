@@ -100,7 +100,29 @@ internal sealed class IntegrationLinkConfiguration : IEntityTypeConfiguration<In
         builder.Property(item => item.ExternalReference).HasMaxLength(200);
         builder.Property(item => item.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(item => item.LastError).HasMaxLength(4000);
+        builder.Property(item => item.FailureStage).HasMaxLength(64);
+        builder.Property(item => item.FailureClassification).HasMaxLength(64);
+        builder.Property(item => item.ErrorCode).HasMaxLength(100);
+        builder.Property(item => item.TargetServer).HasMaxLength(128);
+        builder.Property(item => item.TargetDatabase).HasMaxLength(128);
+        builder.HasIndex(item => new { item.Status, item.NextRetryUtc });
         builder.HasIndex(item => new { item.RequestId, item.SystemName }).IsUnique();
+    }
+}
+
+internal sealed class IntegrationAttemptConfiguration : IEntityTypeConfiguration<IntegrationAttempt>
+{
+    public void Configure(EntityTypeBuilder<IntegrationAttempt> builder)
+    {
+        builder.ToTable("integration_attempts");
+        builder.HasKey(item => item.Id);
+        builder.HasOne<IntegrationLink>().WithMany().HasForeignKey(item => item.LinkId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(item => new { item.LinkId, item.StartedUtc });
+        builder.Property(item => item.Operation).HasMaxLength(64);
+        builder.Property(item => item.Stage).HasMaxLength(64);
+        builder.Property(item => item.Classification).HasMaxLength(64);
+        builder.Property(item => item.ErrorCode).HasMaxLength(100);
+        builder.Property(item => item.Explanation).HasMaxLength(1000);
     }
 }
 

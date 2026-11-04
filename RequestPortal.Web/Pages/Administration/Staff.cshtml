@@ -60,7 +60,7 @@ else { <details><summary>Details</summary><p>@entry.Action</p></details> }
 }
 else
 {
-<p class="action-row"><a class="button button-small" asp-page="AddStaff">Add Staff</a><a class="button button-outline" asp-page="ApplicantAccounts">Account &amp; Identity Management</a></p>
+<p class="action-row"><a class="button button-small" asp-page="AddStaff">Add Staff</a><a class="button button-outline" asp-page="ApplicantAccounts">Account &amp; Identity Management</a><a class="button button-outline" asp-page="/Staff/Integrations">Integrations</a></p>
 <p><a asp-page="Staff">All staff</a> · <a asp-page="Staff" asp-route-Status="PendingAccess">Pending Access (@Model.PendingCount)</a> · <a href="#roles">Roles</a></p>
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
 <form method="get" class="card staff-directory-filters">

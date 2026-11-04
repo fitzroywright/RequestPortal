@@ -1,0 +1,6 @@
+@model RequestPortal.Application.Integration.IntegrationTransferRow
+<div class="operational-toolbar" aria-label="FFP Manager transfer status">
+<strong>FFP Manager transfer: @RequestPortal.Web.Pages.Staff.IntegrationsModel.StatusLabel(Model.Status)</strong>
+<span>@(Model.ApplicationNumber ?? "Destination reference not verified")</span>
+<a asp-page="/Staff/Integrations" asp-route-requestId="@Model.RequestId" asp-fragment="transfer-details">Transfer diagnostics and history</a>
+</div>

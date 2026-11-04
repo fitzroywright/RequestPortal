@@ -12,6 +12,9 @@ using RequestPortal.Domain.Organizations;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
 using RequestPortal.Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
+using RequestPortal.Infrastructure.Integration;
+using RequestPortal.Domain.Integration;
 
 namespace RequestPortal.Infrastructure.Requests;
 
@@ -43,10 +46,12 @@ public sealed class QuickIntakeService : IQuickIntakeService
     };
 
     private readonly RequestPortalDbContext dbContext;
+    private readonly string integrationSystem;
 
-    public QuickIntakeService(RequestPortalDbContext dbContext)
+    public QuickIntakeService(RequestPortalDbContext dbContext, IOptions<FfpManagerBridgeOptions>? integrationOptions = null)
     {
         this.dbContext = dbContext;
+        integrationSystem = integrationOptions?.Value.SystemName ?? "FFPManager";
     }
 
     public async Task<QuickIntakeView?> GetAsync(
@@ -287,6 +292,10 @@ public sealed class QuickIntakeService : IQuickIntakeService
         if (signedInApplicant is not null)
             intake.MarkConverted(signedInApplicant.Id, signedInApplicant.Id, now);
         dbContext.QuickIntakes.Add(intake);
+        // Request, intake, tracking link and submission outbox commit together.
+        var integration = new IntegrationLink(Guid.NewGuid(), request.Id, integrationSystem, now);
+        integration.MarkQueued();
+        dbContext.IntegrationLinks.Add(integration);
 
         RequestSubmittedMessage submitted = new(
             Guid.NewGuid(),
@@ -297,6 +306,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
         dbContext.OutboxMessages.Add(new OutboxMessage
         {
             Id = submitted.MessageId,
+            RequestId = request.Id,
             MessageType = typeof(RequestSubmittedMessage).FullName ?? nameof(RequestSubmittedMessage),
             Payload = JsonSerializer.Serialize(submitted),
             OccurredUtc = submitted.OccurredUtc,

@@ -13,6 +13,8 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.Property(message => message.Payload).HasColumnType("jsonb").IsRequired();
         builder.Property(message => message.LastError).HasMaxLength(4000);
         builder.HasIndex(message => new { message.ProcessedUtc, message.OccurredUtc });
+        builder.HasIndex(message => new { message.ProcessedUtc, message.NextAttemptUtc, message.OccurredUtc });
+        builder.HasIndex(message => message.RequestId);
     }
 }
 
