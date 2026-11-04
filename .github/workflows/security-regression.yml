@@ -12,7 +12,8 @@ jobs:
         working-directory: RequestPortal
     services:
       postgres:
-        image: postgres:16
+        # Production currently runs PostgreSQL 13. Standard CI separately covers 16.
+        image: postgres:13
         env:
           POSTGRES_USER: security_tests
           POSTGRES_PASSWORD: isolated_ci_only

@@ -37,7 +37,7 @@ public sealed class AddStaffModel(StaffPreProvisioningService provisioning, Staf
         if (!ModelState.IsValid) return Page();
         var result=await provisioning.ProvisionAsync(User,Selection ?? "",SelectedRoles,Activate,HttpContext.RequestAborted);
         TempData["Success"]=result.Created ? "Staff account provisioned and audited." : "This staff identity already exists. Its roles and access were preserved.";
-        return RedirectToPage("Staff",new { Id=result.AccountId });
+        return RedirectToPage("/Administration/Staff",new { Id=result.AccountId });
     });
     private async Task LoadAsync() => Roles=await administration.RolesAsync(User);
     private async Task<IActionResult> HandleAsync(Func<Task<IActionResult>> operation)
