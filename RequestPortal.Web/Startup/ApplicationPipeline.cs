@@ -33,7 +33,20 @@ internal static class ApplicationPipeline
         app.Use(RecordRequestFailureAsync);
         app.UseHttpsRedirection();
         app.Use(AddSecurityHeadersAsync);
-        app.UseStaticFiles();
+        var staticTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+        staticTypes.Mappings[".geojson"] = "application/geo+json";
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            ContentTypeProvider = staticTypes,
+            OnPrepareResponse = context =>
+            {
+                string path = context.Context.Request.Path.Value ?? "";
+                if (path.StartsWith("/lib/leaflet/1.9.4/", StringComparison.Ordinal) ||
+                    path.StartsWith("/lib/chart.js/4.6.1/", StringComparison.Ordinal) ||
+                    (path.StartsWith("/data/jamaica-parishes.", StringComparison.Ordinal) && path.EndsWith(".geojson", StringComparison.Ordinal)))
+                    context.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+            }
+        });
         app.UseRouting();
         app.UseRateLimiter();
         app.UseAuthentication();

@@ -1,0 +1,8 @@
+Jamaica ADM1 parish boundaries: geoBoundaries / OpenStreetMap / Wambacher.
+Dataset JAM-ADM1-11528761, pinned geoBoundaries release 9469f09.
+Source: https://github.com/wmgeolab/geoBoundaries/tree/9469f09/releaseData/gbOpen/JAM/ADM1
+Licensed under Creative Commons Attribution-ShareAlike 2.0:
+https://creativecommons.org/licenses/by-sa/2.0/
+https://creativecommons.org/licenses/by-sa/2.0/legalcode
+Adaptation: five-decimal coordinate rounding, minification, canonical parish names and removal of unused feature metadata.
+This derived geographic dataset remains available under the same licence. See docs/management-dashboard-geography.md for provenance and original checksum.
