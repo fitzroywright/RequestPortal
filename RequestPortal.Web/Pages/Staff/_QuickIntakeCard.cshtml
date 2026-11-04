@@ -1,0 +1,81 @@
+@model RequestPortal.Web.Pages.Staff.ReviewModel
+@{
+    var intake = Model.QuickIntake!;
+}
+@functions {
+    private static string Provided(string? value) => string.IsNullOrWhiteSpace(value) ? "Not provided" : value;
+}
+<section class="card quick-intake-review" aria-labelledby="quick-intake-heading">
+    <header class="quick-intake-review-header">
+        <div>
+            <div class="eyebrow">Anonymous Quick Intake</div>
+            <h2 id="quick-intake-heading">@Provided(intake.FirstName) @Provided(intake.LastName)</h2>
+        </div>
+        <span class="status">@(intake.IsConverted ? "Converted to Individual" : "Not converted")</span>
+    </header>
+
+    <section class="quick-intake-review-section" aria-labelledby="quick-intake-personal">
+        <h3 id="quick-intake-personal">Personal details</h3>
+        <dl class="quick-intake-review-fields">
+            <div><dt>First name</dt><dd>@Provided(intake.FirstName)</dd></div>
+            <div><dt>Last name</dt><dd>@Provided(intake.LastName)</dd></div>
+            <div><dt>Date of birth</dt><dd>@intake.DateOfBirth.ToString("yyyy-MM-dd")</dd></div>
+            <div><dt>Gender</dt><dd>@Provided(intake.Gender)</dd></div>
+            <div><dt>Marital status</dt><dd>@Provided(intake.MaritalStatus)</dd></div>
+        </dl>
+    </section>
+
+    <section class="quick-intake-review-section" aria-labelledby="quick-intake-contact">
+        <h3 id="quick-intake-contact">Contact and address</h3>
+        <dl class="quick-intake-review-fields">
+            <div><dt>Primary telephone / WhatsApp</dt><dd>@Provided(intake.Telephone)</dd></div>
+            <div><dt>Secondary telephone</dt><dd>@Provided(intake.SecondaryTelephone)</dd></div>
+            <div><dt>Email</dt><dd>@Provided(intake.Email)</dd></div>
+            <div><dt>Street address</dt><dd>@Provided(intake.StreetAddress)</dd></div>
+            <div><dt>Community / district</dt><dd>@Provided(intake.CommunityDistrict)</dd></div>
+            <div><dt>Parish</dt><dd>@Provided(intake.Parish)</dd></div>
+        </dl>
+    </section>
+
+    <section class="quick-intake-review-section" aria-labelledby="quick-intake-household">
+        <h3 id="quick-intake-household">Household and assistance</h3>
+        <dl class="quick-intake-review-fields">
+            <div><dt>Employment status</dt><dd>@Provided(intake.EmploymentStatus)</dd></div>
+            <div><dt>Monthly household income</dt><dd>@intake.MonthlyIncome.ToString("N2")</dd></div>
+            <div><dt>Children under 18 living full-time</dt><dd>@(intake.HasChildrenUnder18LivingFullTime ? "Yes" : "No")</dd></div>
+            <div><dt>Disability or serious medical condition</dt><dd>@(intake.HasDisabilityOrSeriousMedicalCondition ? "Yes" : "No")</dd></div>
+            <div><dt>Assistance programmes</dt><dd>@Provided(string.Join("; ", intake.AssistancePrograms))</dd></div>
+            <div><dt>Assistance category</dt><dd>@Provided(intake.HelpCategory)</dd></div>
+            <div><dt>Victim / abuse circumstances</dt><dd>@Provided(intake.VictimCircumstances)</dd></div>
+        </dl>
+    </section>
+
+    <section class="quick-intake-review-section" aria-labelledby="quick-intake-status">
+        <h3 id="quick-intake-status">Intake status</h3>
+        <dl class="quick-intake-review-fields">
+            <div><dt>Date received</dt><dd>@intake.CreatedUtc.ToLocalTime().ToString("f")</dd></div>
+            <div><dt>Conversion status</dt><dd>@(intake.IsConverted ? "Converted to Individual" : "Not converted")</dd></div>
+            @if (intake.IsConverted)
+            {
+                <div><dt>Date converted</dt><dd>@(intake.ConvertedUtc?.ToLocalTime().ToString("f") ?? "Not provided")</dd></div>
+            }
+        </dl>
+    </section>
+
+    @if (!intake.IsConverted)
+    {
+        <section class="quick-intake-conversion" aria-labelledby="quick-intake-conversion-heading">
+            <h3 id="quick-intake-conversion-heading">Convert to Individual</h3>
+            <p>This request is being tracked by outbound WhatsApp messages only. Convert it after the applicant has a normal Individual portal account.</p>
+            <form method="post" asp-page-handler="ConvertQuickIntake" asp-route-id="@Model.Request!.Id" class="action-row">
+                <label>
+                    <span>Individual account email</span>
+                    <input asp-for="ConversionEmail" type="email" autocomplete="email" placeholder="applicant@example.com" />
+                    <span asp-validation-for="ConversionEmail"></span>
+                </label>
+                <button class="button" type="submit">Convert to Individual</button>
+            </form>
+            <small class="muted">The request number, status history and request context are retained. Future notifications move to the Individual account.</small>
+        </section>
+    }
+</section>
