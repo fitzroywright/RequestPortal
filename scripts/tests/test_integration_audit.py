@@ -16,6 +16,23 @@ spec.loader.exec_module(audit)
 
 
 class AuditTests(unittest.TestCase):
+    def test_service_environment_forwards_only_configured_bootstrap_credentials(self):
+        raw = b"CommonSecrets__Providers__Primary__Settings__SecretIdEnvironmentVariable=CUSTOM_BOOTSTRAP\0CUSTOM_BOOTSTRAP=SYNTHETIC-PROOF\0REQUESTPORTAL_OPENBAO_SECRET_ID=SYNTHETIC-DEFAULT\0UNRELATED_SECRET=NOT-FORWARDED\0"
+        with patch.object(audit.subprocess,"check_output",return_value="123\n"), patch.object(audit.pathlib.Path,"read_bytes",return_value=raw):
+            env = audit.service_environment("aegis-requestportal")
+        self.assertEqual("SYNTHETIC-PROOF",env["CUSTOM_BOOTSTRAP"])
+        self.assertEqual("SYNTHETIC-DEFAULT",env["REQUESTPORTAL_OPENBAO_SECRET_ID"])
+        self.assertNotIn("UNRELATED_SECRET",env)
+
+    def test_failed_child_reports_exception_type_without_provider_payload(self):
+        result=SimpleNamespace(returncode=1,stdout="TOP-SECRET",stderr='TOP-SECRET\n{"status":"failed","errorType":"PostgresException","message":"TOP-SECRET"}')
+        account=SimpleNamespace(pw_dir="/tmp",pw_uid=1,pw_gid=1)
+        with patch.object(audit.pwd,"getpwnam",return_value=account),patch.object(audit,"service_environment",return_value={}),patch.object(audit.subprocess,"run",return_value=result):
+            with self.assertRaises(RuntimeError) as error:
+                audit.run_audit("portal","aegis","aegis-requestportal","/tmp")
+        self.assertIn("PostgresException",str(error.exception))
+        self.assertNotIn("TOP-SECRET",str(error.exception))
+
     def source(self, **values):
         row = {"requestId": "11111111-1111-4111-8111-111111111111", "reference": "QI-TEST", "status": "Synchronized",
                "applicationId": "123", "applicationNumber": "KGN/26/GR/0100", "submissionEvents": 1,

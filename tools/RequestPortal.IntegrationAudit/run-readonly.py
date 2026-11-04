@@ -24,14 +24,19 @@ def service_environment(service):
     if not pid.isdecimal() or int(pid) < 2:
         raise RuntimeError("The production service must be running for a configuration-consistent audit.")
     entries = pathlib.Path("/proc", pid, "environ").read_bytes().split(b"\0")
+    initial = dict(entry.decode().split("=",1) for entry in entries if b"=" in entry)
     allowed = ("CommonSecrets__", "Bridge__", "FfpManagerIntegration__", "KRB5", "ASPNETCORE_ENVIRONMENT", "DOTNET_ENVIRONMENT")
     env = {"PATH": "/usr/bin:/bin", "DOTNET_CLI_TELEMETRY_OPTOUT": "1", "DOTNET_NOLOGO": "1"}
-    for entry in entries:
-        if b"=" not in entry:
-            continue
-        key, value = entry.decode().split("=", 1)
+    for key,value in initial.items():
         if key.startswith(allowed):
             env[key] = value
+    # A named bootstrap variable is configuration indirection, not a CommonSecrets__ key.
+    # The portal's production JSON declares this default; environment overrides may name another.
+    names = {"REQUESTPORTAL_OPENBAO_SECRET_ID"} if service == "aegis-requestportal" else set()
+    names.update(value for key,value in initial.items() if key.startswith("CommonSecrets__") and key.endswith("__SecretIdEnvironmentVariable"))
+    for name in names:
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*",name) and name in initial:
+            env[name] = initial[name]
     env["DOTNET_ENVIRONMENT"] = "Production"
     env["ASPNETCORE_ENVIRONMENT"] = "Production"
     return env
@@ -52,7 +57,16 @@ def run_audit(mode, account, service, cwd):
                             env=env, preexec_fn=drop_privileges, capture_output=True, text=True, timeout=100)
     if result.returncode:
         # Provider/driver errors may contain protected data. Do not print stderr or stdout on failure.
-        raise RuntimeError(mode + " audit failed; no database writes were requested.")
+        failure = "Unavailable"
+        for line in result.stderr.splitlines():
+            try:
+                detail = json.loads(line)
+                candidate = detail.get("errorType","")
+                if detail.get("status") == "failed" and isinstance(candidate,str) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_.+]{0,99}",candidate):
+                    failure = candidate
+            except (ValueError,AttributeError):
+                continue
+        raise RuntimeError(mode + " audit unavailable (" + failure + "); no database writes were requested.")
     lines = [line for line in result.stdout.splitlines() if line.startswith("{")]
     value = json.loads(lines[-1])
     if value.get("readOnly") is not True:
@@ -140,7 +154,8 @@ def main():
             evidence[mode] = run_audit(mode,account,service,cwd)
         except Exception as exception:
             evidence[mode] = None
-            limitations.append({"stage": mode,"errorType":type(exception).__name__,"detail":"Read-only service-identity inspection was unavailable; do not interpret this as missing data."})
+            limitations.append({"stage": mode,"errorType":type(exception).__name__,
+                                "detail":str(exception) if isinstance(exception,RuntimeError) else "Read-only service-identity inspection was unavailable; do not interpret this as missing data."})
     portal,bridge = evidence["portal"],evidence["bridge"]
     if bridge is not None and (bridge.get("server") != "JMDB01" or bridge.get("database") != "FFPJM"):
         raise RuntimeError("Destination guard failed.")
