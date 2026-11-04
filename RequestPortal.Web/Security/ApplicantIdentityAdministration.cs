@@ -106,6 +106,7 @@ public sealed class ApplicantIdentityAdministration(RequestPortalAccounts accoun
     private async Task<ApplicationUser> Applicant(Guid id, CancellationToken ct)
     {
         var user=await db.Users.AsNoTracking().SingleOrDefaultAsync(u=>u.Id==id && !u.IsInternalStaff,ct) ?? throw new InvalidOperationException("Applicant account not found.");
+        if(string.IsNullOrWhiteSpace(user.Email)) throw new InvalidOperationException("A registered contact email is required for recovery security notifications. Complete the approved contact verification process first.");
         var account=accounts.Public.Find(id.ToString());
         if(account is not null && (account.Population!=AccountPopulation.PublicApplicant || account.Status!=SecurityAccountStatus.Active))
             throw new InvalidOperationException("Recovery cannot activate an inactive account. Resolve its lifecycle status through the authorized account process first.");

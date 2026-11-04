@@ -38,6 +38,8 @@ attestation, not automatic proof of ownership; do not approve an unverified real
 
 Recovery only **adds** verified sign-in methods. It provides no administrator
 impersonation or identity-removal facility and cannot remove a final usable provider.
+A registered contact email is required for recovery security notifications; missing
+contact information must go through the approved contact-verification process first.
 Inactive applicants cannot be activated by recovery. Initiator and approver must still
 be active and authorized when the invitation is redeemed.
 

@@ -339,4 +339,12 @@ public sealed class ApplicantIdentityRecoveryTests
         var message=Assert.Single(sent);Assert.Equal(f.Applicant.Email,message.Recipient);Assert.Contains("Google",message.Body);
         Assert.DoesNotContain(token,message.Body);Assert.DoesNotContain("new-verified-subject",message.Body);Assert.DoesNotContain("different-contact@example.test",message.Body);
     }
+    [Fact]
+    public async Task ApplicantsWithoutNotificationContactCannotIssueRecoveryInvitations()
+    {
+        await using var f=await Setup();f.Applicant.Email=null;f.Applicant.NormalizedEmail=null;await f.Database.Db.SaveChangesAsync(Ct);
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Service.InitiateAsync(f.Actor(f.First),f.Applicant.Id,"Google","Support case lacks verified contact",Ct));
+        Assert.Empty((await f.Service.DetailsAsync(f.Actor(f.First),f.Applicant.Id,Ct))!.Recoveries);
+        Assert.Empty(await f.Database.Db.OutboxMessages.ToListAsync(Ct));
+    }
 }

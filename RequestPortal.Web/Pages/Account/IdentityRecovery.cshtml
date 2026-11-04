@@ -1,9 +1,10 @@
 @page
 @model RequestPortal.Web.Pages.Account.IdentityRecoveryModel
 @{ ViewData["Title"]="Recover your sign-in method"; }
-<section class="section"><div class="shell" style="max-width:680px"><h1>Recover your sign-in method</h1>
+@section Styles { <link rel="stylesheet" href="~/css/identity-recovery.css" asp-append-version="true" /> }
+<section class="section applicant-recovery"><div class="shell"><h1>Recover your sign-in method</h1>
 <p>Use an administrator-approved invitation to add a verified sign-in method to your existing Request Portal account. Your requests and organization memberships stay with that account.</p>
 @if(Model.Error is not null) { <p class="flash error" role="alert">@Model.Error</p> }
-<form method="post" autocomplete="off" data-identity-recovery><div class="field"><label asp-for="Token">Recovery invitation code</label><input asp-for="Token" maxlength="100" required autocomplete="off"/></div><button class="button" type="submit">Continue with approved provider</button></form>
+<form method="post" autocomplete="off" class="identity-recovery-form" data-identity-recovery><div class="field"><label asp-for="Token">Recovery invitation code</label><input asp-for="Token" maxlength="100" required autocomplete="off"/></div><button class="button" type="submit">Continue with approved provider</button></form>
 <p class="muted">The invitation expires after 30 minutes and works once. Support must independently verify account ownership before issuing it.</p></div></section>
 @section Scripts { <script src="~/js/identity-recovery.js" asp-append-version="true" defer></script> }
