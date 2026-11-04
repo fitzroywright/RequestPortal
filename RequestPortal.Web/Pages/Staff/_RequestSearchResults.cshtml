@@ -1,0 +1,31 @@
+@model RequestPortal.Web.Pages.Staff.IndexModel
+@{ var results = Model.SearchResults!; }
+<section class="workspace-panel" aria-labelledby="search-results-title">
+    <div class="panel-titlebar"><div><strong id="search-results-title">Search results</strong><small>@results.TotalCount matching request(s), across all statuses</small></div></div>
+    @if (results.TotalCount == 0)
+    {
+        <div class="workspace-empty"><strong>No requests match “@Model.Search”.</strong><p>Try a first name, surname, or the complete request reference.</p></div>
+    }
+    else
+    {
+        <div class="table-wrap"><table class="workspace-table">
+            <thead><tr><th>Request Reference</th><th>Applicant Name</th><th>Organization</th><th>Category</th><th>Date Received</th><th>Status</th><th>Open</th></tr></thead>
+            <tbody>
+            @foreach (var item in results.Items)
+            {
+                <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Review", new { id = item.RequestId })" role="link" tabindex="0">
+                    <td>@item.PublicReference</td>
+                    <td><strong>@item.ApplicantName</strong>@if (item.IsUnverifiedQuickIntake) { <small class="muted" style="display:block">Unverified User · Anonymous Quick Intake</small> }</td>
+                    <td>@item.OrganizationName</td><td>@item.Category</td><td>@item.ReceivedUtc.ToLocalTime().ToString("g")</td><td>@item.Status</td>
+                    <td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+        <nav class="action-row" aria-label="Search results pages">
+            @if (results.PageNumber > 1) { <a class="button button-secondary" asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageNumber="@(results.PageNumber - 1)">Previous</a> }
+            <span>Page @results.PageNumber of @results.TotalPages</span>
+            @if (results.PageNumber < results.TotalPages) { <a class="button button-secondary" asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageNumber="@(results.PageNumber + 1)">Next</a> }
+        </nav>
+    }
+</section>

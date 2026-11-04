@@ -23,10 +23,11 @@ internal static class ApplicationPipeline
                 !context.Request.Path.StartsWithSegments("/api") &&
                 !context.Request.Path.StartsWithSegments("/hubs");
 
-            bool isMessageNavigation = context.Request.Path.StartsWithSegments("/Messages") ||
+            bool isContextNavigation = context.Request.Path.StartsWithSegments("/Staff/Review") ||
+                context.Request.Path.StartsWithSegments("/Staff/Organization") || context.Request.Path.StartsWithSegments("/Messages") ||
                 (context.Request.Path.StartsWithSegments("/Documents/Preview") &&
                  context.Request.Query.ContainsKey("threadId"));
-            if (isPageNavigation && context.Response.StatusCode == StatusCodes.Status404NotFound && !isMessageNavigation)
+            if (isPageNavigation && context.Response.StatusCode == StatusCodes.Status404NotFound && !isContextNavigation)
             {
                 context.Response.Redirect("/?navigationError=not-found");
             }

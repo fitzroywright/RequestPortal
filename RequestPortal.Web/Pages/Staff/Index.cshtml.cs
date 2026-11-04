@@ -8,8 +8,6 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Administration;
 using RequestPortal.Application.Portal;
 using RequestPortal.Infrastructure.Identity;
-using Microsoft.EntityFrameworkCore;
-using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Web.Pages.Staff;
 
@@ -18,25 +16,31 @@ public sealed class IndexModel : PageModel
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IPortalWorkflowService workflowService;
     private readonly IStaffOperationsService staffOperationsService;
-    private readonly RequestPortalDbContext dbContext;
+    private readonly IStaffRequestSearchService searchService;
 
     public IndexModel(
         UserManager<ApplicationUser> userManager,
         IPortalWorkflowService workflowService,
         IStaffOperationsService staffOperationsService,
-        RequestPortalDbContext dbContext)
+        IStaffRequestSearchService searchService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.staffOperationsService = staffOperationsService;
-        this.dbContext = dbContext;
+        this.searchService = searchService;
     }
 
     public IReadOnlyList<OrganizationSummary> PendingOrganizations { get; private set; } = Array.Empty<OrganizationSummary>();
 
     public IReadOnlyList<RequestSummary> SubmittedRequests { get; private set; } = Array.Empty<RequestSummary>();
 
-    public IReadOnlyDictionary<Guid, string> UnverifiedQuickIntakeApplicants { get; private set; } = new Dictionary<Guid, string>();
+    public IReadOnlyDictionary<Guid, StaffRequestSearchRow> Applicants { get; private set; } = new Dictionary<Guid, StaffRequestSearchRow>();
+
+    [BindProperty(SupportsGet = true)]
+    public string? Search { get; set; }
+    [BindProperty(SupportsGet = true)]
+    public int PageNumber { get; set; } = 1;
+    public StaffRequestSearchResult? SearchResults { get; private set; }
 
     public StaffOperationsSnapshot Operations { get; private set; } = new(
         Array.Empty<PendingOrganizationWorkItem>(),
@@ -63,24 +67,20 @@ public sealed class IndexModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(string? requestCode = null)
     {
-        if (!string.IsNullOrWhiteSpace(requestCode))
+        Search = (Search ?? requestCode)?.Trim();
+        if (!string.IsNullOrWhiteSpace(Search))
         {
-            string reference = requestCode.Trim().ToUpperInvariant();
-            Guid? requestId = await dbContext.AssistanceRequests.AsNoTracking()
-                .Where(item => item.PublicReference == reference)
-                .Select(item => (Guid?)item.Id).SingleOrDefaultAsync(HttpContext.RequestAborted);
-            if (requestId.HasValue)
-                return RedirectToPage("/Staff/Review", new { id = requestId.Value });
-            TempData["Error"] = "No request was found with that request code.";
+            SearchResults = await searchService.SearchAsync(Search, PageNumber, HttpContext.RequestAborted);
+            if (SearchResults.ExactReferenceId is Guid requestId)
+                return RedirectToPage("/Staff/Review", new { id = requestId });
+            return Page();
         }
 
         // These services share the scoped EF context; queries must be sequential.
         PendingOrganizations = await workflowService.GetPendingOrganizationsAsync(HttpContext.RequestAborted);
         SubmittedRequests = await workflowService.GetSubmittedRequestsAsync(HttpContext.RequestAborted);
-        var submittedIds = SubmittedRequests.Select(item => item.Id).ToArray();
-        UnverifiedQuickIntakeApplicants = await dbContext.QuickIntakes.AsNoTracking()
-            .Where(item => submittedIds.Contains(item.RequestId) && item.ConvertedToUserId == null)
-            .ToDictionaryAsync(item => item.RequestId, item => item.FirstName + " " + item.LastName, HttpContext.RequestAborted);
+        var submittedIds = SubmittedRequests.OrderByDescending(item => item.CreatedUtc).Take(12).Select(item => item.Id).ToArray();
+        Applicants = await searchService.GetApplicantsAsync(submittedIds, HttpContext.RequestAborted);
         Operations = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
         return Page();
     }

@@ -121,6 +121,8 @@ internal static class ApplicationServiceRegistration
         builder.Services.AddScoped<
             IStaffOperationsService
             , StaffOperationsService>();
+        builder.Services.AddScoped<IStaffRequestSearchService, StaffRequestSearchService>();
+        builder.Services.AddScoped<IStaffDocumentContextService, StaffDocumentContextService>();
 
         builder.Services.AddScoped<
             IStaffReportingService

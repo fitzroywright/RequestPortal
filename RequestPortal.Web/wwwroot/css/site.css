@@ -82,3 +82,9 @@
         grid-column:auto;
     }
 }
+
+/* Staff document deep links keep the selected evidence visible below the shell. */
+tr[id^="document-"]{scroll-margin-top:6rem}
+tr.selected-document,tr[id^="document-"]:target{outline:2px solid #2563eb;outline-offset:-2px;background:#eff6ff}
+
+.staff-request-review .dashboard-grid>*{min-width:0}
