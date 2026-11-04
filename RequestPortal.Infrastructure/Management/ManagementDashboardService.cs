@@ -105,14 +105,13 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         IQueryable<DeliveryRecord> query = dbContext.Deliveries.AsNoTracking()
             .Where(item => requestIds.Contains(item.RequestId));
 
-        int awaiting = await query.CountAsync(item => item.Status == DeliveryStatus.Ready, cancellationToken);
-        int delivered = await query.CountAsync(item => item.Status == DeliveryStatus.Delivered, cancellationToken);
-        int partial = await query.CountAsync(item => item.Status == DeliveryStatus.PartiallyDelivered, cancellationToken);
-        int failed = await query.CountAsync(item => item.Status == DeliveryStatus.Failed, cancellationToken);
-        int pendingSync = await query.CountAsync(
-            item => item.Status != DeliveryStatus.Ready && item.SyncedToFfpManagerUtc == null,
-            cancellationToken);
-        return new ManagementDeliverySummary(awaiting, delivered, partial, failed, pendingSync);
+        return await query.GroupBy(_ => 1).Select(group => new ManagementDeliverySummary(
+            group.Count(item => item.Status == DeliveryStatus.Ready),
+            group.Count(item => item.Status == DeliveryStatus.Delivered),
+            group.Count(item => item.Status == DeliveryStatus.PartiallyDelivered),
+            group.Count(item => item.Status == DeliveryStatus.Failed),
+            group.Count(item => item.Status != DeliveryStatus.Ready && item.SyncedToFfpManagerUtc == null)))
+            .SingleOrDefaultAsync(cancellationToken) ?? new ManagementDeliverySummary(0, 0, 0, 0, 0);
     }
 
     private async Task<ManagementDeliveryAnalytics> BuildDeliveryAnalyticsAsync(
@@ -198,7 +197,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         if (!string.IsNullOrWhiteSpace(filter.Program))
             rows = rows.Where(row => string.Equals(row.Program, filter.Program, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(filter.Parish))
-            rows = rows.Where(row => string.Equals(row.Parish, filter.Parish, StringComparison.OrdinalIgnoreCase));
+            rows = rows.Where(row => JamaicaParishes.Normalize(row.Parish) == JamaicaParishes.Normalize(filter.Parish));
         if (!string.IsNullOrWhiteSpace(filter.Community))
             rows = rows.Where(row => string.Equals(row.Community, filter.Community, StringComparison.OrdinalIgnoreCase));
 
@@ -259,7 +258,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         if (!string.IsNullOrWhiteSpace(filter.Program))
             rows = rows.Where(item => string.Equals(item.Program, filter.Program, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(filter.Parish))
-            rows = rows.Where(item => string.Equals(item.Parish, filter.Parish, StringComparison.OrdinalIgnoreCase));
+            rows = rows.Where(item => JamaicaParishes.Normalize(item.Parish) == JamaicaParishes.Normalize(filter.Parish));
         if (filter.FromUtc.HasValue)
             rows = rows.Where(item => item.CreatedUtc >= filter.FromUtc.Value);
         if (filter.ToUtc.HasValue)
@@ -337,18 +336,15 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             .ToListAsync(cancellationToken))
             .ToHashSet();
 
-        Task<(Guid RequestId, RequestLocationSnapshot? Location)>[] locationTasks = baseRows
-            .Select(async row =>
+        // Bound storage I/O instead of allocating an unbounded task per historical request.
+        var geo = new System.Collections.Concurrent.ConcurrentDictionary<Guid, RequestLocationSnapshot>();
+        await Parallel.ForEachAsync(baseRows, new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = cancellationToken },
+            async (row, token) =>
             {
-                RequestLocationSnapshot? location = await ReadLocationSafeAsync(row.Id, cancellationToken)
+                RequestLocationSnapshot? location = await ReadLocationSafeAsync(row.Id, token)
                     ?? RequestLocationService.ResolveExisting(row.Id, row.Location);
-                return (row.Id, location);
-            })
-            .ToArray();
-        (Guid RequestId, RequestLocationSnapshot? Location)[] locations = await Task.WhenAll(locationTasks);
-        Dictionary<Guid, RequestLocationSnapshot> geo = locations
-            .Where(item => item.Location is not null)
-            .ToDictionary(item => item.RequestId, item => item.Location!);
+                if (location is not null) geo[row.Id] = location;
+            });
 
         DateTimeOffset overdueCutoff = now.AddDays(-Math.Max(1, options.OverdueDays));
         DateTimeOffset stalledCutoff = now.AddDays(-Math.Max(1, options.StalledDays));
@@ -373,7 +369,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
                 row.Category,
                 row.Program,
                 row.Location,
-                location?.Parish,
+                JamaicaParishes.Normalize(location?.Parish),
                 location?.Community,
                 location?.Precision.ToString(),
                 row.CreatedUtc,
@@ -490,25 +486,18 @@ public sealed class ManagementDashboardService : IManagementDashboardService
 
     private static IReadOnlyList<ParishReachSummary> BuildParishes(IReadOnlyList<ManagementRequestRow> rows)
     {
-        Dictionary<string, (double X, double Y)> points = ParishMapPoints();
-        return rows
-            .Where(row => !string.IsNullOrWhiteSpace(row.Parish))
-            .GroupBy(row => row.Parish!, StringComparer.OrdinalIgnoreCase)
-            .Select(group =>
-            {
-                (double x, double y) = points.GetValueOrDefault(group.Key, (50, 50));
-                return new ParishReachSummary(
-                    group.Key,
-                    group.Count(),
-                    group.Where(row => !string.IsNullOrWhiteSpace(row.Community)).Select(row => row.Community!).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
-                    group.Count(row => string.Equals(row.Precision, "Exact", StringComparison.OrdinalIgnoreCase)),
-                    group.Count(row => !string.Equals(row.Precision, "Exact", StringComparison.OrdinalIgnoreCase)),
-                    x,
-                    y);
-            })
-            .OrderByDescending(item => item.Requests)
-            .ThenBy(item => item.Parish)
-            .ToArray();
+        var groups = rows.GroupBy(row => JamaicaParishes.Normalize(row.Parish))
+            .ToDictionary(group => group.Key, group => group.ToArray());
+        return JamaicaParishes.Names.Append(JamaicaParishes.Unknown).Select(name =>
+        {
+            ManagementRequestRow[] group = groups.GetValueOrDefault(name, []);
+            return new ParishReachSummary(name, group.Length,
+                group.Where(row => !string.IsNullOrWhiteSpace(row.Community)).Select(row => row.Community!).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+                group.Count(row => string.Equals(row.Precision, "Exact", StringComparison.OrdinalIgnoreCase)),
+                group.Count(row => !string.Equals(row.Precision, "Exact", StringComparison.OrdinalIgnoreCase)),
+                group.Count(row => OutstandingStatuses.Contains(ParseStatus(row.Status))),
+                group.Count(row => CompletedStatuses.Contains(ParseStatus(row.Status))));
+        }).ToArray();
     }
 
     private static IReadOnlyList<ManagementNamedCount> GroupNamed(
@@ -585,14 +574,6 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         int middle = sorted.Length / 2;
         return sorted.Length % 2 == 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
     }
-
-    private static Dictionary<string, (double X, double Y)> ParishMapPoints() => new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Hanover"] = (9, 35), ["Westmoreland"] = (14, 61), ["St. James"] = (20, 28), ["Trelawny"] = (32, 27),
-        ["St. Elizabeth"] = (31, 68), ["Manchester"] = (47, 61), ["St. Ann"] = (49, 30), ["Clarendon"] = (58, 65),
-        ["St. Catherine"] = (68, 52), ["St. Mary"] = (66, 28), ["St. Andrew"] = (77, 55), ["Kingston"] = (81, 69),
-        ["Portland"] = (86, 30), ["St. Thomas"] = (91, 59)
-    };
 
     private sealed record LifecycleTiming(Guid RequestId, DateTimeOffset? SubmittedUtc, DateTimeOffset? TerminalUtc, DateTimeOffset? CompletedUtc);
 }

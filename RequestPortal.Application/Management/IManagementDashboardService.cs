@@ -66,8 +66,8 @@ public sealed record ParishReachSummary(
     int Communities,
     int ExactLocations,
     int ApproximateLocations,
-    double MapX,
-    double MapY);
+    int Outstanding,
+    int Completed);
 
 public sealed record CommunityReachSummary(string Community, int Requests);
 
