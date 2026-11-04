@@ -120,6 +120,16 @@ public sealed class OutboxDispatcher
 
     private async Task DispatchAsync(OutboxMessage outbox, CancellationToken cancellationToken)
     {
+        if (outbox.MessageType == typeof(ApplicantIdentityRecoveredMessage).FullName)
+        {
+            var recovered = Deserialize<ApplicantIdentityRecoveredMessage>(outbox.Payload);
+            string? email = await dbContext.Users.AsNoTracking().Where(u => u.Id == recovered.ApplicantId && !u.IsInternalStaff).Select(u => u.Email).SingleOrDefaultAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(email)) throw new InvalidOperationException("Recovery notification requires the applicant's registered contact email.");
+            await notificationSender.SendAsync(new NotificationEnvelope(email, "Request Portal sign-in method linked",
+                $"A verified {recovered.Provider} sign-in method was linked to your existing Request Portal account through administrator-assisted recovery. Your requests and memberships are unchanged. If you did not authorize this recovery, contact Request Portal support immediately.",
+                DeliveryId: recovered.MessageId), cancellationToken);
+            return;
+        }
         if (outbox.MessageType == typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName)
         {
             await SendQuickIntakeClientRelationsEmailAsync(

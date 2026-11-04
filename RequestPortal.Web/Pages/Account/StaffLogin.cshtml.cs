@@ -17,7 +17,7 @@ public sealed class StaffLoginModel : PageModel
         this.options = options.Value;
     }
 
-    public IActionResult OnGet()
+    public IActionResult OnGet(string? returnUrl = null)
     {
         if (!options.Enabled)
         {
@@ -26,7 +26,7 @@ public sealed class StaffLoginModel : PageModel
 
         AuthenticationProperties properties = new()
         {
-            RedirectUri = Url.Page("/Account/StaffComplete") ?? "/Account/StaffComplete",
+            RedirectUri = Url.Page("/Account/StaffComplete", new { returnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null }) ?? "/Account/StaffComplete",
             IsPersistent = false
         };
         return Challenge(properties, StaffOidcOptions.Scheme);

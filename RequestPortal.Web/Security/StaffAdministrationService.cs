@@ -63,7 +63,8 @@ public sealed class StaffAdministrationService(RequestPortalAccounts accounts, R
         var effective = new List<string>();
         foreach (string permission in catalog.SelectMany(x => x.Permissions).Where(x => x != "*")
                      .Append(RequestPortalPermissions.Access).Append(RequestPortalPermissions.ManageSecurity)
-                     .Append(RequestPortalPermissions.ReviewRequests).Append(RequestPortalPermissions.ViewManagementDashboard).Distinct())
+                     .Append(RequestPortalPermissions.ReviewRequests).Append(RequestPortalPermissions.ViewManagementDashboard)
+                     .Append(RequestPortalPermissions.IdentityView).Append(RequestPortalPermissions.IdentityRecoveryInitiate).Append(RequestPortalPermissions.IdentityRecoveryApprove).Distinct())
             if ((await authorizer.AuthorizeAsync(AuthorizationSubject.Create(target, groups), permission)).Allowed) effective.Add(permission);
         return effective;
     }

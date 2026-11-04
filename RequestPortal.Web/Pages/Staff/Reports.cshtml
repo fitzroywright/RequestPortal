@@ -8,7 +8,8 @@
     string? toDateRoute = Model.ToDate?.ToString("yyyy-MM-dd");
 }
 
-<section class="section">
+@section Styles { <link rel="stylesheet" href="~/css/staff-reports.css" asp-append-version="true" /> }
+<section class="section staff-reports">
     <div class="shell">
         <div class="section-heading">
             <div class="eyebrow" style="color:#b45b09">FFP internal</div>
@@ -16,9 +17,8 @@
             <p>Search the complete request portfolio, filter operational data, and export the current result set.</p>
         </div>
 
-        <section class="card">
-            <form method="get" class="form-grid">
-                <div class="grid-3">
+        <form method="get" class="reports-filters">
+                <div class="reports-filter-group">
                     <div class="field">
                         <label asp-for="Search">Search</label>
                         <input asp-for="Search" placeholder="Reference, organization or request summary" />
@@ -39,7 +39,7 @@
                     </div>
                 </div>
 
-                <div class="grid-3">
+                <div class="reports-filter-group">
                     <div class="field">
                         <label asp-for="Category">Category</label>
                         <input asp-for="Category" placeholder="Education" />
@@ -54,13 +54,10 @@
                             }
                         </select>
                     </div>
-                    <div class="action-row" style="align-items:end">
-                        <button class="button" type="submit">Apply filters</button>
-                        <a class="button button-outline" asp-page="/Staff/Reports">Clear</a>
-                    </div>
+
                 </div>
 
-                <div class="grid-2">
+                <div class="reports-filter-group">
                     <div class="field">
                         <label asp-for="FromDate">From date</label>
                         <input asp-for="FromDate" type="date" />
@@ -70,22 +67,25 @@
                         <input asp-for="ToDate" type="date" />
                     </div>
                 </div>
-            </form>
-        </section>
+                    <div class="action-row reports-filter-actions">
+                        <button class="button" type="submit">Apply Filters</button>
+                        <a class="button button-outline" asp-page="/Staff/Reports">Clear</a>
+                    </div>
+        </form>
 
-        <div class="grid-3" style="margin-top:18px">
-            <article class="card"><div class="muted">Total</div><div class="stat">@Model.Report.Total</div></article>
-            <article class="card"><div class="muted">Submitted</div><div class="stat">@Model.Report.Submitted</div></article>
-            <article class="card"><div class="muted">Approved / fulfilled</div><div class="stat">@(Model.Report.Approved + Model.Report.Fulfilled)</div></article>
-        </div>
+        <dl class="reports-summary" aria-label="Report summary">
+            <div><dt>Total</dt><dd>@Model.Report.Total</dd></div>
+            <div><dt>Submitted</dt><dd>@Model.Report.Submitted</dd></div>
+            <div><dt>Approved / Fulfilled</dt><dd>@(Model.Report.Approved + Model.Report.Fulfilled)</dd></div>
+        </dl>
 
-        <section class="card" style="margin-top:18px">
-            <div class="action-row" style="justify-content:space-between;align-items:center">
+        <section class="reports-results">
+            <div class="reports-results-toolbar">
                 <div>
                     <h2>Results</h2>
                     <p class="muted">Page @Model.Report.Page of @Model.Report.TotalPages. @Model.Report.Total matching requests.</p>
                 </div>
-                <div class="action-row">
+                <div class="action-row reports-exports">
                     <a class="button button-outline"
                        asp-page-handler="Export"
                        asp-route-Search="@Model.Search"

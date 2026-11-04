@@ -15,6 +15,9 @@ public static class RequestPortalPermissions
     public const string ReviewRequests = "requests.review";
     public const string ViewManagementDashboard = "ManagementDashboard.View";
     public const string ManageSecurity = "security.manage";
+    public const string IdentityView = "identity.view";
+    public const string IdentityRecoveryInitiate = "identity.recovery.initiate";
+    public const string IdentityRecoveryApprove = "identity.recovery.approve";
 }
 
 public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
@@ -137,6 +140,10 @@ public sealed class RequestPortalAuthorizationStore : IAuthorizationStore
         await EnsurePermissionAsync(RequestPortalPermissions.ReviewRequests, "Review and process assistance requests.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ViewManagementDashboard, "View management dashboards and organization-wide service metrics.", cancellationToken);
         await EnsurePermissionAsync(RequestPortalPermissions.ManageSecurity, "Manage Request Portal roles and security policy.", cancellationToken);
+
+        await EnsurePermissionAsync(RequestPortalPermissions.IdentityView, "Investigate applicant account identities.", cancellationToken);
+        await EnsurePermissionAsync(RequestPortalPermissions.IdentityRecoveryInitiate, "Initiate applicant identity recovery after fresh authentication.", cancellationToken);
+        await EnsurePermissionAsync(RequestPortalPermissions.IdentityRecoveryApprove, "Independently verify and approve applicant identity recovery.", cancellationToken);
 
         await EnsureRolePermissionAsync(PortalRoles.Reviewer, RequestPortalPermissions.Access, cancellationToken);
         await EnsureRolePermissionAsync(PortalRoles.Reviewer, RequestPortalPermissions.ReviewRequests, cancellationToken);

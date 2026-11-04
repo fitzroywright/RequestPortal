@@ -39,7 +39,7 @@ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42
  }
  let cases=0;
  for(const view of ['full','zero','long'])for(const width of [1600,1440,1024,820,600,390,320]){
-  await load(width,view);assert.equal(await page.locator('.mg-map path[role=link]').count(),14);
+  await load(width,view);assert.equal(await page.locator('.mg-card').count(),0);assert(await page.locator('.mg-kpi').first().evaluate(el=>getComputedStyle(el).boxShadow==='none'&&getComputedStyle(el).backgroundColor==='rgba(0, 0, 0, 0)'));assert.equal(await page.locator('.mg-map path[role=link]').count(),14);
   const m=await page.evaluate(()=>{
    const r=s=>document.querySelector(s).getBoundingClientRect().toJSON();
    return {doc:document.documentElement.scrollWidth,kpi:getComputedStyle(document.querySelector('.mg-kpis')).gridTemplateColumns.split(' ').length,

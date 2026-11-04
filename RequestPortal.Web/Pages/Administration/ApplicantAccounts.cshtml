@@ -1,0 +1,63 @@
+@page
+@model RequestPortal.Web.Pages.Administration.ApplicantAccountsModel
+@using System.Security.Claims
+@using Common.Security.Abstractions
+@{ ViewData["Title"]="Account & Identity Management"; }
+@section Styles { <link rel="stylesheet" href="~/css/applicant-identities.css" asp-append-version="true" /> }
+<section class="section applicant-identities"><div class="shell">
+<header><div class="eyebrow">Administration</div><h1>Account &amp; Identity Management</h1><a asp-page="Staff">Staff &amp; Roles</a></header>
+<div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+@if(Model.Selected is { } detail)
+{
+    var account=detail.Account;
+    <p><a asp-page="ApplicantAccounts">← Applicant accounts</a></p><h2>@account.Name</h2>
+    <dl class="identity-facts"><div><dt>Registered email</dt><dd>@account.Email</dd></div><div><dt>Account status</dt><dd>@account.Status</dd></div><div><dt>Registered</dt><dd>@account.Registered.ToLocalTime().ToString("g")</dd></div><div><dt>Last successful sign-in</dt><dd>@(account.LastSignIn?.ToLocalTime().ToString("g") ?? "Not recorded")</dd></div><div><dt>Linked providers</dt><dd>@(account.Providers.Length>0?string.Join(", ",account.Providers):"No approved provider binding")</dd></div></dl>
+    <section><h2>Authentication diagnostics</h2>
+    @if(account.Status!="Active" && account.Status!="Enrollment required") { <p role="status">Account is inactive. Recovery cannot reactivate it.</p> }
+    @if(account.Status=="Enrollment required" || account.Providers.Length==0) { <p>Identity enrollment requires approval. A matching email address cannot establish ownership.</p> }
+    <ul>@foreach(string provider in RequestPortal.Web.Security.ApplicantIdentityAdministration.SupportedProviders) {
+        <li><strong>@provider:</strong> @(account.Providers.Contains(provider)?"Linked":"Unlinked provider") · @(Model.Providers.Contains(provider)?"Provider configured":"Provider not configured; contact the portal operator")</li>
+    }</ul>
+    <p class="muted">A failed external callback does not establish account ownership. Authentication diagnostics use the safe RP-AUTH-EXTERNAL callback codes; correlate the applicant's support incident through the authorized diagnostics service. Recovery failures and approvals appear below. A provider already linked elsewhere cannot be claimed by recovery.</p>
+    </section>
+    <section><h2>Account relationships</h2><p>@detail.RequestCount associated request(s). Showing the most recent 25.</p>
+    <div class="identity-columns"><div><h3>Requests</h3><ul>@foreach(var request in detail.Requests) { <li><a asp-page="/Staff/Review" asp-route-id="@request.Id">@request.Label</a> · @request.Status</li> }</ul></div>
+    <div><h3>Organization memberships</h3><ul>@foreach(var membership in detail.Memberships) { <li><a asp-page="/Staff/Organization" asp-route-id="@membership.Id">@membership.Label</a> · @membership.Status</li> }</ul></div></div></section>
+    @if(Model.InvitationUrl is not null) {
+        <section class="identity-invitation" aria-labelledby="invitation-title"><h2 id="invitation-title">Single-use recovery invitation</h2><p>Expires in 30 minutes. Deliver only through the independently verified support process. This invitation is displayed once; do not place it in logs or public messages.</p><label for="recovery-invitation">Invitation</label><input id="recovery-invitation" value="@Model.InvitationUrl" readonly autocomplete="off"/><a href="@Model.InvitationUrl" rel="noreferrer">Open recovery invitation</a></section>
+    }
+    <section><h2>Initiate provider recovery</h2><p>Requires fresh administrator authentication. Recovery adds a verified sign-in method to this account; it never replaces the account or removes existing providers.</p>
+    <form method="post" asp-page-handler="Initiate" class="identity-form"><input type="hidden" asp-for="Id"/>
+    <div class="field"><label asp-for="Provider">Intended provider</label><select asp-for="Provider">@foreach(string provider in Model.Providers) { <option value="@provider">@provider</option> }</select></div>
+    <div class="field"><label asp-for="Reason">Recovery reason and support case</label><textarea asp-for="Reason" minlength="10" maxlength="2000" required></textarea></div><button class="button" type="submit">Initiate Recovery</button></form></section>
+    <section><h2>Recovery decisions</h2>
+    @if(detail.Recoveries.Count==0) { <p>No recovery requests.</p> }
+    @foreach(var recovery in detail.Recoveries) {
+        <div class="identity-decision"><h3>@recovery.Provider · @recovery.Status</h3><p>@recovery.Reason</p><p class="muted">Created @recovery.Created.ToLocalTime().ToString("g") · Expires @recovery.Expires.ToLocalTime().ToString("g")</p>
+        @if(recovery.Verification is not null) { <p>Verification: @recovery.Verification</p> }
+        @if(recovery.Status=="Pending" && recovery.InitiatedBy.ToString()!=User.FindFirstValue(ClaimTypes.NameIdentifier)) {
+            <form method="post" asp-page-handler="Approve" class="identity-form"><input type="hidden" asp-for="Id"/><input type="hidden" name="RecoveryId" value="@recovery.Id"/>
+            <div class="field"><label for="verification-@recovery.Id">Independent verification case reference and method</label><textarea id="verification-@recovery.Id" name="Verification" minlength="10" maxlength="2000" required></textarea></div>
+            <label><input name="IndependentlyVerified" value="true" type="checkbox" required/> I independently verified ownership using the approved support process, beyond matching email addresses.</label><button class="button" type="submit">Approve &amp; Issue Invitation</button></form>
+        } else if(recovery.Status=="Pending") { <p>A different authorized administrator must verify ownership and approve this recovery.</p> }
+        @if(recovery.Status is "Pending" or "Approved") {
+            <form method="post" asp-page-handler="Cancel" class="identity-form"><input type="hidden" asp-for="Id"/><input type="hidden" name="RecoveryId" value="@recovery.Id"/><label>Cancellation reason<input name="Reason" minlength="10" maxlength="2000" required/></label><button class="button button-outline">Cancel Recovery</button></form>
+        }
+        @if(recovery.Status=="Redeeming") { <p role="status">The invitation is consumed. Completion requires administrator investigation; never reuse or reset the token.</p> }
+        </div>
+    }</section>
+    <section><h2>Recovery audit trail</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead><tbody>
+    @foreach(var entry in detail.Events) { <tr><td>@entry.Time.ToLocalTime().ToString("g")</td><td>@entry.Actor</td><td>@entry.Action</td><td>@entry.Detail</td></tr> }
+    </tbody></table></div></section>
+}
+else
+{
+    <form method="get" class="identity-search"><div class="field"><label asp-for="Search">Applicant name, email or request reference</label><input asp-for="Search" maxlength="200"/></div><div class="field"><label asp-for="Status">Account status</label><select asp-for="Status"><option value="">All statuses</option>@foreach(string status in new[]{"Active","PendingAccess","Suspended","Disabled","Enrollment required"}) { <option value="@status">@status</option> }</select></div><button class="button">Search</button><a asp-page="ApplicantAccounts">Clear</a></form>
+    <p>@Model.Results.Total applicant account(s)</p>
+    @if(Model.Results.Items.Count==0) { <p>No applicant accounts match the search.</p> }
+    else { <div class="table-wrap"><table><thead><tr><th>Applicant name</th><th>Email</th><th>Account status</th><th>Linked providers</th><th>Last successful sign-in</th><th>Open</th></tr></thead><tbody>
+    @foreach(var account in Model.Results.Items) { <tr><td>@account.Name</td><td>@account.Email</td><td>@account.Status</td><td>@(account.Providers.Length>0?string.Join(", ",account.Providers):"Not linked")</td><td>@(account.LastSignIn?.ToLocalTime().ToString("g")??"Not recorded")</td><td><a asp-page="ApplicantAccounts" asp-route-Id="@account.Id">Open</a></td></tr> }
+    </tbody></table></div> }
+    <nav class="action-row" aria-label="Applicant account pages">@if(Model.Results.Page>1) { <a asp-page="ApplicantAccounts" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-PageNumber="@(Model.Results.Page-1)">Previous</a> }<span>Page @Model.Results.Page of @Math.Max(1,(int)Math.Ceiling(Model.Results.Total/25d))</span>@if(Model.Results.Page*25<Model.Results.Total) { <a asp-page="ApplicantAccounts" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-PageNumber="@(Model.Results.Page+1)">Next</a> }</nav>
+}
+</div></section>
