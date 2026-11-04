@@ -59,7 +59,7 @@ public sealed class ApplicantIdentityRecoveryTests
             db.UserRoles.Add(new IdentityUserRole<Guid>{UserId=Guid.Parse(account.Id),RoleId=roleId});db.SaveChanges();return accounts.Staff.Find(account.Id)!;
         }
         var first=Staff("First administrator",PortalRoles.Administrator);var second=Staff("Second administrator",PortalRoles.Administrator);var reviewer=Staff("Ordinary reviewer",PortalRoles.Reviewer);
-        var applicant=new ApplicationUser{Id=Guid.NewGuid(),UserName="existing@example.test",NormalizedUserName="EXISTING@EXAMPLE.TEST",Email="existing@example.test",NormalizedEmail="EXISTING@EXAMPLE.TEST",FirstName="Alex",LastName="Brown",DisplayName="Alex Brown",CreatedUtc=DateTimeOffset.UtcNow};
+        var applicant=new ApplicationUser{Id=Guid.NewGuid(),UserName="existing@example.test",NormalizedUserName="EXISTING@EXAMPLE.TEST",Email="existing@example.test",NormalizedEmail="EXISTING@EXAMPLE.TEST",FirstName="Alex",LastName="Brown",DisplayName="Alex Brown",CreatedUtc=DateTimeOffset.UtcNow,SecurityStamp=Guid.NewGuid().ToString("N"),ConcurrencyStamp=Guid.NewGuid().ToString("N")};
         db.Users.Add(applicant);await db.SaveChangesAsync(Ct);
         if(enrolled) accounts.Public.Create(new(applicant.Id.ToString(),applicant.UserName,applicant.DisplayName,AuthenticationProviderKind.External,AccountPopulation.PublicApplicant,SecurityAccountStatus.Active,Proof("Microsoft","old-identity").Key),first.Id);
         var options=new AuthenticationOptions();options.AddScheme("Google",s=>s.HandlerType=typeof(CookieAuthenticationHandler));options.AddScheme("Microsoft",s=>s.HandlerType=typeof(CookieAuthenticationHandler));
@@ -224,7 +224,7 @@ public sealed class ApplicantIdentityRecoveryTests
     [Fact]
     public async Task ActualAdministratorPagesIssueInvitationAndCorrelatedOAuthRecoversTheOriginalAccountThenNormalGoogleSignInWorks()
     {
-        await using var f=await Setup();await using var web=await Web(f);string path="/Administration/ApplicantAccounts?Id="+f.Applicant.Id;
+        await using var f=await Setup();Assert.False(string.IsNullOrWhiteSpace(f.Applicant.SecurityStamp));await using var web=await Web(f);string path="/Administration/ApplicantAccounts?Id="+f.Applicant.Id;
         using var first=await web.Send(path);Assert.Equal(System.Net.HttpStatusCode.OK,first.StatusCode);string html=await first.Content.ReadAsStringAsync(Ct);Snapshot("identity-details",html);Assert.DoesNotContain("subject_id",html);
         using var initiated=await web.Send(path+"&handler=Initiate","First",new(){["__RequestVerificationToken"]=Antiforgery(html),["Id"]=f.Applicant.Id.ToString(),["Provider"]="Google",["Reason"]="Support CASE-HTTP independently verified"});Assert.Equal(System.Net.HttpStatusCode.Redirect,initiated.StatusCode);
         using var second=await web.Send(path,"Second");html=await second.Content.ReadAsStringAsync(Ct);var recovery=Assert.Single((await f.Service.DetailsAsync(f.Actor(f.First),f.Applicant.Id,Ct))!.Recoveries);
