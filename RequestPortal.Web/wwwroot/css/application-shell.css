@@ -3285,3 +3285,28 @@ body.authenticated-app:has(.messages-workspace-page){
     .authenticated-app .outlook-message-rows .outlook-date,
     .authenticated-app .outlook-message-rows .outlook-message-grid-header>span:nth-child(5){display:none}
 }
+
+/* Staff-only Quick Intake review uses the existing orange intake accent. */
+.authenticated-app .quick-intake-review{
+    margin-bottom:1.5rem;
+    border-left:4px solid #f36c21;
+}
+.quick-intake-review-header{display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap}
+.quick-intake-review-header .eyebrow{color:#b45b09}
+.quick-intake-review-header h2{margin:.25rem 0}
+.quick-intake-review-section,
+.quick-intake-conversion{margin-top:18px;padding-top:14px;border-top:1px solid var(--app-border,#d4dee7)}
+.quick-intake-review-section h3,
+.quick-intake-conversion h3{margin:0 0 12px}
+.quick-intake-review-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;margin:0}
+.quick-intake-review-fields>div{min-width:0}
+.quick-intake-review-fields dt{font-size:.78rem;font-weight:800;color:var(--app-muted,#63758a)}
+.quick-intake-review-fields dd{margin:4px 0 0;overflow-wrap:anywhere;white-space:pre-line}
+.quick-intake-conversion .action-row{align-items:end}
+.quick-intake-conversion label{min-width:min(100%,360px);max-width:100%}
+@media(max-width:900px){
+    .quick-intake-review-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+    .quick-intake-review-fields{grid-template-columns:minmax(0,1fr)}
+}

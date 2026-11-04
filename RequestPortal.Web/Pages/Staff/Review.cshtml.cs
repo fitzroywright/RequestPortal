@@ -10,6 +10,8 @@ using RequestPortal.Application.Portal;
 using RequestPortal.Application.ReferenceData;
 using RequestPortal.Application.Requests;
 using RequestPortal.Infrastructure.Identity;
+using RequestPortal.Infrastructure.Security;
+using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Pages.Staff;
 
@@ -52,6 +54,11 @@ public sealed class ReviewModel : PageModel
     public IReadOnlyList<UnitOfMeasureOption> UnitsOfMeasure { get; private set; } = Array.Empty<UnitOfMeasureOption>();
     public QuickIntakeView? QuickIntake { get; private set; }
 
+    public bool CanReviewQuickIntake =>
+        User.HasClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue) &&
+        User.HasClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.Access) &&
+        User.HasClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ReviewRequests);
+
     [BindProperty]
     public string? ConversionEmail { get; set; }
 
@@ -63,6 +70,7 @@ public sealed class ReviewModel : PageModel
 
     public async Task<IActionResult> OnPostConvertQuickIntakeAsync(Guid id)
     {
+        if (!CanReviewQuickIntake) return Forbid(StaffOidcOptions.StaffCookieScheme);
         ApplicationUser staffUser = await GetStaffUserAsync();
 
         if (string.IsNullOrWhiteSpace(ConversionEmail))
@@ -144,7 +152,9 @@ public sealed class ReviewModel : PageModel
         Documents = await documentService.GetRequestDocumentsAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
         Deliveries = await deliveryService.GetForRequestAsync(id, HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
-        QuickIntake = await quickIntakeService.GetAsync(id, HttpContext.RequestAborted);
+        QuickIntake = CanReviewQuickIntake
+            ? await quickIntakeService.GetAsync(id, HttpContext.RequestAborted)
+            : null;
         return Page();
     }
 
