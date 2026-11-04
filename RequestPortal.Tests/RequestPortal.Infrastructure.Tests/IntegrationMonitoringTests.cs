@@ -189,8 +189,7 @@ public sealed class IntegrationMonitoringTests
         try
         {
             await bridge.Entered.Task.WaitAsync(token);
-            await using var other=new RequestPortalDbContext(new DbContextOptionsBuilder<RequestPortalDbContext>()
-                .UseNpgsql(database.Db.Database.GetDbConnection().ConnectionString).Options);
+            await using var other=database.CreateSiblingContext();
             var concurrent=new FfpManagerIntegrationService(other,new Documents(),bridge,Options.Create(OptionsValue),Clock,null!);
             var error=await Assert.ThrowsAsync<IntegrationTransferException>(()=>concurrent.SubmitRequestAsync(request,token));
             Assert.Equal("Concurrency",error.Failure.Stage);

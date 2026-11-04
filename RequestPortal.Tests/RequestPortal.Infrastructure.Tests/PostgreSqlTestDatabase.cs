@@ -23,6 +23,14 @@ internal sealed class PostgreSqlTestDatabase : IAsyncDisposable
 
     public RequestPortalDbContext Db { get; }
 
+    public RequestPortalDbContext CreateSiblingContext()
+    {
+        // Open connections redact passwords. Use the original isolated fixture configuration,
+        // keeping PersistSecurityInfo disabled and never exposing credentials to test output.
+        var settings = new NpgsqlConnectionStringBuilder(adminConnectionString) { SearchPath = schemaName, Pooling = false };
+        return new(new DbContextOptionsBuilder<RequestPortalDbContext>().UseNpgsql(settings.ConnectionString).Options);
+    }
+
     public static async Task<PostgreSqlTestDatabase> CreateAsync(
         CancellationToken cancellationToken = default, string? targetMigration = null)
     {
