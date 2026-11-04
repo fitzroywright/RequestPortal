@@ -3168,3 +3168,120 @@ body.authenticated-app{
     object-fit:cover;
     padding:0;
 }
+
+
+/* Mail folders share one viewport-bound scrolling region, including on mobile. */
+body.authenticated-app:has(.messages-workspace-page){
+    height:100vh;
+    height:100dvh;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+.authenticated-app:has(.messages-workspace-page) .app-header{
+    flex:0 0 auto;
+}
+.authenticated-app:has(.messages-workspace-page) .app-main{
+    min-height:0;
+    flex:1 1 auto;
+    display:flex;
+    flex-direction:column;
+    padding-bottom:0;
+    overflow:hidden;
+}
+.authenticated-app:has(.messages-workspace-page) .app-main>.flash{
+    flex:0 0 auto;
+}
+.authenticated-app .messages-workspace-page{
+    min-height:0;
+    flex:1 1 auto;
+    display:flex;
+    padding:16px 0;
+    overflow:hidden;
+}
+.authenticated-app .messages-workspace-shell{
+    min-height:0;
+    display:grid;
+    grid-template-rows:auto minmax(0,1fr);
+    gap:10px;
+}
+.authenticated-app .messages-workspace-page .operational-titlebar{
+    margin:0;
+}
+.authenticated-app .messages-workspace-page .outlook-mailbox{
+    min-height:0;
+    overflow:hidden;
+}
+.authenticated-app .messages-workspace-page .outlook-message-workspace{
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+.authenticated-app .messages-workspace-page .outlook-workspace-titlebar{
+    flex:0 0 auto;
+}
+.authenticated-app .outlook-message-rows{
+    min-height:0;
+    flex:1 1 auto;
+    overflow-y:auto;
+    overflow-x:hidden;
+    scrollbar-gutter:stable;
+    scrollbar-width:auto;
+    scrollbar-color:#66798c #edf2f6;
+}
+/* Use the explicit track in Chromium/WebKit, including macOS overlay-scrollbar systems. */
+@supports selector(::-webkit-scrollbar){
+    .authenticated-app .outlook-message-rows{scrollbar-color:auto}
+}
+.authenticated-app .outlook-message-rows::-webkit-scrollbar{width:14px}
+.authenticated-app .outlook-message-rows::-webkit-scrollbar-track{background:#edf2f6}
+.authenticated-app .outlook-message-rows::-webkit-scrollbar-thumb{
+    background:#66798c;
+    border:3px solid #edf2f6;
+    border-radius:8px;
+}
+.authenticated-app .outlook-message-rows:focus-visible{
+    outline:2px solid #1473d1;
+    outline-offset:-2px;
+}
+.authenticated-app .outlook-message-rows .outlook-message-grid{
+    grid-template-columns:30px minmax(0,.85fr) minmax(0,2fr) minmax(0,1fr) 155px;
+}
+.authenticated-app .outlook-message-rows .outlook-message-grid-header{
+    position:sticky;
+    top:0;
+    z-index:2;
+}
+@media(max-width:900px){
+    .authenticated-app .outlook-message-rows .outlook-message-grid{
+        grid-template-columns:24px minmax(0,.8fr) minmax(0,1.7fr) 125px;
+    }
+    .authenticated-app .outlook-message-rows .outlook-message-grid-header>span:nth-child(4){display:none}
+    .authenticated-app .messages-workspace-page .outlook-mailbox{
+        grid-template-columns:minmax(0,1fr);
+        grid-template-rows:auto minmax(0,1fr);
+    }
+    .authenticated-app .messages-workspace-page .outlook-folder-card{min-width:0}
+    .authenticated-app .messages-workspace-page .outlook-folder-card nav{
+        display:flex;
+        overflow-x:auto;
+        overflow-y:hidden;
+    }
+    .authenticated-app .messages-workspace-page .outlook-folder{min-width:max-content}
+}
+@media(max-width:650px){
+    .authenticated-app .outlook-message-rows .outlook-message-grid{
+        grid-template-columns:20px minmax(70px,.8fr) minmax(100px,1.2fr) 90px;
+        gap:5px;
+    }
+    .authenticated-app .outlook-message-rows .outlook-message-grid-header{display:grid}
+}
+@media(max-width:480px){
+    .authenticated-app .outlook-message-rows .outlook-message-grid{
+        grid-template-columns:18px minmax(65px,.8fr) minmax(100px,1.2fr);
+    }
+    .authenticated-app .outlook-message-rows .outlook-date,
+    .authenticated-app .outlook-message-rows .outlook-message-grid-header>span:nth-child(5){display:none}
+}

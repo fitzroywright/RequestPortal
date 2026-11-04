@@ -5,8 +5,8 @@
     ViewData["Title"] = "Unassigned";
 }
 
-<section class="operational-page">
-    <div class="shell">
+<section class="operational-page messages-workspace-page">
+    <div class="shell messages-workspace-shell">
         <header class="operational-titlebar">
             <div>
                 <div class="eyebrow request-eyebrow">FFP Staff Messages</div>
@@ -35,37 +35,42 @@
                     <div><strong>Unassigned</strong><span>@Model.Messages.Count conversations</span></div>
                     <span class="outlook-toolbar-note">Newest first</span>
                 </div>
-                @if (Model.Messages.Count == 0)
-                {
-                    <div class="workspace-empty"><strong>No unassigned conversations.</strong></div>
-                }
-                else
-                {
-                    @foreach (MailboxMessageView message in Model.Messages)
+                <div class="outlook-message-rows" role="region" aria-label="Message list" tabindex="0">
+                    @if (Model.Messages.Count == 0)
                     {
-                        <a class="outlook-message-grid outlook-message-row"
-   href="@(message.RequestId.HasValue
-       ? Url.Page("/Requests/Details", new { id = message.RequestId.Value }) + "#conversation"
-       : Url.Page("/Messages/Thread", new { id = message.ThreadId }))">
-                            <span class="outlook-message-state">@(message.ReadUtc is null ? "●" : "○")</span>
-                            <span class="outlook-sender">
-                                <img class="message-list-avatar"
-                                     src="@(message.SenderKind == "Representative" && message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
-                                     alt="" />
-                                <span class="outlook-sender-copy">
-                                    <strong>@message.SenderName</strong>
-                                    <small>@message.SenderKind</small>
-                                </span>
-                            </span>
-                            <span class="outlook-subject"><strong>@message.Subject</strong><small>@message.Preview</small></span>
-                            <span class="outlook-context">
-                                @if (!string.IsNullOrWhiteSpace(message.OrganizationName)) { <small>@message.OrganizationName</small> }
-                                @if (!string.IsNullOrWhiteSpace(message.RequestReference)) { <small>@message.RequestReference</small> }
-                            </span>
-                            <span class="outlook-date"><time>@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time></span>
-                        </a>
+                        <div class="workspace-empty"><strong>No unassigned conversations.</strong></div>
                     }
-                }
+                    else
+                    {
+                        <div class="outlook-message-grid outlook-message-grid-header" aria-hidden="true">
+                            <span></span><span>Sender</span><span>Subject / Preview</span><span>Context</span><span>Date</span>
+                        </div>
+                        @foreach (MailboxMessageView message in Model.Messages)
+                        {
+                            <a class="outlook-message-grid outlook-message-row"
+       href="@(message.RequestId.HasValue
+           ? Url.Page("/Requests/Details", new { id = message.RequestId.Value }) + "#conversation"
+           : Url.Page("/Messages/Thread", new { id = message.ThreadId }))">
+                                <span class="outlook-message-state">@(message.ReadUtc is null ? "●" : "○")</span>
+                                <span class="outlook-sender">
+                                    <img class="message-list-avatar"
+                                         src="@(message.SenderKind == "Representative" && message.SenderUserId.HasValue ? $"/api/users/{message.SenderUserId.Value:D}/avatar" : "/img/generic-avatar.svg")"
+                                         alt="" />
+                                    <span class="outlook-sender-copy">
+                                        <strong>@message.SenderName</strong>
+                                        <small>@message.SenderKind</small>
+                                    </span>
+                                </span>
+                                <span class="outlook-subject"><strong>@message.Subject</strong><small>@message.Preview</small></span>
+                                <span class="outlook-context">
+                                    @if (!string.IsNullOrWhiteSpace(message.OrganizationName)) { <small>@message.OrganizationName</small> }
+                                    @if (!string.IsNullOrWhiteSpace(message.RequestReference)) { <small>@message.RequestReference</small> }
+                                </span>
+                                <span class="outlook-date"><time>@message.SentUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</time></span>
+                            </a>
+                        }
+                    }
+                </div>
             </section>
         </div>
     </div>
