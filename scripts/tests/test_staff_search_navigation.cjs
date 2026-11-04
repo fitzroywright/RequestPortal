@@ -13,7 +13,7 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
   await page.route('**/*',route=>{
    const req=route.request(),url=new URL(req.url());
    if(req.resourceType()==='document'){
-    let name=url.pathname==='/Staff/Organizations'?'organizations':url.pathname.startsWith('/Staff/Review/')?'request-document':url.pathname==='/Staff/Organization'?'organization-document':url.searchParams.has('Search')?'search':'queue';
+    let name=url.pathname==='/Staff/Organizations'?'organizations':url.pathname.startsWith('/Staff/Review/')?'request-document':url.pathname==='/Staff/Organization'?'organization-document':url.searchParams.has('Search')?(url.searchParams.get('PageSize')==='50'?'search-50':'search'):url.searchParams.get('PageSize')==='50'?'queue-size-50':url.searchParams.get('PageSize')==='100'?'queue-size-100':url.searchParams.get('PageNumber')==='2'?'queue-page-2':'queue';
     return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,name+'.html'))});
    }
    if(url.pathname.endsWith('/messages.js')||url.hostname==='cdnjs.cloudflare.com')return route.fulfill({contentType:'text/javascript',body:''});
@@ -25,10 +25,20 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
   for(const width of [1440,768,390]){
    await page.setViewportSize({width,height:900});errors=[];
    await page.goto('http://127.0.0.1:5499/Staff');
+   assert.equal(await page.locator('.request-panel tbody tr').count(),25);
+   assert.match(await page.locator('.staff-pagination').innerText(),/Showing 1–25 of 46 requests/);
+   await page.locator('.staff-pagination').getByRole('link',{name:'Next',exact:true}).click();await page.waitForURL('**PageNumber=2');
+   assert.equal(new URL(page.url()).searchParams.get('PageSize'),'25');
+   assert.equal(await page.locator('.request-panel tbody tr').count(),21);
+   await page.selectOption('#request-page-size','50');await page.getByRole('button',{name:'Apply page size',exact:true}).click();await page.waitForURL('**PageSize=50');
+   assert(!new URL(page.url()).searchParams.has('PageNumber'));
+   assert.equal(await page.locator('.request-panel tbody tr').count(),46);
    await page.getByRole('textbox',{name:'Search by applicant name or request reference',exact:true}).fill('John');
-   await page.getByRole('button',{name:'Search',exact:true}).click();await page.waitForURL('**/Staff?Search=John');
+   await page.getByRole('button',{name:'Search',exact:true}).click();await page.waitForURL(url=>url.pathname==='/Staff'&&url.searchParams.get('Search')==='John');
    assert(await page.getByRole('cell',{name:'John Brown'}).count()>0);
    await page.getByRole('link',{name:'Next',exact:true}).click();await page.waitForURL('**PageNumber=2');
+   assert.equal(new URL(page.url()).searchParams.get('PageSize'),'50');
+   assert.equal(new URL(page.url()).searchParams.get('Search'),'John');
    await page.getByRole('link',{name:'Clear Search',exact:true}).click();await page.waitForURL('**/Staff');
    for(const index of [0,1,2,3])for(const mode of ['row','link','keyboard']){
     await page.goto('http://127.0.0.1:5499/Staff/Organizations');

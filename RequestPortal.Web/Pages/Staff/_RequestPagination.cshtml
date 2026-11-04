@@ -1,0 +1,26 @@
+@model RequestPortal.Web.Pages.Staff.IndexModel
+@{ var result = Model.SearchResults ?? Model.Queue; }
+<div class="staff-pagination">
+    <span aria-live="polite">Showing @result.FirstRecord–@result.LastRecord of @result.TotalCount requests</span>
+    <form method="get" asp-page="/Staff/Index">
+        @if (!string.IsNullOrWhiteSpace(Model.Search)) { <input type="hidden" name="Search" value="@Model.Search" /> }
+        <label for="request-page-size">Requests per page</label>
+        <select id="request-page-size" name="PageSize">
+            @foreach (int size in new[] { 25, 50, 100 }) { <option value="@size" selected="@(result.PageSize == size)">@size</option> }
+        </select>
+        <button class="button button-small button-secondary" type="submit">Apply page size</button>
+    </form>
+    <nav aria-label="Request pages">
+        <span>Page @result.PageNumber of @result.TotalPages</span>
+        @if (result.PageNumber > 1)
+        {
+            <a asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageSize="@result.PageSize" asp-route-PageNumber="@(result.PageNumber - 1)">Previous</a>
+        }
+        else { <span aria-disabled="true">Previous</span> }
+        @if (result.PageNumber < result.TotalPages)
+        {
+            <a asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageSize="@result.PageSize" asp-route-PageNumber="@(result.PageNumber + 1)">Next</a>
+        }
+        else { <span aria-disabled="true">Next</span> }
+    </nav>
+</div>
