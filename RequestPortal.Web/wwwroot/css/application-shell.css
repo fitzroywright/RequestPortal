@@ -3246,12 +3246,18 @@ body.authenticated-app:has(.messages-workspace-page){
     outline:2px solid #1473d1;
     outline-offset:-2px;
 }
+.authenticated-app .outlook-message-rows .outlook-message-grid{
+    grid-template-columns:30px minmax(0,.85fr) minmax(0,2fr) minmax(0,1fr) 155px;
+}
 .authenticated-app .outlook-message-rows .outlook-message-grid-header{
     position:sticky;
     top:0;
     z-index:2;
 }
 @media(max-width:900px){
+    .authenticated-app .outlook-message-rows .outlook-message-grid{
+        grid-template-columns:24px minmax(0,.8fr) minmax(0,1.7fr) 125px;
+    }
     .authenticated-app .outlook-message-rows .outlook-message-grid-header>span:nth-child(4){display:none}
     .authenticated-app .messages-workspace-page .outlook-mailbox{
         grid-template-columns:minmax(0,1fr);
