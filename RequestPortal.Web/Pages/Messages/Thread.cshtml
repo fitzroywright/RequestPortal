@@ -8,7 +8,17 @@
 
 <section class="operational-page conversation-page">
     <div class="shell conversation-shell">
-        @if (Model.Thread is not null)
+        <div class="action-row" style="margin-bottom:12px">
+            <a class="button button-small button-secondary" asp-page="@Model.ReturnPage">Back to mailbox</a>
+        </div>
+        @if (Model.Thread is null)
+        {
+            <section class="card">
+                <h1>Conversation not found</h1>
+                <p>This conversation does not exist or is not available to your account.</p>
+            </section>
+        }
+        else
         {
             <div class="section-heading conversation-heading">
                 <div class="eyebrow" style="color:#b45b09">Conversation</div>
@@ -19,7 +29,7 @@
                         @if (Model.Thread.ClosedUtc.HasValue)
                         {
                             <span class="status">Closed</span>
-                            <form method="post" asp-page-handler="Reopen" asp-route-id="@Model.Thread.ThreadId">
+                            <form method="post" asp-page-handler="Reopen" asp-route-id="@Model.Thread.ThreadId" asp-route-returnTo="@Model.ReturnPage">
                                 <button class="button button-small" type="submit">Reopen</button>
                             </form>
                         }
@@ -36,18 +46,18 @@
 
                             @if (Model.IsAssignedToCurrentStaff)
                             {
-                                <form method="post" asp-page-handler="Unassign" asp-route-id="@Model.Thread.ThreadId">
+                                <form method="post" asp-page-handler="Unassign" asp-route-id="@Model.Thread.ThreadId" asp-route-returnTo="@Model.ReturnPage">
                                     <button class="button button-small button-secondary" type="submit">Unassign</button>
                                 </form>
                             }
                             else
                             {
-                                <form method="post" asp-page-handler="Assign" asp-route-id="@Model.Thread.ThreadId">
+                                <form method="post" asp-page-handler="Assign" asp-route-id="@Model.Thread.ThreadId" asp-route-returnTo="@Model.ReturnPage">
                                     <button class="button button-small" type="submit">Assign to me</button>
                                 </form>
                             }
 
-                            <form method="post" asp-page-handler="Close" asp-route-id="@Model.Thread.ThreadId">
+                            <form method="post" asp-page-handler="Close" asp-route-id="@Model.Thread.ThreadId" asp-route-returnTo="@Model.ReturnPage">
                                 <button class="button button-small button-secondary" type="submit">Close</button>
                             </form>
                         }
@@ -61,6 +71,15 @@
                     }
                 </p>
             </div>
+
+            @if (Model.Thread.RequestId.HasValue)
+            {
+                <div class="action-row" style="margin-bottom:12px">
+                    <a class="button button-small button-outline"
+                       asp-page="@(Model.IsStaff ? "/Staff/Review" : "/Requests/Details")"
+                       asp-route-id="@Model.Thread.RequestId.Value">View Request</a>
+                </div>
+            }
 
             <div class="message-thread conversation-thread">
                 @foreach (MessageDetailView message in Model.Thread.Messages)
@@ -116,7 +135,7 @@
 
             @if (!Model.Thread.ClosedUtc.HasValue)
             {
-            <form method="post" class="conversation-composer">
+            <form method="post" asp-route-id="@Model.Thread.ThreadId" asp-route-returnTo="@Model.ReturnPage" class="conversation-composer">
                 <div class="conversation-composer-head">
                     <label asp-for="Reply">@(Model.Thread.Audience == MessageAudience.PersonalNote ? "Add note" : "Reply")</label>
                     <span class="muted">Your reply will be added to this conversation.</span>

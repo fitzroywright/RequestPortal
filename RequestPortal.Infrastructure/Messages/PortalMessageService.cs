@@ -715,7 +715,8 @@ public sealed class PortalMessageService : IPortalMessageService
         IReadOnlyCollection<Guid>? attachmentDocumentIds = null)
     {
         MessageThread thread = await dbContext.MessageThreads
-            .SingleAsync(item => item.Id == threadId, cancellationToken);
+            .SingleOrDefaultAsync(item => item.Id == threadId, cancellationToken)
+            ?? throw new MessageThreadNotFoundException();
 
         if (thread.ClosedUtc.HasValue)
         {
@@ -1112,9 +1113,9 @@ public sealed class PortalMessageService : IPortalMessageService
         await EnsureInternalStaffAsync(staffUserId, cancellationToken);
 
         MessageThread thread = await dbContext.MessageThreads
-            .SingleAsync(
+            .SingleOrDefaultAsync(
                 item => item.Id == threadId && item.StaffVisible,
-                cancellationToken);
+                cancellationToken) ?? throw new MessageThreadNotFoundException();
 
         thread.Reopen();
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -1576,12 +1577,12 @@ public sealed class PortalMessageService : IPortalMessageService
         await EnsureInternalStaffAsync(staffUserId, cancellationToken);
 
         return await dbContext.MessageThreads
-            .SingleAsync(
+            .SingleOrDefaultAsync(
                 item =>
                     item.Id == threadId &&
                     item.StaffVisible &&
                     item.ClosedUtc == null,
-                cancellationToken);
+                cancellationToken) ?? throw new MessageThreadNotFoundException();
     }
 
     private async Task EnsureInternalStaffAsync(

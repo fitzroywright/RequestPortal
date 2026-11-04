@@ -463,6 +463,23 @@ public sealed class PortalMessagingTests
             cancellationToken));
     }
 
+    [Fact]
+    public async Task MissingThreadMutationsHaveAnExplicitNotFoundContract()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        var staff = CreateUser("Fixture staff", "fixture.staff@example.test", true);
+        database.Db.Users.Add(staff); await database.Db.SaveChangesAsync(token);
+        var service = CreateService(database.Db, new CapturingRealtimeNotifier());
+        Guid missing = Guid.NewGuid();
+        await Assert.ThrowsAsync<MessageThreadNotFoundException>(() => service.ReplyAsync(staff.Id, true, missing, "Fixture reply", token));
+        await Assert.ThrowsAsync<MessageThreadNotFoundException>(() => service.AssignThreadAsync(staff.Id, missing, token));
+        await Assert.ThrowsAsync<MessageThreadNotFoundException>(() => service.UnassignThreadAsync(staff.Id, missing, token));
+        await Assert.ThrowsAsync<MessageThreadNotFoundException>(() => service.CloseThreadAsync(staff.Id, missing, token));
+        await Assert.ThrowsAsync<MessageThreadNotFoundException>(() => service.ReopenThreadAsync(staff.Id, missing, token));
+        Assert.Empty(database.Db.MessageThreads);
+    }
+
     private static PortalMessageService CreateService(
         RequestPortal.Infrastructure.Persistence.RequestPortalDbContext dbContext,
         IPortalMessageRealtimeNotifier notifier)
