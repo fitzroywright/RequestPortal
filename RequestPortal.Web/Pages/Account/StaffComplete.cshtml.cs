@@ -19,7 +19,7 @@ public sealed class StaffCompleteModel : PageModel
         this.auditWriter = auditWriter;
     }
 
-    public async Task<IActionResult> OnGetAsync()
+    public async Task<IActionResult> OnGetAsync(string? returnUrl = null)
     {
         if(!User.HasClaim(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.Access))
             return RedirectToPage("/Account/StaffAccessDenied",new {reason="pending"});
@@ -32,6 +32,7 @@ public sealed class StaffCompleteModel : PageModel
             null,
             $"name={User.Identity?.Name}",
             HttpContext.RequestAborted);
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl);
         bool canViewManagement = User.HasClaim(
             StaffOidcOptions.PermissionClaim,
             RequestPortalPermissions.ViewManagementDashboard);

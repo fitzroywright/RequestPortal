@@ -23,6 +23,7 @@ internal static class PlatformServiceRegistration
     {
         AddUploadLimits(builder);
         builder.Services.AddScoped<RequestPortal.Web.Security.StaffAdministrationService>();
+        builder.Services.AddScoped<RequestPortal.Web.Security.ApplicantIdentityAdministration>();
         builder.Services.AddScoped<RequestPortal.Web.Security.StaffPreProvisioningService>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.Configure<RequestPortal.Web.Security.StaffDirectoryOptions>(

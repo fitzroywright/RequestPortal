@@ -133,3 +133,5 @@ public sealed record PortalMessageNotificationRequestedMessage(
     string SenderName,
     string Subject,
     IReadOnlyCollection<Guid> RecipientUserIds) : IMessage;
+
+public sealed record ApplicantIdentityRecoveredMessage(Guid MessageId, DateTimeOffset OccurredUtc, Guid ApplicantId, string Provider) : IMessage;

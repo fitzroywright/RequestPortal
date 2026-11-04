@@ -13,7 +13,7 @@ public sealed record StaffOidcPrincipalResult(bool Allowed, ClaimsPrincipal? Pri
 /// <summary>Request Portal staff permission projection. Provider proof and lifecycle are shared framework concerns.</summary>
 public sealed class StaffOidcPrincipalService(RequestPortalAccounts accounts, IPermissionAuthorizer authorizer)
 {
-    private static readonly string[] permissions = ["requestportal.access", "requests.review", "ManagementDashboard.View", "security.manage"];
+    private static readonly string[] permissions = ["requestportal.access", "requests.review", "ManagementDashboard.View", "security.manage", "identity.view", "identity.recovery.initiate", "identity.recovery.approve"];
     public async Task<StaffOidcPrincipalResult> BuildPrincipalAsync(VerifiedIdentity proof, CancellationToken cancellationToken=default)
     {
         var account = new global::Common.Security.Services.AccountProvisioningService(accounts.Staff)
