@@ -124,11 +124,11 @@ public sealed class QuickIntakeService : IQuickIntakeService
         string gender = RequireAllowed(submission.Gender, "Gender", AllowedGenders);
         string maritalStatus = RequireAllowed(submission.MaritalStatus, "Marital status", AllowedMaritalStatuses);
         string mobile = NormalizeMobile(submission.Telephone);
+        if (submission.SecondaryTelephone?.Length > 40)
+            throw new ArgumentException("Secondary phone number cannot exceed 40 characters.");
         string? secondaryTelephone = Normalize(submission.SecondaryTelephone);
         if (secondaryTelephone is not null)
         {
-            if (secondaryTelephone.Length > 40)
-                throw new ArgumentException("Secondary phone number cannot exceed 40 characters.");
             try { secondaryTelephone = NormalizeMobile(secondaryTelephone); }
             catch (ArgumentException)
             {
@@ -286,7 +286,9 @@ public sealed class QuickIntakeService : IQuickIntakeService
             helpCategory,
             now,
             secondaryTelephone,
-            victimCircumstances);
+            victimCircumstances,
+            submission.Telephone,
+            submission.SecondaryTelephone);
         if (signedInApplicant is not null)
             IntakeProfilePromotion.FillMissing(signedInApplicant, intake);
         if (signedInApplicant is not null)
@@ -511,21 +513,8 @@ public sealed class QuickIntakeService : IQuickIntakeService
     private static string NormalizeMobile(string value)
     {
         string raw = Require(value, "Telephone");
-        string compact = new(raw.Where(character => char.IsDigit(character) || character == '+').ToArray());
-
-        if (compact.StartsWith("00", StringComparison.Ordinal))
-            compact = "+" + compact[2..];
-
-        if (!compact.StartsWith('+'))
-        {
-            string digits = new(compact.Where(char.IsDigit).ToArray());
-            compact = digits.Length == 10 ? $"+1{digits}" : $"+{digits}";
-        }
-
-        int digitCount = compact.Count(char.IsDigit);
-        if (digitCount is < 10 or > 15)
-            throw new ArgumentException("Enter a valid telephone number including country code.");
-
-        return compact;
+        if (value.Length > 40) throw new ArgumentException("Telephone cannot exceed 40 characters.");
+        return RequestPortal.Common.Contacts.ApplicantTelephone.Normalize(raw)
+            ?? throw new ArgumentException("Telephone is required.");
     }
 }

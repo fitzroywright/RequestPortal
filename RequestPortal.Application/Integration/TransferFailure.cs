@@ -7,6 +7,8 @@ public static class TransferFailures
     public static TransferFailure For(string stage, string code) => code switch
     {
         "VALIDATION" => new(stage, "PermanentValidation", code, "Required fields or mapping values are invalid. Correct the source or mapping before an authorized retry.", false),
+        "VALIDATION_PRIMARY_TELEPHONE" => new(stage, "PermanentValidation", code, "The primary applicant telephone cannot be transferred. Verify the original submission and correct the source before an authorized reconciled retry.", false),
+        "VALIDATION_SECONDARY_TELEPHONE" => new(stage, "PermanentValidation", code, "The secondary applicant telephone cannot be transferred. Verify the original submission and correct the source before an authorized reconciled retry.", false),
         "VALIDATION_PARISH" => new(stage, "PermanentValidation", code, "The explicitly selected parish is missing or has no approved FFP Manager mapping. Correct the intake/profile or mapping before retrying; address text cannot substitute for a parish.", false),
         "SQL_CONSTRAINT" => new(stage, "PermanentSql", code, "SQL Server rejected a constraint or field value. Review the mapping before retrying.", false),
         "SQL_AUTH" => new(stage, "Authentication", code, "SQL Server rejected the bridge service identity. Verify its approved credentials and database access.", false),

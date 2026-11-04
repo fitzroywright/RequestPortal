@@ -10,6 +10,33 @@ namespace RequestPortal.Infrastructure.Tests;
 public sealed class IntegrationMigrationTests
 {
     [Fact]
+    public async Task TelephoneUpgradePreservesLegacyNumbersWithoutInventingOriginals()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token, "20261104183257_IntegrationTransferDiagnostics");
+        var id = Guid.NewGuid(); var request = Guid.NewGuid(); var user = Guid.NewGuid(); var context = Guid.NewGuid();
+        var received = DateTimeOffset.UtcNow;
+        await database.Db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO quick_intakes
+            ("Id", "RequestId", "AnonymousUserId", "IndividualContextId", "FirstName", "LastName",
+             "DateOfBirth", "Gender", "MaritalStatus", "MobileNumber", "SecondaryTelephone", "StreetAddress",
+             "CommunityDistrict", "Parish", "EmploymentStatus", "MonthlyIncome", "HasChildrenUnder18LivingFullTime",
+             "HasDisabilityOrSeriousMedicalCondition", "AssistancePrograms", "HelpCategory", "CreatedUtc")
+            VALUES ({id}, {request}, {user}, {context}, 'Synthetic', 'Migration', DATE '1980-01-01', 'Male',
+                    'Single', '+18765550199', '+442079460018', 'Synthetic', 'Synthetic', 'Kingston', 'Unemployed',
+                    0, false, false, 'None', 'Food', {received})
+            """, token);
+        await database.Db.GetService<IMigrator>().MigrateAsync(cancellationToken: token);
+        var intake = await database.Db.QuickIntakes.SingleAsync(item => item.Id == id, token);
+        Assert.Equal("+18765550199", intake.MobileNumber);
+        Assert.Equal("+442079460018", intake.SecondaryTelephone);
+        Assert.Null(intake.OriginalTelephone);
+        Assert.Null(intake.OriginalSecondaryTelephone);
+        Assert.Equal(request, intake.RequestId);
+        Assert.Equal(user, intake.AnonymousUserId);
+    }
+
+    [Fact]
     public async Task UpgradePreservesExistingPayloadOutcomeAndRetrySchedule_AndSupportsLegacyWriters()
     {
         var token=TestContext.Current.CancellationToken;

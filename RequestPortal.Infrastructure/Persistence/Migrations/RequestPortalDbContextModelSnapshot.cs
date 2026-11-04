@@ -364,6 +364,14 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<string>("OriginalSecondaryTelephone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("OriginalTelephone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<decimal>("MonthlyIncome")
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");

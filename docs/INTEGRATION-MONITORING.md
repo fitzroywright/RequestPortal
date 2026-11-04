@@ -54,3 +54,14 @@ Before production schema changes, record the actual PostgreSQL target and verify
 After CI and review gates, synchronize the deployment checkout with verified GitHub main. Use Aegis.Operations' existing bridge deployment tool first (additive authenticated lookup/diagnostic endpoints), preserving its Production configuration and checking readiness. Validate lookup using the approved protected credential before publishing the portal. Use `Deploy-Kratos.ps1 -Applications requestportal` for the portal-only rollout. Preserve protected environment files, OpenBao configuration, PostgreSQL data, storage, Data Protection keys and existing service identities. Do not deploy Studio or change FFPJM schema.
 
 Verify deployed commit/artifact hashes, both service states, HTTPS health, authenticated diagnostic/review pages, read-only destination lookup, callback health and sanitized logs. Do not create production applications merely to demonstrate monitoring. Controlled synthetic scenarios belong in disposable tests; any production recovery requires the reconciled, reviewed plan.
+
+
+## Telephone validation and source preservation
+
+Quick Intake and the bridge share the same libphonenumber-based validator. Jamaican local numbers and explicit international numbers normalize to E.164. Bare `00` and `011` international access prefixes are accepted; a malformed existing `+011` value is rejected rather than guessed or rewritten. Extensions, unsupported characters, impossible lengths and the SQL column's 15-character limit are checked before a new intake commits or a transfer inserts data.
+
+`OriginalTelephone` and `OriginalSecondaryTelephone` retain the exact submitted strings for new intakes. Historical rows remain null: previously discarded formatting cannot be recovered by inventing a value. These fields are private persistence metadata and are not added to public responses, notifications or diagnostics exports. Existing canonical phone, identity and notification fields retain their roles.
+
+Bridge failures identify `VALIDATION_PRIMARY_TELEPHONE` or `VALIDATION_SECONDARY_TELEPHONE` without including the number. Existing durable diagnostics retain the request reference, attempt time, retry and resolution history. These are permanent validation failures; existing destination bindings must be reconciled before any authorized retry. This release does not bulk correct or replay production records.
+
+The additive `PreserveSubmittedIntakeTelephones` migration must follow verified production PostgreSQL backup and isolated restore testing. It adds two nullable bounded columns with short lock/statement timeouts and no data rewrite or automatic recovery. Application rollback retains these columns and all captured originals; destructive migration rollback is deliberately disabled.
