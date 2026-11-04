@@ -125,7 +125,7 @@
                             <tbody>
                             @foreach (DocumentSummary document in Model.Documents)
                             {
-                                <tr>
+                                <tr id="document-@document.Id.ToString("N")" class="@(Model.SelectedDocumentId == document.Id ? "selected-document" : "")" tabindex="-1">
                                     <td>
                                         <a asp-page-handler="DownloadDocument"
                                            asp-route-id="@organization.Id"

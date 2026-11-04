@@ -1,3 +1,5 @@
+using RequestPortal.Application.Administration;
+using RequestPortal.Domain.Documents;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -19,6 +21,7 @@ public sealed class ReviewModel : PageModel
 {
     private readonly UserManager<ApplicationUser> userManager;
     private readonly IPortalWorkflowService workflowService;
+    private readonly IStaffDocumentContextService documentContextService;
     private readonly IDocumentService documentService;
     private readonly IProjectProposalService projectProposalService;
     private readonly IProjectPlanningService projectPlanningService;
@@ -34,11 +37,13 @@ public sealed class ReviewModel : PageModel
         IProjectPlanningService projectPlanningService,
         IRequestReferenceDataService referenceDataService,
         IDeliveryService deliveryService,
-        IQuickIntakeService quickIntakeService)
+        IQuickIntakeService quickIntakeService,
+        IStaffDocumentContextService documentContextService)
     {
         this.userManager = userManager;
         this.workflowService = workflowService;
         this.documentService = documentService;
+        this.documentContextService = documentContextService;
         this.projectProposalService = projectProposalService;
         this.projectPlanningService = projectPlanningService;
         this.referenceDataService = referenceDataService;
@@ -61,6 +66,9 @@ public sealed class ReviewModel : PageModel
 
     [BindProperty]
     public string? ConversionEmail { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public Guid? SelectedDocumentId { get; set; }
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
@@ -107,6 +115,7 @@ public sealed class ReviewModel : PageModel
     public async Task<IActionResult> OnGetDownloadAsync(Guid id, Guid documentId)
     {
         ApplicationUser staffUser = await GetStaffUserAsync();
+        if (await CheckDocumentAsync(id, documentId) is IActionResult error) return error;
         DocumentDownload? download = await documentService.DownloadAsync(
             staffUser.Id,
             documentId,
@@ -149,6 +158,9 @@ public sealed class ReviewModel : PageModel
         if (ProjectProposal is not null)
             ProjectPlanning = await projectPlanningService.GetAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
 
+        if (SelectedDocumentId is Guid selectedId && await CheckDocumentAsync(id, selectedId) is IActionResult error)
+            return error;
+
         Documents = await documentService.GetRequestDocumentsAsync(staffUser.Id, id, isStaff: true, HttpContext.RequestAborted);
         Deliveries = await deliveryService.GetForRequestAsync(id, HttpContext.RequestAborted);
         UnitsOfMeasure = await referenceDataService.GetUnitsOfMeasureAsync(HttpContext.RequestAborted);
@@ -156,6 +168,47 @@ public sealed class ReviewModel : PageModel
             ? await quickIntakeService.GetAsync(id, HttpContext.RequestAborted)
             : null;
         return Page();
+    }
+
+
+    public async Task<IActionResult> OnPostVerifyDocumentAsync(Guid id, Guid documentId, string? notes)
+    {
+        ApplicationUser staffUser = await GetStaffUserAsync();
+        if (await CheckDocumentAsync(id, documentId) is IActionResult error) return error;
+        if (notes?.Length > 1000) return BadRequest("Verification notes must be at most 1000 characters.");
+        await documentService.VerifyAsync(staffUser.Id, documentId, notes, HttpContext.RequestAborted);
+        TempData["Success"] = "Document verified.";
+        return RedirectToPage(new { id, selectedDocumentId = documentId });
+    }
+
+    public async Task<IActionResult> OnPostRejectDocumentAsync(Guid id, Guid documentId, string reason)
+    {
+        ApplicationUser staffUser = await GetStaffUserAsync();
+        if (await CheckDocumentAsync(id, documentId) is IActionResult error) return error;
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 1000) return BadRequest("A rejection reason of at most 1000 characters is required.");
+        await documentService.RejectVerificationAsync(staffUser.Id, documentId, reason, HttpContext.RequestAborted);
+        TempData["Success"] = "Document verification rejected.";
+        return RedirectToPage(new { id, selectedDocumentId = documentId });
+    }
+
+    public async Task<IActionResult> OnPostArchiveDocumentAsync(Guid id, Guid documentId)
+    {
+        ApplicationUser staffUser = await GetStaffUserAsync();
+        if (await CheckDocumentAsync(id, documentId) is IActionResult error) return error;
+        await documentService.ArchiveAsync(staffUser.Id, documentId, HttpContext.RequestAborted);
+        TempData["Success"] = "Document archived.";
+        return RedirectToPage(new { id, selectedDocumentId = (Guid?)null });
+    }
+
+    private async Task<IActionResult?> CheckDocumentAsync(Guid id, Guid documentId)
+    {
+        var status = await documentContextService.ValidateAsync(DocumentOwnerType.AssistanceRequest, id, documentId, HttpContext.RequestAborted);
+        return status switch
+        {
+            StaffDocumentContextStatus.Available => null,
+            StaffDocumentContextStatus.Archived => new ObjectResult("This document has been archived and is no longer available for review.") { StatusCode = 410 },
+            _ => NotFound("The document or its related request could not be found in this review context.")
+        };
     }
 
     private async Task<ApplicationUser> GetStaffUserAsync() =>

@@ -6,7 +6,7 @@
     ViewData["Title"] = "Review Request";
 }
 
-<section class="section">
+<section class="section staff-request-review">
     <div class="shell">
         @if (Model.Request is null)
         {
@@ -130,10 +130,31 @@
                         }
                         else
                         {
-                            <div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Uploaded UTC</th><th></th></tr></thead><tbody>
+                            <div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Uploaded UTC</th><th>Verification</th><th>Actions</th></tr></thead><tbody>
                             @foreach (DocumentSummary document in Model.Documents)
                             {
-                                <tr><td>@document.OriginalFileName</td><td>@document.DocumentType</td><td>@document.UploadedUtc.ToString("u")</td><td><a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@document.Id">Download</a></td></tr>
+                                <tr id="document-@document.Id.ToString("N")" class="@(Model.SelectedDocumentId == document.Id ? "selected-document" : "")" tabindex="-1">
+                                    <td>@document.OriginalFileName</td><td>@document.DocumentType</td><td>@document.UploadedUtc.ToString("u")</td>
+                                    <td>@document.VerificationStatus@if (!string.IsNullOrWhiteSpace(document.VerificationNotes)) { <small class="muted">@document.VerificationNotes</small> }</td>
+                                    <td><a asp-page-handler="Download" asp-route-id="@Model.Request.Id" asp-route-documentId="@document.Id">Download</a>
+                                        <div class="action-row">
+                                            <form method="post" asp-page-handler="VerifyDocument">
+                                                <input type="hidden" name="id" value="@Model.Request.Id" /><input type="hidden" name="documentId" value="@document.Id" />
+                                                <input type="text" name="notes" maxlength="1000" placeholder="Optional verification note" aria-label="Verification note for @document.OriginalFileName" />
+                                                <button class="button button-small" type="submit">Verify</button>
+                                            </form>
+                                            <form method="post" asp-page-handler="RejectDocument">
+                                                <input type="hidden" name="id" value="@Model.Request.Id" /><input type="hidden" name="documentId" value="@document.Id" />
+                                                <input type="text" name="reason" maxlength="1000" placeholder="Rejection reason" aria-label="Rejection reason for @document.OriginalFileName" required />
+                                                <button class="button button-small button-secondary" type="submit">Reject</button>
+                                            </form>
+                                            <form method="post" asp-page-handler="ArchiveDocument">
+                                                <input type="hidden" name="id" value="@Model.Request.Id" /><input type="hidden" name="documentId" value="@document.Id" />
+                                                <button class="button button-small button-secondary" type="submit">Archive</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
                             }
                             </tbody></table></div>
                         }

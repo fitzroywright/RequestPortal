@@ -1,3 +1,4 @@
+using RequestPortal.Application.Administration;
 using System.Net;
 using System.Reflection;
 using System.Security.Claims;
@@ -94,6 +95,7 @@ public sealed class QuickIntakeReviewPageTests
                 services.AddSingleton(ReadProxy.For<IPortalWorkflowService>(_ => Task.FromResult<RequestDetail?>(requestExists ? request : null)));
                 services.AddSingleton(ReadProxy.For<IProjectProposalService>(_ => Task.FromResult<ProjectProposalDetail?>(null)));
                 services.AddSingleton(ReadProxy.For<IProjectPlanningService>(_ => throw new InvalidOperationException("No project proposal in this fixture.")));
+                services.AddSingleton(ReadProxy.For<IStaffDocumentContextService>(_ => Task.FromResult(StaffDocumentContextStatus.Available)));
                 services.AddSingleton(ReadProxy.For<IDocumentService>(_ => Task.FromResult<IReadOnlyList<DocumentSummary>>([])));
                 services.AddSingleton(ReadProxy.For<IDeliveryService>(_ => Task.FromResult<IReadOnlyList<DeliveryView>>([])));
                 services.AddSingleton(ReadProxy.For<IRequestReferenceDataService>(_ => Task.FromResult<IReadOnlyList<UnitOfMeasureOption>>([])));
@@ -232,7 +234,7 @@ public sealed class QuickIntakeReviewPageTests
         Assert.DoesNotContain("quick-intake-heading", html); Assert.DoesNotContain(Intake.Telephone, html);
         Assert.DoesNotContain(Intake.VictimCircumstances!, html); Assert.Equal(0, fixture.IntakeReads);
         // Exercise the handler guard before user lookup, validation, or any conversion write.
-        var page = new ReviewModel(null!, null!, null!, null!, null!, null!, null!, null!)
+        var page = new ReviewModel(null!, null!, null!, null!, null!, null!, null!, null!, null!)
         {
             PageContext = new() { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = new(new ClaimsIdentity([
                 new(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue),

@@ -32,7 +32,7 @@
                     <tbody>
                     @foreach (StaffOrganizationSummary organization in Model.Organizations)
                     {
-                        <tr class="staff-select-row" data-row-href="/Staff/Organization/@organization.Id" role="link" tabindex="0">
+                        <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Organization", new { id = organization.Id })" role="link" tabindex="0">
                             <td><strong>@organization.Name</strong></td>
                             <td>@organization.CountryCode</td>
                             <td><span class="status status-@organization.Status">@organization.Status</span></td>
@@ -79,7 +79,7 @@
                     <tbody>
                     @foreach (RequestPortal.Application.Administration.OrganizationReverificationWorkItem item in Model.ReverificationOrganizations)
                     {
-                        <tr class="staff-select-row" data-row-href="/Staff/Organization/@item.OrganizationId" role="link" tabindex="0">
+                        <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Organization", new { id = item.OrganizationId })" role="link" tabindex="0">
                             <td>@item.OrganizationName</td>
                             <td>@item.CountryCode</td>
                             <td>@item.Status</td>
@@ -99,7 +99,7 @@
     <div class="shell">
         <div class="section-heading">
             <h2>Documents awaiting verification</h2>
-            <p>Organization documents that still need staff verification.</p>
+            <p>Organization and request documents that still need staff verification.</p>
         </div>
         @if (Model.DocumentsAwaitingVerification.Count == 0)
         {
@@ -111,7 +111,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Organization</th>
+                            <th>Organization / Applicant</th>
                             <th>Type</th>
                             <th>File</th>
                             <th>Age</th>
@@ -121,12 +121,16 @@
                     <tbody>
                     @foreach (RequestPortal.Application.Administration.DocumentWorkItem item in Model.DocumentsAwaitingVerification)
                     {
-                        <tr class="staff-select-row" data-row-href="/Staff/Organization/@item.OrganizationId" role="link" tabindex="0">
-                            <td>@item.OrganizationName</td>
+                        var destination = item.HasValidContext
+                            ? Url.Page(item.RequestId.HasValue ? "/Staff/Review" : "/Staff/Organization", null,
+                                new { id = item.RequestId ?? item.OrganizationId, selectedDocumentId = item.DocumentId }, null, null, $"document-{item.DocumentId:N}")
+                            : null;
+                        <tr class="@(destination is null ? "" : "staff-select-row")" data-row-href="@destination" role="@(destination is null ? null : "link")" tabindex="@(destination is null ? null : "0")">
+                            <td>@(item.ApplicantName ?? item.OrganizationName)</td>
                             <td>@item.DocumentType</td>
                             <td>@item.OriginalFileName</td>
                             <td>@item.AgeDays day(s)</td>
-                            <td><a asp-page="/Staff/Organization" asp-route-id="@item.OrganizationId">Open organization</a></td>
+                            <td>@if (destination is not null) { <a href="@destination">Review Document</a> } else { <span class="muted">Document context unavailable. Contact an administrator.</span> }</td>
                         </tr>
                     }
                     </tbody>

@@ -16,8 +16,9 @@
             </div>
             <div class="workspace-toolbar">
                 <form method="get" class="operational-toolbar">
-                    <input name="requestCode" maxlength="40" placeholder="Request code" aria-label="Request code" />
-                    <button class="button button-small" type="submit">Find request</button>
+                    <input name="Search" value="@Model.Search" maxlength="200" placeholder="Search by applicant name or request reference..." aria-label="Search by applicant name or request reference" />
+                    <button class="button button-small" type="submit">Search</button>
+                    @if (Model.SearchResults is not null) { <a asp-page="/Staff/Index">Clear Search</a> }
                 </form>
                 <a class="button button-secondary" asp-page="/Staff/Organizations">Organizations</a>
                 <a class="button button-secondary" asp-page="/Staff/Reports">Reports</a>
@@ -25,6 +26,12 @@
             </div>
         </header>
 
+        @if (Model.SearchResults is not null)
+        {
+            <partial name="_RequestSearchResults" model="Model" />
+        }
+        else
+        {
         <div class="portal-workspace-grid">
             <aside class="workspace-panel status-panel">
                 <div class="panel-titlebar">
@@ -114,21 +121,24 @@
                             @foreach (RequestSummary request in Model.SubmittedRequests.OrderByDescending(item => item.CreatedUtc).Take(12))
                             {
                                 var ageDays = Math.Max(0, (DateTimeOffset.UtcNow - request.CreatedUtc).Days);
-                                <tr class="staff-select-row" data-row-href="/Staff/Review/@request.Id" role="link" tabindex="0">
+                                <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Review", new { id = request.Id })" role="link" tabindex="0">
                                     <td>
                                         <a asp-page="/Staff/Review" asp-route-id="@request.Id">
                                             <strong>@request.PublicReference</strong>
                                         </a>
                                     </td>
                                     <td>
-                                        @if (Model.UnverifiedQuickIntakeApplicants.TryGetValue(request.Id, out string? applicantName))
+                                        @if (Model.Applicants.TryGetValue(request.Id, out var applicant))
                                         {
-                                            <strong>@applicantName</strong>
+                                            <strong>@applicant.ApplicantName</strong>
+                                            @if (applicant.IsUnverifiedQuickIntake)
+                                            {
                                             <span class="muted" style="display:block;font-size:.8rem">Unverified User · Anonymous Quick Intake</span>
+                                            }
                                         }
                                         else
                                         {
-                                            <span class="muted">Registered requester</span>
+                                            <span class="muted">Name not provided</span>
                                         }
                                     </td>
                                     <td>@request.OrganizationName</td>
@@ -172,7 +182,7 @@
                     {
                         @foreach (OrganizationSummary organization in Model.PendingOrganizations.Take(8))
                         {
-                            <div class="organization-row staff-organization-row staff-select-row" data-row-href="/Staff/Organization/@organization.Id" role="link" tabindex="0">
+                            <div class="organization-row staff-organization-row staff-select-row" data-row-href="@Url.Page("/Staff/Organization", new { id = organization.Id })" role="link" tabindex="0">
                                 <a asp-page="/Staff/Organization" asp-route-id="@organization.Id">
                                     <strong>@organization.Name</strong>
                                     <span>@organization.CountryCode</span>
@@ -208,10 +218,13 @@
                 </div>
             </aside>
         </div>
+        }
     </div>
 </section>
 
 
+@if (Model.SearchResults is null)
+{
 <section class="section section-muted">
     <div class="shell">
         <div class="section-heading">
@@ -238,7 +251,7 @@
                     <tbody>
                     @foreach (RequestWorkItem item in Model.Operations.ActionRequiredRequests)
                     {
-                        <tr class="staff-select-row" data-row-href="/Staff/Review/@item.RequestId" role="link" tabindex="0">
+                        <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Review", new { id = item.RequestId })" role="link" tabindex="0">
                             <td><strong>@item.PublicReference</strong></td>
                             <td>@item.OrganizationName</td>
                             <td>@item.Status</td>
@@ -253,6 +266,7 @@
     </div>
 </section>
 
+}
 
 <style>
 .staff-age-column{width:96px;min-width:96px;white-space:nowrap}
