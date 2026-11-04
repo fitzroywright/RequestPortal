@@ -33,3 +33,12 @@ Map selection opens the existing `/Management/Requests?parish=...` listing. The 
 Map and chart scripts load on approach to the viewport; shared script promises avoid duplicate loads. Geographic fetches time out, static versioned assets have immutable caching, resize preserves the full country fit, and page unload disposes the map, charts, observers and pending geographic requests. BFCache navigation keeps a live page intact.
 
 Delivery summary counts use one aggregate SQL query instead of five. Existing location-storage reads are bounded to eight concurrent operations; they do not geocode remotely. All other existing metric calculations are preserved.
+
+
+## Focused validation
+
+`ManagementDashboardTests` reconciles persisted PostgreSQL request, status, parish, delivery and trend scopes, canonical aliases, unknown values and the pinned geographic dataset. Use a disposable test PostgreSQL connection via `REQUESTPORTAL_POSTGRES`; never point tests at production.
+
+`ManagementDashboardPageTests` renders the real Razor pages against synthetic services and checks backend authorization, aggregate-only payloads, preserved sections, links, zero delivery data and long names. It needs no database. Set `REQUESTPORTAL_DASHBOARD_RENDER_OUTPUT` to a temporary directory when running this class to export its full, zero-delivery and long-name pages.
+
+Run `node scripts/tests/test_management_dashboard.cjs` with that same output variable and Playwright 1.64.1 available (`PLAYWRIGHT_MODULE` may identify an existing installation). `CHROME_EXECUTABLE_PATH` optionally selects an installed Chrome executable; otherwise Playwright's Chromium is used. The script runs 21 responsive/data/console scenarios and tests keyboard/parish filtering, pan/zoom/reset and asset failure recovery. All automated interactions use test-only tiles and make no external tile requests. The browser fixtures stub the unrelated notification transport. `DASHBOARD_BROWSER_OUTPUT` optionally redirects screenshots. Visual inspection of an initial real-tile viewport is separate from the offline regression matrix.

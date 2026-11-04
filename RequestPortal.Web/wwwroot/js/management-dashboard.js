@@ -108,7 +108,14 @@
                 const occupied = [];
                 boundaries.eachLayer(layer => {
                     const name = layer.feature.properties.name;
-                    const center = layer.getCenter();
+                    // Place labels on the main land polygon, rather than the first offshore cay in a MultiPolygon.
+                    const geometry = layer.feature.geometry;
+                    let center = layer.getCenter();
+                    if (geometry.type === 'MultiPolygon') {
+                        const area = ring => Math.abs(ring.slice(1).reduce((sum, point, i) => sum + ring[i][0] * point[1] - point[0] * ring[i][1], 0));
+                        const main = geometry.coordinates.map(polygon => polygon[0]).reduce((largest, ring) => area(ring) > area(largest) ? ring : largest);
+                        center = L.latLngBounds(main.map(([longitude, latitude]) => [latitude, longitude])).getCenter();
+                    }
                     const point = map.latLngToContainerPoint(center);
                     const bounds = layer.getBounds();
                     const east = map.latLngToContainerPoint(bounds.getNorthEast());

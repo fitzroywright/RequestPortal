@@ -77,3 +77,4 @@
 
 .mg-map .mg-parish-label{min-width:0;padding:0;background:transparent;border:0;box-shadow:none;font-size:9px;font-weight:700;white-space:nowrap;color:#274a59;text-shadow:1px 0 #fff,-1px 0 #fff,0 1px #fff,0 -1px #fff}
 .mg-map .mg-parish-label:before{display:none}
+.mg-dimension-row>span:first-child{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
