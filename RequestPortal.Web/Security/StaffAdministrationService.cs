@@ -83,17 +83,18 @@ public sealed class StaffAdministrationService(RequestPortalAccounts accounts, R
         RequireStaff(target);
         await db.Database.OpenConnectionAsync();
         await using var cmd = db.Database.GetDbConnection().CreateCommand();
+        // Explicit, non-keyword alias also supports PostgreSQL 13's stricter alias grammar.
         cmd.CommandText = """
             SELECT coalesce(nullif(u."DisplayName",''),nullif(u."DirectoryUserName",''),nullif(u."UserName",''),events.actor_id),
-                events.action,events.time,events.previous_roles::text,events.new_roles::text,events.detail
+                events.action,events.audit_time,events.previous_roles::text,events.new_roles::text,events.detail
             FROM (
-                SELECT actor_id,action,occurred_at::text time,previous_roles,new_roles,detail FROM requestportal_staff_admin_events WHERE subject_id=@id
+                SELECT actor_id,action,occurred_at::text AS audit_time,previous_roles,new_roles,detail FROM requestportal_staff_admin_events WHERE subject_id=@id
                 UNION ALL
                 SELECT actor_id,action,occurred_at,NULL::jsonb,NULL::jsonb,NULL::text FROM common_security_account_events old
                 WHERE old.application_id='RequestPortal.Staff' AND old.account_id=@id
                   AND NOT EXISTS(SELECT 1 FROM requestportal_staff_admin_events current WHERE current.id::text=old.event_id)
             ) events LEFT JOIN "AspNetUsers" u ON u."Id"::text=events.actor_id
-            ORDER BY events.time::timestamptz DESC LIMIT 200
+            ORDER BY events.audit_time::timestamptz DESC LIMIT 200
             """;
         Add(cmd, "id", target);
         var result = new List<StaffAudit>();
