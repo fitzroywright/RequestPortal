@@ -42,6 +42,41 @@ public sealed class IntegrationMonitoringTests
     private static IntegrationStatusService Monitor(PostgreSqlTestDatabase database, Bridge bridge, bool authorized = true)
         => new(database.Db, Clock, Submit(database, bridge), Options.Create(OptionsValue), new BusinessAuditWriter(database.Db, Clock), bridge, new Authorization(authorized));
 
+    [Theory]
+    [InlineData(0, 10)]
+    [InlineData(12, 12)]
+    public async Task ExistingFailuresShowRecordedAttemptsWithoutResubmitting(int linkAttempts, int expected)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid request = await Intake(database);
+        var link = await database.Db.IntegrationLinks.SingleAsync(token);
+        for (int i = 0; i < linkAttempts; i++) link.BeginAttempt(DateTimeOffset.UtcNow);
+        link.MarkFailed(DateTimeOffset.UtcNow, "PROTECTED historical provider payload");
+        var submission = new OutboxMessage {
+            Id = Guid.NewGuid(), RequestId = request,
+            MessageType = typeof(FfpManagerSubmissionRequestedMessage).FullName!,
+            Payload = "{}", OccurredUtc = DateTimeOffset.UtcNow, AttemptCount = 10 };
+        database.Db.OutboxMessages.Add(submission);
+        var notification = await database.Db.OutboxMessages.SingleAsync(item =>
+            item.RequestId == request && item.MessageType.EndsWith("RequestSubmittedMessage"), token);
+        notification.AttemptCount = 99;
+        await database.Db.SaveChangesAsync(token);
+        database.Db.ChangeTracker.Clear();
+        var bridge = new Bridge();
+        var monitor = Monitor(database, bridge);
+        var page = await monitor.SearchAsync(new(Status: "Failed"), cancellationToken: token);
+        var displayed = Assert.Single(page.Items);
+        Assert.Equal(expected, displayed.AttemptCount);
+        Assert.Equal(expected, (await monitor.GetRequestAsync(request, token))!.Transfer.AttemptCount);
+        Assert.Equal("LEGACY_FAILURE", displayed.ErrorCode);
+        Assert.DoesNotContain("PROTECTED", displayed.Explanation!);
+        Assert.NotNull(displayed.LastAttemptUtc);
+        Assert.Equal(0, bridge.Inserts);
+        Assert.Empty(await database.Db.IntegrationAttempts.ToListAsync(token));
+        Assert.Equal(10, (await database.Db.OutboxMessages.SingleAsync(item => item.Id == submission.Id, token)).AttemptCount);
+    }
+
     [Fact]
     public async Task SubmissionAndTrackingAreAtomic_AndSuccessfulTransferIsVerifiedAndIdempotent()
     {

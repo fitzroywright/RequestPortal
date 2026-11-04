@@ -43,7 +43,12 @@ public sealed partial class IntegrationStatusService
                    Stage = link == null || missingQueue ? "Queue" : stalePending || staleRetry ? "Worker" : link.FailureStage,
                    Classification = link == null || missingQueue || stalePending || staleRetry || unverified ? "Reconciliation" : link.FailureClassification,
                    TargetServer = link == null ? null : link.TargetServer, TargetDatabase = link == null ? null : link.TargetDatabase,
-                   AttemptCount = link == null ? 0 : link.AttemptCount, LastAttemptUtc = link == null ? null : link.LastAttemptUtc,
+                   // Legacy failures predate link-level counters; retain the existing submission outbox evidence.
+                   AttemptCount = Math.Max(link == null ? 0 : link.AttemptCount,
+                       dbContext.OutboxMessages.Where(message => message.RequestId == request.Id &&
+                           message.MessageType.EndsWith("FfpManagerSubmissionRequestedMessage"))
+                           .Select(message => (int?)message.AttemptCount).Max() ?? 0),
+                   LastAttemptUtc = link == null ? null : link.LastAttemptUtc,
                    NextRetryUtc = link == null ? null : link.NextRetryUtc, SynchronizedUtc = link == null ? null : link.SynchronizedUtc,
                    VerifiedUtc = link == null ? null : link.VerifiedUtc, ApplicationId = link == null ? null : link.ExternalReference,
                    ApplicationNumber = link == null ? null : link.ApplicationNumber, HasQueuedSubmission = queued
