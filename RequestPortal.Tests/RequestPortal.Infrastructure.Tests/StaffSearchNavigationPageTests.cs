@@ -41,6 +41,7 @@ public sealed class StaffSearchNavigationPageTests
         public int Reads, Writes, Downloads;
         public bool Archived;
         public StaffRequestSearchRow Row => new() { RequestId = RequestId, PublicReference = "REQ-FIXTURE", ApplicantName = "John Brown", OrganizationName = "Fixture organization", Category = "Food", ReceivedUtc = DateTimeOffset.UtcNow, Status = RequestStatus.Submitted };
+        public IReadOnlyList<StaffRequestSearchRow> QueueRows => Enumerable.Range(0,46).Select(i=>new StaffRequestSearchRow { RequestId=i==0?RequestId:Guid.Parse($"33333333-3333-4333-8333-{i:D12}"),PublicReference=i==0?"REQ-FIXTURE":$"REQ-QUEUE-{i:D3}",ApplicantName="John Brown",OrganizationName="Fixture organization",Summary="Queue summary",ReceivedUtc=DateTimeOffset.UtcNow.AddDays(-i),CreatedUtc=DateTimeOffset.UtcNow.AddDays(-i),Status=RequestStatus.Submitted }).ToArray();
         public DocumentSummary Document(Guid id) => new(id, DocumentType.RequestSupport, "evidence.pdf", "application/pdf", 12, DateTimeOffset.UtcNow, DocumentVerificationStatus.Pending, DocumentRetentionClass.RequestEvidence, null, false, null);
         public StaffOperationsSnapshot Snapshot => new([], [new(Organization, "Fixture organization", "JM", DateOnly.FromDateTime(DateTime.UtcNow), "Approved", 0)], [], [],
             [new(OrgDocument, Organization, "Fixture organization", DocumentType.OrganizationRegistrationCertificate, "registration.pdf", DateTimeOffset.UtcNow, 1),
@@ -92,9 +93,16 @@ public sealed class StaffSearchNavigationPageTests
         {
             data.Reads++;
             if (method == "GetApplicantsAsync") return Task.FromResult<IReadOnlyDictionary<Guid, StaffRequestSearchRow>>(new Dictionary<Guid, StaffRequestSearchRow> { [RequestId] = data.Row });
+            if (method == "GetSubmittedQueueAsync")
+            {
+                int pageSize=(int)args[1]!;pageSize=pageSize is 25 or 50 or 100?pageSize:25;
+                int page=Math.Clamp((int)args[0]!,1,(int)Math.Ceiling(46d/pageSize));
+                return Task.FromResult(new StaffRequestSearchResult(data.QueueRows.Skip((page-1)*pageSize).Take(pageSize).ToArray(),46,page,pageSize,null));
+            }
             string search = (string)args[0]!;
+            int size = args.Length == 4 ? (int)args[2]! : 25;
             return Task.FromResult(search.Equals("REQ-FIXTURE", StringComparison.OrdinalIgnoreCase) ? new StaffRequestSearchResult([], 1, 1, 25, RequestId)
-                : search == "none" ? new([], 0, 1, 25, null) : new([data.Row], 26, (int)args[1]!, 25, null));
+                : search == "none" ? new([], 0, 1, 25, null) : new([data.Row], 101, (int)args[1]!, size, null));
         }));
         builder.Services.AddSingleton(Proxy.For<IPortalWorkflowService>((method, args) =>
         {
@@ -102,7 +110,7 @@ public sealed class StaffSearchNavigationPageTests
             return method switch
             {
                 "GetRequestAsync" => Task.FromResult<RequestDetail?>((Guid)args[1]! == RequestId ? new(RequestId, "REQ-FIXTURE", Organization, "Fixture organization", "Submitted", "Fixture summary", [], []) : null),
-                "GetSubmittedRequestsAsync" => Task.FromResult<IReadOnlyList<RequestSummary>>([new(RequestId, "REQ-FIXTURE", Organization, "Fixture organization", "Submitted", "Fixture summary", DateTimeOffset.UtcNow, null)]),
+                "GetSubmittedRequestsAsync" => throw new InvalidOperationException("The staff page must not load the unlimited submitted request list."),
                 "GetPendingOrganizationsAsync" => Task.FromResult<IReadOnlyList<OrganizationSummary>>([new(Organization, "Fixture organization", "JM", "PendingApproval", "Approved", "Administrator")]),
                 _ => throw new NotSupportedException(method)
             };
@@ -154,15 +162,40 @@ public sealed class StaffSearchNavigationPageTests
         await using var f = await Setup(actor);
         using var queue = await f.Get("/Staff"); Assert.Equal(HttpStatusCode.OK, queue.StatusCode);
         string html = await queue.Content.ReadAsStringAsync(TestContext.Current.CancellationToken); Snapshot("queue", html);
+        Assert.Contains("Showing 1", html); Assert.Contains("25 of 46 requests", html); Assert.Contains("Page 1 of 2", html); Assert.DoesNotContain("View queue", html); Assert.DoesNotContain("View all submitted requests", html);
         Assert.Contains("John Brown", html); Assert.DoesNotContain("Registered requester", html); Assert.Contains("Search by applicant name or request reference...", html);
         var orgLink = Regex.Match(html, "data-row-href=\"([^\"]*Staff/Organization[^\"]*)\""); Assert.Contains("?id=" + Organization, Href(orgLink, "data-row-href"));
         using var result = await f.Get("/Staff?Search=John&PageNumber=1"); Assert.Equal(HttpStatusCode.OK, result.StatusCode);
         html = await result.Content.ReadAsStringAsync(TestContext.Current.CancellationToken); Snapshot("search", html);
         Assert.Contains("John Brown", html); Assert.Contains("Clear Search", html); Assert.Contains("PageNumber=2", html); Assert.Contains("Search=John", html); Assert.Contains("/Staff/Review/" + RequestId, html);
         Assert.DoesNotContain("Requests Awaiting Review", html);
+        Assert.Contains("Showing 1", html); Assert.Contains("of 101 requests", html);
+        using var sized = await f.Get("/Staff?Search=John&PageSize=50&PageNumber=2");
+        string sizedHtml = await sized.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("Showing 51", sizedHtml); Assert.Contains("100 of 101 requests", sizedHtml); Assert.Contains("Page 2 of 3", sizedHtml);
+        Assert.Contains("PageSize=50", sizedHtml); Assert.Contains("Search=John", sizedHtml);
+        using var search50=await f.Get("/Staff?Search=John&PageSize=50");Snapshot("search-50",await search50.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
         using var none = await f.Get("/Staff?Search=none"); Assert.Contains("No requests match", await none.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         foreach (string query in new[] { "Search=req-fixture", "requestCode=REQ-FIXTURE" })
         { using var exact = await f.Get("/Staff?" + query); Assert.Equal(HttpStatusCode.Redirect, exact.StatusCode); Assert.Equal("/Staff/Review/" + RequestId, exact.Headers.Location!.OriginalString); }
+    }
+
+    [Fact]
+    public async Task QueueRendersEveryRowAcrossPagesAndRetainsPageSize()
+    {
+        await using var f=await Setup();
+        foreach(var sample in new[]{(Query:"",Rows:25,Range:"25 of 46 requests",Page:"Page 1 of 2"),(Query:"?PageNumber=2&PageSize=25",Rows:21,Range:"46 of 46 requests",Page:"Page 2 of 2"),(Query:"?PageSize=50",Rows:46,Range:"46 of 46 requests",Page:"Page 1 of 1"),(Query:"?PageSize=100",Rows:46,Range:"46 of 46 requests",Page:"Page 1 of 1")})
+        {
+            using var response=await f.Get("/Staff"+sample.Query);Assert.Equal(HttpStatusCode.OK,response.StatusCode);
+            string html=await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            var panel=Regex.Match(html,"<main class=\"workspace-panel request-panel\">(.*?)</main>",RegexOptions.Singleline).Value;
+            Assert.Equal(sample.Rows,Regex.Matches(panel,"<tr class=\"staff-select-row\"").Count);
+            Assert.Contains(sample.Range,panel);Assert.Contains(sample.Page,panel);Assert.Contains("Requests per page",panel);
+            Snapshot(sample.Query.Contains("PageNumber=2")?"queue-page-2":sample.Query.Contains("50")?"queue-size-50":sample.Query.Contains("100")?"queue-size-100":"queue",html);
+            foreach(Match row in Regex.Matches(panel,"<tr class=\"staff-select-row\".*?</tr>",RegexOptions.Singleline))
+                Assert.Contains("href=\""+Href(row,"data-row-href")+"\"",row.Value);
+        }
     }
 
     [Theory][InlineData("Administrator")][InlineData("Reviewer")]

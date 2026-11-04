@@ -16,6 +16,7 @@
             </div>
             <div class="workspace-toolbar">
                 <form method="get" class="operational-toolbar">
+                    <input type="hidden" name="PageSize" value="@Model.PageSize" />
                     <input name="Search" value="@Model.Search" maxlength="200" placeholder="Search by applicant name or request reference..." aria-label="Search by applicant name or request reference" />
                     <button class="button button-small" type="submit">Search</button>
                     @if (Model.SearchResults is not null) { <a asp-page="/Staff/Index">Clear Search</a> }
@@ -44,7 +45,7 @@
                 <div class="status-list" role="list">
                     <a class="status-row" asp-page="/Staff/Index">
                         <span>Requests awaiting review</span>
-                        <strong>@Model.Operations.OpenReviewRequests.Count</strong>
+                        <strong>@Model.Queue.TotalCount</strong>
                     </a>
                     <a class="status-row" asp-page="/Staff/Index">
                         <span>More information</span>
@@ -91,9 +92,8 @@
                 <div class="panel-titlebar">
                     <div>
                         <strong>Requests Awaiting Review</strong>
-                        <small>@Model.SubmittedRequests.Count submitted requests in the current queue</small>
+                        <small>@Model.Queue.TotalCount submitted requests in the current queue</small>
                     </div>
-                    <a asp-page="/Staff/Index">View queue</a>
                 </div>
 
                 @if (Model.SubmittedRequests.Count == 0)
@@ -114,38 +114,31 @@
                                     <th>Organization</th>
                                     <th>Summary</th>
                                     <th class="staff-age-column">Age</th>
-                                    <th></th>
+                                    <th>Review</th>
                                 </tr>
                             </thead>
                             <tbody>
-                            @foreach (RequestSummary request in Model.SubmittedRequests.OrderByDescending(item => item.CreatedUtc).Take(12))
+                            @foreach (StaffRequestSearchRow request in Model.SubmittedRequests)
                             {
                                 var ageDays = Math.Max(0, (DateTimeOffset.UtcNow - request.CreatedUtc).Days);
-                                <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Review", new { id = request.Id })" role="link" tabindex="0">
+                                <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Review", new { id = request.RequestId })" role="link" tabindex="0">
                                     <td>
-                                        <a asp-page="/Staff/Review" asp-route-id="@request.Id">
+                                        <a asp-page="/Staff/Review" asp-route-id="@request.RequestId">
                                             <strong>@request.PublicReference</strong>
                                         </a>
                                     </td>
                                     <td>
-                                        @if (Model.Applicants.TryGetValue(request.Id, out var applicant))
+                                        <strong>@request.ApplicantName</strong>
+                                        @if (request.IsUnverifiedQuickIntake)
                                         {
-                                            <strong>@applicant.ApplicantName</strong>
-                                            @if (applicant.IsUnverifiedQuickIntake)
-                                            {
                                             <span class="muted" style="display:block;font-size:.8rem">Unverified User · Anonymous Quick Intake</span>
-                                            }
-                                        }
-                                        else
-                                        {
-                                            <span class="muted">Name not provided</span>
                                         }
                                     </td>
                                     <td>@request.OrganizationName</td>
                                     <td>@request.Summary</td>
                                     <td class="staff-age-column">@ageDays d</td>
                                     <td>
-                                        <a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.Id">Review</a>
+                                        <a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.RequestId">Review</a>
                                     </td>
                                 </tr>
                             }
@@ -153,13 +146,8 @@
                         </table>
                     </div>
 
-                    @if (Model.SubmittedRequests.Count > 12)
-                    {
-                        <div class="workspace-panel-footer">
-                            <a asp-page="/Staff/Index"><strong>View all submitted requests →</strong></a>
-                        </div>
-                    }
                 }
+                <partial name="_RequestPagination" model="Model" />
             </main>
 
             <aside class="workspace-panel context-panel">
@@ -269,5 +257,6 @@
 }
 
 <style>
+.staff-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px}.staff-pagination form{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.staff-pagination nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.staff-pagination select{padding:6px}.staff-pagination [aria-disabled="true"]{color:#637083}
 .staff-age-column{width:96px;min-width:96px;white-space:nowrap}
 </style>

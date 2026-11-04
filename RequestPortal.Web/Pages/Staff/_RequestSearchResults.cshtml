@@ -22,10 +22,7 @@
             }
             </tbody>
         </table></div>
-        <nav class="action-row" aria-label="Search results pages">
-            @if (results.PageNumber > 1) { <a class="button button-secondary" asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageNumber="@(results.PageNumber - 1)">Previous</a> }
-            <span>Page @results.PageNumber of @results.TotalPages</span>
-            @if (results.PageNumber < results.TotalPages) { <a class="button button-secondary" asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageNumber="@(results.PageNumber + 1)">Next</a> }
-        </nav>
+
     }
+    <partial name="_RequestPagination" model="Model" />
 </section>

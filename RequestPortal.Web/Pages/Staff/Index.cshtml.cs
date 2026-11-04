@@ -32,14 +32,15 @@ public sealed class IndexModel : PageModel
 
     public IReadOnlyList<OrganizationSummary> PendingOrganizations { get; private set; } = Array.Empty<OrganizationSummary>();
 
-    public IReadOnlyList<RequestSummary> SubmittedRequests { get; private set; } = Array.Empty<RequestSummary>();
-
-    public IReadOnlyDictionary<Guid, StaffRequestSearchRow> Applicants { get; private set; } = new Dictionary<Guid, StaffRequestSearchRow>();
+    public StaffRequestSearchResult Queue { get; private set; } = new([], 0, 1, 25, null);
+    public IReadOnlyList<StaffRequestSearchRow> SubmittedRequests => Queue.Items;
 
     [BindProperty(SupportsGet = true)]
     public string? Search { get; set; }
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
+    [BindProperty(SupportsGet = true)]
+    public int PageSize { get; set; } = 25;
     public StaffRequestSearchResult? SearchResults { get; private set; }
 
     public StaffOperationsSnapshot Operations { get; private set; } = new(
@@ -54,7 +55,7 @@ public sealed class IndexModel : PageModel
     public int TotalAttentionItems =>
         Operations.PendingOrganizations.Count +
         Operations.ReverificationOrganizations.Count +
-        Operations.OpenReviewRequests.Count +
+        Queue.TotalCount +
         Operations.ActionRequiredRequests.Count +
         Operations.DocumentsAwaitingVerification.Count +
         Operations.DeadLetters.Count +
@@ -70,7 +71,8 @@ public sealed class IndexModel : PageModel
         Search = (Search ?? requestCode)?.Trim();
         if (!string.IsNullOrWhiteSpace(Search))
         {
-            SearchResults = await searchService.SearchAsync(Search, PageNumber, HttpContext.RequestAborted);
+            SearchResults = await searchService.SearchAsync(Search, PageNumber, PageSize, HttpContext.RequestAborted);
+            PageSize = SearchResults.PageSize;
             if (SearchResults.ExactReferenceId is Guid requestId)
                 return RedirectToPage("/Staff/Review", new { id = requestId });
             return Page();
@@ -78,9 +80,8 @@ public sealed class IndexModel : PageModel
 
         // These services share the scoped EF context; queries must be sequential.
         PendingOrganizations = await workflowService.GetPendingOrganizationsAsync(HttpContext.RequestAborted);
-        SubmittedRequests = await workflowService.GetSubmittedRequestsAsync(HttpContext.RequestAborted);
-        var submittedIds = SubmittedRequests.OrderByDescending(item => item.CreatedUtc).Take(12).Select(item => item.Id).ToArray();
-        Applicants = await searchService.GetApplicantsAsync(submittedIds, HttpContext.RequestAborted);
+        Queue = await searchService.GetSubmittedQueueAsync(PageNumber, PageSize, HttpContext.RequestAborted);
+        PageSize = Queue.PageSize;
         Operations = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
         return Page();
     }
