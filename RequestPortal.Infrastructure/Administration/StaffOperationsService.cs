@@ -87,7 +87,7 @@ public sealed class StaffOperationsService : IStaffOperationsService
                     ((document.OwnerType == DocumentOwnerType.Organization && document.OwnerId == document.OrganizationId) ||
                     (document.OwnerType == DocumentOwnerType.AssistanceRequest && request != null && request.OrganizationId == document.OrganizationId))
             }).Take(200).ToListAsync(cancellationToken);
-        List<DeadLetterWorkItem> deadLetters = await dbContext.OutboxMessages.AsNoTracking().Where(message => message.ProcessedUtc == null && message.AttemptCount >= MaxOutboxAttempts).OrderBy(message => message.OccurredUtc).Select(message => new DeadLetterWorkItem(message.Id, message.MessageType, message.OccurredUtc, message.AttemptCount, message.LastError)).Take(200).ToListAsync(cancellationToken);
+        List<DeadLetterWorkItem> deadLetters = await dbContext.OutboxMessages.AsNoTracking().Where(message => message.ProcessedUtc == null && (message.IsTerminal || message.AttemptCount >= MaxOutboxAttempts)).OrderBy(message => message.OccurredUtc).Select(message => new DeadLetterWorkItem(message.Id, message.MessageType, message.OccurredUtc, message.AttemptCount, message.LastError, message.RequestId)).Take(200).ToListAsync(cancellationToken);
         List<NotificationDeliveryWorkItem> failedDeliveries = await dbContext.NotificationHistory
             .AsNoTracking()
             .Where(item => item.Status == NotificationDeliveryStatus.Failed || item.Status == NotificationDeliveryStatus.DeadLettered)
@@ -116,17 +116,21 @@ public sealed class StaffOperationsService : IStaffOperationsService
     public async Task ReplayDeadLetterAsync(Guid staffUserId, Guid messageId, CancellationToken cancellationToken = default)
     {
         OutboxMessage message = await dbContext.OutboxMessages.SingleAsync(item => item.Id == messageId, cancellationToken);
+        if(message.MessageType.EndsWith("FfpManagerSubmissionRequestedMessage",StringComparison.Ordinal))
+            throw new InvalidOperationException("Use integration diagnostics to reconcile and safely retry this transfer.");
         if (message.ProcessedUtc.HasValue)
         {
             throw new InvalidOperationException("Processed messages cannot be replayed.");
         }
-        if (message.AttemptCount < MaxOutboxAttempts)
+        if (!message.IsTerminal && message.AttemptCount < MaxOutboxAttempts)
         {
             throw new InvalidOperationException("Only terminal dead-letter messages can be manually replayed.");
         }
 
         message.AttemptCount = 0;
         message.LastError = null;
+        message.NextAttemptUtc = null;
+        message.IsTerminal = false;
         await dbContext.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync(staffUserId, "OutboxDeadLetterReplayed", "OutboxMessage", message.Id, null, message.MessageType, cancellationToken);
     }

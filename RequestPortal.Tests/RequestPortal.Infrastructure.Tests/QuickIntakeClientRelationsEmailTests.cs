@@ -92,7 +92,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
         var result = await Create(database, token);
         var bridge = new BridgeClient { Fail = true };
         var integration = Integration(database, bridge);
-        await Assert.ThrowsAsync<IOException>(() => integration.SubmitRequestAsync(result.RequestId, token));
+        await Assert.ThrowsAsync<IntegrationTransferException>(() => integration.SubmitRequestAsync(result.RequestId, token));
         Assert.Null(JsonSerializer.Deserialize<QuickIntakeClientRelationsEmailRequestedMessage>((await Email(database, result.RequestId, token)).Payload)!.FfpManagerReference);
         bridge.Fail = false;
         await integration.SubmitRequestAsync(result.RequestId, token);
@@ -131,6 +131,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
         Assert.StartsWith("RETRY_AT=", email.LastError);
         Assert.Equal(result, await new QuickIntakeService(database.Db).CreateAsync(Submission, token, result.RequestId));
         email.LastError = $"RETRY_AT={DateTimeOffset.UtcNow.AddMinutes(-1):O}|Simulated durable queue failure";
+        email.NextAttemptUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
         await database.Db.SaveChangesAsync(token);
         sender.Fail = false;
         Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token));
@@ -250,8 +251,14 @@ public sealed class QuickIntakeClientRelationsEmailTests
     private sealed class BridgeClient : IExternalApplicationBridgeClient
     {
         public bool Fail { get; set; }
-        public Task<ExternalApplicationReference> SubmitApplicationAsync(ExternalApplicationSubmission submission, CancellationToken cancellationToken = default) =>
-            Fail ? throw new IOException("Simulated bridge outage") : Task.FromResult(new ExternalApplicationReference("123", "KGN/26/GR/0042", submission.SubmittedUtc));
+        private ExternalApplicationReceipt? receipt;
+        public Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default) => Task.FromResult(receipt);
+        public Task<ExternalApplicationReference> SubmitApplicationAsync(ExternalApplicationSubmission submission, CancellationToken cancellationToken = default)
+        {
+            if(Fail) throw new HttpRequestException("Simulated bridge outage");
+            receipt = new(submission.PortalRequestId,"123","KGN/26/GR/0042",submission.SubmittedUtc,"JMDB01","FFPJM");
+            return Task.FromResult(new ExternalApplicationReference("123", "KGN/26/GR/0042", submission.SubmittedUtc));
+        }
         public Task UploadArtifactAsync(string applicationId, ExternalArtifactDescriptor descriptor, Stream content, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ExternalApplicationStatus> GetStatusAsync(string applicationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task SendInformationResponseAsync(ExternalInformationResponse response, CancellationToken cancellationToken = default) => Task.CompletedTask;

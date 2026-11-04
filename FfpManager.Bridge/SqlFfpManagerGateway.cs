@@ -7,6 +7,27 @@ namespace FfpManager.Bridge;
 
 public sealed class SqlFfpManagerGateway : IFfpManagerGateway
 {
+    // This lookup never repairs references, inserts applications or changes destination data.
+    public async Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = new SqlCommand("""
+            SELECT TOP (2) ID, ReferenceNo, DateCreated, GCRecord FROM dbo.ApplicationLetters
+            WHERE ExternalRequestId=@RequestId ORDER BY ID
+            """, connection);
+        command.Parameters.Add("@RequestId", SqlDbType.UniqueIdentifier).Value = requestId;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        if (!reader.IsDBNull(3)) throw new IntegrationTransferException(TransferFailures.For("DestinationLookup", "DESTINATION_CONFLICT"));
+        if (reader.IsDBNull(1) || string.IsNullOrWhiteSpace(reader.GetString(1)))
+            throw new IntegrationTransferException(TransferFailures.For("DestinationLookup", "DESTINATION_CONFLICT"));
+        var receipt = new ExternalApplicationReceipt(requestId, reader.GetInt64(0).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            reader.GetString(1), reader.IsDBNull(2) ? DateTimeOffset.UnixEpoch : JamaicaBusinessTime.ToUtc(reader.GetDateTime(2)),
+            "JMDB01", FfpSqlConnection.DatabaseFor(options.SqlTarget));
+        if (await reader.ReadAsync(cancellationToken))
+            throw new IntegrationTransferException(TransferFailures.For("DestinationLookup", "DESTINATION_CONFLICT"));
+        return receipt;
+    }
     private readonly BridgeOptions options;
 
     public SqlFfpManagerGateway(IOptions<BridgeOptions> options)
@@ -27,9 +48,9 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         ExistingApplication? existing = await FindByPortalRequestIdAsync(connection, transaction, submission.PortalRequestId, cancellationToken);
         if (existing is not null)
         {
-            string existingReference = await FfpManagerReferenceNumberGenerator.EnsureExistingAsync(
-                connection, transaction, existing.Id, existing.ReferenceNo,
-                existing.DateCreated ?? submission.SubmittedUtc, submission, cancellationToken);
+            if (string.IsNullOrWhiteSpace(existing.ReferenceNo) || string.Equals(existing.ReferenceNo, submission.PublicReference, StringComparison.OrdinalIgnoreCase))
+                throw new IntegrationTransferException(TransferFailures.For("DestinationLookup", "DESTINATION_CONFLICT"));
+            string existingReference = existing.ReferenceNo;
             await transaction.CommitAsync(cancellationToken);
             return new ExternalApplicationReference(
                 existing.Id.ToString(),
@@ -533,9 +554,9 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT TOP (1) ID, Code, ReferenceNo, DateCreated
+            SELECT TOP (2) ID, Code, ReferenceNo, DateCreated, GCRecord
             FROM dbo.ApplicationLetters WITH (UPDLOCK, HOLDLOCK)
-            WHERE ExternalRequestId = @ExternalRequestId AND GCRecord IS NULL
+            WHERE ExternalRequestId = @ExternalRequestId
             ORDER BY ID;
             """;
         await using SqlCommand command = new(sql, connection, transaction);
@@ -545,11 +566,14 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         {
             return null;
         }
-        return new ExistingApplication(
+        if (!reader.IsDBNull(4)) throw new IntegrationTransferException(TransferFailures.For("DestinationLookup", "DESTINATION_CONFLICT"));
+        var existing = new ExistingApplication(
             reader.GetInt64(0),
             reader.IsDBNull(1) ? null : reader.GetString(1),
             reader.IsDBNull(2) ? null : reader.GetString(2),
             reader.IsDBNull(3) ? null : JamaicaBusinessTime.ToUtc(reader.GetDateTime(3)));
+        if (await reader.ReadAsync(cancellationToken)) throw new IntegrationTransferException(TransferFailures.For("DestinationLookup", "DESTINATION_CONFLICT"));
+        return existing;
     }
 
     private async Task<SqlConnection> OpenConnectionAsync(CancellationToken cancellationToken)

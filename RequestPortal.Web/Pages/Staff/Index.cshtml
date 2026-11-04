@@ -63,6 +63,7 @@
                         <span>Reverification</span>
                         <strong>@Model.Operations.ReverificationOrganizations.Count</strong>
                     </a>
+                    @await Component.InvokeAsync("IntegrationStatus")
                     <a class="status-row" asp-page="/Staff/Integrations">
                         <span>Dead letters</span>
                         <strong>@Model.Operations.DeadLetters.Count</strong>

@@ -58,6 +58,9 @@ public sealed class FfpManagerStatusReconciliationWorker : BackgroundService
         RequestPortalDbContext dbContext = scope.ServiceProvider.GetRequiredService<RequestPortalDbContext>();
         IExternalApplicationIntegrationService integrationService = scope.ServiceProvider.GetRequiredService<IExternalApplicationIntegrationService>();
         IIntegrationStatusService statusService = scope.ServiceProvider.GetRequiredService<IIntegrationStatusService>();
+        try { await statusService.ObserveReturnOutboxAsync(cancellationToken); }
+        catch (OperationCanceledException) when(cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception) { logger.LogError("Return-event health could not be persisted ({FailureType}).", exception.GetType().Name); }
 
         var links = await dbContext.IntegrationLinks
             .AsNoTracking()
@@ -102,10 +105,10 @@ public sealed class FfpManagerStatusReconciliationWorker : BackgroundService
             }
             catch (Exception exception)
             {
-                string failure = $"{exception.GetType().Name}: {exception.Message}";
+                var failure = IntegrationFailureClassifier.Classify(exception, "StatusRefresh");
                 try
                 {
-                    await statusService.MarkFailedAsync(link.Id, failure, cancellationToken);
+                    await statusService.RecordFailureAsync(link.Id, failure, cancellationToken);
                 }
                 catch (Exception persistenceException)
                 {

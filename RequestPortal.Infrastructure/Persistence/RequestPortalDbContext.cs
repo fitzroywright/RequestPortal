@@ -43,6 +43,7 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RequestFulfilment> Fulfilments => Set<RequestFulfilment>();
     public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
+    public DbSet<IntegrationAttempt> IntegrationAttempts => Set<IntegrationAttempt>();
     public DbSet<MessageThread> MessageThreads => Set<MessageThread>();
     public DbSet<PortalMessage> PortalMessages => Set<PortalMessage>();
     public DbSet<MessageRecipient> MessageRecipients => Set<MessageRecipient>();

@@ -5,24 +5,33 @@
 @{
     ViewData["Title"] = "Integrations";
 }
-<section class="section"><div class="shell">
+@section Styles { <link rel="stylesheet" href="~/css/integrations.css" asp-append-version="true" /> }
+<section class="section integration-monitor"><div class="shell">
+<header class="section-heading"><div class="eyebrow">Administration</div><h1>Integrations</h1><p>Request transfers to JMDB01 / FFPJM. Source records and diagnostic history are retained after recovery.</p></header>
+<partial name="_IntegrationTransfers" model="Model" />
+<section aria-labelledby="return-events-title" class="integration-subsection">
+<h2 id="return-events-title">Return-event outbox</h2><p class="muted">FFP Manager → Request Portal callbacks. These are separate from initial application submissions.</p>
+@if (Model.ReturnOutbox is { } callbacks) {
+<dl class="integration-summary"><div><dt>Pending</dt><dd>@callbacks.Pending</dd></div><div><dt>Failed</dt><dd>@callbacks.Failed</dd></div><div><dt>Locked</dt><dd>@callbacks.Locked</dd></div><div><dt>Oldest pending</dt><dd>@(callbacks.OldestPendingUtc?.ToString("u") ?? "None")</dd></div></dl>
+} else { <p role="status">@Model.ReturnOutboxError</p> }
+<details><summary>Recorded return-event health changes</summary>
+<p class="muted">Latest 100 state changes. History is retained after callbacks recover; unchanged states do not create repeated entries.</p>
+<ul>@foreach(var observation in Model.ReturnHistory) {
+<li>@observation.ObservedUtc.ToString("u") — @if(observation.Snapshot is { } prior) { <span>Pending @prior.Pending · Failed @prior.Failed · Locked @prior.Locked</span> } else { <span>@observation.ErrorCode</span> }</li>
+}</ul></details>
+</section>
+@if(Model.CanOperate) {
 <form method="post" asp-page-handler="TestSharePoint" class="operational-toolbar">
-    <button class="button button-small" type="submit">Test SharePoint</button>
-    <span>Test the configured Graph connection, library and document round trip.</span>
+<button class="button button-small" type="submit">Test SharePoint</button><span>Test the configured Graph connection, library and document round trip.</span>
 </form>
-<div class="section-heading"><div class="eyebrow" style="color:#b45b09">FFP internal</div><h1>Integration status</h1><p>Track synchronization, retry failed submissions, and reconcile external status without coupling Request Portal records to the external system.</p></div>
-<section class="card">
-@if(Model.Items.Count==0){<p class="muted">No integration links have been created yet.</p>}else{<div class="table-wrap"><table><thead><tr><th>Request</th><th>Organization</th><th>System</th><th>Status</th><th>External reference</th><th>Last attempt</th><th>Error</th><th>Operations</th></tr></thead><tbody>
-@foreach(IntegrationStatusSummary item in Model.Items){<tr><td>@item.PublicReference</td><td>@item.OrganizationName</td><td>@item.SystemName</td><td>@item.Status</td><td>@(item.ExternalReference ?? "—")</td><td>@(item.LastAttemptUtc?.ToString("u") ?? "—")</td><td>@(item.LastError ?? "—")</td><td><div class="action-row">@if(item.Status==SynchronizationStatus.Failed || string.IsNullOrWhiteSpace(item.ExternalReference)){<form method="post" asp-page-handler="Retry"><input type="hidden" name="linkId" value="@item.LinkId"/><button class="button button-small" type="submit">Retry</button></form>}@if(!string.IsNullOrWhiteSpace(item.ExternalReference)){<form method="post" asp-page-handler="Reconcile"><input type="hidden" name="linkId" value="@item.LinkId"/><button class="button button-small button-outline" type="submit">Reconcile now</button></form>}</div></td></tr>}
-</tbody></table></div>}
-</section></div></section>
-
+}
+</div></section>
 
 <section class="section section-muted">
     <div class="shell">
         <div class="section-heading">
             <h2>Dead-letter messages</h2>
-            <p>Messages appear here only after automatic retries are exhausted. Manual replay is audited and resets the retry budget.</p>
+            <p>Terminal failures and exhausted retries appear here. FFP Manager transfers require destination reconciliation before recovery; other manual replays are audited.</p>
         </div>
         @if (Model.DeadLetters.Count == 0)
         {
@@ -48,12 +57,13 @@
                             <td>@item.OccurredUtc.ToString("u")</td>
                             <td>@item.MessageType</td>
                             <td>@item.AttemptCount</td>
-                            <td>@item.LastError</td>
+                            <td>@(item.LastError is null ? "None" : "Delivery failed. Inspect protected diagnostics using the message reference.")</td>
                             <td>
-                                <form method="post" asp-page-handler="ReplayDeadLetter">
+                                @if(item.MessageType.EndsWith("FfpManagerSubmissionRequestedMessage",StringComparison.Ordinal)) { <a asp-page="/Staff/Integrations" asp-route-requestId="@item.RequestId" asp-fragment="transfer-details">Review transfer</a> }
+                                else if(Model.CanOperate) { <form method="post" asp-page-handler="ReplayDeadLetter">
                                     <input type="hidden" name="messageId" value="@item.MessageId" />
                                     <button class="button button-small" type="submit">Replay</button>
-                                </form>
+                                </form> }
                             </td>
                         </tr>
                     }
@@ -97,7 +107,7 @@
                             <td>@item.Destination</td>
                             <td>@item.Subject</td>
                             <td>@item.Status</td>
-                            <td>@item.LastError</td>
+                            <td>@(item.LastError is null ? "None" : "Delivery failed. Provider details remain in protected diagnostics.")</td>
                         </tr>
                     }
                     </tbody>

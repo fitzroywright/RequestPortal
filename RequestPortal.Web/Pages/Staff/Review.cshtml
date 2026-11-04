@@ -29,6 +29,8 @@
                 </div>
             </div>
 
+            @await Component.InvokeAsync("IntegrationStatus", new { requestId = Model.Request.Id })
+
             @if (Model.QuickIntake is not null)
             {
                 @await Html.PartialAsync("_QuickIntakeCard", Model)

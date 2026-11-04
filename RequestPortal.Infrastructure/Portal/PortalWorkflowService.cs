@@ -602,6 +602,7 @@ public sealed class PortalWorkflowService : IPortalWorkflowService
         OutboxMessage outboxMessage = new()
         {
             Id = message.MessageId,
+            RequestId = message is RequestSubmittedMessage submitted ? submitted.RequestId : null,
             MessageType = typeof(TMessage).FullName ?? typeof(TMessage).Name,
             Payload = JsonSerializer.Serialize(message),
             OccurredUtc = message.OccurredUtc,

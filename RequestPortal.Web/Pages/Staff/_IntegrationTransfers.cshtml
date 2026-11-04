@@ -1,0 +1,60 @@
+@model RequestPortal.Web.Pages.Staff.IntegrationsModel
+@using RequestPortal.Domain.Integration
+@{
+    var result = Model.Transfers;
+    var counts = result.Counts;
+}
+<dl class="integration-summary" aria-label="Transfer summary for the search and date range">
+@foreach(var item in new[] { ("Failed",counts.Failed), ("Pending",counts.Pending), ("Retrying",counts.Retrying), ("Synchronized",counts.Synchronized), ("Reconciliation Required",counts.ReconciliationRequired) }) {
+<div><dt>@item.Item1</dt><dd>@item.Item2</dd></div>
+}
+</dl>
+<form method="get" class="integration-filters" asp-page="/Staff/Integrations">
+<label>Search<input asp-for="Search" maxlength="200" placeholder="Applicant, Quick Intake or FFP Manager reference" /></label>
+<label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@RequestPortal.Web.Pages.Staff.IntegrationsModel.StatusLabel(status)</option> }</select></label>
+<label>From (UTC)<input asp-for="From" type="date" /></label><label>Through (UTC)<input asp-for="Through" type="date" /></label>
+<label>Sort<select asp-for="Sort"><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
+<button class="button button-small" type="submit">Apply filters</button><a asp-page="/Staff/Integrations">Clear</a>
+<a class="button button-small button-outline" asp-page-handler="Export" asp-all-route-data="Model.Routes(1)">Export diagnostics CSV</a>
+</form>
+<div class="table-wrap"><table class="integration-table"><caption class="sr-only">Persistent transfer history</caption>
+<thead><tr><th>Request / Applicant</th><th>Source / Target</th><th>Status</th><th>Last attempt / Retry</th><th>FFP Manager</th><th>Diagnostics</th></tr></thead><tbody>
+@foreach(var item in result.Items) {
+<tr><td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">@item.PublicReference</a><br/>@item.ApplicantName</td>
+<td>@item.Source<small>@item.Target</small></td><td>@RequestPortal.Web.Pages.Staff.IntegrationsModel.StatusLabel(item.Status)<small>@item.ErrorCode</small></td>
+<td>@(item.LastAttemptUtc?.ToString("u") ?? "Not attempted")<small>@item.AttemptCount attempt(s) · Next: @(item.NextRetryUtc?.ToString("u") ?? "Not scheduled")</small></td>
+<td>@(item.ApplicationNumber ?? "Not verified")<small>@item.ApplicationId</small></td>
+<td><a asp-page="/Staff/Integrations" asp-route-requestId="@item.RequestId" asp-fragment="transfer-details">View diagnostics</a></td></tr>
+}
+@if(result.Items.Count == 0) { <tr><td colspan="6">No matching transfers.</td></tr> }
+</tbody></table></div>
+<nav class="integration-paging" aria-label="Transfer pages"><span>Showing @(result.TotalCount == 0 ? 0 : (result.Page-1)*result.PageSize+1)–@(Math.Min(result.Page*result.PageSize,result.TotalCount)) of @result.TotalCount transfers · Page @result.Page of @result.TotalPages</span>
+@if(result.Page>1) { <a asp-page="/Staff/Integrations" asp-all-route-data="Model.Routes(result.Page-1)">Previous</a> }
+@if(result.Page<result.TotalPages) { <a asp-page="/Staff/Integrations" asp-all-route-data="Model.Routes(result.Page+1)">Next</a> }</nav>
+@if(Model.Selected is { } detail) {
+var transfer = detail.Transfer;
+<section id="transfer-details" class="integration-subsection" tabindex="-1" aria-labelledby="transfer-details-title">
+<h2 id="transfer-details-title">@transfer.PublicReference — transfer diagnostics</h2>
+<p><a asp-page="/Staff/Review" asp-route-id="@transfer.RequestId">Open original request</a> · @transfer.ApplicantName · @transfer.Source</p>
+<dl class="integration-facts">
+<div><dt>Status</dt><dd>@RequestPortal.Web.Pages.Staff.IntegrationsModel.StatusLabel(transfer.Status)</dd></div><div><dt>Target</dt><dd>@transfer.Target</dd></div><div><dt>Correlation ID</dt><dd>@(transfer.LinkId?.ToString() ?? "No link")</dd></div>
+<div><dt>Submitted</dt><dd>@transfer.SubmittedUtc.ToString("u")</dd></div><div><dt>Last attempt</dt><dd>@(transfer.LastAttemptUtc?.ToString("u") ?? "Not attempted")</dd></div><div><dt>Attempt count</dt><dd>@transfer.AttemptCount</dd></div>
+<div><dt>Next retry</dt><dd>@(transfer.NextRetryUtc?.ToString("u") ?? "Not scheduled")</dd></div><div><dt>Synchronized</dt><dd>@(transfer.SynchronizedUtc?.ToString("u") ?? "Not synchronized")</dd></div><div><dt>Destination verified</dt><dd>@(transfer.VerifiedUtc?.ToString("u") ?? "Not verified")</dd></div>
+<div><dt>FFP Manager application ID / reference</dt><dd>@(transfer.ApplicationId ?? "Not verified") / @(transfer.ApplicationNumber ?? "Not verified")</dd></div>
+<div><dt>Failure stage / classification</dt><dd>@(transfer.FailureStage ?? "None") / @(transfer.FailureClassification ?? "None")</dd></div><div><dt>Error code</dt><dd>@(transfer.ErrorCode ?? "None")</dd></div>
+</dl>
+@if(transfer.Explanation is { } explanation) { <p role="status">@explanation</p> }
+@if(Model.CanOperate) {
+<div class="action-row"><form method="post" asp-page-handler="Reconcile"><input type="hidden" name="RequestId" value="@transfer.RequestId"/><button class="button button-small button-outline" type="submit">Reconcile destination (read-only)</button></form>
+@if(transfer.LinkId.HasValue && transfer.Status != SynchronizationStatus.Synchronized) {
+<form method="post" asp-page-handler="Retry"><input type="hidden" name="linkId" value="@transfer.LinkId"/><input type="hidden" name="RequestId" value="@transfer.RequestId"/><button class="button button-small" type="submit">Verify destination and retry</button></form>
+}</div>
+<p class="muted">Retry may create a missing FFP Manager application or resume document transfer. Permanent failures require correcting the approved mapping first. Every operator action is audited.</p>
+}
+<h3>Attempt history</h3><p>Latest @detail.Attempts.Count of @detail.AttemptTotal recorded outcomes. <a asp-page-handler="HistoryExport" asp-route-requestId="@transfer.RequestId">Export complete attempt history</a></p><div class="table-wrap"><table><thead><tr><th>Started / Completed (UTC)</th><th>Operation</th><th>Outcome</th><th>Stage / Code</th><th>Explanation</th></tr></thead><tbody>
+@foreach(var attempt in detail.Attempts) { <tr><td>@attempt.StartedUtc.ToString("u")<small>@(attempt.CompletedUtc?.ToString("u") ?? "Incomplete — inspect worker health")</small></td><td>@attempt.Operation@if(attempt.Operation == "Submission") { <span> #@attempt.Number</span> }</td><td>@(attempt.Succeeded ? "Succeeded" : attempt.CompletedUtc.HasValue ? "Failed" : "In progress / interrupted")</td><td>@attempt.Stage / @attempt.ErrorCode</td><td>@attempt.Explanation</td></tr> }
+@if(detail.Attempts.Count==0) { <tr><td colspan="5">No recorded attempts. Historical outcomes before monitoring was installed cannot be reconstructed automatically.</td></tr> }
+</tbody></table></div>
+<h3>Operator audit</h3><p class="muted">Latest 100 actions; full audit records are retained.</p><ul>@foreach(var entry in detail.OperatorEvents) { <li>@entry.OccurredUtc.ToString("u") — @entry.Action — Actor @entry.ActorUserId — @entry.Detail</li> }</ul>
+</section>
+}

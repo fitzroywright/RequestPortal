@@ -10,31 +10,39 @@ using Microsoft.Extensions.Options;
 using RequestPortal.Application.Auditing;
 using RequestPortal.Application.Integration;
 using RequestPortal.Common.Time;
+using RequestPortal.Common.Messaging;
+using System.Text.Json;
 using RequestPortal.Domain.Integration;
 using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Integration;
 
-public sealed class IntegrationStatusService : IIntegrationStatusService
+public sealed partial class IntegrationStatusService : IIntegrationStatusService
 {
     private readonly RequestPortalDbContext dbContext;
     private readonly IClock clock;
     private readonly IExternalApplicationIntegrationService ffpManagerIntegrationService;
     private readonly FfpManagerBridgeOptions ffpManagerOptions;
     private readonly IBusinessAuditWriter auditWriter;
+    private readonly IExternalApplicationBridgeClient bridgeClient;
+    private readonly IIntegrationOperatorAuthorization operatorAuthorization;
 
     public IntegrationStatusService(
         RequestPortalDbContext dbContext,
         IClock clock,
         IExternalApplicationIntegrationService ffpManagerIntegrationService,
         IOptions<FfpManagerBridgeOptions> ffpManagerOptions,
-        IBusinessAuditWriter auditWriter)
+        IBusinessAuditWriter auditWriter,
+        IExternalApplicationBridgeClient bridgeClient,
+        IIntegrationOperatorAuthorization operatorAuthorization)
     {
         this.dbContext = dbContext;
         this.clock = clock;
         this.ffpManagerIntegrationService = ffpManagerIntegrationService;
         this.ffpManagerOptions = ffpManagerOptions.Value;
         this.auditWriter = auditWriter;
+        this.bridgeClient = bridgeClient;
+        this.operatorAuthorization = operatorAuthorization;
     }
 
     public async Task<Guid> EnsureLinkAsync(Guid requestId, string systemName, CancellationToken cancellationToken = default)
@@ -62,6 +70,7 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
     public async Task MarkPendingAsync(Guid linkId, CancellationToken cancellationToken = default)
     {
         IntegrationLink link = await GetLinkAsync(linkId, cancellationToken);
+        await IntegrationLegacyHistory.PreserveAsync(dbContext,link,cancellationToken);
         link.MarkPending(clock.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -69,25 +78,56 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
     public async Task MarkSynchronizedAsync(Guid linkId, string externalReference, CancellationToken cancellationToken = default)
     {
         IntegrationLink link = await GetLinkAsync(linkId, cancellationToken);
-        link.MarkSynchronized(externalReference, clock.UtcNow);
+        await IntegrationLegacyHistory.PreserveAsync(dbContext,link,cancellationToken);
+        if (link.VerifiedUtc >= clock.UtcNow.AddMinutes(-5) && link.ArtifactsSynchronizedUtc.HasValue && link.ExternalReference == externalReference)
+            link.MarkSynchronized(externalReference, clock.UtcNow);
+        else
+            link.RequireReconciliation(clock.UtcNow, "ARTIFACT", "Destination verification or document acknowledgement is incomplete. Use an authorized safe retry.");
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task MarkFailedAsync(Guid linkId, string error, CancellationToken cancellationToken = default)
     {
-        IntegrationLink link = await GetLinkAsync(linkId, cancellationToken);
-        link.MarkFailed(clock.UtcNow, error);
+        await RecordFailureAsync(linkId, TransferFailures.For("Reconciliation", "UNCLASSIFIED"), cancellationToken);
+    }
+
+    public async Task RecordFailureAsync(Guid linkId, TransferFailure failure, CancellationToken cancellationToken = default)
+    {
+        var link = await GetLinkAsync(linkId, cancellationToken);
+        await IntegrationLegacyHistory.PreserveAsync(dbContext,link,cancellationToken);
+        var attempt = new IntegrationAttempt(link.Id, link.AttemptCount, clock.UtcNow, "StatusRefresh");
+        attempt.Fail(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation);
+        dbContext.IntegrationAttempts.Add(attempt);
+        link.RecordFailure(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation, false);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task RetryAsync(Guid staffUserId, Guid linkId, CancellationToken cancellationToken = default)
     {
+        await operatorAuthorization.DemandAsync(staffUserId, cancellationToken);
         IntegrationLink link = await GetLinkAsync(linkId, cancellationToken);
         EnsureSupported(link);
+        await auditWriter.WriteAsync(staffUserId, "IntegrationRetryRequested", "IntegrationLink", link.Id, null,
+            "Operator requested destination verification and a safe retry.", cancellationToken);
+        // Reconciliation is read-only at the destination. An ambiguous result blocks the write.
+        await ReconcileRequestAsync(staffUserId, link.RequestId, cancellationToken);
+        var queueId = FfpManagerSubmissionRequestedMessage.IdForRequest(link.RequestId);
+        var queue = await dbContext.OutboxMessages.SingleOrDefaultAsync(item => item.Id == queueId, cancellationToken);
+        if (queue is null)
+        {
+            var message = new FfpManagerSubmissionRequestedMessage(queueId, clock.UtcNow, link.RequestId);
+            queue = new OutboxMessage { Id = queueId, RequestId = link.RequestId, OccurredUtc = message.OccurredUtc,
+                MessageType = typeof(FfpManagerSubmissionRequestedMessage).FullName!, Payload = JsonSerializer.Serialize(message) };
+            dbContext.OutboxMessages.Add(queue);
+        }
+        queue.ProcessedUtc = null; queue.AttemptCount = 0; queue.NextAttemptUtc = null; queue.LastError = null; queue.IsTerminal = false;
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         try
         {
             await ffpManagerIntegrationService.SubmitRequestAsync(link.RequestId, cancellationToken);
+            queue.ProcessedUtc = clock.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
             await auditWriter.WriteAsync(staffUserId, "IntegrationRetried", "IntegrationLink", link.Id, null, link.SystemName, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -96,6 +136,14 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
         }
         catch (Exception exception)
         {
+            var failure = IntegrationFailureClassifier.Classify(exception, "Submission");
+            queue.AttemptCount = 1;
+            queue.IsTerminal = !failure.Transient || !link.NextRetryUtc.HasValue;
+            queue.NextAttemptUtc = link.NextRetryUtc;
+            queue.LastError = failure.Explanation;
+            if(queue.IsTerminal) queue.StopRetrying(failure.Explanation);
+            using var persistenceTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await dbContext.SaveChangesAsync(persistenceTimeout.Token);
             await auditWriter.WriteAsync(
                 staffUserId,
                 "IntegrationRetryFailed",
@@ -110,24 +158,49 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
 
     public async Task ReconcileAsync(Guid staffUserId, Guid linkId, CancellationToken cancellationToken = default)
     {
+        await operatorAuthorization.DemandAsync(staffUserId, cancellationToken);
+        IntegrationLink link = await GetLinkAsync(linkId, cancellationToken);
+        await ReconcileRequestAsync(staffUserId, link.RequestId, cancellationToken);
+    }
+
+    public async Task ReconcileRequestAsync(Guid staffUserId, Guid requestId, CancellationToken cancellationToken = default)
+    {
+        await operatorAuthorization.DemandAsync(staffUserId, cancellationToken);
+        await using var requestLock = await IntegrationRequestLock.AcquireAsync(dbContext, requestId, cancellationToken);
+        var linkId = await EnsureLinkAsync(requestId, ffpManagerOptions.SystemName, cancellationToken);
         IntegrationLink link = await GetLinkAsync(linkId, cancellationToken);
         EnsureSupported(link);
-        if (string.IsNullOrWhiteSpace(link.ExternalReference))
-        {
-            throw new InvalidOperationException("The integration has no external reference to reconcile. Retry the submission first.");
-        }
+        await auditWriter.WriteAsync(staffUserId, "IntegrationReconciliationRequested", "IntegrationLink", link.Id, null,
+            "Read-only destination verification requested.", cancellationToken);
+        var attempt = new IntegrationAttempt(link.Id, link.AttemptCount, clock.UtcNow, "Reconciliation");
+        await IntegrationLegacyHistory.PreserveAsync(dbContext,link,cancellationToken);
+        dbContext.IntegrationAttempts.Add(attempt);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         try
         {
-            ExternalApplicationStatus? status = await ffpManagerIntegrationService.RefreshStatusAsync(link.RequestId, cancellationToken);
-            if (status is null)
+            var receipt = await bridgeClient.FindApplicationAsync(requestId, cancellationToken);
+            if (receipt is null)
             {
-                throw new InvalidOperationException("The external system did not return a status for this request.");
+                link.RequireReconciliation(clock.UtcNow, "DESTINATION_NOT_FOUND", "No active destination record matches this immutable request ID. An authorized retry can submit it.");
             }
-
-            Guid messageId = CreateDeterministicMessageId(link.ExternalReference, status.StatusCode, status.ChangedUtc);
-            await ffpManagerIntegrationService.ReceiveStatusAsync(messageId, link.RequestId, status, cancellationToken);
-            await auditWriter.WriteAsync(staffUserId, "IntegrationReconciled", "IntegrationLink", link.Id, null, $"{link.SystemName}:{status.StatusCode}", cancellationToken);
+            else
+            {
+                FfpManagerIntegrationService.ValidateReceipt(requestId, receipt);
+                if (link.ExternalReference is not null && link.ExternalReference != receipt.ApplicationId)
+                    throw new IntegrationTransferException(TransferFailures.For("Reconciliation", "DESTINATION_CONFLICT"));
+                link.RecordVerifiedDestination(receipt.ApplicationId, receipt.ApplicationNumber, receipt.Server, receipt.Database, clock.UtcNow);
+                // Reconciliation never claims that untransferred artifacts have succeeded.
+                if (link.ArtifactsSynchronizedUtc.HasValue)
+                    link.MarkSynchronized(receipt.ApplicationId, clock.UtcNow, receipt.ApplicationNumber);
+                else
+                    link.RequireReconciliation(clock.UtcNow, "ARTIFACT", "Destination record verified. Document transfer and acknowledgement must complete through a safe retry.");
+            }
+            attempt.SetStage("DestinationLookup");
+            attempt.Complete(clock.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await auditWriter.WriteAsync(staffUserId, "IntegrationReconciled", "IntegrationLink", link.Id, null,
+                receipt is null ? "DestinationNotFound" : "DestinationVerified", cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -135,6 +208,11 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
         }
         catch (Exception exception)
         {
+            var failure = IntegrationFailureClassifier.Classify(exception, "Reconciliation");
+            attempt.Fail(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation);
+            link.RecordFailure(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation, false);
+            using var persistenceTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await dbContext.SaveChangesAsync(persistenceTimeout.Token);
             await auditWriter.WriteAsync(
                 staffUserId,
                 "IntegrationReconciliationFailed",
@@ -143,7 +221,7 @@ public sealed class IntegrationStatusService : IIntegrationStatusService
                 null,
                 $"system={link.SystemName}; failureType={exception.GetType().Name}",
                 cancellationToken);
-            throw;
+            throw new IntegrationTransferException(failure);
         }
     }
 

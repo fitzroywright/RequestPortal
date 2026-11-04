@@ -218,12 +218,38 @@ RouteGroupBuilder api = app.MapGroup("/api");
 api.AddEndpointFilter(async (context, next) =>
 {
     HttpContext http = context.HttpContext;
+    http.Response.Headers.CacheControl = "no-store";
     if (!IsAuthorized(http.Request, sharedSecret, app.Environment.IsDevelopment()))
     {
         return Results.Unauthorized();
     }
-    return await next(context);
+    try { return await next(context); }
+    catch (IntegrationTransferException exception)
+    {
+        return Results.Json(exception.Failure, statusCode: 409);
+    }
+    catch (ExternalApplicationValidationException)
+    {
+        return Results.Json(TransferFailures.For("Validation", "VALIDATION"), statusCode: 422);
+    }
+    catch (Microsoft.Data.SqlClient.SqlException exception)
+    {
+        var failure = TransferFailures.Sql("SqlServer", exception.Number);
+        return Results.Json(failure, statusCode: failure.Transient ? 503 : 422);
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.Json(TransferFailures.For("Bridge", "VALIDATION"), statusCode: 422);
+    }
 });
+
+api.MapGet("/applications/by-request/{requestId:guid}", async (Guid requestId, IFfpManagerGateway gateway, CancellationToken token) =>
+{
+    var receipt = await gateway.FindApplicationAsync(requestId, token);
+    return receipt is null ? Results.NoContent() : Results.Ok(receipt);
+});
+api.MapGet("/integration-outbox", async (IIntegrationOutboxStore store, CancellationToken token) =>
+    Results.Ok(await store.GetSnapshotAsync(token)));
 
 api.MapGet("/reference-data", async (
     IFfpManagerReferenceDataCatalog catalog,

@@ -9,6 +9,16 @@ namespace RequestPortal.Infrastructure.Tests;
 public sealed class FfpManagerBridgeTests
 {
     [Fact]
+    public async Task ChangedCorrelationCannotCreateSecondApplicationForSameImmutablePortalRequest()
+    {
+        var token=TestContext.Current.CancellationToken;
+        var gateway=new FakeFfpManagerGateway();var submission=CreateSubmission(Guid.NewGuid());
+        var first=await gateway.CreateApplicationAsync(submission,token);
+        var second=await gateway.CreateApplicationAsync(submission with {CorrelationId=Guid.NewGuid()},token);
+        Assert.Equal(first.ApplicationId,second.ApplicationId);Assert.True(second.AlreadyExisted);
+        Assert.Equal(first.ApplicationId,(await gateway.FindApplicationAsync(submission.PortalRequestId,token))!.ApplicationId);
+    }
+    [Fact]
     public async Task CreateApplicationAsync_IsIdempotentByCorrelationId()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;

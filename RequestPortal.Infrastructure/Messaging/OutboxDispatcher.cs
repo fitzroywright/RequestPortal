@@ -59,7 +59,8 @@ public sealed class OutboxDispatcher
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         List<OutboxMessage> candidates = await dbContext.OutboxMessages
-            .Where(message => message.ProcessedUtc == null && message.AttemptCount < MaxAttempts &&
+            .Where(message => message.ProcessedUtc == null && !message.IsTerminal && message.AttemptCount < MaxAttempts &&
+                (message.NextAttemptUtc == null || message.NextAttemptUtc <= now) &&
                 message.MessageType != QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType)
             .OrderBy(message => message.OccurredUtc)
             .Take(Math.Max(batchSize * 4, batchSize))
@@ -79,28 +80,33 @@ public sealed class OutboxDispatcher
                 await DispatchAsync(message, cancellationToken);
                 message.ProcessedUtc = DateTimeOffset.UtcNow;
                 message.LastError = null;
+                message.NextAttemptUtc = null;
                 processed++;
             }
+            catch (OperationCanceledException) when(cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception exception)
             {
                 message.AttemptCount++;
-                bool exhausted = message.AttemptCount >= MaxAttempts;
+                string safeError = exception is IntegrationTransferException transfer ? transfer.Failure.Explanation : exception.Message;
+                bool exhausted = message.AttemptCount >= MaxAttempts || exception is IntegrationTransferException { Failure.Transient: false };
+                message.IsTerminal = exhausted;
 
                 if (exhausted)
                 {
-                    message.LastError = $"DEAD LETTER: {exception.Message}";
+                    message.StopRetrying(safeError);
                     foreach (NotificationHistory history in dbContext.NotificationHistory.Local.Where(item =>
                         item.Status == NotificationDeliveryStatus.Failed &&
                         !failedHistoryBeforeDispatch.Contains(item.Id)))
                     {
                         history.MarkDeadLettered(exception.Message);
                     }
-                    logger.LogCritical(exception, "Outbox message {MessageId} exhausted {AttemptCount} attempts and was dead-lettered.", message.Id, message.AttemptCount);
+                    logger.LogCritical(exception, "Outbox message {MessageId} stopped after {AttemptCount} attempt(s) and was dead-lettered.", message.Id, message.AttemptCount);
                 }
                 else
                 {
                     DateTimeOffset retryAt = DateTimeOffset.UtcNow.Add(GetRetryDelay(message.AttemptCount));
-                    message.LastError = $"{RetryAtPrefix}{retryAt:O}|{exception.Message}";
+                    message.NextAttemptUtc = retryAt;
+                    message.LastError = $"{RetryAtPrefix}{retryAt:O}|{safeError}";
                     logger.LogError(
                         exception,
                         "Outbox message {MessageId} failed on attempt {AttemptCount}; next retry is due at {RetryAtUtc}.",
@@ -109,6 +115,8 @@ public sealed class OutboxDispatcher
                         retryAt);
                 }
             }
+            // Commit each outcome, rather than losing a whole batch on process termination.
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         if (messages.Count > 0)
@@ -192,27 +200,24 @@ public sealed class OutboxDispatcher
         if (outbox.MessageType.EndsWith(nameof(FfpManagerSubmissionRequestedMessage), StringComparison.Ordinal))
         {
             FfpManagerSubmissionRequestedMessage message = Deserialize<FfpManagerSubmissionRequestedMessage>(outbox.Payload);
-            if (ffpManagerOptions.Enabled)
+            try
             {
-                try
-                {
-                    await ffpManagerIntegrationService.SubmitRequestAsync(message.RequestId, cancellationToken);
-                    operationsFlowPublisher.TryEnqueue(
-                        message.RequestId,
-                        "Downstream",
-                        DateTimeOffset.UtcNow,
-                        "FFP Manager downstream submission completed.");
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    operationsFlowPublisher.TryEnqueue(
-                        message.RequestId,
-                        "Downstream",
-                        DateTimeOffset.UtcNow,
-                        $"Downstream submission failed with {exception.GetType().Name}.",
-                        failed: true);
-                    throw;
-                }
+                await ffpManagerIntegrationService.SubmitRequestAsync(message.RequestId, cancellationToken);
+                operationsFlowPublisher.TryEnqueue(
+                    message.RequestId,
+                    "Downstream",
+                    DateTimeOffset.UtcNow,
+                    "FFP Manager downstream submission completed.");
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                operationsFlowPublisher.TryEnqueue(
+                    message.RequestId,
+                    "Downstream",
+                    DateTimeOffset.UtcNow,
+                    $"Downstream submission failed with {exception.GetType().Name}.",
+                    failed: true);
+                throw;
             }
             return;
         }
@@ -248,7 +253,7 @@ public sealed class OutboxDispatcher
 
     private async Task EnsureFfpManagerSubmissionQueuedAsync(RequestSubmittedMessage source, CancellationToken cancellationToken)
     {
-        Guid integrationMessageId = CreateDeterministicGuid(source.RequestId, "FFPManagerSubmission");
+        Guid integrationMessageId = FfpManagerSubmissionRequestedMessage.IdForRequest(source.RequestId);
         bool alreadyTracked = dbContext.OutboxMessages.Local.Any(message => message.Id == integrationMessageId);
         if (!alreadyTracked)
         {
@@ -260,6 +265,7 @@ public sealed class OutboxDispatcher
         dbContext.OutboxMessages.Add(new OutboxMessage
         {
             Id = message.MessageId,
+            RequestId = source.RequestId,
             MessageType = typeof(FfpManagerSubmissionRequestedMessage).FullName ?? nameof(FfpManagerSubmissionRequestedMessage),
             Payload = JsonSerializer.Serialize(message),
             OccurredUtc = message.OccurredUtc,

@@ -99,6 +99,7 @@ public sealed class QuickIntakeReviewPageTests
                 services.AddSingleton(ReadProxy.For<IDocumentService>(_ => Task.FromResult<IReadOnlyList<DocumentSummary>>([])));
                 services.AddSingleton(ReadProxy.For<IDeliveryService>(_ => Task.FromResult<IReadOnlyList<DeliveryView>>([])));
                 services.AddSingleton(ReadProxy.For<IRequestReferenceDataService>(_ => Task.FromResult<IReadOnlyList<UnitOfMeasureOption>>([])));
+                services.AddSingleton(ReadProxy.For<RequestPortal.Application.Integration.IIntegrationStatusService>(_ => Task.FromResult<RequestPortal.Application.Integration.IntegrationTransferRow?>(null)));
                 services.AddSingleton(ReadProxy.For<IPortalMessageService>(_ => Task.FromResult<IReadOnlyList<MessageThreadView>>([])));
                 services.AddSingleton(ReadProxy.For<IQuickIntakeService>(method =>
                 {

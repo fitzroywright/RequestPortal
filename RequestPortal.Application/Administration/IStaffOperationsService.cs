@@ -12,7 +12,7 @@ public sealed record PendingOrganizationWorkItem(Guid OrganizationId, string Org
 public sealed record OrganizationReverificationWorkItem(Guid OrganizationId, string OrganizationName, string CountryCode, DateOnly ExpiryDate, string Status, int DaysUntilExpiry);
 public sealed record RequestWorkItem(Guid RequestId, string PublicReference, Guid OrganizationId, string OrganizationName, RequestStatus Status, DateTimeOffset? SubmittedUtc, DateTimeOffset CreatedUtc, int AgeDays);
 public sealed record DocumentWorkItem(Guid DocumentId, Guid OrganizationId, string OrganizationName, DocumentType DocumentType, string OriginalFileName, DateTimeOffset UploadedUtc, int AgeDays, Guid? RequestId = null, string? ApplicantName = null, bool HasValidContext = true);
-public sealed record DeadLetterWorkItem(Guid MessageId, string MessageType, DateTimeOffset OccurredUtc, int AttemptCount, string? LastError);
+public sealed record DeadLetterWorkItem(Guid MessageId, string MessageType, DateTimeOffset OccurredUtc, int AttemptCount, string? LastError, Guid? RequestId = null);
 public sealed record NotificationDeliveryWorkItem(Guid DeliveryId, NotificationChannel Channel, string Destination, string Subject, NotificationDeliveryStatus Status, DateTimeOffset CreatedUtc, string? LastError);
 
 public sealed record StaffOperationsSnapshot(
