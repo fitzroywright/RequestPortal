@@ -104,6 +104,7 @@ internal static class AuthorizationServiceRegistration
             options.Conventions.AuthorizeFolder(
                 "/Messages"
                 , "PortalMessages");
+            options.Conventions.AuthorizePage("/Documents/Preview", "PortalMessages");
             options.Conventions.AuthorizePage(
                 "/Messages/Assigned"
                 , PortalPolicies.FfpStaff);

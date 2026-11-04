@@ -7,6 +7,7 @@ using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Pages.Documents;
 
+[MessagePageExceptionFilter]
 public sealed class PreviewModel(
     IDocumentService documentService,
     IDocumentPreviewRenderer previewRenderer,

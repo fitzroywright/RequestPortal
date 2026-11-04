@@ -8,10 +8,18 @@ using RequestPortal.Web.Security;
 
 namespace RequestPortal.Web.Pages.Messages;
 
+[MessagePageExceptionFilter]
 public sealed class ThreadModel(
     IPortalMessageService messageService,
     IDocumentService documentService) : PageModel
 {
+    private static readonly string[] MailboxPages = ["/Messages/Inbox", "/Messages/Assigned", "/Messages/Unassigned", "/Messages/Sent", "/Messages/Archived"];
+
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnTo { get; set; }
+
+    public string ReturnPage => MailboxPages.FirstOrDefault(page => string.Equals(page, ReturnTo, StringComparison.OrdinalIgnoreCase)) ?? "/Messages/Inbox";
+
     public MessageThreadView? Thread { get; private set; }
 
     public IReadOnlyList<DocumentSummary> AvailableAttachments { get; private set; } = Array.Empty<DocumentSummary>();
@@ -82,7 +90,7 @@ public sealed class ThreadModel(
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Conversation assigned to you.";
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, returnTo = ReturnPage });
     }
 
     public async Task<IActionResult> OnPostUnassignAsync(Guid id)
@@ -99,7 +107,7 @@ public sealed class ThreadModel(
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Conversation returned to the unassigned queue.";
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, returnTo = ReturnPage });
     }
 
     public async Task<IActionResult> OnPostCloseAsync(Guid id)
@@ -116,7 +124,7 @@ public sealed class ThreadModel(
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Conversation closed.";
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, returnTo = ReturnPage });
     }
 
     public async Task<IActionResult> OnPostReopenAsync(Guid id)
@@ -133,7 +141,7 @@ public sealed class ThreadModel(
             HttpContext.RequestAborted);
 
         TempData["Success"] = "Conversation reopened.";
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, returnTo = ReturnPage });
     }
 
     public async Task<IActionResult> OnPostAsync(Guid id)
@@ -154,7 +162,7 @@ public sealed class ThreadModel(
             cancellationToken: HttpContext.RequestAborted,
             attachmentDocumentIds: AttachmentDocumentIds);
 
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, returnTo = ReturnPage });
     }
 
     private async Task<IActionResult> LoadAsync(Guid id)
@@ -170,7 +178,8 @@ public sealed class ThreadModel(
 
         if (Thread is null)
         {
-            return NotFound();
+            Response.StatusCode = StatusCodes.Status404NotFound;
+            return Page();
         }
 
         IsAssignedToCurrentStaff =
