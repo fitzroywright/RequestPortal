@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FfpManager.Bridge;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging.Abstractions;
 using RequestPortal.Application.Integration;
 using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Integration;
@@ -59,10 +60,12 @@ public sealed class ParishSubmissionTests
     public async Task MissingParish_ReturnsFieldValidation400_BeforeReferenceAllocation(string? parish)
     {
         ExternalApplicationSubmission submission = Submission() with { Parish = parish };
-        var result = await ApplicationSubmissionEndpoint.HandleAsync(submission, new MissingParishGateway(), TestContext.Current.CancellationToken);
-        ValidationProblem problem = Assert.IsType<ValidationProblem>(result.Result);
-        Assert.Equal(400, problem.StatusCode);
-        Assert.Contains("explicitly selected parish", Assert.Single(problem.ProblemDetails.Errors["Parish"]));
+        var result = await ApplicationSubmissionEndpoint.HandleAsync(submission, new MissingParishGateway(), NullLoggerFactory.Instance, TestContext.Current.CancellationToken);
+        var response = Assert.IsType<JsonHttpResult<TransferFailure>>(result);
+        Assert.Equal(422, response.StatusCode);
+        Assert.Equal("VALIDATION_PARISH", response.Value!.Code);
+        Assert.Contains("Parish", response.Value.Explanation);
+        Assert.Contains("ExternalApplicationValidationException", response.Value.TechnicalDetails);
     }
 
     [Fact]
@@ -85,9 +88,9 @@ public sealed class ParishSubmissionTests
         submission = JsonSerializer.Deserialize<ExternalApplicationSubmission>(body, json)!;
         FakeFfpManagerGateway gateway = new();
         var first = Assert.IsType<Ok<ExternalApplicationReference>>(
-            (await ApplicationSubmissionEndpoint.HandleAsync(submission, gateway, TestContext.Current.CancellationToken)).Result).Value!;
+            (await ApplicationSubmissionEndpoint.HandleAsync(submission, gateway, NullLoggerFactory.Instance, TestContext.Current.CancellationToken))).Value!;
         var second = Assert.IsType<Ok<ExternalApplicationReference>>(
-            (await ApplicationSubmissionEndpoint.HandleAsync(submission, gateway, TestContext.Current.CancellationToken)).Result).Value!;
+            (await ApplicationSubmissionEndpoint.HandleAsync(submission, gateway, NullLoggerFactory.Instance, TestContext.Current.CancellationToken))).Value!;
         Assert.Equal(first.ApplicationId, second.ApplicationId);
         Assert.Equal(first.ApplicationNumber, second.ApplicationNumber);
         Assert.True(second.AlreadyExisted);
@@ -101,7 +104,7 @@ public sealed class ParishSubmissionTests
         var options = Microsoft.Extensions.Options.Options.Create(new BridgeOptions());
         await Assert.ThrowsAsync<InvalidOperationException>(() => ApplicationSubmissionEndpoint.HandleAsync(
             Submission(), new SyncedSqlFfpManagerGateway(options, new FfpManagerReferenceDataCatalog(options)),
-            TestContext.Current.CancellationToken));
+            NullLoggerFactory.Instance, TestContext.Current.CancellationToken));
     }
 
     private static QuickIntakeRecord CreateIntake() => new(
