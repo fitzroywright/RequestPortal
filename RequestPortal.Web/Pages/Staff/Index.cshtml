@@ -37,12 +37,11 @@
                             <thead>
                                 <tr>
                                     <th>Reference</th>
-                                    <th><label for="requests-applicant-filter">Applicant</label><input id="requests-applicant-filter" name="Applicant" form="requests-grid-filters" value="@Model.Applicant" maxlength="200" type="search" placeholder="Search applicant…" autocomplete="off" aria-label="Filter requests by applicant" /></th>
-                                    <th><label for="requests-organization-filter">Organization</label><input id="requests-organization-filter" name="Organization" form="requests-grid-filters" value="@Model.Organization" maxlength="200" type="search" placeholder="Search organization…" autocomplete="off" aria-label="Filter requests by organization" /></th>
+                                    <th class="staff-applicant-header"><div class="staff-request-header-filter"><label for="requests-applicant-filter">Applicant</label><input id="requests-applicant-filter" name="Applicant" form="requests-grid-filters" value="@Model.Applicant" maxlength="200" type="search" placeholder="Search applicant…" autocomplete="off" aria-label="Filter requests by applicant" /></div></th>
+                                    <th class="staff-organization-header"><div class="staff-request-header-filter"><label for="requests-organization-filter">Organization</label><input id="requests-organization-filter" name="Organization" form="requests-grid-filters" value="@Model.Organization" maxlength="200" type="search" placeholder="Search organization…" autocomplete="off" aria-label="Filter requests by organization" /></div></th>
                                     <th>Summary</th>
-                                    <th><label for="requests-status-filter">Work Status</label><select id="requests-status-filter" name="WorkStatus" form="requests-grid-filters" aria-label="Filter requests by work status"><option value="">All statuses</option>@foreach (var status in Enum.GetValues<RequestPortal.Domain.Requests.RequestStatus>()) { <option value="@status" selected="@(Model.WorkStatus == status)">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(status.ToString())</option> }</select></th>
+                                    <th class="staff-work-status-header"><select id="requests-status-filter" name="WorkStatus" form="requests-grid-filters" aria-label="Filter requests by work status"><option value="">All statuses</option>@foreach (var status in Enum.GetValues<RequestPortal.Domain.Requests.RequestStatus>()) { <option value="@status" selected="@(Model.WorkStatus == status)">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(status.ToString())</option> }</select></th>
                                     <th class="staff-age-column">Age</th>
-                                    <th>Review</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -66,14 +65,11 @@
                                     <td>@request.Summary</td>
                                     <td><span class="status">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(request.Status.ToString())</span></td>
                                     <td class="staff-age-column">@ageDays d</td>
-                                    <td>
-                                        <a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.RequestId">Review</a>
-                                    </td>
                                 </tr>
                             }
                             @if (Model.SubmittedRequests.Count == 0)
                             {
-                                <tr><td colspan="7" class="workspace-empty">No requests match the current filters. Adjust or clear the filters above.</td></tr>
+                                <tr><td colspan="6" class="workspace-empty">No requests match the current filters. Adjust or clear the filters above.</td></tr>
                             }
                             </tbody>
                         </table>
@@ -182,11 +178,16 @@
 .staff-requests-grid .workspace-table-wrap{width:100%;max-width:100%;overflow-x:auto}
 .staff-requests-grid .request-panel{min-width:0}
 .staff-requests-grid .workspace-table{min-width:950px}
-.staff-requests-grid .workspace-table thead th{vertical-align:bottom}
-.staff-requests-grid .workspace-table th label{display:block;margin-bottom:5px}
-.staff-requests-grid .workspace-table th :is(input,select){display:block;width:100%;min-width:125px;margin:0;font-size:.85rem;letter-spacing:normal;text-transform:none;box-sizing:border-box}
-.staff-requests-grid .workspace-table th:nth-child(2),.staff-requests-grid .workspace-table th:nth-child(3){min-width:185px}
-.staff-requests-grid .workspace-table th:nth-child(5){min-width:170px}
+.staff-requests-grid .workspace-table thead th{vertical-align:middle}
+.staff-requests-grid .workspace-table .staff-request-header-filter{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.staff-requests-grid .workspace-table .staff-request-header-filter label{display:inline;margin:0;flex:0 0 auto}
+.staff-requests-grid .workspace-table .staff-request-header-filter input{width:100%;min-width:96px;max-width:190px;margin:0;font-size:.8rem;letter-spacing:normal;text-transform:none;box-sizing:border-box}
+.staff-requests-grid .workspace-table .staff-applicant-header{min-width:235px}
+.staff-requests-grid .workspace-table .staff-organization-header{min-width:255px}
+.staff-requests-grid .workspace-table .staff-work-status-header{width:140px;min-width:140px;max-width:150px}
+.staff-requests-grid .workspace-table .staff-work-status-header select{width:100%;max-width:140px;min-width:0;margin:0;font-size:.8rem;letter-spacing:normal;text-transform:none;box-sizing:border-box}
+.staff-requests-grid .workspace-table tbody tr.staff-select-row{cursor:pointer}
+.staff-requests-grid .workspace-table tbody tr.staff-select-row:focus-visible{outline:2px solid var(--workspace-focus,#245b8a);outline-offset:-2px;background:#edf3f8}
 @@media(max-width:1100px){.portal-workspace.staff-workspace .portal-workspace-grid.staff-requests-grid{grid-template-columns:minmax(0,1fr)!important}.staff-requests-grid>.request-panel,.staff-requests-grid>.staff-context-stack{grid-column:1}}
 .staff-context-stack{display:grid;gap:10px;align-content:start;min-width:0}
 .staff-waiting-action{min-width:0}
