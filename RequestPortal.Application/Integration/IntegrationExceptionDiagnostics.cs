@@ -12,7 +12,7 @@ namespace RequestPortal.Application.Integration;
 /// </summary>
 public static class IntegrationExceptionDiagnostics
 {
-    private static readonly Regex SafeSymbol = new(@"[^a-zA-Z0-9_.+\\u0060]", RegexOptions.Compiled);
+    private static readonly Regex SafeSymbol = new(@"[^a-zA-Z0-9_.+]", RegexOptions.Compiled);
     private static string Symbol(string? value, int limit = 100)
     {
         string filtered = SafeSymbol.Replace(value ?? "unknown", "");
@@ -29,7 +29,16 @@ public static class IntegrationExceptionDiagnostics
         if (exception is IntegrationTransferException transfer)
             text.Append("Classified reason: ").AppendLine(transfer.Failure.Code);
         if (exception is ExternalApplicationValidationException validation)
+        {
             text.Append("Rejected field: ").AppendLine(Symbol(validation.Field));
+            if (validation.Message == "The applicant telephone requires correction before transfer.")
+                text.AppendLine("Exception message: The applicant telephone requires correction before transfer.");
+        }
+        if (exception is InvalidOperationException invalid && invalid.Message is
+            "Draft requests cannot be sent to FFP Manager." or
+            "Quick Intake applicant first and last name are required for FFP Manager." or
+            "FFP Manager did not return a generated ReferenceNo. Notifications remain pending.")
+            text.Append("Exception message: ").AppendLine(invalid.Message);
         for (Exception? inner = exception.InnerException; inner is not null && text.Length < 1800; inner = inner.InnerException)
         {
             text.Append("Inner exception: ").AppendLine(Symbol(inner.GetType().Name));
