@@ -68,3 +68,32 @@
 .staff-administration .staff-directory-table thead .staff-actions-header{gap:.4rem}
 .staff-administration .staff-directory-table thead .staff-actions-header .button{min-height:30px;flex:none}
 .staff-administration .staff-directory-table thead .staff-filter-clear{flex:none}
+
+/* The directory is the scroll container, not the entire Staff & Roles page. */
+.staff-administration .staff-directory-form>.staff-directory-scroll{
+    height:clamp(220px,calc(100dvh - 260px),900px);
+    max-height:calc(100dvh - 24px);
+    min-height:0;
+    overflow:auto;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+    position:relative;
+}
+.staff-administration .staff-directory-scroll .staff-directory-table{
+    border-collapse:separate;
+    border-spacing:0;
+}
+.staff-administration .staff-directory-scroll .staff-directory-table thead th{
+    position:sticky;
+    top:0;
+    z-index:2;
+    background:var(--surface-muted,#eaf0f5);
+    box-shadow:0 1px 0 var(--border,#d8e0e8);
+}
+.staff-administration .staff-directory-scroll:focus-visible{
+    outline:2px solid var(--accent,#1464bc);
+    outline-offset:2px;
+}
+@media(max-height:540px){
+    .staff-administration .staff-directory-form>.staff-directory-scroll{height:220px;max-height:calc(100dvh - 12px)}
+}
