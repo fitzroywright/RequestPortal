@@ -1,5 +1,8 @@
 (() => {
     const form = document.querySelector('[data-requests-grid-filters]');
+    document.getElementById("request-page-size")?.addEventListener("change", event => {
+        event.currentTarget.form?.requestSubmit();
+    });
     if (!form) return;
     const filters = ['requests-applicant-filter', 'requests-organization-filter', 'requests-status-filter']
         .map(id => document.getElementById(id)).filter(Boolean);
