@@ -226,10 +226,12 @@ api.AddEndpointFilter(async (context, next) =>
     try { return await next(context); }
     catch (IntegrationTransferException exception)
     {
+        app.Logger.LogError(exception, "Bridge transfer failed: stage {Stage}, error {ErrorCode}", exception.Failure.Stage, exception.Failure.Code);
         return Results.Json(exception.Failure, statusCode: 409);
     }
     catch (ExternalApplicationValidationException exception)
     {
+        app.Logger.LogError(exception, "Bridge validation exception for field {Field}", exception.Field);
         string code = exception.Field switch {
             "PrimaryTelephone" => "VALIDATION_PRIMARY_TELEPHONE",
             "SecondaryTelephone" => "VALIDATION_SECONDARY_TELEPHONE",
@@ -239,11 +241,13 @@ api.AddEndpointFilter(async (context, next) =>
     }
     catch (Microsoft.Data.SqlClient.SqlException exception)
     {
+        app.Logger.LogError(exception, "Bridge SQL exception {SqlNumber} during authenticated API request", exception.Number);
         var failure = TransferFailures.Sql("SqlServer", exception.Number);
         return Results.Json(failure, statusCode: failure.Transient ? 503 : 422);
     }
-    catch (InvalidOperationException)
+    catch (InvalidOperationException exception)
     {
+        app.Logger.LogError(exception, "Bridge invalid operation during authenticated API request");
         return Results.Json(TransferFailures.For("Bridge", "VALIDATION"), statusCode: 422);
     }
 });
