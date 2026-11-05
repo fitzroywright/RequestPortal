@@ -210,6 +210,10 @@ public sealed partial class IntegrationStatusService : IIntegrationStatusService
         {
             var failure = IntegrationFailureClassifier.Classify(exception, "Reconciliation");
             attempt.Fail(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation);
+            string? bridgeDetails = exception is IntegrationTransferException transfer ? transfer.Failure.TechnicalDetails : null;
+            attempt.SetExceptionDetails(IntegrationExceptionDiagnostics.IsSafeTransportDetail(bridgeDetails)
+                ? bridgeDetails
+                : IntegrationExceptionDiagnostics.Capture(exception, "Reconciliation", failure.Code));
             link.RecordFailure(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation, false);
             using var persistenceTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await dbContext.SaveChangesAsync(persistenceTimeout.Token);
