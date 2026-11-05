@@ -51,3 +51,20 @@
 .staff-administration .staff-filter-clear{font-size:.75rem;font-weight:600;text-decoration:none}
 .staff-administration .staff-filter-clear:hover{text-decoration:underline}
 .staff-administration .staff-directory-table thead :is(input,select,a,button):focus-visible{outline:2px solid var(--accent,#1464bc);outline-offset:2px}
+
+/* Single-line directory header: Name + search, header-only status/role filters. */
+.staff-administration .staff-directory-table{min-width:970px}
+.staff-administration .staff-directory-table thead th{vertical-align:middle;white-space:nowrap}
+.staff-administration .staff-directory-table thead input,
+.staff-administration .staff-directory-table thead select{display:inline-block;vertical-align:middle;margin:0}
+.staff-administration .staff-directory-table thead .staff-header-inline{display:flex;align-items:center;gap:.6rem;min-height:34px;white-space:nowrap}
+.staff-administration .staff-directory-table thead .staff-name-header{min-width:300px;width:30%}
+.staff-administration .staff-directory-table thead .staff-name-header input{flex:1 1 auto;min-width:150px;max-width:340px}
+.staff-administration .staff-directory-table thead .staff-status-header,
+.staff-administration .staff-directory-table thead .staff-role-header{min-width:135px;width:14%}
+.staff-administration .staff-directory-table thead .staff-status-header select,
+.staff-administration .staff-directory-table thead .staff-role-header select{min-height:34px;width:100%;max-width:185px}
+.staff-administration .staff-directory-table thead th:last-child{min-width:148px}
+.staff-administration .staff-directory-table thead .staff-actions-header{gap:.4rem}
+.staff-administration .staff-directory-table thead .staff-actions-header .button{min-height:30px;flex:none}
+.staff-administration .staff-directory-table thead .staff-filter-clear{flex:none}
