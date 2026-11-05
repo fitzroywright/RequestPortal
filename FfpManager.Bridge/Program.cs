@@ -227,7 +227,10 @@ api.AddEndpointFilter(async (context, next) =>
     catch (IntegrationTransferException exception)
     {
         app.Logger.LogError(exception, "Bridge transfer failed: stage {Stage}, error {ErrorCode}", exception.Failure.Stage, exception.Failure.Code);
-        return Results.Json(exception.Failure, statusCode: 409);
+        return Results.Json(exception.Failure with
+        {
+            TechnicalDetails = IntegrationExceptionDiagnostics.Capture(exception, exception.Failure.Stage, exception.Failure.Code)
+        }, statusCode: 409);
     }
     catch (ExternalApplicationValidationException exception)
     {
@@ -237,18 +240,31 @@ api.AddEndpointFilter(async (context, next) =>
             "SecondaryTelephone" => "VALIDATION_SECONDARY_TELEPHONE",
             _ => "VALIDATION"
         };
-        return Results.Json(TransferFailures.For("Validation", code), statusCode: 422);
+        return Results.Json(TransferFailures.For("Validation", code) with
+        {
+            TechnicalDetails = IntegrationExceptionDiagnostics.Capture(exception, "Validation", code)
+        }, statusCode: 422);
     }
     catch (Microsoft.Data.SqlClient.SqlException exception)
     {
         app.Logger.LogError(exception, "Bridge SQL exception {SqlNumber} during authenticated API request", exception.Number);
         var failure = TransferFailures.Sql("SqlServer", exception.Number);
-        return Results.Json(failure, statusCode: failure.Transient ? 503 : 422);
+        // The SQL number, procedure name (letters/digits/underscore only), and line
+        // are useful operator evidence; never expose SQL text, parameters or values.
+        string procedure = new string((exception.Procedure ?? "").Where(c => char.IsAsciiLetterOrDigit(c) || c == '_').Take(100).ToArray());
+        return Results.Json(failure with
+        {
+            TechnicalDetails = IntegrationExceptionDiagnostics.Capture(exception, "SqlServer", failure.Code)
+                + $"SQL procedure: {procedure}\nSQL line: {exception.LineNumber}\n"
+        }, statusCode: failure.Transient ? 503 : 422);
     }
     catch (InvalidOperationException exception)
     {
         app.Logger.LogError(exception, "Bridge invalid operation during authenticated API request");
-        return Results.Json(TransferFailures.For("Bridge", "VALIDATION"), statusCode: 422);
+        return Results.Json(TransferFailures.For("Bridge", "VALIDATION") with
+        {
+            TechnicalDetails = IntegrationExceptionDiagnostics.Capture(exception, "Bridge", "VALIDATION")
+        }, statusCode: 422);
     }
 });
 
