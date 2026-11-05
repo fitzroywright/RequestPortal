@@ -5,11 +5,11 @@
     var result = Model.Transfers;
     var counts = result.Counts;
 }
-<dl class="integration-summary" aria-label="Transfer summary for the search and date range">
+<div class="integration-summary" role="group" aria-label="Filter transfers by status">
 @foreach(var item in new[] { ("failed","Failed",counts.Failed), ("pending","Pending",counts.Pending), ("retrying","Retrying",counts.Retrying), ("synchronized","Synchronized",counts.Synchronized), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired) }) {
     <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
 }
-</dl>
+</div>
 <form method="get" class="integration-filters" asp-page="/Staff/Integrations">
     <label class="integration-search">Search<span><svg class="integration-icon" aria-hidden="true"><use href="#integration-search"/></svg><input asp-for="Search" maxlength="200" placeholder="Request #, applicant name, TRN, or FFP Manager #" /></span></label>
     <label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@Monitor.StatusLabel(status)</option> }</select></label>
