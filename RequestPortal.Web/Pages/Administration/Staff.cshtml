@@ -65,7 +65,7 @@ else
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
 <form method="get" class="staff-directory-form" data-staff-directory-filters>
 <input type="hidden" name="Sort" value="@(Model.Sort ?? "name")"/>
-<div class="card staff-table-scroll"><table class="staff-directory-table"><thead><tr>
+<div class="card staff-table-scroll staff-directory-scroll" role="region" aria-label="Staff directory, scroll to view more staff and columns" tabindex="0"><table class="staff-directory-table"><thead><tr>
 <th scope="col" class="staff-name-header"><div class="staff-header-inline"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="name">Name</a><input asp-for="Search" type="search" aria-label="Search staff by name, username, email or provider" placeholder="Search staff…" autocomplete="off"/></div></th>
 <th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="username">Username</a></th>
 <th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="email">Email</a></th>
