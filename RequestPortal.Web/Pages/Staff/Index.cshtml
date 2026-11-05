@@ -22,7 +22,7 @@
         }
         else
         {
-        <div class="portal-workspace-grid staff-requests-grid">
+        <div class="portal-workspace-grid staff-requests-grid" style="grid-template-columns:minmax(0,1fr) 300px">
             <main class="workspace-panel request-panel">
                 <div class="panel-titlebar">
                     <div>
@@ -176,7 +176,10 @@
 
 
 <style>
-.staff-requests-grid{grid-template-columns:minmax(0,1fr) minmax(270px,.32fr)}
+.portal-workspace.staff-workspace .portal-workspace-grid.staff-requests-grid{grid-template-columns:minmax(0,1fr) 300px;align-items:start}
+.staff-requests-grid>.request-panel{grid-column:1;min-width:0}
+.staff-requests-grid>.staff-context-stack{grid-column:2;min-width:0;align-self:start}
+.staff-requests-grid .workspace-table-wrap{width:100%;max-width:100%;overflow-x:auto}
 .staff-requests-grid .request-panel{min-width:0}
 .staff-requests-grid .workspace-table{min-width:950px}
 .staff-requests-grid .workspace-table thead th{vertical-align:bottom}
@@ -184,10 +187,10 @@
 .staff-requests-grid .workspace-table th :is(input,select){display:block;width:100%;min-width:125px;margin:0;font-size:.85rem;letter-spacing:normal;text-transform:none;box-sizing:border-box}
 .staff-requests-grid .workspace-table th:nth-child(2),.staff-requests-grid .workspace-table th:nth-child(3){min-width:185px}
 .staff-requests-grid .workspace-table th:nth-child(5){min-width:170px}
-@@media(max-width:1100px){.staff-requests-grid{grid-template-columns:minmax(0,1fr)}}
+@@media(max-width:1100px){.portal-workspace.staff-workspace .portal-workspace-grid.staff-requests-grid{grid-template-columns:minmax(0,1fr)!important}.staff-requests-grid>.request-panel,.staff-requests-grid>.staff-context-stack{grid-column:1}}
 .staff-context-stack{display:grid;gap:10px;align-content:start;min-width:0}
 .staff-waiting-action{min-width:0}
-@@media(max-width:1100px){.staff-context-stack{grid-column:1 / -1}}
+
 .staff-waiting-list{display:grid;max-height:360px;overflow-y:auto;overscroll-behavior:contain}
 .staff-waiting-row{display:grid;gap:3px;padding:12px 14px;border-bottom:1px solid var(--border,#d8e0e8);text-decoration:none;min-width:0}
 .staff-waiting-row:hover,.staff-waiting-row:focus-visible{background:var(--surface-muted,#f1f5f9)}
