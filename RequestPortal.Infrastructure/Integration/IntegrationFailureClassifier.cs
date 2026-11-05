@@ -22,6 +22,14 @@ internal static class IntegrationFailureClassifier
             OperationCanceledException => "The integration operation was cancelled.",
             ExternalApplicationValidationException validation
                 => $"Invalid field: {validation.Field}.",
+            InvalidOperationException invalid when
+                invalid.Message is "Draft requests cannot be sent to FFP Manager."
+                or "Quick Intake applicant first and last name are required for FFP Manager."
+                or "FFP Manager did not return a generated ReferenceNo. Notifications remain pending."
+                => invalid.Message,
+            InvalidOperationException invalid when invalid.Message.StartsWith(
+                "FFP Manager bridge returned an empty ", StringComparison.Ordinal)
+                => "The FFP Manager bridge returned an empty response.",
             InvalidOperationException when stage == "Preparation"
                 => "The source request or required mapping failed validation.",
             _ => "The exception message is withheld because it may contain confidential values."
