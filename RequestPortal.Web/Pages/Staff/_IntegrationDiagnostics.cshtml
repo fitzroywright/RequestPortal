@@ -23,6 +23,13 @@ Target: @transfer.Target</pre></section>
         </div>
         <section id="full-diagnostics-@transfer.RequestId" class="integration-full-diagnostics" hidden>
             <h3>@transfer.PublicReference — transfer diagnostics</h3>
+            @if (Model.CanOperate) {
+                <section class="integration-exception-evidence" aria-label="Restricted exception evidence">
+                    <h3>Captured exception and stack trace</h3>
+                    <p>Restricted to security administrators. Shows exception type, approved error details, inner exception types, SQL number/procedure/line where available, and stack method names. Raw messages, connection strings, applicant data and source paths remain in protected service logs.</p>
+                    <pre data-integration-exception data-exception-url="@Url.Page("/Staff/Integrations", "Exception", new { requestId = transfer.RequestId })">Open Full Diagnostics to load restricted exception evidence.</pre>
+                </section>
+            }
             <div class="integration-technical-reference"><strong>Technical reference (for log lookup only)</strong><p>The ID connects this record to available operational logs. It is not the failure cause.</p>@if(transfer.LinkId is { } correlation) { <div class="integration-correlation"><code>@correlation</code><button type="button" data-copy-correlation="@correlation" aria-label="Copy technical reference" title="Copy technical reference"><svg class="integration-icon" aria-hidden="true"><use href="#integration-copy"/></svg></button></div> } else { <p>No technical reference is available.</p> }</div>
             <p><a asp-page="/Staff/Review" asp-route-id="@transfer.RequestId">Open original request</a> · @transfer.ApplicantName · @transfer.Source</p>
             <dl class="integration-facts"><div><dt>Submitted (UTC)</dt><dd>@transfer.SubmittedUtc.ToString("u")</dd></div><div><dt>Synchronized (UTC)</dt><dd>@(transfer.SynchronizedUtc?.ToString("u") ?? "Not synchronized")</dd></div><div><dt>Destination verified (UTC)</dt><dd>@(transfer.VerifiedUtc?.ToString("u") ?? "Not verified")</dd></div><div><dt>FFP Manager reference / ID</dt><dd>@(transfer.ApplicationNumber ?? "Not verified") / @(transfer.ApplicationId ?? "Not verified")</dd></div></dl>
