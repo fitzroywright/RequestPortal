@@ -3310,3 +3310,16 @@ body.authenticated-app:has(.messages-workspace-page){
 @media(max-width:600px){
     .quick-intake-review-fields{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Staff administration dropdown directly after the Reviewers navigation entry. */
+.authenticated-app .app-main-nav .staff-admin-menu{position:relative;display:flex;align-items:center;flex:0 0 auto;min-width:0}
+.authenticated-app .app-main-nav .staff-admin-menu>summary{display:inline-flex;gap:6px;align-items:center;justify-content:center;cursor:pointer;list-style:none;min-height:32px;padding:7px 12px;border-radius:7px;color:inherit;font-size:inherit;font-weight:inherit;white-space:nowrap}
+.authenticated-app .app-main-nav .staff-admin-menu>summary::-webkit-details-marker{display:none}
+.authenticated-app .app-main-nav .staff-admin-menu>summary:hover,.authenticated-app .app-main-nav .staff-admin-menu[open]>summary{background:var(--app-nav-hover-bg,rgba(255,255,255,.12));color:inherit}
+.authenticated-app .app-main-nav .staff-admin-menu>summary:focus-visible{outline:2px solid var(--theme-accent,#e59a42);outline-offset:2px}
+.authenticated-app .app-main-nav .staff-admin-menu[open]{z-index:40}
+.authenticated-app .app-main-nav .staff-admin-menu-panel{position:absolute;z-index:45;top:calc(100% + 6px);right:0;display:flex;flex-direction:column;gap:2px;min-width:230px;padding:7px;border:1px solid var(--studio-control-border,#d4d9df);border-radius:9px;background:var(--app-menu-bg,#fff);color:var(--app-menu-text,#253448);box-shadow:0 12px 28px rgba(16,26,39,.18)}
+.authenticated-app .app-main-nav .staff-admin-menu-panel a{display:block;padding:10px 12px;border-radius:6px;color:inherit;text-decoration:none;white-space:nowrap;font-weight:600;font-size:13px}
+.authenticated-app .app-main-nav .staff-admin-menu-panel a:hover,.authenticated-app .app-main-nav .staff-admin-menu-panel a:focus-visible{background:#edf2f7;color:#143b59}
+.authenticated-app .app-main-nav .staff-admin-menu-panel a:focus-visible{outline:2px solid var(--theme-accent,#e59a42)}
+@media(max-width:800px){.authenticated-app .app-main-nav .staff-admin-menu-panel{right:auto;left:0;min-width:200px}}
