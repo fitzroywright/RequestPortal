@@ -94,3 +94,28 @@
 /* Action column heading is the creation action, kept on the same sticky header row. */
 .staff-administration .staff-directory-table thead .staff-add-header{text-align:center;vertical-align:middle}
 .staff-administration .staff-directory-table thead .staff-add-header .button{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;min-height:32px;text-decoration:none}
+
+/* Keep per-staff actions visible even when the directory scrolls horizontally. */
+.staff-administration .staff-directory-scroll .staff-directory-table thead th:last-child{
+    position:sticky;
+    right:0;
+    z-index:4;
+    background:var(--surface-muted,#eaf0f5);
+    box-shadow:-1px 0 0 var(--border,#d8e0e8),0 1px 0 var(--border,#d8e0e8);
+}
+.staff-administration .staff-directory-scroll .staff-directory-table tbody td:last-child{
+    position:sticky;
+    right:0;
+    z-index:1;
+    background:var(--surface,#fff);
+    box-shadow:-1px 0 0 var(--border,#d8e0e8);
+    white-space:nowrap;
+    text-align:center;
+}
+.staff-administration .staff-directory-scroll .staff-directory-table tbody tr:hover td:last-child{
+    background:var(--surface-muted,#eaf0f5);
+}
+.staff-administration .staff-directory-scroll .staff-directory-table tbody .staff-review-access{
+    white-space:nowrap;
+    font-weight:700;
+}
