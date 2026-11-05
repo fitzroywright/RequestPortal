@@ -60,7 +60,6 @@ else { <details><summary>Details</summary><p>@entry.Action</p></details> }
 }
 else
 {
-<p class="action-row"><a class="button button-small" asp-page="AddStaff">Add Staff</a></p>
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
 <form method="get" class="staff-directory-form" data-staff-directory-filters>
 <input type="hidden" name="Sort" value="@(Model.Sort ?? "name")"/>
@@ -72,7 +71,7 @@ else
 <th scope="col" class="staff-role-header"><select asp-for="Role" aria-label="Filter by staff role"><option value="">All roles</option>@foreach(var role in Model.Roles) { <option value="@role.Key">@role.Name</option> }</select></th>
 <th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="last">Last sign-in</a></th>
 <th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="registered">Registered</a></th>
-<th scope="col"><span>Actions</span></th>
+<th scope="col" class="staff-add-header"><a class="button button-small" asp-page="AddStaff">Add Staff</a></th>
 </tr></thead><tbody>
 @foreach(var entry in Model.Entries) {
 <tr><td><a asp-page="Staff" asp-route-Id="@entry.Account.Id">@entry.Account.DisplayName</a></td><td>@entry.Account.LoginName</td><td>@entry.Email</td><td>@StaffModel.StatusLabel(entry.Account.Status)</td><td>@string.Join(", ",entry.Roles.Where(x=>x==PortalRoles.Administrator||x==PortalRoles.Reviewer))</td><td>@(entry.LastSignIn.HasValue ? StaffModel.DisplayTime(entry.LastSignIn) : "Never signed in")</td><td>@StaffModel.DisplayTime(entry.Registered)</td><td><a class="button button-small @(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "" : "button-outline")" asp-page="Staff" asp-route-Id="@entry.Account.Id">@(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "Review access" : "Manage")</a></td></tr>
