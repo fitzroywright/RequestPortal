@@ -36,5 +36,5 @@ public sealed class NotificationOptions
 
     public string WhatsAppPhoneNumberId { get; set; } = string.Empty;
 
-    public string WhatsAppAccessTokenSecretName { get; set; } = "messaging/whatsapp/access-token";
+    public string WhatsAppAccessTokenSecretName { get; set; } = "messaging/whatsapp/api-token";
 }

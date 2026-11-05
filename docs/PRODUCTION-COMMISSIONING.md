@@ -180,12 +180,15 @@ field:
 | --- | --- |
 | `Notifications:WhatsAppVerificationTokenSecretName` | `messaging/whatsapp/verification-token` |
 | `Notifications:WhatsAppAppSecretName` | `messaging/whatsapp/app-secret` |
-| `Notifications:WhatsAppAccessTokenSecretName` | `messaging/whatsapp/access-token` |
+| `Notifications:WhatsAppAccessTokenSecretName` | `messaging/whatsapp/api-token` |
 
-An authorized OpenBao operator must preserve any existing values, generate at least
-32 random bytes for an absent verification token, and provision the actual Meta App
-Secret for the app owning the WhatsApp account. Do not substitute the login/Facebook
-app secret without verifying that it is the same Meta app. Never print secret values
+All three secrets have been provisioned under the existing RequestPortal KV v2
+namespace. Preserve the existing `api-token`, `verification-token` and `app-secret`
+values and their versions. Retrieve each through Common.Secrets using the existing
+workload AppRole before commissioning. Do not create an `access-token` alias, copy,
+rotate, rename or overwrite the API credential. Verify the API token against Meta
+for the configured development WABA and phone before enabling outbound delivery.
+Do not substitute the login/Facebook app secret without verifying that it is the same Meta app. Never print secret values
 or place them in arguments, source files, environment overrides or deployment logs.
 The workload requires only `read` on the three exact KV data paths, such as
 `secret/data/requestportal/messaging/whatsapp/verification-token`, not write/list
@@ -201,7 +204,22 @@ prerequisite, not an application migration.
 
 Set `Notifications:WhatsAppPhoneNumberId` and `Notifications:WhatsAppBusinessAccountId`
 for the intended environment. The development identifiers are `1427917097069650`
-and `1823610105620506`; they are deliberately not production defaults. Keep
+and `1823610105620506`; they are deliberately not production defaults. The intended
+development commissioning settings (host configuration only) are:
+
+```ini
+# Meta development test number; not the future production WhatsApp number.
+Notifications__WhatsAppWebhookEnabled=true
+Notifications__WhatsAppPhoneNumberId=1427917097069650
+Notifications__WhatsAppBusinessAccountId=1823610105620506
+Notifications__WhatsAppAccessTokenSecretName=messaging/whatsapp/api-token
+Notifications__WhatsAppEnabled=false
+```
+
+Enable the webhook only after its AppRole secret-read and nginx logging checks
+pass. Keep outbound notifications disabled until token validity, messaging grants,
+recipient opt-in and delivery behavior have been verified. An invalid API token
+blocks outbound delivery but does not authenticate incoming webhooks. Keep
 `Notifications:WhatsAppGraphApiVersion` explicitly configured for outbound delivery.
 Deploy through Aegis.Operations `Deploy-Kratos.ps1 -Applications requestportal`
 using verified main and the pinned CommonRoot. Its backups and rollback preserve

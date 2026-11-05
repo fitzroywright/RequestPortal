@@ -19,7 +19,7 @@ internal static class ProductionCommissioning
 
         string whatsAppSecretName =
             configuration["Notifications:WhatsAppAccessTokenSecretName"]?.Trim()
-            ?? "messaging/whatsapp/access-token";
+            ?? "messaging/whatsapp/api-token";
 
         string messagingGraphSecretName =
             configuration["Messaging:MicrosoftGraph:ClientSecretName"]?.Trim()

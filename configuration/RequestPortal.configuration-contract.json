@@ -574,7 +574,7 @@
       "kind": "Secret",
       "required": false,
       "purpose": "Resolved using the existing Common.Secrets/OpenBao workload identity when the related channel is enabled.",
-      "secretName": "messaging/whatsapp/access-token",
+      "secretName": "messaging/whatsapp/api-token",
       "isConfigured": false,
       "sensitive": true
     }
