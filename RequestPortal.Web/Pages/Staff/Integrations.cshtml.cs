@@ -124,6 +124,18 @@ public sealed class IntegrationsModel : PageModel
         return Page();
     }
 
+    // Exception frames are privileged and loaded only on explicit demand.
+    // They never accompany the normal list or general staff diagnostics.
+    public async Task<IActionResult> OnGetExceptionAsync(Guid requestId)
+    {
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        if (!CanOperate) return Forbid(StaffOidcOptions.StaffCookieScheme);
+        if (requestId == Guid.Empty) return BadRequest();
+        string? detail = await integrationStatusService.GetExceptionDetailsAsync(requestId, HttpContext.RequestAborted);
+        return Content(detail ?? "No captured exception evidence is available for this request. Historical exceptions cannot be reconstructed.", "text/plain");
+    }
+
     public async Task<IActionResult> OnGetDiagnosticsAsync(Guid requestId)
     {
         Response.Headers.CacheControl = "no-store";
