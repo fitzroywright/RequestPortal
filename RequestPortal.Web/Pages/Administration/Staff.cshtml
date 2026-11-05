@@ -7,7 +7,7 @@
 @{ ViewData["Title"] = Model.Selected is null ? "Staff & Roles" : "Staff details"; }
 @section Styles { <link rel="stylesheet" href="~/css/staff-administration.css" asp-append-version="true"/> }
 <section class="section staff-administration"><div class="shell">
-<div class="eyebrow">Administration</div><h1>@ViewData["Title"]</h1>
+<div class="eyebrow">Administration</div><div class="staff-page-heading"><h1>@ViewData["Title"]</h1>@if (Model.Selected is null) { <a class="button button-small" asp-page="AddStaff">Add Staff</a> }</div>
 @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" class="flash error" role="alert"></div> }
 @if (Model.Selected is { } staff)
 {
@@ -61,7 +61,6 @@ else { <details><summary>Details</summary><p>@entry.Action</p></details> }
 else
 {
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
-<div class="staff-directory-toolbar"><a class="button button-small" asp-page="AddStaff">Add Staff</a></div>
 <form method="get" class="staff-directory-form" data-staff-directory-filters>
 <input type="hidden" name="Sort" value="@(Model.Sort ?? "name")"/>
 <div class="card staff-table-scroll staff-directory-scroll" role="region" aria-label="Staff directory, scroll to view more staff and columns" tabindex="0"><table class="staff-directory-table"><thead><tr>
