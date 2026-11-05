@@ -61,7 +61,6 @@ else { <details><summary>Details</summary><p>@entry.Action</p></details> }
 else
 {
 <p class="action-row"><a class="button button-small" asp-page="AddStaff">Add Staff</a></p>
-<p><a asp-page="Staff">All staff</a> · <a asp-page="Staff" asp-route-Status="PendingAccess">Pending Access (@Model.PendingCount)</a></p>
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
 <form method="get" class="staff-directory-form" data-staff-directory-filters>
 <input type="hidden" name="Sort" value="@(Model.Sort ?? "name")"/>
