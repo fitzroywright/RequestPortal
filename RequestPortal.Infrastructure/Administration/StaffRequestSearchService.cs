@@ -41,6 +41,33 @@ public sealed class StaffRequestSearchService(RequestPortalDbContext db) : IStaf
     public Task<StaffRequestSearchResult> GetSubmittedQueueAsync(int pageNumber = 1, int pageSize = 25, CancellationToken cancellationToken = default) =>
         PageAsync(Rows().Where(r => r.Status == RequestPortal.Domain.Requests.RequestStatus.Submitted), pageNumber, pageSize, cancellationToken);
 
+    public Task<StaffRequestSearchResult> GetFilteredQueueAsync(string? applicant, string? organization, RequestPortal.Domain.Requests.RequestStatus? status, int pageNumber = 1, int pageSize = 25, CancellationToken cancellationToken = default)
+    {
+        var query = Rows();
+        if (status.HasValue)
+            query = query.Where(r => r.Status == status.Value);
+        else
+            query = query.Where(r => r.Status != RequestPortal.Domain.Requests.RequestStatus.Draft);
+
+        // Treat text as literal substrings, not SQL LIKE expressions.
+        static string Escape(string value) => value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        string name = applicant?.Trim() ?? "";
+        string org = organization?.Trim() ?? "";
+        if (name.Length > 0)
+        {
+            string pattern = "%" + Escape(name[..Math.Min(200, name.Length)]) + "%";
+            query = query.Where(r => EF.Functions.ILike(r.ApplicantName, pattern, "\\") ||
+                                     EF.Functions.ILike(r.RegisteredName, pattern, "\\") ||
+                                     EF.Functions.ILike(r.DisplayName, pattern, "\\"));
+        }
+        if (org.Length > 0)
+        {
+            string pattern = "%" + Escape(org[..Math.Min(200, org.Length)]) + "%";
+            query = query.Where(r => EF.Functions.ILike(r.OrganizationName, pattern, "\\"));
+        }
+        return PageAsync(query, pageNumber, pageSize, cancellationToken);
+    }
+
     public async Task<StaffRequestSearchResult> SearchAsync(string search, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
     {
         pageSize = ValidPageSize(pageSize);
