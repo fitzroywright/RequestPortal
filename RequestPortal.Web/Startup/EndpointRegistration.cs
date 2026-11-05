@@ -26,6 +26,7 @@ internal static class EndpointRegistration
 
         app.MapFfpManagerIntegrationEndpoints();
         app.MapDeliveryEndpoints();
+        app.MapWhatsAppWebhookEndpoints();
         app.MapProfileAvatar();
     }
 

@@ -188,6 +188,14 @@ public sealed class RequiredSecretsDiagnosticLevelTest(
 
         string? diagnosticCredentialName =
             configuration["Aegis:Diagnostics:RequestCredentialSecretName"]?.Trim();
+
+        if (configuration.GetValue("Notifications:WhatsAppWebhookEnabled", false))
+        {
+            required.Add(("WhatsApp verification token", configuration["Notifications:WhatsAppVerificationTokenSecretName"]
+                ?? "messaging/whatsapp/verification-token"));
+            required.Add(("Meta application secret", configuration["Notifications:WhatsAppAppSecretName"]
+                ?? "messaging/whatsapp/app-secret"));
+        }
         if (!string.IsNullOrWhiteSpace(diagnosticCredentialName))
         {
             required.Add(("Diagnostics request credential", diagnosticCredentialName));

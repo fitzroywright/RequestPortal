@@ -9,6 +9,7 @@ internal static class MessagingServiceRegistration
 {
     public static void Add(WebApplicationBuilder builder)
     {
+        builder.Services.AddScoped<IWhatsAppWebhookStore, WhatsAppWebhookStore>();
         builder.Services
             .AddOptions<NotificationOptions>()
             .Bind(

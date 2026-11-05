@@ -484,6 +484,99 @@
       "secretName": "FfpManagerIntegration:SharedSecret",
       "isConfigured": false,
       "sensitive": true
+    },
+    {
+      "id": "whatsapp-whatsappwebhookenabled",
+      "displayName": "WhatsApp webhook enabled",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Configures the optional Meta WhatsApp integration; values and resolved secrets are never published.",
+      "configurationKey": "Notifications:WhatsAppWebhookEnabled",
+      "isConfigured": false
+    },
+    {
+      "id": "whatsapp-whatsappphonenumberid",
+      "displayName": "WhatsApp phone number ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Configures the optional Meta WhatsApp integration; values and resolved secrets are never published.",
+      "configurationKey": "Notifications:WhatsAppPhoneNumberId",
+      "isConfigured": false
+    },
+    {
+      "id": "whatsapp-whatsappbusinessaccountid",
+      "displayName": "WhatsApp business account ID",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Configures the optional Meta WhatsApp integration; values and resolved secrets are never published.",
+      "configurationKey": "Notifications:WhatsAppBusinessAccountId",
+      "isConfigured": false
+    },
+    {
+      "id": "whatsapp-whatsappgraphapiversion",
+      "displayName": "WhatsApp Graph API version",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Configures the optional Meta WhatsApp integration; values and resolved secrets are never published.",
+      "configurationKey": "Notifications:WhatsAppGraphApiVersion",
+      "isConfigured": false
+    },
+    {
+      "id": "whatsapp-whatsappverificationtokensecretname",
+      "displayName": "WhatsApp verification token secret reference",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Configures the optional Meta WhatsApp integration; values and resolved secrets are never published.",
+      "configurationKey": "Notifications:WhatsAppVerificationTokenSecretName",
+      "isConfigured": false
+    },
+    {
+      "id": "whatsapp-whatsappappsecretname",
+      "displayName": "Meta application secret reference",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Configures the optional Meta WhatsApp integration; values and resolved secrets are never published.",
+      "configurationKey": "Notifications:WhatsAppAppSecretName",
+      "isConfigured": false
+    },
+    {
+      "id": "whatsapp-whatsappaccesstokensecretname",
+      "displayName": "WhatsApp access token secret reference",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Configures the optional Meta WhatsApp integration; values and resolved secrets are never published.",
+      "configurationKey": "Notifications:WhatsAppAccessTokenSecretName",
+      "isConfigured": false
+    },
+    {
+      "id": "whatsapp-verification-token",
+      "displayName": "WhatsApp webhook verification token",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Resolved using the existing Common.Secrets/OpenBao workload identity when the related channel is enabled.",
+      "secretName": "messaging/whatsapp/verification-token",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "whatsapp-app-secret",
+      "displayName": "Meta application secret",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Resolved using the existing Common.Secrets/OpenBao workload identity when the related channel is enabled.",
+      "secretName": "messaging/whatsapp/app-secret",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "whatsapp-access-token",
+      "displayName": "WhatsApp Cloud API access token",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Resolved using the existing Common.Secrets/OpenBao workload identity when the related channel is enabled.",
+      "secretName": "messaging/whatsapp/access-token",
+      "isConfigured": false,
+      "sensitive": true
     }
   ],
   "runbookReference": "docs/RUNBOOK.md",

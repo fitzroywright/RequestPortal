@@ -36,7 +36,11 @@ internal static class ProductionCommissioning
             await provider.GetAsync(integrationSharedSecretName),
             await provider.GetAsync(storageSecretName),
             await provider.GetAsync(whatsAppSecretName),
-            await provider.GetAsync(messagingGraphSecretName));
+            await provider.GetAsync(messagingGraphSecretName),
+            configuration.GetValue("Notifications:WhatsAppWebhookEnabled", false)
+                ? await provider.GetAsync(configuration["Notifications:WhatsAppVerificationTokenSecretName"] ?? "messaging/whatsapp/verification-token") : null,
+            configuration.GetValue("Notifications:WhatsAppWebhookEnabled", false)
+                ? await provider.GetAsync(configuration["Notifications:WhatsAppAppSecretName"] ?? "messaging/whatsapp/app-secret") : null);
     }
 
     public static IReadOnlyList<ProductionConfigurationFailure> Validate(
@@ -44,6 +48,14 @@ internal static class ProductionCommissioning
         RuntimeSecrets secrets)
     {
         var failures = new List<ProductionConfigurationFailure>();
+        if (configuration.GetValue("Notifications:WhatsAppWebhookEnabled", false) &&
+            (string.IsNullOrWhiteSpace(secrets.WhatsAppVerificationToken) ||
+             string.IsNullOrWhiteSpace(secrets.WhatsAppAppSecret) ||
+             !IsMetaId(configuration["Notifications:WhatsAppPhoneNumberId"]) ||
+             !IsMetaId(configuration["Notifications:WhatsAppBusinessAccountId"])))
+        {
+            failures.Add(new("RP-WHATSAPP-WEBHOOK-001", "Enabled WhatsApp webhooks require PhoneNumberId, BusinessAccountId and both Common.Secrets-backed webhook secrets."));
+        }
         string connectionString = secrets.ConnectionString ?? string.Empty;
         string storageProvider = configuration["Storage:Provider"]?.Trim() ?? "LocalFolder";
         string storageRoot = storageProvider.Equals("NetworkFolder", StringComparison.OrdinalIgnoreCase)
@@ -170,6 +182,8 @@ internal static class ProductionCommissioning
             string.Join("\n", failures.Select(
                 failure => $"{failure.Code}: {failure.Message}"));
     }
+
+    private static bool IsMetaId(string? value) => value is { Length: > 0 and <= 32 } && value.All(char.IsAsciiDigit);
 }
 
 internal sealed record RuntimeSecrets(
@@ -183,7 +197,9 @@ internal sealed record RuntimeSecrets(
     string? FfpManagerSharedSecret,
     string? StorageSharePointClientSecret,
     string? WhatsAppAccessToken,
-    string? MessagingMicrosoftGraphClientSecret);
+    string? MessagingMicrosoftGraphClientSecret,
+    string? WhatsAppVerificationToken = null,
+    string? WhatsAppAppSecret = null);
 
 internal sealed record ProductionConfigurationFailure(
     string Code,

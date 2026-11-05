@@ -10,6 +10,14 @@ public sealed class NotificationOptions
 
     public bool WhatsAppEnabled { get; set; }
 
+    public bool WhatsAppWebhookEnabled { get; set; }
+
+    public string WhatsAppBusinessAccountId { get; set; } = string.Empty;
+
+    public string WhatsAppVerificationTokenSecretName { get; set; } = "messaging/whatsapp/verification-token";
+
+    public string WhatsAppAppSecretName { get; set; } = "messaging/whatsapp/app-secret";
+
     public string SmtpHost { get; set; } = string.Empty;
 
     public int SmtpPort { get; set; } = 587;

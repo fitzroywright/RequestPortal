@@ -162,3 +162,78 @@ Before DNS cutover:
 12. Production diagnostics/alerts are green.
 13. Demo mode is confirmed disabled and the production guard is tested.
 14. Backup/restore drill is complete.
+
+## Meta WhatsApp webhook commissioning
+
+The public callback is `https://requestportal.ffpja.org/api/webhooks/whatsapp`.
+GET and POST explicitly allow anonymous requests and use Meta verification and
+HMAC-SHA256 authentication respectively. `Notifications:WhatsAppWebhookEnabled`
+defaults to false and is independent of outbound `WhatsAppEnabled`. Enabled
+production startup requires both webhook secrets and configured phone/account IDs.
+Keep existing outbound routing, templates, access token and retry settings intact.
+
+Use these Common.Secrets references with the existing RequestPortal OpenBao KV v2
+mount/base path (default `secret` / `requestportal`); each secret uses the `value`
+field:
+
+| Configuration | Default secret reference |
+| --- | --- |
+| `Notifications:WhatsAppVerificationTokenSecretName` | `messaging/whatsapp/verification-token` |
+| `Notifications:WhatsAppAppSecretName` | `messaging/whatsapp/app-secret` |
+| `Notifications:WhatsAppAccessTokenSecretName` | `messaging/whatsapp/access-token` |
+
+An authorized OpenBao operator must preserve any existing values, generate at least
+32 random bytes for an absent verification token, and provision the actual Meta App
+Secret for the app owning the WhatsApp account. Do not substitute the login/Facebook
+app secret without verifying that it is the same Meta app. Never print secret values
+or place them in arguments, source files, environment overrides or deployment logs.
+The workload requires only `read` on the three exact KV data paths, such as
+`secret/data/requestportal/messaging/whatsapp/verification-token`, not write/list
+or policy administration. Preserve its other required application permissions.
+Operator write permissions are separate from workload read permissions.
+
+Before enabling, ensure nginx access logs for this exact endpoint omit query strings
+(or disable access logging for the endpoint); the GET token arrives in the query.
+Preserve the existing proxy/TLS settings. Keep ASP.NET request logging at Warning
+for `Microsoft.AspNetCore` and do not enable request-body logging. Do not run a real
+verification-token request until logging is safe. This is a host commissioning
+prerequisite, not an application migration.
+
+Set `Notifications:WhatsAppPhoneNumberId` and `Notifications:WhatsAppBusinessAccountId`
+for the intended environment. The development identifiers are `1427917097069650`
+and `1823610105620506`; they are deliberately not production defaults. Keep
+`Notifications:WhatsAppGraphApiVersion` explicitly configured for outbound delivery.
+Deploy through Aegis.Operations `Deploy-Kratos.ps1 -Applications requestportal`
+using verified main and the pinned CommonRoot. Its backups and rollback preserve
+protected configuration and data. Do not use the wrapper that also deploys Bridge.
+
+The webhook reads at most 1 MiB, verifies the signature over the original bytes,
+checks account/phone IDs, and commits normalized receipts atomically to the existing
+inbox/outbox journal before responding 200. The composite inbox key deduplicates
+retries across processes. Journal records use MessageType/Consumer
+`RequestPortal.WhatsAppWebhook.v1`, with ProcessedUtc populated so outbound workers
+do not send them. Status receipts preserve sent/delivered/read/failed history by
+Meta message ID, state and timestamp. Inbound receipts preserve the message ID,
+type and timestamp. Text, media, sender/recipient phone numbers, contacts and provider
+error descriptions are discarded. Numeric error codes are retained and failures
+are also routed to Common.Diagnostics. Unknown event types receive a durable
+ignored receipt. No account linking, applicant creation, automatic replies or
+application-status mutations occur. Common.Messaging currently discards Meta's
+outbound provider message ID, so receipts are searchable by Meta ID but are not
+asserted to update a particular applicant's NotificationHistory.
+
+After host commissioning, verify exact GET challenge echo, wrong-token 403,
+unsigned/tampered POST 403 and a signed synthetic event committed to the protected
+journal. Database failures must return 503 so Meta retries. Use synthetic event IDs;
+do not touch live applicant records. Verify service, nginx, HTTPS, health, protected
+pages and outbound configuration separately. An endpoint deployment alone does
+not establish a Meta subscription.
+
+In Meta Developer Portal, select the app owning the development WhatsApp account,
+open WhatsApp > Configuration > Webhooks, enter the callback above and the
+verification token from the approved secret handoff, then select Verify and save.
+Subscribe the WhatsApp Business Account `messages` field (it carries inbound
+messages and delivery statuses). Confirm the intended account/phone is subscribed,
+run the dashboard webhook test, and confirm receipt persistence. Use the existing
+test recipient for an authorized outbound test and verify sent/delivered/read
+callbacks. Do not mark dashboard subscription complete until Meta verifies it.
