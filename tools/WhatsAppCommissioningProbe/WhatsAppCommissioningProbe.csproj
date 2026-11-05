@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WhatsAppCommissioningProbe.Tests" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="Common.Secrets"><HintPath>$(PortalPublishRoot)/Common.Secrets.dll</HintPath></Reference>
+    <Reference Include="Common.Diagnostics"><HintPath>$(PortalPublishRoot)/Common.Diagnostics.dll</HintPath></Reference>
+    <Reference Include="Npgsql"><HintPath>$(PortalPublishRoot)/Npgsql.dll</HintPath></Reference>
+  </ItemGroup>
+  <Target Name="RequireDeployedReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(PortalPublishRoot)/RequestPortal.Web.dll')" Text="PortalPublishRoot must identify the validated deployed publish output; no application rebuild is required." />
+  </Target>
+</Project>
