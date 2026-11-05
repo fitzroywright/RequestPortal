@@ -115,7 +115,23 @@
 .staff-administration .staff-directory-scroll .staff-directory-table tbody tr:hover td:last-child{
     background:var(--surface-muted,#eaf0f5);
 }
-.staff-administration .staff-directory-scroll .staff-directory-table tbody .staff-review-access{
-    white-space:nowrap;
+
+/* Entire staff rows open details. Keep the Add Staff header visible on horizontal scroll. */
+.staff-administration .staff-directory-scroll .staff-directory-table tbody tr.staff-select-row{cursor:pointer}
+.staff-administration .staff-directory-scroll .staff-directory-table tbody tr.staff-select-row:hover>td,
+.staff-administration .staff-directory-scroll .staff-directory-table tbody tr.staff-select-row:focus-visible>td{
+    background:var(--surface-muted,#eaf0f5);
+}
+.staff-administration .staff-directory-scroll .staff-directory-table tbody tr.staff-select-row:focus-visible{
+    outline:2px solid var(--accent,#1464bc);
+    outline-offset:-2px;
+}
+.staff-administration .staff-directory-scroll .staff-directory-table tbody .staff-row-indicator{
+    color:var(--muted,#526578);
+    font-size:1.5rem;
+    font-weight:600;
+    line-height:1;
+}
+.staff-administration .staff-directory-scroll .staff-directory-table tbody .staff-pending-row>td:first-child{
     font-weight:700;
 }
