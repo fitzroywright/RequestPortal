@@ -23,7 +23,8 @@ public interface IIntegrationStatusService
     Task<IntegrationMonitorPage> SearchAsync(IntegrationMonitorQuery query, CancellationToken cancellationToken = default);
     Task<IntegrationTransferDetail?> GetRequestAsync(Guid requestId, CancellationToken cancellationToken = default);
     // Restricted diagnostic retrieval. Web callers MUST enforce ManageSecurity.
-    Task<string?> GetExceptionDetailsAsync(Guid requestId, CancellationToken cancellationToken = default);
+    Task<string?> GetExceptionDetailsAsync(Guid requestId, CancellationToken cancellationToken = default)
+        => Task.FromResult<string?>(null);
     Task<IntegrationTransferRow?> GetTransferAsync(Guid requestId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<IntegrationAttemptView>> GetAttemptPageAsync(Guid linkId, int page, CancellationToken cancellationToken = default);
     Task<int> CountAttentionAsync(CancellationToken cancellationToken = default);
