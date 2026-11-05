@@ -252,10 +252,11 @@ api.AddEndpointFilter(async (context, next) =>
         // The SQL number, procedure name (letters/digits/underscore only), and line
         // are useful operator evidence; never expose SQL text, parameters or values.
         string procedure = new string((exception.Procedure ?? "").Where(c => char.IsAsciiLetterOrDigit(c) || c == '_').Take(100).ToArray());
+        string sqlDetail = IntegrationExceptionDiagnostics.Capture(exception, "SqlServer", failure.Code)
+            + $"SQL procedure: {procedure}\nSQL line: {exception.LineNumber}\n";
         return Results.Json(failure with
         {
-            TechnicalDetails = IntegrationExceptionDiagnostics.Capture(exception, "SqlServer", failure.Code)
-                + $"SQL procedure: {procedure}\nSQL line: {exception.LineNumber}\n"
+            TechnicalDetails = sqlDetail[..Math.Min(sqlDetail.Length, 4000)]
         }, statusCode: failure.Transient ? 503 : 422);
     }
     catch (InvalidOperationException exception)
