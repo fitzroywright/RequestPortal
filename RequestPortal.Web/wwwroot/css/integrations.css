@@ -181,3 +181,9 @@ body.integrations-page{height:100vh;height:100dvh;min-height:0;display:flex;flex
 .integration-monitor .integration-technical-reference .integration-correlation{max-width:480px}
 @media(max-width:1100px){.integration-monitor .integration-diagnostic-columns{grid-template-columns:repeat(2,minmax(0,1fr))}.integration-monitor .integration-summary .integration-tile-label{font-size:12px}}
 @media(max-width:650px){.integration-monitor .integration-diagnostic-columns{grid-template-columns:minmax(0,1fr)}}
+
+/* Restricted exception trace: only shown after explicit privileged request. */
+.integration-monitor .integration-exception-evidence{margin:16px 0 20px;border:1px solid #b5c9dd;border-radius:8px;background:#f1f6fc;padding:13px 16px}
+.integration-monitor .integration-exception-evidence h3{margin:0 0 6px;color:#173b5d}
+.integration-monitor .integration-exception-evidence p{margin:0 0 10px;font-size:12px;line-height:1.5;color:#38546c}
+.integration-monitor .integration-exception-evidence pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;max-height:310px;overflow-y:auto;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;background:#fff;border:1px solid #c5d3e3;border-radius:6px;padding:12px}
