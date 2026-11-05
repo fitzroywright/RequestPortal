@@ -1,0 +1,34 @@
+@model RequestPortal.Web.Pages.Staff.IntegrationsModel
+@using RequestPortal.Domain.Integration
+@using Monitor = RequestPortal.Web.Pages.Staff.IntegrationsModel
+@if(Model.Selected is { } detail) {
+    var transfer = detail.Transfer;
+    var last = detail.Attempts.FirstOrDefault();
+    string statusClass = Monitor.StatusClass(transfer.Status);
+    <section class="integration-diagnostics @statusClass" aria-label="Diagnostics for @transfer.PublicReference">
+        <header class="integration-error-heading"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@statusClass"/></svg><div><strong>@(transfer.Status is SynchronizationStatus.Failed or SynchronizationStatus.ReconciliationRequired or SynchronizationStatus.Retrying ? "Actual Error" : "Transfer diagnostics")</strong><h2>@Monitor.DiagnosticTitle(transfer)</h2><p>@(transfer.RecordedError ?? transfer.Explanation ?? "No error was recorded.")</p></div></header>
+        <div class="integration-diagnostic-columns">
+            <section><h3>Technical Details</h3><pre>Code: @(transfer.ErrorCode ?? "Not recorded")
+Stage: @(transfer.FailureStage ?? "Not recorded")
+Classification: @(transfer.FailureClassification ?? "Not recorded")
+Source: @transfer.Source
+Target: @transfer.Target</pre></section>
+            <section><h3>Last Operation</h3><dl class="integration-operation"><dt>Operation:</dt><dd>@(last?.Operation ?? "Not recorded")</dd><dt>Attempted:</dt><dd>@(last?.StartedUtc.ToString("MMM dd, yyyy HH:mm:ss'Z'") ?? transfer.LastAttemptUtc?.ToString("MMM dd, yyyy HH:mm:ss'Z'") ?? "Not attempted")</dd><dt>Duration:</dt><dd>@(last?.CompletedUtc is { } completed ? (completed - last.StartedUtc).TotalSeconds.ToString("0.##") + " s" : "Not recorded")</dd><dt>Result:</dt><dd>@(last is null ? "Not recorded" : last.Succeeded ? "Succeeded" : last.CompletedUtc.HasValue ? "Failed (" + last.Classification + ")" : "In progress / interrupted")</dd></dl></section>
+            <section><h3>Retry History</h3><dl class="integration-operation"><dt>Attempts:</dt><dd>@transfer.AttemptCount</dd><dt>Next retry:</dt><dd>@(transfer.NextRetryUtc?.ToString("MMM dd, yyyy HH:mm:ss'Z'") ?? "Not scheduled")</dd></dl></section>
+            <section><h3>Correlation ID</h3>@if(transfer.LinkId is { } correlation) { <div class="integration-correlation"><code>@correlation</code><button type="button" data-copy-correlation="@correlation" aria-label="Copy correlation ID" title="Copy correlation ID"><svg class="integration-icon" aria-hidden="true"><use href="#integration-copy"/></svg></button></div> } else { <p>No correlation ID was recorded.</p> }</section>
+            <section class="integration-recovery"><h3>Recommended Recovery Action</h3><p class="integration-guidance"><svg class="integration-icon" aria-hidden="true"><use href="#integration-info"/></svg><span>@(transfer.RecoveryAction ?? "No recovery action was recorded.")</span></p><div class="integration-diagnostic-actions"><button class="button button-small button-outline" type="button" data-full-diagnostics aria-expanded="false" aria-controls="full-diagnostics-@transfer.RequestId">View Full Diagnostics</button>@if(Model.CanOperate && Monitor.CanRetry(transfer)) { <form method="post" asp-page-handler="Retry" asp-all-route-data="Model.Routes(Model.PageNumber)"><input type="hidden" name="linkId" value="@transfer.LinkId"/><input type="hidden" name="RequestId" value="@transfer.RequestId"/><button class="button button-small" type="submit" title="Verify destination and retry">Retry Integration</button></form> }</div></section>
+        </div>
+        <section id="full-diagnostics-@transfer.RequestId" class="integration-full-diagnostics" hidden>
+            <h3>@transfer.PublicReference — transfer diagnostics</h3>
+            <p><a asp-page="/Staff/Review" asp-route-id="@transfer.RequestId">Open original request</a> · @transfer.ApplicantName · @transfer.Source</p>
+            <dl class="integration-facts"><div><dt>Submitted (UTC)</dt><dd>@transfer.SubmittedUtc.ToString("u")</dd></div><div><dt>Synchronized (UTC)</dt><dd>@(transfer.SynchronizedUtc?.ToString("u") ?? "Not synchronized")</dd></div><div><dt>Destination verified (UTC)</dt><dd>@(transfer.VerifiedUtc?.ToString("u") ?? "Not verified")</dd></div><div><dt>FFP Manager reference / ID</dt><dd>@(transfer.ApplicationNumber ?? "Not verified") / @(transfer.ApplicationId ?? "Not verified")</dd></div></dl>
+            @if(Model.CanOperate) { <form method="post" asp-page-handler="Reconcile" asp-all-route-data="Model.Routes(Model.PageNumber)"><input type="hidden" name="RequestId" value="@transfer.RequestId"/><button class="button button-small button-outline" type="submit">Recheck synchronization status</button></form> }
+            <h3>Attempt history</h3><p>Latest @detail.Attempts.Count of @detail.AttemptTotal recorded outcomes.</p>
+            <table class="integration-attempts"><thead><tr><th>Started / Completed (UTC)</th><th>Operation</th><th>Outcome</th><th>Stage / Code</th><th>Explanation</th></tr></thead><tbody>
+            @foreach(var attempt in detail.Attempts) { <tr><td>@attempt.StartedUtc.ToString("u")<span>@(attempt.CompletedUtc?.ToString("u") ?? "Incomplete — inspect worker health")</span></td><td>@attempt.Operation #@attempt.Number</td><td>@(attempt.Succeeded ? "Succeeded" : attempt.CompletedUtc.HasValue ? "Failed" : "In progress / interrupted")</td><td>@attempt.Stage / @attempt.ErrorCode</td><td>@attempt.Explanation</td></tr> }
+            @if(detail.Attempts.Count==0) { <tr><td colspan="5">No recorded attempts. Historical outcomes before monitoring was installed cannot be reconstructed automatically.</td></tr> }
+            </tbody></table>
+            <h3>Operator audit</h3><p>Latest 100 actions; full audit records are retained.</p><ul>@foreach(var entry in detail.OperatorEvents) { <li>@entry.OccurredUtc.ToString("u") — @entry.Action — Actor @entry.ActorUserId — @entry.Detail</li> }</ul>
+        </section>
+    </section>
+}

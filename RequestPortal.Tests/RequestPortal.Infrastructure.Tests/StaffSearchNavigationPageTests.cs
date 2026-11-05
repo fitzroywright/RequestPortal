@@ -42,9 +42,11 @@ public sealed class StaffSearchNavigationPageTests
     {
         public int Reads, Writes, Downloads;
         public string TransferApplicant = "John Brown";
+        public IReadOnlyList<IntegrationTransferRow>? TransferRows;
+        public Exception? RecoveryFailure;
         public IntegrationTransferRow Transfer => new(RequestId,Organization,"REQ-FIXTURE",TransferApplicant,"Quick Intake","FFPManager",
             "JMDB01 / FFPJM",SynchronizationStatus.Failed,"SqlSubmission","PermanentSql","SQL_CONSTRAINT","SQL Server rejected a field value.",
-            DateTimeOffset.UtcNow,DateTimeOffset.UtcNow,1,null,null,null,null,null,true);
+            DateTimeOffset.UtcNow,DateTimeOffset.UtcNow,1,null,null,null,null,null,true) { RecordedError = "SQL Server rejected a field value. Review the mapping before retrying.", RecoveryAction = "Review the mapping before retrying." };
 
         public bool Archived;
         public StaffRequestSearchRow Row => new() { RequestId = RequestId, PublicReference = "REQ-FIXTURE", ApplicantName = "John Brown", OrganizationName = "Fixture organization", Category = "Food", ReceivedUtc = DateTimeOffset.UtcNow, Status = RequestStatus.Submitted };
@@ -63,7 +65,10 @@ public sealed class StaffSearchNavigationPageTests
             if (actor is "anonymous" or "expired") return Task.FromResult(AuthenticateResult.NoResult());
             var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, Staff.ToString()), new(ClaimTypes.Name, "Fixture staff") };
             if (actor is "Administrator" or "Reviewer" or "no-access") claims.Add(new(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue));
-            if (actor == "Administrator") claims.Add(new(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.ManageSecurity));
+            if (actor == "Administrator") {
+                claims.Add(new(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.ManageSecurity));
+                claims.Add(new(StaffOidcOptions.PermissionClaim,RequestPortalPermissions.ViewManagementDashboard));
+            }
             if (actor is "Administrator" or "Reviewer") claims.Add(new(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.Access));
             return Task.FromResult(AuthenticateResult.Success(new(new(new ClaimsIdentity(claims, Scheme.Name)), Scheme.Name)));
         }
@@ -153,11 +158,11 @@ public sealed class StaffSearchNavigationPageTests
                 "GetRequestAsync" => Task.FromResult<IntegrationTransferDetail?>((Guid)args[0]! == RequestId ? new(data.Transfer,
                     [new(Guid.NewGuid(),1,"Submission",DateTimeOffset.UtcNow,DateTimeOffset.UtcNow,false,"SqlSubmission","PermanentSql","SQL_CONSTRAINT","SQL Server rejected a field value.")],[],1) : null),
                 "GetAttemptPageAsync" => Task.FromResult<IReadOnlyList<IntegrationAttemptView>>([]),
-                "SearchAsync" => Task.FromResult(new IntegrationMonitorPage([data.Transfer],1,1,25,new(1,0,0,0,0))),
+                "SearchAsync" => Task.FromResult(new IntegrationMonitorPage(data.TransferRows ?? [data.Transfer], data.TransferRows?.Count ?? 1,1,25,new(2,0,0,1,74))),
                 "ReconcileRequestAsync" or "RetryAsync" => Write(),
                 _ => throw new InvalidOperationException(method)
             };
-            Task Write(){data.Writes++;return Task.CompletedTask;}
+            Task Write(){data.Writes++;return data.RecoveryFailure is { } error ? Task.FromException(error) : Task.CompletedTask;}
         }));
         builder.Services.AddSingleton(Proxy.For<IExternalApplicationBridgeClient>((method,_)=>method=="GetReturnOutboxAsync" ? Task.FromResult(new ExternalReturnOutboxStatus(2,1,0,DateTimeOffset.UtcNow)) : throw new InvalidOperationException(method)));
         builder.Services.AddSingleton(Proxy.For<global::Common.Storage.IFileStorage>((method,_)=>throw new InvalidOperationException(method)));
@@ -278,7 +283,7 @@ public sealed class StaffSearchNavigationPageTests
     public async Task UnauthorizedActorsCannotSearchReadOrMutateDocuments(string actor)
     {
         await using var f = await Setup(actor);
-        foreach (string url in new[] { "/Staff?Search=John", "/Staff/Integrations", "/Staff/Integrations?handler=Export", "/Staff/Organizations", "/Staff/Organization?id=" + Organization, "/Staff/Review/" + RequestId + "?handler=Download&documentId=" + RequestDocument })
+        foreach (string url in new[] { "/Staff?Search=John", "/Staff/Integrations", "/Staff/Integrations?handler=Export", "/Staff/Integrations?handler=Diagnostics&requestId=" + RequestId, "/Staff/Organizations", "/Staff/Organization?id=" + Organization, "/Staff/Review/" + RequestId + "?handler=Download&documentId=" + RequestDocument })
         {
             using var response = await f.Get(url); Assert.Contains(response.StatusCode, new[] { HttpStatusCode.Forbidden, HttpStatusCode.Redirect });
             if (response.StatusCode == HttpStatusCode.Redirect) Assert.StartsWith("/Account/StaffLogin", response.Headers.Location!.OriginalString);
@@ -286,7 +291,7 @@ public sealed class StaffSearchNavigationPageTests
         Assert.Equal(0, f.Data.Reads); Assert.Equal(0, f.Data.Writes); Assert.Equal(0, f.Data.Downloads);
     }
     [Theory][InlineData("Administrator")][InlineData("Reviewer")]
-    public async Task IntegrationMonitoringRendersStatusDetailsHistoryExportsAndRestrictedActions(string actor)
+    public async Task IntegrationMonitoringRendersStatusDetailsHistoryAndRestrictedActionsWithoutCsvExport(string actor)
     {
         await using var fixture=await Setup(actor);
         using var response=await fixture.Get("/Staff/Integrations?RequestId="+RequestId+"&Search=John&Status=Failed&Sort=oldest&From=2026-01-01&Through=2026-12-31");
@@ -299,13 +304,20 @@ public sealed class StaffSearchNavigationPageTests
         using var original=await fixture.Get("/Staff/Review/"+RequestId);
         Assert.Contains("FFP Manager transfer: Failed",await original.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         using var queue=await fixture.Get("/Staff");Assert.Contains("Integration failures / reconciliation",await queue.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-        Assert.Contains("Search=John",html);Assert.Contains("Status=Failed",html);
+        Assert.Contains("value=\"John\"",html);
+        Assert.Matches("<option(?=[^>]*value=\"Failed\")(?=[^>]*selected)[^>]*>",html);
         using var invalid=await fixture.Get("/Staff/Integrations?From=2026-12-31&Through=2026-01-01");Assert.Equal(HttpStatusCode.BadRequest,invalid.StatusCode);
         string token=Token(html);
         using var missing=await fixture.Get("/Staff/Integrations?RequestId="+Guid.NewGuid());Assert.Equal(HttpStatusCode.NotFound,missing.StatusCode);Assert.Null(missing.Headers.Location);
-        fixture.Data.TransferApplicant="=SUM(1+1)";
-        using var export=await fixture.Get("/Staff/Integrations?handler=Export&Search=John&Status=Failed");Assert.Equal(HttpStatusCode.OK,export.StatusCode);
-        Assert.Equal("text/csv",export.Content.Headers.ContentType!.MediaType);Assert.Contains("'=SUM(1+1)",await export.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.DoesNotContain("Export diagnostics CSV",html);
+        Assert.DoesNotContain("Export complete attempt history",html);
+        foreach (string handler in new[] { "Export", "HistoryExport" })
+        {
+            using var formerExport = await fixture.Get("/Staff/Integrations?handler=" + handler + "&RequestId=" + RequestId);
+            Assert.Equal(HttpStatusCode.OK, formerExport.StatusCode);
+            Assert.Equal("text/html", formerExport.Content.Headers.ContentType!.MediaType);
+            Assert.Null(formerExport.Content.Headers.ContentDisposition);
+        }
         foreach(string handler in new[]{"Retry","Reconcile"})
         {
             using var post=await fixture.Send(new(HttpMethod.Post,"/Staff/Integrations?handler="+handler){Content=new FormUrlEncodedContent(new Dictionary<string,string>{["RequestId"]=RequestId.ToString(),["linkId"]=Organization.ToString(),["__RequestVerificationToken"]=token})});
@@ -321,4 +333,68 @@ public sealed class StaffSearchNavigationPageTests
         foreach (string url in new[] { "/Staff/Review/" + Guid.NewGuid(), "/Staff/Organization?id=" + Guid.NewGuid(), "/Staff/Review/" + RequestId + "?selectedDocumentId=" + Guid.NewGuid(), "/Staff/Organization?id=" + Organization + "&selectedDocumentId=" + Guid.NewGuid() })
         { using var response = await f.Get(url); Assert.Equal(HttpStatusCode.NotFound, response.StatusCode); Assert.Null(response.Headers.Location); }
     }
+    [Theory][InlineData("Administrator")][InlineData("Reviewer")]
+    public async Task InlineDiagnosticsUseStoredDataAndKeepRecoveryPermissions(string actor)
+    {
+        await using var fixture = await Setup(actor);
+        using var response = await fixture.Get("/Staff/Integrations?handler=Diagnostics&RequestId=" + RequestId + "&Search=John&Status=Failed&Sort=activity&PageNumber=2");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl!.NoStore);
+        string html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("<html", html);
+        Assert.Contains("SQL Server rejected a field value. Review the mapping before retrying.", html);
+        Assert.Contains("Submission", html);
+        Assert.Contains("data-copy-correlation", html);
+        Assert.DoesNotContain("applicant TRN is missing", html);
+        Assert.Equal(actor == "Administrator", html.Contains("Retry Integration"));
+        Assert.Equal(actor == "Administrator", html.Contains("Recheck synchronization status"));
+        if (actor == "Administrator") { Assert.Contains("Search=John", html); Assert.Contains("PageNumber=2", html); Snapshot("integration-detail", html); }
+        using var missing = await fixture.Get("/Staff/Integrations?handler=Diagnostics&RequestId=" + Guid.NewGuid());
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Theory][InlineData("Retry")][InlineData("Reconcile")]
+    public async Task RecoveryTransportFailuresReturnMessageAndPreserveFilters(string handler)
+    {
+        await using var fixture = await Setup();
+        using var page = await fixture.Get("/Staff/Integrations?RequestId=" + RequestId);
+        string token = Token(await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        fixture.Data.RecoveryFailure = new HttpRequestException("PROTECTED transport payload");
+        using var response = await fixture.Send(new(HttpMethod.Post, "/Staff/Integrations?handler=" + handler + "&Search=John&Status=Failed&Sort=activity&PageNumber=2") {
+            Content = new FormUrlEncodedContent(new Dictionary<string,string> { ["RequestId"] = RequestId.ToString(), ["linkId"] = Organization.ToString(), ["__RequestVerificationToken"] = token }) });
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("Search=John", response.Headers.Location!.OriginalString);
+        Assert.Contains("Status=Failed", response.Headers.Location.OriginalString);
+        Assert.Contains("PageNumber=2", response.Headers.Location.OriginalString);
+        using var follow = await fixture.Get(response.Headers.Location.OriginalString);
+        string html = await follow.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("The integration service could not be reached", html);
+        Assert.DoesNotContain("PROTECTED transport payload", html);
+    }
+
+    [Fact]
+    public async Task IntegrationVisualAndLargeResultFixturesRenderRealRazor()
+    {
+        await using var fixture = await Setup();
+        var failed = fixture.Data.Transfer;
+        var statuses = new[] { SynchronizationStatus.Synchronized, SynchronizationStatus.Failed, SynchronizationStatus.ReconciliationRequired, SynchronizationStatus.ReconciliationRequired, SynchronizationStatus.Failed, SynchronizationStatus.ReconciliationRequired };
+        fixture.Data.TransferRows = statuses.Select((status,index) => index == 1 ? failed : failed with {
+            RequestId = Guid.Parse($"99999999-9999-4999-8999-{index:D12}"),
+            PublicReference = $"RP-FIXTURE-{10053-index}", ApplicantName = new[] { "D. Palmer (fixture)", "John Brown", "T. Harrison (fixture)", "S. Brown (fixture)", "A. Foster (fixture)", "J. McDermott (fixture)" }[index],
+            Status = status, RecordedError = status == SynchronizationStatus.Synchronized ? null : status == SynchronizationStatus.Failed ? "A connection timeout interrupted the transfer." : "The destination identity could not be verified. Reconcile before retrying.", ErrorCode = status == SynchronizationStatus.Synchronized ? null : status == SynchronizationStatus.Failed ? "SQL_TIMEOUT" : "DESTINATION_CONFLICT",
+            Explanation = status == SynchronizationStatus.Synchronized ? null : status == SynchronizationStatus.Failed ? "A connection timeout interrupted the transfer." : "The destination identity could not be verified. Reconcile before retrying.",
+            ApplicationNumber = $"TEST/26/GR/{12056-index}", ApplicationId = (411625-index).ToString()
+        }).ToArray();
+        using var visual = await fixture.Get("/Staff/Integrations?RequestId=" + RequestId);
+        Assert.Equal(HttpStatusCode.OK, visual.StatusCode);
+        Snapshot("integration-visual", await visual.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var collapsed = await fixture.Get("/Staff/Integrations");
+        Snapshot("integration-collapsed", await collapsed.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        fixture.Data.TransferRows = Enumerable.Range(0,100).Select(index => failed with {
+            RequestId = index == 0 ? RequestId : Guid.Parse($"99999999-9999-4999-8999-{index:D12}"), PublicReference = $"MANY-{index:D3}" }).ToArray();
+        using var many = await fixture.Get("/Staff/Integrations?RequestId=" + RequestId);
+        Assert.Equal(HttpStatusCode.OK, many.StatusCode);
+        Snapshot("integration-many", await many.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+    }
+
 }

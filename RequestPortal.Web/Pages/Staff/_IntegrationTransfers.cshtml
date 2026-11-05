@@ -1,60 +1,65 @@
 @model RequestPortal.Web.Pages.Staff.IntegrationsModel
 @using RequestPortal.Domain.Integration
+@using Monitor = RequestPortal.Web.Pages.Staff.IntegrationsModel
 @{
     var result = Model.Transfers;
     var counts = result.Counts;
 }
 <dl class="integration-summary" aria-label="Transfer summary for the search and date range">
-@foreach(var item in new[] { ("Failed",counts.Failed), ("Pending",counts.Pending), ("Retrying",counts.Retrying), ("Synchronized",counts.Synchronized), ("Reconciliation Required",counts.ReconciliationRequired) }) {
-<div><dt>@item.Item1</dt><dd>@item.Item2</dd></div>
+@foreach(var item in new[] { ("failed","Failed",counts.Failed), ("pending","Pending",counts.Pending), ("retrying","Retrying",counts.Retrying), ("synchronized","Synchronized",counts.Synchronized), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired) }) {
+    <div class="integration-tile @item.Item1"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><div><dt>@item.Item2</dt><dd>@item.Item3</dd></div></div>
 }
 </dl>
 <form method="get" class="integration-filters" asp-page="/Staff/Integrations">
-<label>Search<input asp-for="Search" maxlength="200" placeholder="Applicant, Quick Intake or FFP Manager reference" /></label>
-<label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@RequestPortal.Web.Pages.Staff.IntegrationsModel.StatusLabel(status)</option> }</select></label>
-<label>From (UTC)<input asp-for="From" type="date" /></label><label>Through (UTC)<input asp-for="Through" type="date" /></label>
-<label>Sort<select asp-for="Sort"><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
-<button class="button button-small" type="submit">Apply filters</button><a asp-page="/Staff/Integrations">Clear</a>
-<a class="button button-small button-outline" asp-page-handler="Export" asp-all-route-data="Model.Routes(1)">Export diagnostics CSV</a>
+    <label class="integration-search">Search<span><svg class="integration-icon" aria-hidden="true"><use href="#integration-search"/></svg><input asp-for="Search" maxlength="200" placeholder="Request #, applicant name, TRN, or FFP Manager #" /></span></label>
+    <label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@Monitor.StatusLabel(status)</option> }</select></label>
+    <label>Date From (UTC)<input asp-for="From" type="date" /></label>
+    <label>Date Through (UTC)<input asp-for="Through" type="date" /></label>
+    <label>Sort<select asp-for="Sort"><option value="activity">Newest activity</option><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
+    <button class="button" type="submit">Apply filters</button><a class="integration-clear" asp-page="/Staff/Integrations">Clear</a>
 </form>
-<div class="table-wrap"><table class="integration-table"><caption class="sr-only">Persistent transfer history</caption>
-<thead><tr><th>Request / Applicant</th><th>Source / Target</th><th>Status</th><th>Last attempt / Retry</th><th>FFP Manager</th><th>Diagnostics</th></tr></thead><tbody>
-@foreach(var item in result.Items) {
-<tr><td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">@item.PublicReference</a><br/>@item.ApplicantName</td>
-<td>@item.Source<small>@item.Target</small></td><td>@RequestPortal.Web.Pages.Staff.IntegrationsModel.StatusLabel(item.Status)<small>@item.ErrorCode</small></td>
-<td>@(item.LastAttemptUtc?.ToString("u") ?? "Not attempted")<small>@item.AttemptCount attempt(s) · Next: @(item.NextRetryUtc?.ToString("u") ?? "Not scheduled")</small></td>
-<td>@(item.ApplicationNumber ?? "Not verified")<small>@item.ApplicationId</small></td>
-<td><a asp-page="/Staff/Integrations" asp-route-requestId="@item.RequestId" asp-fragment="transfer-details">View diagnostics</a></td></tr>
-}
-@if(result.Items.Count == 0) { <tr><td colspan="6">No matching transfers.</td></tr> }
-</tbody></table></div>
-<nav class="integration-paging" aria-label="Transfer pages"><span>Showing @(result.TotalCount == 0 ? 0 : (result.Page-1)*result.PageSize+1)–@(Math.Min(result.Page*result.PageSize,result.TotalCount)) of @result.TotalCount transfers · Page @result.Page of @result.TotalPages</span>
-@if(result.Page>1) { <a asp-page="/Staff/Integrations" asp-all-route-data="Model.Routes(result.Page-1)">Previous</a> }
-@if(result.Page<result.TotalPages) { <a asp-page="/Staff/Integrations" asp-all-route-data="Model.Routes(result.Page+1)">Next</a> }</nav>
-@if(Model.Selected is { } detail) {
-var transfer = detail.Transfer;
-<section id="transfer-details" class="integration-subsection" tabindex="-1" aria-labelledby="transfer-details-title">
-<h2 id="transfer-details-title">@transfer.PublicReference — transfer diagnostics</h2>
-<p><a asp-page="/Staff/Review" asp-route-id="@transfer.RequestId">Open original request</a> · @transfer.ApplicantName · @transfer.Source</p>
-<dl class="integration-facts">
-<div><dt>Status</dt><dd>@RequestPortal.Web.Pages.Staff.IntegrationsModel.StatusLabel(transfer.Status)</dd></div><div><dt>Target</dt><dd>@transfer.Target</dd></div><div><dt>Correlation ID</dt><dd>@(transfer.LinkId?.ToString() ?? "No link")</dd></div>
-<div><dt>Submitted</dt><dd>@transfer.SubmittedUtc.ToString("u")</dd></div><div><dt>Last attempt</dt><dd>@(transfer.LastAttemptUtc?.ToString("u") ?? "Not attempted")</dd></div><div><dt>Attempt count</dt><dd>@transfer.AttemptCount</dd></div>
-<div><dt>Next retry</dt><dd>@(transfer.NextRetryUtc?.ToString("u") ?? "Not scheduled")</dd></div><div><dt>Synchronized</dt><dd>@(transfer.SynchronizedUtc?.ToString("u") ?? "Not synchronized")</dd></div><div><dt>Destination verified</dt><dd>@(transfer.VerifiedUtc?.ToString("u") ?? "Not verified")</dd></div>
-<div><dt>FFP Manager application ID / reference</dt><dd>@(transfer.ApplicationId ?? "Not verified") / @(transfer.ApplicationNumber ?? "Not verified")</dd></div>
-<div><dt>Failure stage / classification</dt><dd>@(transfer.FailureStage ?? "None") / @(transfer.FailureClassification ?? "None")</dd></div><div><dt>Error code</dt><dd>@(transfer.ErrorCode ?? "None")</dd></div>
-</dl>
-@if(transfer.Explanation is { } explanation) { <p role="status">@explanation</p> }
-@if(Model.CanOperate) {
-<div class="action-row"><form method="post" asp-page-handler="Reconcile"><input type="hidden" name="RequestId" value="@transfer.RequestId"/><button class="button button-small button-outline" type="submit">Reconcile destination (read-only)</button></form>
-@if(transfer.LinkId.HasValue && transfer.Status != SynchronizationStatus.Synchronized) {
-<form method="post" asp-page-handler="Retry"><input type="hidden" name="linkId" value="@transfer.LinkId"/><input type="hidden" name="RequestId" value="@transfer.RequestId"/><button class="button button-small" type="submit">Verify destination and retry</button></form>
-}</div>
-<p class="muted">Retry may create a missing FFP Manager application or resume document transfer. Permanent failures require correcting the approved mapping first. Every operator action is audited.</p>
-}
-<h3>Attempt history</h3><p>Latest @detail.Attempts.Count of @detail.AttemptTotal recorded outcomes. <a asp-page-handler="HistoryExport" asp-route-requestId="@transfer.RequestId">Export complete attempt history</a></p><div class="table-wrap"><table><thead><tr><th>Started / Completed (UTC)</th><th>Operation</th><th>Outcome</th><th>Stage / Code</th><th>Explanation</th></tr></thead><tbody>
-@foreach(var attempt in detail.Attempts) { <tr><td>@attempt.StartedUtc.ToString("u")<small>@(attempt.CompletedUtc?.ToString("u") ?? "Incomplete — inspect worker health")</small></td><td>@attempt.Operation@if(attempt.Operation == "Submission") { <span> #@attempt.Number</span> }</td><td>@(attempt.Succeeded ? "Succeeded" : attempt.CompletedUtc.HasValue ? "Failed" : "In progress / interrupted")</td><td>@attempt.Stage / @attempt.ErrorCode</td><td>@attempt.Explanation</td></tr> }
-@if(detail.Attempts.Count==0) { <tr><td colspan="5">No recorded attempts. Historical outcomes before monitoring was installed cannot be reconstructed automatically.</td></tr> }
-</tbody></table></div>
-<h3>Operator audit</h3><p class="muted">Latest 100 actions; full audit records are retained.</p><ul>@foreach(var entry in detail.OperatorEvents) { <li>@entry.OccurredUtc.ToString("u") — @entry.Action — Actor @entry.ActorUserId — @entry.Detail</li> }</ul>
-</section>
-}
+<div class="integration-grid" role="table" aria-label="Integration diagnostics" aria-colcount="8">
+    <div class="integration-columns integration-grid-header" role="row">
+        <span role="columnheader" aria-label="Expand diagnostics"></span><span role="columnheader">Request / Applicant</span><span role="columnheader">Source / Target</span><span role="columnheader">Status</span><span role="columnheader">Error / Explanation</span><span role="columnheader">Last Activity (UTC)</span><span role="columnheader">FFP Manager</span><span role="columnheader">Actions</span>
+    </div>
+    <div class="integration-rows" tabindex="0" aria-label="Scrollable integration records">
+        <div role="rowgroup">
+        @foreach(var item in result.Items.Concat(Model.Selected is { } selected && !result.Items.Any(row => row.RequestId == selected.Transfer.RequestId) ? new[] { selected.Transfer } : Array.Empty<RequestPortal.Application.Integration.IntegrationTransferRow>())) {
+            bool expanded = Model.Selected?.Transfer.RequestId == item.RequestId;
+            string panelId = "diagnostics-" + item.RequestId;
+            string statusClass = Monitor.StatusClass(item.Status);
+            <div class="integration-record @statusClass @(expanded ? "is-expanded" : "")" data-record="@item.RequestId">
+                <div class="integration-columns integration-data-row" role="row">
+                    <span role="cell" class="integration-expander"><a class="integration-expand" asp-page="/Staff/Integrations" asp-all-route-data="Model.DetailRoutes(item.RequestId)" asp-fragment="@panelId" data-diagnostics-url="@Url.Page("/Staff/Integrations", "Diagnostics", new { requestId = item.RequestId, Model.Search, Model.Status, Model.From, Model.Through, Model.Sort, Model.PageNumber })" aria-expanded="@expanded.ToString().ToLowerInvariant()" aria-controls="@panelId" aria-label="Diagnostics for @item.PublicReference"><svg class="integration-icon" aria-hidden="true"><use href="#integration-chevron"/></svg></a></span>
+                    <span role="cell" data-label="Request / Applicant" class="integration-applicant"><a asp-page="/Staff/Review" asp-route-id="@item.RequestId"><strong>@item.PublicReference</strong></a><span>@item.ApplicantName</span></span>
+                    <span role="cell" data-label="Source / Target">@item.Source<span>@item.Target</span></span>
+                    <span role="cell" data-label="Status"><span class="integration-status @statusClass"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@statusClass"/></svg>@Monitor.StatusLabel(item.Status)</span></span>
+                    <span role="cell" data-label="Error / Explanation" class="integration-explanation">@if(item.ErrorCode is not null) { <strong>@Monitor.DiagnosticTitle(item)</strong><span>@Monitor.DiagnosticDescription(item)</span> } else { <span>@(item.Explanation ?? (item.Status == SynchronizationStatus.Synchronized ? "Synchronized successfully. Request and applicant data are up to date in FFP Manager." : "No error was recorded."))</span> }</span>
+                    <span role="cell" data-label="Last Activity (UTC)">@Monitor.LastActivity(item).ToString("MMM dd, yyyy HH:mm:ss'Z'")<span>@Monitor.StatusLabel(item.Status)</span></span>
+                    <span role="cell" data-label="FFP Manager">@(item.ApplicationNumber ?? "Not verified")<span>@item.ApplicationId</span></span>
+                    <span role="cell" data-label="Actions" class="integration-row-actions">
+                        @if(Model.CanOperate && Monitor.CanRetry(item)) {
+                            <form method="post" asp-page-handler="Retry" asp-all-route-data="Model.Routes(result.Page)"><input type="hidden" name="linkId" value="@item.LinkId"/><input type="hidden" name="RequestId" value="@item.RequestId"/><button class="button button-small" type="submit" title="Verify destination and retry">Retry</button></form>
+                        } else if(Model.CanOperate && item.Status == SynchronizationStatus.ReconciliationRequired) {
+                            <form method="post" asp-page-handler="Reconcile" asp-all-route-data="Model.Routes(result.Page)"><input type="hidden" name="RequestId" value="@item.RequestId"/><button class="button button-small button-outline" type="submit">Recheck</button></form>
+                        }
+                        <a class="button button-small button-outline" asp-page="/Staff/Integrations" asp-all-route-data="Model.DetailRoutes(item.RequestId)" asp-fragment="@panelId" data-view-diagnostics>View</a>
+                        <details class="integration-more-menu"><summary class="integration-more" aria-label="More actions for @item.PublicReference" title="More actions">⋮</summary><div class="integration-more-options"><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open original request</a><button type="button" data-system-toggle aria-expanded="false" aria-controls="integration-operations">System diagnostics</button></div></details>
+                    </span>
+                </div>
+                <div role="row" class="integration-diagnostic-row" id="@panelId" hidden="@(!expanded)">
+                    <div role="cell" aria-colspan="8" class="integration-diagnostic-content">@if(expanded) { <partial name="_IntegrationDiagnostics" model="Model" /> }</div>
+                </div>
+            </div>
+        }
+        @if(result.Items.Count == 0) { <div class="integration-empty"><p role="status">No matching transfers.</p><button type="button" class="button button-small button-outline" data-system-toggle aria-expanded="false" aria-controls="integration-operations">System diagnostics</button></div> }
+        </div>
+        <section id="integration-operations" class="integration-operations" hidden aria-label="System diagnostics"><partial name="_IntegrationOperations" model="Model" /></section>
+    </div>
+    @if(result.TotalPages > 1) {
+        <nav class="integration-paging" aria-label="Transfer pages"><span>Showing @((result.Page-1)*result.PageSize+1)–@(Math.Min(result.Page*result.PageSize,result.TotalCount)) of @result.TotalCount transfers · Page @result.Page of @result.TotalPages</span>
+        @if(result.Page>1) { <a asp-page="/Staff/Integrations" asp-all-route-data="Model.Routes(result.Page-1)">Previous</a> }
+        @if(result.Page<result.TotalPages) { <a asp-page="/Staff/Integrations" asp-all-route-data="Model.Routes(result.Page+1)">Next</a> }</nav>
+    }
+</div>
+<p class="integration-announcement" role="status" aria-live="polite"></p>

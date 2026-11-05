@@ -58,13 +58,20 @@
     <link rel="stylesheet" href="~/css/application-shell.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
-<body class="@(useApplicationShell ? "authenticated-app" : "public-site")">
+<body class="@(useApplicationShell ? "authenticated-app" : "public-site") @ViewData["BodyClass"]">
     <header class="site-header @(useApplicationShell ? "app-header" : null)">
         <div class="shell nav-shell @(useApplicationShell ? "app-nav-shell" : null)">
             <a class="brand @(useApplicationShell ? "app-brand" : null)" asp-page="/Index">
                 @if (useApplicationShell)
                 {
-                    <img class="brand-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor Jamaica" />
+                    @if (string.Equals(currentPage, "/Staff/Integrations", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <span class="integration-brand-logo" aria-label="Food For The Poor Jamaica">FFPJA</span>
+                    }
+                    else
+                    {
+                        <img class="brand-logo" src="https://foodforthepoor.org/wp-content/uploads/fftp-logo-img-media.png" alt="Food For The Poor Jamaica" />
+                    }
                     <span class="brand-copy"><strong>Request Portal</strong></span>
                 }
                 else

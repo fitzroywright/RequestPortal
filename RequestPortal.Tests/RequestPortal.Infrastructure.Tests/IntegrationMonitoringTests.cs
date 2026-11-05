@@ -42,6 +42,34 @@ public sealed class IntegrationMonitoringTests
     private static IntegrationStatusService Monitor(PostgreSqlTestDatabase database, Bridge bridge, bool authorized = true)
         => new(database.Db, Clock, Submit(database, bridge), Options.Create(OptionsValue), new BusinessAuditWriter(database.Db, Clock), bridge, new Authorization(authorized));
 
+    [Fact]
+    public async Task MonitorShowsStoredClassifiedErrorAndSearchesTrnAndDestinationIdWithActivitySorting()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid first = await Intake(database, "First");
+        Guid second = await Intake(database, "Second");
+        var intake = await database.Db.QuickIntakes.SingleAsync(item => item.RequestId == first, token);
+        var applicant = await database.Db.Users.SingleAsync(item => item.Id == intake.AnonymousUserId, token);
+        applicant.NationalIdTrn = "TEST-TRN-123456789";
+        var firstLink = await database.Db.IntegrationLinks.SingleAsync(item => item.RequestId == first, token);
+        var secondLink = await database.Db.IntegrationLinks.SingleAsync(item => item.RequestId == second, token);
+        firstLink.RecordVerifiedDestination("DESTINATION-901", "TEST/26/901", "JMDB01", "FFPJM", DateTimeOffset.UtcNow.AddMinutes(2));
+        firstLink.RecordFailure(DateTimeOffset.UtcNow, "SqlSubmission", "PermanentSql", "SQL_CONSTRAINT", "Recorded constraint diagnostic: field length exceeded.", false);
+        secondLink.RecordFailure(DateTimeOffset.UtcNow, "SqlSubmission", "PermanentSql", "SQL_CONSTRAINT", "Second diagnostic.", false);
+        await database.Db.SaveChangesAsync(token);
+        var monitor = Monitor(database, new Bridge());
+        var trn = Assert.Single((await monitor.SearchAsync(new(Search: "TEST-TRN-123456789"), token)).Items);
+        Assert.Equal(first, trn.RequestId);
+        Assert.Equal("Recorded constraint diagnostic: field length exceeded.", trn.RecordedError);
+        Assert.Equal(trn.RecordedError, trn.Explanation);
+        Assert.Equal("Review the mapping before retrying.", trn.RecoveryAction);
+        Assert.Equal(first, Assert.Single((await monitor.SearchAsync(new(Search: "DESTINATION-901"), token)).Items).RequestId);
+        Assert.Equal(first, (await monitor.SearchAsync(new(Sort: "activity"), token)).Items[0].RequestId);
+        Assert.Equal(trn.RecordedError, (await monitor.GetRequestAsync(first, token))!.Transfer.RecordedError);
+        Assert.Empty((await monitor.SearchAsync(new(Search: "not-a-real-reference"), token)).Items);
+    }
+
     [Theory]
     [InlineData(0, 10)]
     [InlineData(12, 12)]
