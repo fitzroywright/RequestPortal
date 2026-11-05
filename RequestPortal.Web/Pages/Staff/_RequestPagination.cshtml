@@ -8,10 +8,10 @@
         @if (!string.IsNullOrWhiteSpace(Model.Organization)) { <input type="hidden" name="Organization" value="@Model.Organization" /> }
         @if (Model.WorkStatus.HasValue) { <input type="hidden" name="WorkStatus" value="@Model.WorkStatus.Value" /> }
         <label for="request-page-size">Requests per page</label>
-        <select id="request-page-size" name="PageSize">
+        <select id="request-page-size" name="PageSize" aria-label="Requests per page">
             @foreach (int size in new[] { 25, 50, 100 }) { <option value="@size" selected="@(result.PageSize == size)">@size</option> }
         </select>
-        <button class="button button-small button-secondary" type="submit">Apply page size</button>
+        
     </form>
     <nav aria-label="Request pages">
         <span>Page @result.PageNumber of @result.TotalPages</span>
