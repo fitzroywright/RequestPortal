@@ -69,11 +69,15 @@ public sealed class IntegrationsModel : PageModel
         _ => "pending"
     };
     public static string DiagnosticTitle(IntegrationTransferRow transfer) {
+        if (string.Equals(transfer.ErrorCode, "LEGACY_FAILURE", StringComparison.OrdinalIgnoreCase))
+            return "Original failure reason unavailable";
         string text = transfer.RecordedError ?? transfer.Explanation ?? transfer.ErrorCode ?? StatusLabel(transfer.Status);
         int sentence = text.IndexOf(". ", StringComparison.Ordinal);
         return sentence < 0 ? text : text[..(sentence + 1)];
     }
     public static string? DiagnosticDescription(IntegrationTransferRow transfer) {
+        if (string.Equals(transfer.ErrorCode, "LEGACY_FAILURE", StringComparison.OrdinalIgnoreCase))
+            return "No original exception was stored. Verify the destination record and review retained operational logs before retrying.";
         string? text = transfer.RecordedError ?? transfer.Explanation;
         if (text is null) return null;
         int sentence = text.IndexOf(". ", StringComparison.Ordinal);
