@@ -4,6 +4,9 @@
     <span aria-live="polite">Showing @result.FirstRecord–@result.LastRecord of @result.TotalCount requests</span>
     <form method="get" asp-page="/Staff/Index">
         @if (!string.IsNullOrWhiteSpace(Model.Search)) { <input type="hidden" name="Search" value="@Model.Search" /> }
+        @if (!string.IsNullOrWhiteSpace(Model.Applicant)) { <input type="hidden" name="Applicant" value="@Model.Applicant" /> }
+        @if (!string.IsNullOrWhiteSpace(Model.Organization)) { <input type="hidden" name="Organization" value="@Model.Organization" /> }
+        @if (Model.WorkStatus.HasValue) { <input type="hidden" name="WorkStatus" value="@Model.WorkStatus.Value" /> }
         <label for="request-page-size">Requests per page</label>
         <select id="request-page-size" name="PageSize">
             @foreach (int size in new[] { 25, 50, 100 }) { <option value="@size" selected="@(result.PageSize == size)">@size</option> }
@@ -14,7 +17,7 @@
         <span>Page @result.PageNumber of @result.TotalPages</span>
         @if (result.PageNumber > 1)
         {
-            <a asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageSize="@result.PageSize" asp-route-PageNumber="@(result.PageNumber - 1)">Previous</a>
+            <a asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageSize="@result.PageSize" asp-route-Applicant="@Model.Applicant" asp-route-Organization="@Model.Organization" asp-route-WorkStatus="@Model.WorkStatus" asp-route-PageNumber="@(result.PageNumber - 1)">Previous</a>
         }
         else { <span aria-disabled="true">Previous</span> }
         @if (result.PageNumber < result.TotalPages)
