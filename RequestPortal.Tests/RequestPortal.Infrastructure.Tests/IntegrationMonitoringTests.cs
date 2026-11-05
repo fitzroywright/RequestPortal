@@ -33,7 +33,7 @@ public sealed class IntegrationMonitoringTests
         using var response = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
         {
             Content = new StringContent(
-                "{\\"type\\":\\"https://tools.ietf.org/html/rfc9110#section-15.5.1\\",\\"title\\":\\"One or more validation errors occurred.\\",\\"errors\\":{\\"PrimaryTelephone\\":[\\"The applicant telephone requires correction before transfer.\\"]}}",
+                """{"type":"https://tools.ietf.org/html/rfc9110#section-15.5.1","title":"One or more validation errors occurred.","errors":{"PrimaryTelephone":["The applicant telephone requires correction before transfer."]}}""",
                 System.Text.Encoding.UTF8, "application/problem+json")
         };
         async Task Call() => await (Task)method.Invoke(null, [response, TestContext.Current.CancellationToken])!;
@@ -51,7 +51,7 @@ public sealed class IntegrationMonitoringTests
         using var response = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
         {
             Content = new StringContent(
-                "{\\"errors\\":{\\"password=TOP-SECRET\\":[\\"Applicant Private Person, token TOP-SECRET\\"]}}",
+                """{"errors":{"password=TOP-SECRET":["Applicant Private Person, token TOP-SECRET"]}}""",
                 System.Text.Encoding.UTF8, "application/problem+json")
         };
         async Task Call() => await (Task)method.Invoke(null, [response, TestContext.Current.CancellationToken])!;
