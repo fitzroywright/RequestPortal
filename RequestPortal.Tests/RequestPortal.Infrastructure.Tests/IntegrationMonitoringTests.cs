@@ -81,6 +81,57 @@ public sealed class IntegrationMonitoringTests
         Assert.DoesNotContain("TOP-SECRET", bridge.Explanation);
     }
 
+    [Fact]
+    public void RestrictedExceptionCaptureOmitsUntrustedMessagesAndSourcePaths()
+    {
+        var unsafeException = new InvalidOperationException(
+            "password=TOP-SECRET; applicant=Private Person; server=hidden.internal");
+        string detail = IntegrationExceptionDiagnostics.Capture(unsafeException, "SqlSubmission", "UNCLASSIFIED");
+        Assert.Contains("InvalidOperationException", detail);
+        Assert.Contains("SqlSubmission", detail);
+        Assert.DoesNotContain("TOP-SECRET", detail);
+        Assert.DoesNotContain("Private Person", detail);
+        Assert.DoesNotContain("hidden.internal", detail);
+        Assert.True(detail.Length <= 4000);
+        Assert.True(IntegrationExceptionDiagnostics.IsSafeTransportDetail(detail));
+    }
+
+    [Fact]
+    public void RestrictedExceptionCaptureKeepsApprovedValidationAndInnerExceptionTypes()
+    {
+        var error = new IntegrationTransferException(
+            TransferFailures.For("SqlServer", "SQL_CONSTRAINT"),
+            new TimeoutException("SECRET=TOP-SECRET"));
+        string detail = IntegrationExceptionDiagnostics.Capture(error, "SqlServer", "SQL_CONSTRAINT");
+        Assert.Contains("IntegrationTransferException", detail);
+        Assert.Contains("TimeoutException", detail);
+        Assert.DoesNotContain("TOP-SECRET", detail);
+    }
+
+    [Fact]
+    public async Task RestrictedExceptionHistoryIsPersistedWithoutLeakingIntoTransferSummary()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        Guid requestId = await Intake(database, "Diagnostics");
+        var link = await database.Db.IntegrationLinks.SingleAsync(l => l.RequestId == requestId, token);
+        link.BeginAttempt(DateTimeOffset.UtcNow);
+        var attempt = new IntegrationAttempt(link.Id, link.AttemptCount, DateTimeOffset.UtcNow);
+        attempt.Fail(DateTimeOffset.UtcNow, "SqlServer", "PermanentSql", "SQL_2627",
+            "The destination rejected a SQL constraint.");
+        attempt.SetExceptionDetails("Exception: SqlException\nStage: SqlServer\nSQL procedure: InsertApplication\nSQL line: 42");
+        database.Db.IntegrationAttempts.Add(attempt);
+        link.RecordFailure(DateTimeOffset.UtcNow, "SqlServer", "PermanentSql", "SQL_2627",
+            "The destination rejected a SQL constraint.", false);
+        await database.Db.SaveChangesAsync(token);
+        var monitor = Monitor(database, new Bridge());
+        string? restricted = await monitor.GetExceptionDetailsAsync(requestId, token);
+        Assert.Contains("SQL line: 42", restricted);
+        var row = Assert.Single((await monitor.SearchAsync(new(Search: "Diagnostics"), token)).Items);
+        Assert.DoesNotContain("SQL line: 42", row.Explanation ?? "");
+        Assert.DoesNotContain("SQL procedure:", row.RecordedError ?? "");
+    }
+
     private static readonly FfpManagerBridgeOptions OptionsValue = new() { Enabled = true };
     private static readonly IClock Clock = new SystemClock();
 
