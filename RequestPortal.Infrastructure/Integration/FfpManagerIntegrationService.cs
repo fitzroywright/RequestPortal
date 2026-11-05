@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Documents;
 using RequestPortal.Application.Integration;
@@ -25,6 +26,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
     private readonly FfpManagerBridgeOptions options;
     private readonly IClock clock;
     private readonly IPortalMessageService portalMessageService;
+    private readonly ILogger<FfpManagerIntegrationService>? logger;
 
     public FfpManagerIntegrationService(
         RequestPortalDbContext dbContext,
@@ -32,7 +34,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         IExternalApplicationBridgeClient bridgeClient,
         IOptions<FfpManagerBridgeOptions> options,
         IClock clock,
-        IPortalMessageService portalMessageService)
+        IPortalMessageService portalMessageService,
+        ILogger<FfpManagerIntegrationService>? logger = null)
     {
         this.dbContext = dbContext;
         this.documentService = documentService;
@@ -40,6 +43,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         this.options = options.Value;
         this.clock = clock;
         this.portalMessageService = portalMessageService;
+        this.logger = logger;
     }
 
     public async Task<ExternalApplicationReference> SubmitRequestAsync(
@@ -242,6 +246,9 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         }
         catch (Exception exception)
         {
+            logger?.LogError(exception,
+                "FFP Manager integration exception for request {RequestId}, link {LinkId}, attempt {AttemptNumber}, stage {Stage}",
+                requestId, link.Id, attempt.Number, attempt.Stage);
             var failure = IntegrationFailureClassifier.Classify(exception, attempt.Stage);
             link.RecordFailure(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation, failure.Transient);
             attempt.Fail(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation);
