@@ -190,6 +190,18 @@ public sealed class FfpManagerBridgeClient : IExternalApplicationBridgeClient
                             if (code.StartsWith("SQL_", StringComparison.Ordinal) &&
                                 int.TryParse(code.AsSpan(4), out int number))
                                 failure = TransferFailures.Sql("SqlServer", number);
+                            if (root.TryGetProperty("technicalDetails", out JsonElement diagnostic) &&
+                                diagnostic.ValueKind == JsonValueKind.String &&
+                                IntegrationExceptionDiagnostics.IsSafeTransportDetail(diagnostic.GetString()))
+                                failure = failure with { TechnicalDetails = diagnostic.GetString() };
+                            // Accept only fixed, known validation messages; never echo arbitrary
+                            // remote JSON into applicant-facing or administrator list views.
+                            if (code == "VALIDATION_PRIMARY_TELEPHONE")
+                                failure = failure with { Explanation = "Primary telephone requires correction before transfer." };
+                            else if (code == "VALIDATION_SECONDARY_TELEPHONE")
+                                failure = failure with { Explanation = "Secondary telephone requires correction before transfer." };
+                            else if (code == "VALIDATION_PARISH")
+                                failure = failure with { Explanation = "Parish selection or mapping is invalid." };
                             throw new IntegrationTransferException(failure);
                         }
                     }
