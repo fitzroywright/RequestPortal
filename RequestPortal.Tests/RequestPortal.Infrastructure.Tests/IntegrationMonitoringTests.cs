@@ -26,6 +26,41 @@ namespace RequestPortal.Infrastructure.Tests;
 public sealed class IntegrationMonitoringTests
 {
     [Fact]
+    public async Task BridgeBadRequestRetainsRejectedValidationFieldInsteadOfHttpWrapper()
+    {
+        var method = typeof(FfpManagerBridgeClient).GetMethod(
+            "EnsureSuccessAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        using var response = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent(
+                "{\\"type\\":\\"https://tools.ietf.org/html/rfc9110#section-15.5.1\\",\\"title\\":\\"One or more validation errors occurred.\\",\\"errors\\":{\\"PrimaryTelephone\\":[\\"The applicant telephone requires correction before transfer.\\"]}}",
+                System.Text.Encoding.UTF8, "application/problem+json")
+        };
+        async Task Call() => await (Task)method.Invoke(null, [response, TestContext.Current.CancellationToken])!;
+        var error = await Assert.ThrowsAsync<IntegrationTransferException>(Call);
+        Assert.Equal("VALIDATION_PRIMARY_TELEPHONE", error.Failure.Code);
+        Assert.Contains("Primary telephone: requires correction", error.Failure.Explanation);
+        Assert.DoesNotContain("HTTP 400", error.Failure.Explanation);
+    }
+
+    [Fact]
+    public async Task BridgeBadRequestDoesNotDisplayUntrustedValidationValues()
+    {
+        var method = typeof(FfpManagerBridgeClient).GetMethod(
+            "EnsureSuccessAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        using var response = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent(
+                "{\\"errors\\":{\\"password=TOP-SECRET\\":[\\"Applicant Private Person, token TOP-SECRET\\"]}}",
+                System.Text.Encoding.UTF8, "application/problem+json")
+        };
+        async Task Call() => await (Task)method.Invoke(null, [response, TestContext.Current.CancellationToken])!;
+        var error = await Assert.ThrowsAsync<IntegrationTransferException>(Call);
+        Assert.DoesNotContain("TOP-SECRET", error.Failure.Explanation);
+        Assert.DoesNotContain("Private Person", error.Failure.Explanation);
+    }
+
+    [Fact]
     public void CapturedIntegrationExceptionsRetainSafeTypeStageAndDiagnostic()
     {
         var classifier = typeof(FfpManagerIntegrationService).Assembly.GetType(
