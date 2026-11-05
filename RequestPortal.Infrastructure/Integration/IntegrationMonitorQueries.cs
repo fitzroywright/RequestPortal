@@ -117,8 +117,7 @@ public sealed partial class IntegrationStatusService
     public async Task<string?> GetExceptionDetailsAsync(Guid requestId, CancellationToken cancellationToken = default)
         => await (from attempt in dbContext.IntegrationAttempts.AsNoTracking()
                   join link in dbContext.IntegrationLinks.AsNoTracking() on attempt.LinkId equals link.Id
-                  where link.RequestId == requestId && link.SystemName == ffpManagerOptions.SystemName &&
-                        attempt.ExceptionDetails != null
+                  where link.RequestId == requestId && link.SystemName == ffpManagerOptions.SystemName
                   orderby attempt.StartedUtc descending, attempt.Id descending
                   select attempt.ExceptionDetails)
             .FirstOrDefaultAsync(cancellationToken);
