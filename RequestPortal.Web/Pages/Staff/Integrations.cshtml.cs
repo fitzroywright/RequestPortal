@@ -11,7 +11,6 @@ using Common.Storage;
 using Common.Diagnostics;
 using RequestPortal.Infrastructure.Security;
 using RequestPortal.Web.Security;
-using System.Text;
 
 namespace RequestPortal.Web.Pages.Staff;
 
@@ -85,60 +84,6 @@ public sealed class IntegrationsModel : PageModel
         catch (Exception exception) when (exception is HttpRequestException or IntegrationTransferException or NotSupportedException or TaskCanceledException)
         { ReturnOutboxError = "Return-event diagnostics could not be read. Initial submission status is shown separately; inspect bridge readiness and callback delivery."; }
         return Page();
-    }
-
-    public async Task<IActionResult> OnGetExportAsync()
-    {
-        Response.Headers.CacheControl = "no-store";
-        if(!ValidFilters) return BadRequest("Select valid integration filters and a valid date range.");
-        Response.ContentType = "text/csv; charset=utf-8";
-        Response.Headers.ContentDisposition = "attachment; filename=requestportal-integration-reconciliation.csv";
-        await using var writer = new StreamWriter(Response.Body, new UTF8Encoding(true), leaveOpen: true);
-        await writer.WriteLineAsync("Reference,Applicant,Source,Target,Status,Stage,Classification,Code,Explanation,Correlation,Submitted UTC,Last attempt UTC,Attempts,Next retry UTC,Synchronized UTC,Verified UTC,FFP application ID,FFP reference");
-        int page = 1;
-        IntegrationMonitorPage result;
-        do
-        {
-            result = await integrationStatusService.SearchAsync(Query(page) with { PageSize = 100 }, HttpContext.RequestAborted);
-            foreach (var item in result.Items)
-                await writer.WriteLineAsync(string.Join(",", new object?[] { item.PublicReference,item.ApplicantName,item.Source,item.Target,item.Status,
-                    item.FailureStage,item.FailureClassification,item.ErrorCode,item.Explanation,item.LinkId,item.SubmittedUtc.ToString("O"),
-                    item.LastAttemptUtc?.ToString("O"),item.AttemptCount,item.NextRetryUtc?.ToString("O"),item.SynchronizedUtc?.ToString("O"),
-                    item.VerifiedUtc?.ToString("O"),item.ApplicationId,item.ApplicationNumber }.Select(Csv)));
-        } while (++page <= result.TotalPages);
-        await writer.FlushAsync(HttpContext.RequestAborted);
-        return new EmptyResult();
-    }
-    public async Task<IActionResult> OnGetHistoryExportAsync(Guid requestId)
-    {
-        Response.Headers.CacheControl = "no-store";
-        var detail = await integrationStatusService.GetRequestAsync(requestId, HttpContext.RequestAborted);
-        if (detail is null) return NotFound();
-        Response.ContentType = "text/csv; charset=utf-8";
-        Response.Headers.ContentDisposition = "attachment; filename=requestportal-transfer-attempts.csv";
-        await using var writer = new StreamWriter(Response.Body,new UTF8Encoding(true),leaveOpen:true);
-        await writer.WriteLineAsync("Correlation,Attempt ID,Number,Operation,Started UTC,Completed UTC,Succeeded,Stage,Classification,Error code,Explanation");
-        if(detail.Transfer.LinkId.HasValue)
-        {
-            int page = 1;
-            IReadOnlyList<IntegrationAttemptView> attempts;
-            do
-            {
-                attempts = await integrationStatusService.GetAttemptPageAsync(detail.Transfer.LinkId.Value,page++,HttpContext.RequestAborted);
-                foreach(var item in attempts)
-                    await writer.WriteLineAsync(string.Join(",",new object?[]{detail.Transfer.LinkId,item.Id,item.Number,item.Operation,
-                        item.StartedUtc.ToString("O"),item.CompletedUtc?.ToString("O"),item.Succeeded,item.Stage,item.Classification,item.ErrorCode,item.Explanation}.Select(Csv)));
-            } while(attempts.Count==100);
-        }
-        await writer.FlushAsync(HttpContext.RequestAborted);
-        return new EmptyResult();
-    }
-    private static string Csv(object? value)
-    {
-        string text = value?.ToString() ?? "";
-        string probe = text.TrimStart(' ','\t','\r','\n');
-        if (probe.Length > 0 && "=+-@".Contains(probe[0])) text = "'" + text;
-        return "\"" + text.Replace("\"", "\"\"") + "\"";
     }
 
     public async Task<IActionResult> OnPostTestSharePointAsync()

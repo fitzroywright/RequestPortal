@@ -286,7 +286,7 @@ public sealed class StaffSearchNavigationPageTests
         Assert.Equal(0, f.Data.Reads); Assert.Equal(0, f.Data.Writes); Assert.Equal(0, f.Data.Downloads);
     }
     [Theory][InlineData("Administrator")][InlineData("Reviewer")]
-    public async Task IntegrationMonitoringRendersStatusDetailsHistoryExportsAndRestrictedActions(string actor)
+    public async Task IntegrationMonitoringRendersStatusDetailsHistoryAndRestrictedActionsWithoutCsvExport(string actor)
     {
         await using var fixture=await Setup(actor);
         using var response=await fixture.Get("/Staff/Integrations?RequestId="+RequestId+"&Search=John&Status=Failed&Sort=oldest&From=2026-01-01&Through=2026-12-31");
@@ -299,13 +299,20 @@ public sealed class StaffSearchNavigationPageTests
         using var original=await fixture.Get("/Staff/Review/"+RequestId);
         Assert.Contains("FFP Manager transfer: Failed",await original.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         using var queue=await fixture.Get("/Staff");Assert.Contains("Integration failures / reconciliation",await queue.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-        Assert.Contains("Search=John",html);Assert.Contains("Status=Failed",html);
+        Assert.Contains("value=\"John\"",html);
+        Assert.Matches("<option(?=[^>]*value=\"Failed\")(?=[^>]*selected)[^>]*>",html);
         using var invalid=await fixture.Get("/Staff/Integrations?From=2026-12-31&Through=2026-01-01");Assert.Equal(HttpStatusCode.BadRequest,invalid.StatusCode);
         string token=Token(html);
         using var missing=await fixture.Get("/Staff/Integrations?RequestId="+Guid.NewGuid());Assert.Equal(HttpStatusCode.NotFound,missing.StatusCode);Assert.Null(missing.Headers.Location);
-        fixture.Data.TransferApplicant="=SUM(1+1)";
-        using var export=await fixture.Get("/Staff/Integrations?handler=Export&Search=John&Status=Failed");Assert.Equal(HttpStatusCode.OK,export.StatusCode);
-        Assert.Equal("text/csv",export.Content.Headers.ContentType!.MediaType);Assert.Contains("'=SUM(1+1)",await export.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.DoesNotContain("Export diagnostics CSV",html);
+        Assert.DoesNotContain("Export complete attempt history",html);
+        foreach (string handler in new[] { "Export", "HistoryExport" })
+        {
+            using var formerExport = await fixture.Get("/Staff/Integrations?handler=" + handler + "&RequestId=" + RequestId);
+            Assert.Equal(HttpStatusCode.OK, formerExport.StatusCode);
+            Assert.Equal("text/html", formerExport.Content.Headers.ContentType!.MediaType);
+            Assert.Null(formerExport.Content.Headers.ContentDisposition);
+        }
         foreach(string handler in new[]{"Retry","Reconcile"})
         {
             using var post=await fixture.Send(new(HttpMethod.Post,"/Staff/Integrations?handler="+handler){Content=new FormUrlEncodedContent(new Dictionary<string,string>{["RequestId"]=RequestId.ToString(),["linkId"]=Organization.ToString(),["__RequestVerificationToken"]=token})});

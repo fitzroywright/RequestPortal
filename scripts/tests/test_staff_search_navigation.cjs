@@ -70,9 +70,8 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
     assert.equal(await page.getByRole('heading',{name:'Attempt history',exact:true}).count(),1);
     assert.equal(await page.getByRole('heading',{name:'Return-event outbox',exact:true}).count(),1);
     assert.equal(await page.getByRole('button',{name:'Verify destination and retry',exact:true}).count(),reviewer?0:1);
-    const exported=new URL(await page.getByRole('link',{name:'Export diagnostics CSV',exact:true}).getAttribute('href'),page.url());
-    assert.equal(exported.searchParams.get('Search'),'John');assert.equal(exported.searchParams.get('Status'),'Failed');
-    assert.equal(exported.searchParams.get('From'),'2026-01-01');assert.equal(exported.searchParams.get('Through'),'2026-12-31');
+    assert.equal(await page.getByRole('link',{name:/export.*csv|export complete attempt history/i}).count(),0);
+    assert.equal(await page.locator('a[href*="handler=Export"],a[href*="handler=HistoryExport"]').count(),0);
     const requestLink=await page.getByRole('link',{name:'Open original request',exact:true}).getAttribute('href');
     assert.equal(requestLink,'/Staff/Review/'+request);
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Integration page-wide overflow at '+width);
@@ -81,6 +80,6 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
     cases++;
    }
   }
-  console.log(`${cases} browser navigation cases passed at desktop/tablet/mobile: row, explicit link, and Enter activation; organization and request document anchors/highlights, search, pagination, integration diagnostics/exports and Administrator/Reviewer controls, and clear; no console errors or page-wide overflow.`);
+  console.log(`${cases} browser navigation cases passed at desktop/tablet/mobile: row, explicit link, and Enter activation; organization and request document anchors/highlights, search, pagination, integration diagnostics, CSV export absence and Administrator/Reviewer controls, and clear; no console errors or page-wide overflow.`);
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

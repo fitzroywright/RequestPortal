@@ -15,7 +15,6 @@
 <label>From (UTC)<input asp-for="From" type="date" /></label><label>Through (UTC)<input asp-for="Through" type="date" /></label>
 <label>Sort<select asp-for="Sort"><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
 <button class="button button-small" type="submit">Apply filters</button><a asp-page="/Staff/Integrations">Clear</a>
-<a class="button button-small button-outline" asp-page-handler="Export" asp-all-route-data="Model.Routes(1)">Export diagnostics CSV</a>
 </form>
 <div class="table-wrap"><table class="integration-table"><caption class="sr-only">Persistent transfer history</caption>
 <thead><tr><th>Request / Applicant</th><th>Source / Target</th><th>Status</th><th>Last attempt / Retry</th><th>FFP Manager</th><th>Diagnostics</th></tr></thead><tbody>
@@ -51,7 +50,7 @@ var transfer = detail.Transfer;
 }</div>
 <p class="muted">Retry may create a missing FFP Manager application or resume document transfer. Permanent failures require correcting the approved mapping first. Every operator action is audited.</p>
 }
-<h3>Attempt history</h3><p>Latest @detail.Attempts.Count of @detail.AttemptTotal recorded outcomes. <a asp-page-handler="HistoryExport" asp-route-requestId="@transfer.RequestId">Export complete attempt history</a></p><div class="table-wrap"><table><thead><tr><th>Started / Completed (UTC)</th><th>Operation</th><th>Outcome</th><th>Stage / Code</th><th>Explanation</th></tr></thead><tbody>
+<h3>Attempt history</h3><p>Latest @detail.Attempts.Count of @detail.AttemptTotal recorded outcomes.</p><div class="table-wrap"><table><thead><tr><th>Started / Completed (UTC)</th><th>Operation</th><th>Outcome</th><th>Stage / Code</th><th>Explanation</th></tr></thead><tbody>
 @foreach(var attempt in detail.Attempts) { <tr><td>@attempt.StartedUtc.ToString("u")<small>@(attempt.CompletedUtc?.ToString("u") ?? "Incomplete — inspect worker health")</small></td><td>@attempt.Operation@if(attempt.Operation == "Submission") { <span> #@attempt.Number</span> }</td><td>@(attempt.Succeeded ? "Succeeded" : attempt.CompletedUtc.HasValue ? "Failed" : "In progress / interrupted")</td><td>@attempt.Stage / @attempt.ErrorCode</td><td>@attempt.Explanation</td></tr> }
 @if(detail.Attempts.Count==0) { <tr><td colspan="5">No recorded attempts. Historical outcomes before monitoring was installed cannot be reconstructed automatically.</td></tr> }
 </tbody></table></div>
