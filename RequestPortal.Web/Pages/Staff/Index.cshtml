@@ -14,14 +14,6 @@
                 <h1>Requests</h1>
                 <p>Review work requiring attention, open operational queues, and move directly into the next action.</p>
             </div>
-            <div class="workspace-toolbar">
-                <form method="get" class="operational-toolbar">
-                    <input type="hidden" name="PageSize" value="@Model.PageSize" />
-                    <input name="Search" value="@Model.Search" maxlength="200" placeholder="Search by applicant name or request reference..." aria-label="Search by applicant name or request reference" />
-                    <button class="button button-small" type="submit">Search</button>
-                    @if (Model.SearchResults is not null) { <a asp-page="/Staff/Index">Clear Search</a> }
-                </form>
-            </div>
         </header>
 
         @if (Model.SearchResults is not null)
@@ -30,75 +22,21 @@
         }
         else
         {
-        <div class="portal-workspace-grid">
-            <aside class="workspace-panel status-panel">
-                <div class="panel-titlebar">
-                    <div>
-                        <strong>Work Status</strong>
-                        <small>@Model.TotalAttentionItems items require attention</small>
-                    </div>
-                </div>
-
-                <div class="status-list" role="list">
-                    <a class="status-row" asp-page="/Staff/Index">
-                        <span>Requests awaiting review</span>
-                        <strong>@Model.Queue.TotalCount</strong>
-                    </a>
-                    <a class="status-row" asp-page="/Staff/Index">
-                        <span>More information</span>
-                        <strong>@Model.Operations.ActionRequiredRequests.Count</strong>
-                    </a>
-                    <a class="status-row" asp-page="/Staff/Organizations">
-                        <span>Organizations pending</span>
-                        <strong>@Model.Operations.PendingOrganizations.Count</strong>
-                    </a>
-                    <a class="status-row" asp-page="/Staff/Organizations">
-                        <span>Documents awaiting verification</span>
-                        <strong>@Model.Operations.DocumentsAwaitingVerification.Count</strong>
-                    </a>
-                    <a class="status-row" asp-page="/Staff/Organizations">
-                        <span>Reverification</span>
-                        <strong>@Model.Operations.ReverificationOrganizations.Count</strong>
-                    </a>
-                    @await Component.InvokeAsync("IntegrationStatus")
-                    <a class="status-row" asp-page="/Staff/Integrations">
-                        <span>Dead letters</span>
-                        <strong>@Model.Operations.DeadLetters.Count</strong>
-                    </a>
-                    <a class="status-row" asp-page="/Staff/Integrations">
-                        <span>Messaging failures</span>
-                        <strong>@Model.Operations.FailedNotificationDeliveries.Count</strong>
-                    </a>
-                </div>
-
-                <div class="panel-titlebar panel-titlebar-secondary">
-                    <strong>Actions</strong>
-                </div>
-                <nav class="actions-list" aria-label="Requests actions">
-                    <a asp-page="/Staff/Organizations">Organizations <span>›</span></a>
-                    <a asp-page="/Staff/Fulfilment">Fulfilment <span>›</span></a>
-                    <a asp-page="/Staff/Reports">Reports &amp; search <span>›</span></a>
-                    <a asp-page="/Staff/Integrations">Integrations <span>›</span></a>
-                    @if (User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ViewManagementDashboard))
-                    {
-                        <a asp-page="/Management/Index">Management dashboard <span>›</span></a>
-                    }
-                </nav>
-            </aside>
-
+        <div class="portal-workspace-grid staff-requests-grid">
             <main class="workspace-panel request-panel">
                 <div class="panel-titlebar">
                     <div>
-                        <strong>Requests Awaiting Review</strong>
-                        <small>@Model.Queue.TotalCount submitted requests in the current queue</small>
+                        <strong>Requests</strong>
+                        <small>@Model.Queue.TotalCount requests matching the filters</small>
                     </div>
                 </div>
 
+                <form id="requests-grid-filters" method="get" asp-page="/Staff/Index" data-requests-grid-filters><input type="hidden" name="PageSize" value="@Model.PageSize" /></form>
                 @if (Model.SubmittedRequests.Count == 0)
                 {
                     <div class="workspace-empty">
-                        <strong>No submitted requests are awaiting review.</strong>
-                        <p>The review queue is currently clear.</p>
+                        <strong>No requests match the current filters.</strong>
+                        <p>Try clearing the applicant, organization, or work status filters.</p>
                     </div>
                 }
                 else
@@ -108,9 +46,10 @@
                             <thead>
                                 <tr>
                                     <th>Reference</th>
-                                    <th>Applicant</th>
-                                    <th>Organization</th>
+                                    <th><label for="requests-applicant-filter">Applicant</label><input id="requests-applicant-filter" name="Applicant" form="requests-grid-filters" value="@Model.Applicant" maxlength="200" type="search" placeholder="Search applicant…" autocomplete="off" aria-label="Filter requests by applicant" /></th>
+                                    <th><label for="requests-organization-filter">Organization</label><input id="requests-organization-filter" name="Organization" form="requests-grid-filters" value="@Model.Organization" maxlength="200" type="search" placeholder="Search organization…" autocomplete="off" aria-label="Filter requests by organization" /></th>
                                     <th>Summary</th>
+                                    <th><label for="requests-status-filter">Work Status</label><select id="requests-status-filter" name="WorkStatus" form="requests-grid-filters" aria-label="Filter requests by work status"><option value="">All statuses</option>@foreach (var status in Enum.GetValues<RequestPortal.Domain.Requests.RequestStatus>()) { <option value="@status" selected="@(Model.WorkStatus == status)">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(status.ToString())</option> }</select></th>
                                     <th class="staff-age-column">Age</th>
                                     <th>Review</th>
                                 </tr>
@@ -134,6 +73,7 @@
                                     </td>
                                     <td>@request.OrganizationName</td>
                                     <td>@request.Summary</td>
+                                    <td><span class="status">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(request.Status.ToString())</span></td>
                                     <td class="staff-age-column">@ageDays d</td>
                                     <td>
                                         <a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.RequestId">Review</a>
@@ -238,10 +178,20 @@
         }
     </div>
 </section>
+<script src="~/js/requests-grid-filters.js" asp-append-version="true" defer></script>
 
 
 
 <style>
+.staff-requests-grid{grid-template-columns:minmax(0,1fr) minmax(270px,.32fr)}
+.staff-requests-grid .request-panel{min-width:0}
+.staff-requests-grid .workspace-table{min-width:950px}
+.staff-requests-grid .workspace-table thead th{vertical-align:bottom}
+.staff-requests-grid .workspace-table th label{display:block;margin-bottom:5px}
+.staff-requests-grid .workspace-table th :is(input,select){display:block;width:100%;min-width:125px;margin:0;font-size:.85rem;letter-spacing:normal;text-transform:none;box-sizing:border-box}
+.staff-requests-grid .workspace-table th:nth-child(2),.staff-requests-grid .workspace-table th:nth-child(3){min-width:185px}
+.staff-requests-grid .workspace-table th:nth-child(5){min-width:170px}
+@@media(max-width:1100px){.staff-requests-grid{grid-template-columns:minmax(0,1fr)}}
 .staff-context-stack{display:grid;gap:10px;align-content:start;min-width:0}
 .staff-waiting-action{min-width:0}
 @@media(max-width:1100px){.staff-context-stack{grid-column:1 / -1}}
