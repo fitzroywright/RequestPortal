@@ -72,6 +72,8 @@ public sealed class IntegrationsModel : PageModel
         if (string.Equals(transfer.ErrorCode, "LEGACY_FAILURE", StringComparison.OrdinalIgnoreCase))
             return "Original failure reason unavailable";
         string text = transfer.RecordedError ?? transfer.Explanation ?? transfer.ErrorCode ?? StatusLabel(transfer.Status);
+        int observed = text.IndexOf(" Encountered ", StringComparison.Ordinal);
+        if (observed >= 0) return text[(observed + 1)..];
         int sentence = text.IndexOf(". ", StringComparison.Ordinal);
         return sentence < 0 ? text : text[..(sentence + 1)];
     }
@@ -80,6 +82,8 @@ public sealed class IntegrationsModel : PageModel
             return "No original exception was stored. Verify the destination record and review retained operational logs before retrying.";
         string? text = transfer.RecordedError ?? transfer.Explanation;
         if (text is null) return null;
+        int observed = text.IndexOf(" Encountered ", StringComparison.Ordinal);
+        if (observed >= 0) return text[..observed];
         int sentence = text.IndexOf(". ", StringComparison.Ordinal);
         return sentence < 0 ? null : text[(sentence + 2)..];
     }
