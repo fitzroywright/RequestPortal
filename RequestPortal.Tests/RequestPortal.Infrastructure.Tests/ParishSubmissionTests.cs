@@ -57,7 +57,7 @@ public sealed class ParishSubmissionTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task MissingParish_ReturnsFieldValidation400_BeforeReferenceAllocation(string? parish)
+    public async Task MissingParish_ReturnsStructuredFieldValidation422_BeforeReferenceAllocation(string? parish)
     {
         ExternalApplicationSubmission submission = Submission() with { Parish = parish };
         var result = await ApplicationSubmissionEndpoint.HandleAsync(submission, new MissingParishGateway(), NullLoggerFactory.Instance, TestContext.Current.CancellationToken);
@@ -100,7 +100,7 @@ public sealed class ParishSubmissionTests
     [Fact]
     public async Task InfrastructureErrors_AreNotMisreportedAsApplicantValidation()
     {
-        // A valid parish with no SQL connection configured is a deployment error, not a 400.
+        // A valid parish with no SQL connection configured is a deployment error, not applicant validation.
         var options = Microsoft.Extensions.Options.Options.Create(new BridgeOptions());
         await Assert.ThrowsAsync<InvalidOperationException>(() => ApplicationSubmissionEndpoint.HandleAsync(
             Submission(), new SyncedSqlFfpManagerGateway(options, new FfpManagerReferenceDataCatalog(options)),
