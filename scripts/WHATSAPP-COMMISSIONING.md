@@ -112,10 +112,15 @@ Notifications__WhatsAppAccessTokenSecretName=messaging/whatsapp/api-token
 
 All unrelated environment bytes, credentials, service definitions and TLS/proxy
 settings are preserved. Existing outbound notification configuration stays disabled.
-The nginx change adds one HTTP-context map and one conditional access-log directive
-to each of the portal's existing HTTP/HTTPS server blocks. It suppresses access
-logging only for the normalized, case-insensitive webhook path (including a trailing
-slash), so its query cannot enter access logs. Other application sites are untouched.
+The nginx change adds one HTTP-context map and an explicit unbuffered conditional
+access log to each existing portal server and location. This overrides inherited
+logging and replaces duplicate unconditional directives for the reviewed combined
+access-log destination. Unsupported destinations, formats, buffering or includes
+fail closed for review; the exact reviewed-site hash remains required. Existing
+location precedence, reverse proxy directives, TLS and redirects are preserved.
+Logging is suppressed only for the normalized, case-insensitive webhook path
+(including a trailing slash); normal portal access logging stays enabled. Other
+application sites are untouched.
 An nginx error log is not an access log; both current/previous error and access logs
 are scanned for secret values before/after validation. Existing leaked credentials
 cause a stop requiring operator handling; this procedure never edits/deletes logs.
@@ -123,8 +128,18 @@ cause a stop requiring operator handling; this procedure never edits/deletes log
 The script takes root-only, checksummed backups under
 `/var/lib/requestportal-whatsapp-commissioning/<AUDIT_ID>/`, validates the
 complete candidate include graph with `nginx -t`, checks for configuration drift,
-then promotes and reloads nginx. A dummy-token canary checks the running access
-logs before a real verification token is ever sent. It then atomically promotes
+then promotes and reloads nginx. Because nginx reload only signals the master,
+the helper waits for all accepting workers to adopt a new generation before sending
+canaries on fresh connections. It retains worker IDs in the protected audit.
+Paired dummy-token webhook and harmless `/health` control requests exercise both
+HTTP and HTTPS through loopback and public DNS, with the correct Host/TLS SNI,
+certificate validation, no environment proxies and no redirect following.
+The canary must observe all four normal controls and suppress all twelve webhook
+variants, including case, trailing slash, duplicate slash and percent encoding.
+Log inspection starts at captured inode/offset positions, follows renamed files
+and new log files, and polls for asynchronous writes plus a settling interval.
+Missing positive controls, truncation or any logged webhook marker stop commissioning
+before a real verification token is ever sent. It then atomically promotes
 the environment, restarts only `aegis-requestportal`, and checks local/public health,
 homepage and protected staff authentication. It does not restart other applications.
 
@@ -208,3 +223,16 @@ to overwrite configuration changed by another operator/deployment. It leaves the
 original file owner/mode intact. After SIGKILL/power loss, inspect the most recent
 protected audit directory and execute this command before retrying. Stop and review
 configuration drift rather than bypassing a failed hash or permission check.
+
+## Nginx regression verification
+
+Run the focused Python suite with `python3 -m unittest discover -s scripts/tests
+-p test_whatsapp_commissioning.py`. Set `REQUESTPORTAL_TEST_NGINX=/usr/sbin/nginx`
+on Linux to include the real-nginx regression. It starts an independent unprivileged
+process on random loopback ports, never the production service. The test holds its
+own master between the reload signal and worker adoption to prove that a successful
+reload command alone can still leave old workers logging webhook queries. It then
+verifies worker replacement, normal logging and webhook suppression with inherited
+logging, duplicate access logs and exact/prefix/regex location precedence.
+This reproduces the timing defect; the historical production worker that handled
+the rolled-back canary cannot be identified without its protected log/audit evidence.

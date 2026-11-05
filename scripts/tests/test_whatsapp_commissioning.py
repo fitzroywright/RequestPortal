@@ -2,6 +2,12 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
+import http.client
+import socket
+import signal
+import subprocess
+import time
 import pathlib
 import tempfile
 import types
@@ -133,7 +139,7 @@ class ConfigurationTests(unittest.TestCase):
         original = b'server {\n    return 301 https://$host$request_uri;\n}\nserver {\n    ssl_certificate /protected/cert;\n    location / { proxy_pass http://127.0.0.1:5401; }\n}\n'
         with patch.object(c, 'BASE_SITE_HASH', c.digest(original)):
             candidate = c.patch_site(original)
-            self.assertEqual(original, candidate[len(c.MAP.encode()):].replace(c.LOG.encode(), b''))
+            self.assertEqual(original, candidate[len((c.MAP + c.POLICY_MARKER).encode()):].replace(c.LOG.encode(), b''))
             self.assertEqual(2, candidate.count(c.LOG.encode()))
             self.assertEqual(candidate, c.patch_site(candidate))
             with self.assertRaises(c.Stop):
@@ -206,6 +212,180 @@ class ConfigurationTests(unittest.TestCase):
             self.assertEqual('http { include /etc/nginx/sites-enabled/*; }', main.read_text())
 
 
+class NginxLoggingTests(unittest.TestCase):
+    fixture = SOURCE.parent / 'tests/fixtures/requestportal.nginx.conf'
+
+    def test_exact_reviewed_site_and_legacy_candidate_upgrade(self):
+        original = self.fixture.read_bytes()
+        self.assertEqual(c.BASE_SITE_HASH, c.digest(original))
+        candidate = c.patch_site(original)
+        self.assertEqual(3, candidate.count(c.LOG.strip().encode()))
+        self.assertEqual(candidate, c.patch_site(candidate))
+        legacy = (c.MAP + original.decode().replace('server {\n', 'server {\n' + c.LOG)).encode()
+        self.assertEqual(candidate, c.patch_site(legacy))
+        for directive in ['proxy_pass', 'proxy_set_header', 'ssl_certificate', 'ssl_protocols', 'listen', 'return 301']:
+            self.assertEqual([line for line in original.splitlines() if directive.encode() in line],
+                             [line for line in candidate.splitlines() if directive.encode() in line])
+
+    def test_replaces_duplicate_unconditional_logs_and_retains_location_precedence(self):
+        original = self.fixture.read_text().replace('server {\n', 'server {\n    access_log /var/log/nginx/access.log;\n')
+        original = original.replace('    location / {\n',
+            '    location = /api/webhooks/whatsapp {\n        access_log /var/log/nginx/access.log combined;\n        return 403;\n    }\n'
+            '    location ^~ /api/ {\n        access_log /var/log/nginx/access.log;\n        access_log /var/log/nginx/access.log combined;\n        return 403;\n    }\n'
+            '    location / {\n')
+        with patch.object(c, 'BASE_SITE_HASH', c.digest(original.encode())):
+            candidate = c.patch_site(original.encode())
+            self.assertEqual(candidate, c.patch_site(candidate))
+        active = '\n'.join(line for line in candidate.decode().splitlines() if not line.lstrip().startswith('#'))
+        logs = [line for line in active.splitlines() if 'access_log' in line]
+        self.assertEqual(5, len(logs))
+        self.assertTrue(all('combined if=$requestportal_whatsapp_loggable;' in line for line in logs))
+        self.assertEqual([line for line in original.splitlines() if 'location ' in line],
+                         [line for line in active.splitlines() if 'location ' in line])
+
+    def test_unknown_destinations_formats_buffering_and_includes_require_review(self):
+        for directive in ['access_log /other.log;', 'access_log /var/log/nginx/access.log custom;',
+                          'access_log /var/log/nginx/access.log combined buffer=32k;',
+                          'include /etc/nginx/snippets/unknown.conf;']:
+            original = self.fixture.read_text().replace('server {\n', 'server {\n    ' + directive + '\n')
+            with self.subTest(directive=directive), patch.object(c, 'BASE_SITE_HASH', c.digest(original.encode())):
+                with self.assertRaises(c.Stop): c.patch_site(original.encode())
+
+    def test_waits_until_accepting_workers_have_replaced_the_old_generation(self):
+        with patch.object(c, 'nginx_workers', side_effect=[(10, {11}), (10, set()), (10, {12})]) as workers, \
+             patch.object(c.time, 'sleep'):
+            c.wait_for_nginx_reload((10, {11}))
+            self.assertEqual(3, workers.call_count)
+        with patch.object(c, 'nginx_workers', return_value=(20, {21})):
+            with self.assertRaises(c.Stop): c.wait_for_nginx_reload((10, {11}))
+
+    def test_tail_ignores_old_entries_and_follows_rotation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = pathlib.Path(temporary)
+            current = directory / 'access.log'; current.write_bytes(b'old webhook canary\n')
+            (directory / 'access.log.1').write_bytes(b'older canary\n')
+            with c.AccessLogTail(directory) as tail:
+                self.assertEqual(b'', tail.read())
+                current.rename(directory / 'access.log.1')
+                self.assertEqual(b'', tail.read())  # A rotation may briefly leave no current path.
+                current.write_bytes(b'new control\n')
+                with (directory / 'access.log.1').open('ab') as stream: stream.write(b'late old-worker log\n')
+                data = tail.read()
+                self.assertIn(b'new control', data)
+                self.assertIn(b'late old-worker log', data)
+                self.assertNotIn(b'old webhook', data)
+                self.assertEqual(b'', tail.read())
+
+    def test_canary_requires_normal_logging_and_rejects_any_webhook_log(self):
+        for failure in [None, 'webhook', 'missing-control', 'delayed-control', 'delayed-webhook']:
+            with self.subTest(failure=failure):
+                tail = types.SimpleNamespace(discover=lambda **kw: None)
+                chunks, calls = [], []
+                def request(path, local, secure):
+                    calls.append((path, local, secure))
+                    if '/health?' in path and failure != 'missing-control': chunks.append(path.encode())
+                    if 'hub.verify_token=' in path and failure in ('webhook', 'delayed-webhook'): chunks.append(path.encode())
+                reads = []
+                def read():
+                    reads.append(True)
+                    if failure == 'delayed-control' and len(reads) == 1: return b''
+                    if failure == 'delayed-webhook' and len(reads) == 1:
+                        data = b'\n'.join(x for x in chunks if b'/health?' in x)
+                        chunks[:] = [x for x in chunks if b'hub.verify_token=' in x]
+                        return data
+                    data = b'\n'.join(chunks); chunks.clear(); return data
+                tail.read = read
+                clock = iter(range(100))
+                with patch.object(c, 'AccessLogTail') as logs, \
+                     patch.object(c, 'logging_canary_request', side_effect=request), \
+                     patch.object(c.time, 'monotonic', side_effect=lambda: next(clock)), patch.object(c.time, 'sleep'):
+                    logs.return_value.__enter__.return_value = tail
+                    if failure in ('webhook', 'missing-control', 'delayed-webhook'):
+                        with self.assertRaises(c.Stop): c.verify_nginx_logging()
+                    else:
+                        result = c.verify_nginx_logging()
+                        self.assertEqual(4, result['normalRequestsLogged'])
+                        self.assertEqual(12, result['webhookRequestsSuppressed'])
+                self.assertEqual({(True, True), (True, False), (False, True), (False, False)},
+                                 {(local, secure) for _, local, secure in calls})
+
+
+@unittest.skipUnless(os.environ.get('REQUESTPORTAL_TEST_NGINX'), 'Requires isolated nginx executable')
+class NginxProcessTests(unittest.TestCase):
+    def test_real_nginx_reload_inheritance_duplicates_and_location_precedence(self):
+        # Runs an independent unprivileged nginx on random loopback ports. No live config is read/changed.
+        with tempfile.TemporaryDirectory(prefix='rp-nginx-test-') as temporary:
+            root = pathlib.Path(temporary)
+            sockets = [socket.socket(), socket.socket()]
+            for sock in sockets: sock.bind(('127.0.0.1', 0))
+            ports = [sock.getsockname()[1] for sock in sockets]
+            for sock in sockets: sock.close()
+            servers = []
+            for port in ports:
+                servers.append('server {\n    listen 127.0.0.1:' + str(port) + ';\n'
+                    '    server_name requestportal.ffpja.org;\n'
+                    '    access_log /var/log/nginx/access.log;\n'
+                    '    access_log /var/log/nginx/access.log combined;\n'
+                    '    location = /api/webhooks/whatsapp {\n'
+                    '        access_log /var/log/nginx/access.log;\n        return 403;\n    }\n'
+                    '    location ^~ /api/ {\n        return 403;\n    }\n'
+                    '    location ~* whatsapp {\n        access_log /var/log/nginx/access.log;\n        return 403;\n    }\n'
+                    '    location / {\n        return 204;\n    }\n}\n')
+            original = ''.join(servers).encode()
+            with patch.object(c, 'BASE_SITE_HASH', c.digest(original)):
+                candidate = c.patch_site(original).decode()
+            def configuration(site):
+                site = site.replace('/var/log/nginx/access.log', str(root / 'access.log'))
+                return ('daemon off;\nworker_processes 1;\npid ' + str(root / 'nginx.pid') + ';\n'
+                        'error_log ' + str(root / 'error.log') + ';\nevents {}\nhttp {\n'
+                        'access_log ' + str(root / 'access.log') + ';\n' + site + '\n}\n')
+            config = root / 'nginx.conf'; config.write_text(configuration(original.decode()))
+            binary = os.environ['REQUESTPORTAL_TEST_NGINX']
+            subprocess.run([binary, '-t', '-p', str(root), '-c', str(config)], check=True, capture_output=True)
+            process = subprocess.Popen([binary, '-p', str(root), '-c', str(config)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            try:
+                for _ in range(100):
+                    try:
+                        with socket.create_connection(('127.0.0.1', ports[0]), timeout=0.1): break
+                    except OSError: time.sleep(0.02)
+                with patch.object(c, 'native', return_value=str(process.pid)):
+                    before = c.nginx_workers()
+                    # Deterministically hold only our isolated master between signal and
+                    # adoption. The reload command succeeds while old workers still log.
+                    os.kill(process.pid, signal.SIGSTOP)
+                    config.write_text(configuration(candidate))
+                    subprocess.run([binary, '-p', str(root), '-c', str(config), '-s', 'reload'],
+                                   check=True, capture_output=True)
+                    connection = http.client.HTTPConnection('127.0.0.1', ports[0], timeout=2)
+                    connection.request('GET', '/api/webhooks/whatsapp?stale=reload-not-adopted',
+                                       headers={'Host': 'requestportal.ffpja.org', 'Connection': 'close'})
+                    response = connection.getresponse(); response.read(); connection.close()
+                    self.assertIn('stale=reload-not-adopted', (root / 'access.log').read_text())
+                    os.kill(process.pid, signal.SIGCONT)
+                    c.wait_for_nginx_reload(before)
+                for port in ports:
+                    for path in ['/api/webhooks/whatsapp?token=hidden-exact',
+                                 '/API/WEBHOOKS/WHATSAPP/?token=hidden-regex',
+                                 '/api//webhooks/%77hatsapp?token=hidden-normalized',
+                                 '/health?control=visible']:
+                        connection = http.client.HTTPConnection('127.0.0.1', port, timeout=2)
+                        connection.request('GET', path, headers={'Host': 'requestportal.ffpja.org', 'Connection': 'close'})
+                        response = connection.getresponse(); response.read(); connection.close()
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    text = (root / 'access.log').read_text()
+                    if text.count('control=visible') == 2: break
+                    time.sleep(0.02)
+                self.assertEqual(2, text.count('control=visible'))
+                self.assertNotIn('hidden-', text)
+            finally:
+                if process.poll() is None:
+                    os.kill(process.pid, signal.SIGCONT)
+                    process.terminate()
+                process.communicate(timeout=5)
+
+
+
 class ProcedureTests(unittest.TestCase):
     def run_case(self, mode='apply', fail=None, idempotent=False):
         with tempfile.TemporaryDirectory() as temporary:
@@ -238,6 +418,10 @@ class ProcedureTests(unittest.TestCase):
                     self.assertEqual(candidate_env, env.read_bytes())
                     self.assertEqual(candidate_site, site.read_bytes())
                 return [{'status': 'ok', 'mode': probe_mode}]
+            def canary():
+                operations.append(['canary'])
+                if fail == 'canary': raise c.Stop('fixture canary failed')
+                return {'normalRequestsLogged': 4}
             def replace(path, data, metadata):
                 operations.append(['replace', path.name]); path.write_bytes(data)
             (root / 'access.log').write_text('ordinary logs')
@@ -254,6 +438,8 @@ class ProcedureTests(unittest.TestCase):
                  patch.object(c, 'validate_nginx', return_value=c.digest(b'unchanged-configuration-graph')), \
                  patch.object(c, 'native', side_effect=native), patch.object(c, 'run_probe', side_effect=probe), \
                  patch.object(c, 'atomic_replace', side_effect=replace), patch.object(c.urllib.request, 'urlopen'), \
+                 patch.multiple(c, nginx_workers=lambda: (10, {11}), wait_for_nginx_reload=lambda before: (10, {12}),
+                                verify_nginx_logging=canary), \
                  patch.object(c, 'Path', side_effect=path), contextlib.redirect_stdout(output):
                 if fail:
                     with self.assertRaises(c.Stop): c.commission(mode, root)
@@ -275,6 +461,7 @@ class ProcedureTests(unittest.TestCase):
                 self.assertLess(operations.index(['probe', 'preflight']), operations.index(['replace', 'site']))
                 self.assertLess(operations.index(['/usr/bin/systemctl', 'reload', 'nginx']), operations.index(['replace', 'env']))
                 self.assertIn(['probe', 'verify'], operations)
+                self.assertLess(operations.index(['canary']), operations.index(['replace', 'env']))
             return result
 
     def test_dry_run_has_no_production_writes(self): self.run_case('dry-run')
@@ -283,6 +470,7 @@ class ProcedureTests(unittest.TestCase):
     def test_existing_secret_in_logs_prevents_enablement(self): self.run_case(fail='scan-logs')
     def test_success_applies_logging_before_enablement(self): self.run_case()
     def test_repeat_apply_is_idempotent(self): self.run_case(idempotent=True)
+    def test_failed_canary_rolls_back_before_real_token_verification(self): self.run_case(fail='canary')
     def test_failed_reload_rolls_back_both_files(self): self.run_case(fail='reload')
     def test_failed_https_or_durable_verification_rolls_back(self): self.run_case(fail='verify')
 

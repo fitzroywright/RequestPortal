@@ -5,12 +5,14 @@ Never invokes sudo, a deployer, a shell, migrations, outbound messaging or secre
 import argparse
 import fcntl
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
 import re
 import shlex
 import socket
+import ssl
 import stat
 import subprocess
 import sys
@@ -51,6 +53,8 @@ map $uri $requestportal_whatsapp_loggable {
 # END RequestPortal WhatsApp access-log protection
 
 """
+POLICY_MARKER = "# RequestPortal WhatsApp logging policy v2\n"
+ORIGINAL_LOG_MARKER = "# RequestPortal original access log: "
 LOG = "    access_log /var/log/nginx/access.log combined if=$requestportal_whatsapp_loggable;\n"
 
 
@@ -145,14 +149,172 @@ def patch_environment(data):
 
 def patch_site(data):
     text = data.decode("utf-8")
+    managed = text.startswith(MAP + POLICY_MARKER)
     if text.startswith(MAP):
-        original = text[len(MAP):].replace(LOG, "")
-        if digest(original.encode()) != BASE_SITE_HASH or text.count(LOG) != 2:
-            raise Stop("Managed nginx site has drifted; no changes made.")
-        return data
-    if digest(data) != BASE_SITE_HASH or text.count("server {\n") != 2:
+        original = text[len(MAP):]
+        if managed:
+            original = original[len(POLICY_MARKER):]
+            original = re.sub(r"(?m)^[ \t]*" + re.escape(LOG.strip()) + r"\n", "", original)
+            original = re.sub(r"(?m)^([ \t]*)" + re.escape(ORIGINAL_LOG_MARKER) + r"([^\n]+)\n",
+                              lambda match: match[1] + match[2] + "\n", original)
+        else:
+            # Accept only the exact previously managed site, then upgrade its policy.
+            if text.count(LOG) != 2:
+                raise Stop("Managed nginx site has drifted; no changes made.")
+            original = original.replace(LOG, "")
+    else:
+        original = text
+    if digest(original.encode()) != BASE_SITE_HASH or original.count("server {\n") != 2:
         raise Stop("Nginx site differs from the reviewed Kratos site; no changes made.")
-    return (MAP + text.replace("server {\n", "server {\n" + LOG)).encode()
+
+    def replace_log(match):
+        # Deduplicate the reviewed destination, preserving its original bytes for drift checks.
+        # Unknown formats/destinations/buffering require review, never an implicit logging bypass.
+        if not re.fullmatch(r"/var/log/nginx/access\.log(?:[ \t]+combined)?", match[2].strip()):
+            raise Stop("Unsupported portal access log requires review.")
+        return match[1] + ORIGINAL_LOG_MARKER + "access_log " + match[2] + ";\n"
+
+    patched = re.sub(r"(?m)^([ \t]*)access_log ([^;\n]+);\n", replace_log, original)
+    # Inline or included logging is outside the reviewed site's supported composition.
+    active = re.sub(r"(?m)#.*$", "", patched)
+    if re.search(r"\baccess_log\b|\binclude\b", active):
+        raise Stop("Unsupported portal logging/include requires review.")
+    # A log at every existing server/location overrides http inheritance and any old
+    # location-level logging. No location, proxy, redirect or TLS routing is added/changed.
+    patched = re.sub(r"(?m)^([ \t]*)(server|location[^{};\n]+) *\{\n",
+                     lambda match: match[0] + match[1] + LOG, patched)
+    candidate = (MAP + POLICY_MARKER + patched).encode()
+    if managed and candidate != data:
+        raise Stop("Managed nginx site has drifted; no changes made.")
+    return candidate
+
+
+def nginx_workers(require_workers=True):
+    master = int(native(["/usr/bin/systemctl", "show", "nginx", "--property=MainPID", "--value"]))
+    if master < 2:
+        raise Stop("Nginx master cannot be identified.")
+    workers = set()
+    children = Path(f"/proc/{master}/task/{master}/children").read_text().split()
+    for child in children:
+        try:
+            command = Path(f"/proc/{int(child)}/cmdline").read_bytes()
+        except FileNotFoundError:
+            continue
+        if b"nginx: worker process" in command and b"shutting down" not in command:
+            workers.add(int(child))
+    if require_workers and not workers:
+        raise Stop("Nginx accepting workers cannot be identified.")
+    return master, workers
+
+
+def wait_for_nginx_reload(before):
+    # systemctl reload only sends HUP; it does not acknowledge worker replacement.
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        current = nginx_workers(require_workers=False)
+        if current[0] != before[0]:
+            raise Stop("Nginx master changed during commissioning.")
+        if current[1] and current[1].isdisjoint(before[1]):
+            return current
+        time.sleep(0.1)
+    raise Stop("Nginx workers did not finish adopting the logging configuration.")
+
+
+class AccessLogTail:
+    def __init__(self, directory=Path("/var/log/nginx")):
+        self.directory = directory
+        self.streams = {}
+
+    def discover(self, initial=False):
+        if initial and not (self.directory / "access.log").is_file():
+            raise Stop("Nginx access log cannot be inspected.")
+        for path in self.directory.glob("access.log*"):
+            if path.suffix == ".gz" or not path.is_file():
+                continue
+            try:
+                stream = path.open("rb")
+            except FileNotFoundError:
+                continue  # Rotation between discovery and open; retained descriptors stay valid.
+            info = os.fstat(stream.fileno())
+            key = (info.st_dev, info.st_ino)
+            if key in self.streams:
+                stream.close()
+            else:
+                if initial:
+                    stream.seek(0, os.SEEK_END)
+                self.streams[key] = stream
+
+    def read(self):
+        self.discover()
+        chunks = []
+        for stream in self.streams.values():
+            if os.fstat(stream.fileno()).st_size < stream.tell():
+                raise Stop("Nginx access log was truncated during canary verification; retry required.")
+            chunks.append(stream.read())
+        return b"".join(chunks)
+
+    def __enter__(self):
+        self.discover(initial=True)
+        return self
+
+    def __exit__(self, *args):
+        for stream in self.streams.values():
+            stream.close()
+
+
+def logging_canary_request(path, local, secure):
+    # Direct connections avoid proxy environment variables, redirect following and
+    # pooled connections to old workers. HTTPS retains certificate and SNI checks.
+    host = "requestportal.ffpja.org"
+    port = 443 if secure else 80
+    connection = (http.client.HTTPSConnection if secure else http.client.HTTPConnection)(host, port, timeout=10)
+    try:
+        if local:
+            connection.sock = socket.create_connection(("127.0.0.1", port), timeout=10)
+            if secure:
+                connection.sock = ssl.create_default_context().wrap_socket(connection.sock, server_hostname=host)
+        connection.request("GET", path, headers={"Host": host, "Connection": "close"})
+        response = connection.getresponse()
+        response.read()
+        if not secure and response.status != 301:
+            raise Stop("Nginx HTTP canary did not use the reviewed redirect server.")
+        if secure and path.startswith("/health?") and response.status != 200:
+            raise Stop("Nginx HTTPS control did not reach portal health.")
+    finally:
+        connection.close()
+
+
+def verify_nginx_logging():
+    controls, suppressed = set(), set()
+    with AccessLogTail() as logs:
+        for local in (True, False):
+            for secure in (False, True):
+                control = "rp-wa-control-" + uuid.uuid4().hex
+                controls.add(control.encode())
+                logging_canary_request("/health?rp_log_control=" + control, local, secure)
+                for path in ("/api/webhooks/whatsapp", "/API/WEBHOOKS/WHATSAPP/",
+                             "/api//webhooks/%77hatsapp"):
+                    marker = "rp-wa-webhook-" + uuid.uuid4().hex
+                    suppressed.add(marker.encode())
+                    logging_canary_request(path + "?hub.verify_token=" + marker, local, secure)
+        deadline = time.monotonic() + 10
+        observed = set()
+        settled = None
+        while time.monotonic() < deadline:
+            chunk = logs.read()
+            if any(marker in chunk for marker in suppressed):
+                raise Stop("Running nginx still logs webhook query strings; no real token request sent.")
+            observed.update(marker for marker in controls if marker in chunk)
+            if observed == controls:
+                # The reviewed conditional log is deliberately unbuffered. Allow an
+                # additional settling interval after all positive controls are visible.
+                if settled is None:
+                    settled = time.monotonic() + 1
+                elif time.monotonic() >= settled:
+                    return {"webhookRequestsSuppressed": len(suppressed), "normalRequestsLogged": len(controls),
+                            "routes": ["loopback-http", "loopback-https", "public-http", "public-https"]}
+            time.sleep(0.1)
+    raise Stop("Nginx normal-path access logging was not proven; no real token request sent.")
 
 
 def property_value(name):
@@ -387,23 +549,15 @@ def commission(mode, bundle):
             raise Stop("Service context changed during preflight.")
         # Secret reads and candidate nginx -t have passed before enabling or restarting anything.
         print(json.dumps({"status": "applying", "audit": str(work / "result.json")}), flush=True)
+        old_workers = nginx_workers()
         changed = True
         atomic_replace(SITE, candidate_site, site_metadata)
         native([NGINX, "-t"])
         native(["/usr/bin/systemctl", "reload", "nginx"])
-        # Harmless canary proves the running nginx workers suppress query-bearing access logs.
-        canary = "rp-whatsapp-log-canary-" + uuid.uuid4().hex
-        try:
-            urllib.request.urlopen("https://requestportal.ffpja.org/api/webhooks/whatsapp?hub.verify_token=" + canary, timeout=15).close()
-        except urllib.error.HTTPError:
-            pass
-        for path in (Path("/var/log/nginx/access.log"), Path("/var/log/nginx/access.log.1")):
-            if path.exists():
-                with path.open() as stream:
-                    if any(canary in line for line in stream):
-                        raise Stop("Running nginx still logs webhook query strings; no real token request sent.")
-        if not Path("/var/log/nginx/access.log").is_file():
-            raise Stop("Nginx access log cannot be inspected.")
+        new_workers = wait_for_nginx_reload(old_workers)
+        evidence["nginxReload"] = {"masterPid": new_workers[0],
+                                   "oldWorkerPids": sorted(old_workers[1]), "newWorkerPids": sorted(new_workers[1])}
+        evidence["nginxLoggingCanary"] = verify_nginx_logging()
         if ENV.read_bytes() != original_env or SITE.read_bytes() != candidate_site:
             raise Stop("Configuration changed before environment promotion.")
         atomic_replace(ENV, candidate_env, env_metadata)
