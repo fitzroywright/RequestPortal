@@ -54,6 +54,22 @@
             detail.hidden = !detail.hidden;
             full.setAttribute('aria-expanded', String(!detail.hidden));
             full.textContent = detail.hidden ? 'View Full Diagnostics' : 'Hide Full Diagnostics';
+            if (!detail.hidden) {
+                const evidence = detail.querySelector('[data-integration-exception]');
+                if (evidence && !evidence.dataset.loaded) {
+                    evidence.textContent = 'Loading protected exception evidence…';
+                    try {
+                        const response = await fetch(evidence.dataset.exceptionUrl, {
+                            headers: { 'Accept': 'text/plain' }, credentials: 'same-origin', cache: 'no-store', redirect: 'error'
+                        });
+                        if (!response.ok) throw new Error('Exception evidence unavailable or access denied.');
+                        evidence.textContent = (await response.text()).slice(0, 4000);
+                        evidence.dataset.loaded = 'true';
+                    } catch {
+                        evidence.textContent = 'Unable to load exception evidence. Check your security-management permission and staff session.';
+                    }
+                }
+            }
             return;
         }
         const system = event.target.closest('[data-system-toggle]');
