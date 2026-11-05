@@ -252,6 +252,13 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             var failure = IntegrationFailureClassifier.Classify(exception, attempt.Stage);
             link.RecordFailure(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation, failure.Transient);
             attempt.Fail(clock.UtcNow, failure.Stage, failure.Classification, failure.Code, failure.Explanation);
+            // Preserve bounded sanitized original exception chain separately from the
+            // ordinary list-view explanation; do not persist exception.ToString().
+            string? bridgeDetails = exception is IntegrationTransferException transfer
+                ? transfer.Failure.TechnicalDetails : null;
+            attempt.SetExceptionDetails(IntegrationExceptionDiagnostics.IsSafeTransportDetail(bridgeDetails)
+                ? bridgeDetails
+                : IntegrationExceptionDiagnostics.Capture(exception, attempt.Stage, failure.Code));
             // Caller cancellation must not erase the durable failure checkpoint.
             using var persistenceTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await dbContext.SaveChangesAsync(persistenceTimeout.Token);
