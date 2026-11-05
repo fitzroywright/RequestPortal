@@ -1,6 +1,10 @@
 namespace RequestPortal.Application.Integration;
 
-public sealed record TransferFailure(string Stage, string Classification, string Code, string Explanation, bool Transient);
+public sealed record TransferFailure(string Stage, string Classification, string Code, string Explanation, bool Transient)
+{
+    // Bridge-owned restricted diagnostic: method-only frames, no raw messages or paths.
+    public string? TechnicalDetails { get; init; }
+}
 
 public static class TransferFailures
 {
