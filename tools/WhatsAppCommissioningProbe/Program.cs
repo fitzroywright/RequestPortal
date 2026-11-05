@@ -32,10 +32,11 @@ internal static class Program
             ValidateConfiguration(config);
             phase = "approle-secret-read";
             await using var runtime = CommonSecretsBootstrapRuntime.Create(config);
-            // Use the actual OpenBao provider, never a development fallback provider.
-            if (runtime.ProviderHealth.SingleOrDefault()?.ProviderName != "OpenBao" ||
-                config["CommonSecrets:Providers:OpenBao:Type"] != "OpenBao" ||
-                !config.GetValue("CommonSecrets:Providers:OpenBao:Settings:RequireHttps", false)) throw new InvalidOperationException();
+            // Health metadata identifies the configured instance, not its technology.
+            var definition = ResolveOpenBaoProvider(config);
+            if (runtime.ProviderHealth is not [var health] || !health.IsEnabled ||
+                !string.Equals(health.ProviderName, definition.Name, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException();
             var provider = runtime.Provider;
             phase = "approle-verification-token-read";
             string verification = await provider.GetRequiredAsync("messaging/whatsapp/verification-token", ct);
@@ -131,10 +132,31 @@ internal static class Program
         Require(ConfigurationRule.WhatsAppAccessTokenReference, () => config["Notifications:WhatsAppAccessTokenSecretName"] == "messaging/whatsapp/api-token");
         Require(ConfigurationRule.WhatsAppVerificationTokenReference, () => config["Notifications:WhatsAppVerificationTokenSecretName"] == "messaging/whatsapp/verification-token");
         Require(ConfigurationRule.WhatsAppAppSecretReference, () => config["Notifications:WhatsAppAppSecretName"] == "messaging/whatsapp/app-secret");
-        Require(ConfigurationRule.OpenBaoProviderOrder, () => config.GetSection("CommonSecrets:ProviderOrder").Get<string[]>() is ["OpenBao"]);
         Require(ConfigurationRule.CommonSecretsProductionMode, () => config["CommonSecrets:Mode"] == "Production");
+        Require(ConfigurationRule.OpenBaoProviderOrder, () => ResolveOpenBaoProvider(config) is not null);
         // Fail closed if request logging could disclose a verification query string.
         Require(ConfigurationRule.RequestLoggingSafe, () => RequestLoggingIsSafe(config));
+    }
+
+    internal static SecretProviderDefinition ResolveOpenBaoProvider(IConfiguration config)
+    {
+        var options = config.GetSection("CommonSecrets").Get<CommonSecretsOptions>() ?? new();
+        // Require one explicit effective entry. Unreferenced JSON definitions are not fallbacks.
+        if (options.Mode != SecretsEnvironmentMode.Production || options.ProviderOrder is not [_])
+            throw new InvalidOperationException();
+        var definitions = SecretProviderConfiguration.ReadProviders(config);
+        var order = CommonSecretsPolicy.ResolveProviderOrder(options, definitions);
+        CommonSecretsPolicy.Validate(options, definitions);
+        var definition = definitions[order.Single()];
+        var settings = definition.Settings.Get<OpenBaoOptions>() ?? new();
+        if (!string.Equals(definition.Type, "OpenBao", StringComparison.OrdinalIgnoreCase) ||
+            !settings.Enabled || !settings.RequireHttps ||
+            !Uri.TryCreate(settings.Address, UriKind.Absolute, out var address) ||
+            address.Scheme != Uri.UriSchemeHttps ||
+            !settings.ClearSecretIdEnvironmentVariableAfterRead ||
+            !settings.RenewTokens || !settings.RevokeTokenOnDispose)
+            throw new InvalidOperationException();
+        return definition;
     }
 
     internal static bool RequestLoggingIsSafe(IConfiguration config)

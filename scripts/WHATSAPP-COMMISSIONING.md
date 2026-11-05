@@ -166,7 +166,17 @@ secret-ID preservation overrides. The remaining codes identify the unchanged che
 - `WhatsAppPhoneNumberId` and `WhatsAppBusinessAccountId`: the approved IDs must match.
 - `WhatsAppAccessTokenReference`, `WhatsAppVerificationTokenReference` and
   `WhatsAppAppSecretReference`: the existing secret reference names must match.
-- `OpenBaoProviderOrder`: the order must contain exactly the configured OpenBao instance.
+- `OpenBaoProviderOrder`: the effective order must explicitly reference exactly one
+  configured instance (for example `PrimarySecrets` or `OpenBao`), with no fallback.
+  Common.Secrets resolves instance names using its normal trimming and
+  case-insensitive lookup. The referenced instance must have type OpenBao, be
+  enabled, require HTTPS with an HTTPS address, clear the bootstrap environment
+  variable after reading, renew tokens and revoke its token on disposal. Production
+  mode and the existing Common.Secrets AppRole/bootstrap access controls still apply.
+  An unreferenced JSON provider definition is not an active fallback. Environment
+  settings override JSON by key, so `CommonSecrets__ProviderOrder__0=PrimarySecrets`
+  selects `CommonSecrets:Providers:PrimarySecrets`; it does not change its technology.
+  Runtime health metadata must identify that same sole enabled instance.
 - `CommonSecretsProductionMode`: the secrets mode must be Production.
 - `RequestLoggingSafe`: ASP.NET request logging and category/provider overrides
   must satisfy the existing query-string privacy checks.

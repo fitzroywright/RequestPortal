@@ -19,6 +19,10 @@ public sealed class ConfigurationTests
         ["Notifications:WhatsAppAppSecretName"] = "messaging/whatsapp/app-secret",
         ["CommonSecrets:ProviderOrder:0"] = "OpenBao",
         ["CommonSecrets:Mode"] = "Production",
+        ["CommonSecrets:Providers:OpenBao:Type"] = "OpenBao",
+        ["CommonSecrets:Providers:OpenBao:Settings:Enabled"] = "true",
+        ["CommonSecrets:Providers:OpenBao:Settings:RequireHttps"] = "true",
+        ["CommonSecrets:Providers:OpenBao:Settings:Address"] = "https://bao.example.test",
         ["Logging:LogLevel:Microsoft.AspNetCore"] = "Warning"
     };
 
@@ -55,6 +59,104 @@ public sealed class ConfigurationTests
         using var document = JsonDocument.Parse(output);
         Assert.Equal(rule, document.RootElement.GetProperty("rule").GetString());
         Assert.Equal(3, document.RootElement.EnumerateObject().Count());
+    }
+
+    [Theory]
+    [InlineData("OpenBao")]
+    [InlineData("PrimarySecrets")]
+    [InlineData(" primarysecrets ")]
+    public async Task NamedOpenBaoInstanceUsesEffectiveOrderAndBootstrap(string instance)
+    {
+        var values = ValidSettings();
+        var overrides = new Dictionary<string, string?> {
+            ["CommonSecrets:ProviderOrder:0"] = instance,
+            ["CommonSecrets:Providers:PrimarySecrets:Type"] = "OpenBao",
+            ["CommonSecrets:Providers:PrimarySecrets:Settings:Enabled"] = "true",
+            ["CommonSecrets:Providers:PrimarySecrets:Settings:RequireHttps"] = "true",
+            ["CommonSecrets:Providers:PrimarySecrets:Settings:Address"] = "https://primary.example.test"
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(values).AddInMemoryCollection(overrides).Build();
+        Probe.ValidateConfiguration(config);
+        var definition = Probe.ResolveOpenBaoProvider(config);
+        Assert.Equal(instance.Trim(), definition.Name, ignoreCase: true);
+        await using var runtime = Common.Secrets.CommonSecretsBootstrapRuntime.Create(config);
+        var health = Assert.Single(runtime.ProviderHealth);
+        Assert.Equal(definition.Name, health.ProviderName, ignoreCase: true);
+        Assert.True(health.IsEnabled);
+    }
+
+    [Theory]
+    [InlineData("CommonSecrets:Providers:OpenBao:Type", null)]
+    [InlineData("CommonSecrets:Providers:OpenBao:Type", "Environment")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Type", "Configuration")]
+    [InlineData("CommonSecrets:ProviderOrder:0", "Missing")]
+    [InlineData("CommonSecrets:ProviderOrder:0", " ")]
+    [InlineData("CommonSecrets:ProviderOrder:1", "OpenBao")]
+    [InlineData("CommonSecrets:ProviderOrder:1", "Fallback")]
+    [InlineData("CommonSecrets:ProviderOrder:1", "SecondBao")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:Enabled", "false")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:Enabled", "fixture-private")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:RequireHttps", "false")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:Address", "http://bao.example.test")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:Address", "fixture-private")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:Address", null)]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:ClearSecretIdEnvironmentVariableAfterRead", "false")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:RenewTokens", "false")]
+    [InlineData("CommonSecrets:Providers:OpenBao:Settings:RevokeTokenOnDispose", "false")]
+    public void InvalidOrInsecureProviderFailsClosed(string key, string? value)
+    {
+        var values = ValidSettings();
+        values[key] = value;
+        values["CommonSecrets:Providers:Fallback:Type"] = "Environment";
+        values["CommonSecrets:Providers:SecondBao:Type"] = "OpenBao";
+        values["CommonSecrets:Providers:SecondBao:Settings:Enabled"] = "true";
+        values["CommonSecrets:Providers:SecondBao:Settings:Address"] = "https://second.example.test";
+        var config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        var error = Assert.Throws<Probe.ConfigurationFailure>(() => Probe.ValidateConfiguration(config));
+        Assert.Equal(Probe.ConfigurationRule.OpenBaoProviderOrder, error.Rule);
+        Assert.DoesNotContain("fixture-private", Probe.FailureJson(error, "configuration"));
+    }
+
+    [Fact]
+    public void MissingProviderDefinitionsFailClosed()
+    {
+        var values = ValidSettings().Where(x => !x.Key.StartsWith("CommonSecrets:Providers:"));
+        var config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        var error = Assert.Throws<Probe.ConfigurationFailure>(() => Probe.ValidateConfiguration(config));
+        Assert.Equal(Probe.ConfigurationRule.OpenBaoProviderOrder, error.Rule);
+    }
+
+    [Fact]
+    public void EnvironmentSelectsNamedInstanceAndPreservesItsSecretIdFile()
+    {
+        var directory = Directory.CreateTempSubdirectory("rp-provider-order-");
+        var env = new Dictionary<string, string?> {
+            ["CommonSecrets__ProviderOrder__0"] = "PrimarySecrets",
+            ["CommonSecrets__Providers__PrimarySecrets__Type"] = "OpenBao",
+            ["CommonSecrets__Providers__PrimarySecrets__Settings__Enabled"] = "true",
+            ["CommonSecrets__Providers__PrimarySecrets__Settings__RequireHttps"] = "true",
+            ["CommonSecrets__Providers__PrimarySecrets__Settings__Address"] = "https://primary.example.test",
+            ["CommonSecrets__Providers__PrimarySecrets__Settings__DeleteSecretIdFileAfterRead"] = "true"
+        };
+        try
+        {
+            File.WriteAllText(Path.Combine(directory.FullName, "appsettings.json"), "{}");
+            File.WriteAllText(Path.Combine(directory.FullName, "appsettings.Production.json"),
+                """{"CommonSecrets":{"Mode":"Production","ProviderOrder":["OpenBao"],"Providers":{"OpenBao":{"Type":"OpenBao"}}}}""");
+            var original = env.Keys.ToDictionary(k => k, Environment.GetEnvironmentVariable);
+            try
+            {
+                foreach (var item in env) Environment.SetEnvironmentVariable(item.Key, item.Value);
+                var loaded = Probe.LoadConfiguration(directory.FullName);
+                Assert.Equal("PrimarySecrets", Probe.ResolveOpenBaoProvider(loaded).Name);
+                Assert.False(loaded.GetValue<bool>("CommonSecrets:Providers:PrimarySecrets:Settings:DeleteSecretIdFileAfterRead"));
+            }
+            finally { foreach (var item in original) Environment.SetEnvironmentVariable(item.Key, item.Value); }
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
     }
 
     [Fact]
