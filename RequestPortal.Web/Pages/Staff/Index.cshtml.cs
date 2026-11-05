@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Administration;
 using RequestPortal.Application.Portal;
+using RequestPortal.Domain.Requests;
 using RequestPortal.Infrastructure.Identity;
 
 namespace RequestPortal.Web.Pages.Staff;
@@ -37,6 +38,13 @@ public sealed class IndexModel : PageModel
 
     [BindProperty(SupportsGet = true)]
     public string? Search { get; set; }
+    [BindProperty(SupportsGet = true)]
+    public string? Applicant { get; set; }
+    [BindProperty(SupportsGet = true)]
+    public string? Organization { get; set; }
+    [BindProperty(SupportsGet = true)]
+    public RequestStatus? WorkStatus { get; set; }
+
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
     [BindProperty(SupportsGet = true)]
@@ -80,7 +88,9 @@ public sealed class IndexModel : PageModel
 
         // These services share the scoped EF context; queries must be sequential.
         PendingOrganizations = await workflowService.GetPendingOrganizationsAsync(HttpContext.RequestAborted);
-        Queue = await searchService.GetSubmittedQueueAsync(PageNumber, PageSize, HttpContext.RequestAborted);
+        Applicant = Applicant?.Trim();
+        Organization = Organization?.Trim();
+        Queue = await searchService.GetFilteredQueueAsync(Applicant, Organization, WorkStatus, PageNumber, PageSize, HttpContext.RequestAborted);
         PageSize = Queue.PageSize;
         Operations = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
         return Page();
