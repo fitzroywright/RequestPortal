@@ -120,32 +120,83 @@ public sealed class FfpManagerBridgeClient : IExternalApplicationBridgeClient
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        if (response.IsSuccessStatusCode)
-        {
-            return;
-        }
+        if (response.IsSuccessStatusCode) return;
 
-        // Do not persist or log remote exception bodies, SQL details or applicant payloads.
-        if(response.Content.Headers.ContentType?.MediaType == "application/problem+json")
+        // Read only structured bridge failures and trusted validation field names.
+        // Never persist arbitrary remote exception messages or submitted field values.
+        string? mediaType = response.Content.Headers.ContentType?.MediaType;
+        if (mediaType is "application/problem+json" or "application/json")
         {
             try
             {
-                using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-                if(document.RootElement.TryGetProperty("errors",out var errors) && errors.TryGetProperty("Parish",out _))
-                    throw new IntegrationTransferException(TransferFailures.For("Bridge", "VALIDATION_PARISH"));
+                await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+                JsonElement root = document.RootElement;
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    if (root.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Object)
+                    {
+                        var rejected = new List<string>();
+                        foreach (JsonProperty field in errors.EnumerateObject().Take(8))
+                        {
+                            // Field identifiers from the bridge are not trusted as display text.
+                            string name = field.Name switch
+                            {
+                                "PrimaryTelephone" => "Primary telephone",
+                                "SecondaryTelephone" => "Secondary telephone",
+                                "Parish" => "Parish",
+                                "FirstName" => "First name",
+                                "LastName" => "Last name",
+                                "DateOfBirth" => "Date of birth",
+                                "StreetAddress" => "Street address",
+                                "ApplicantGender" => "Applicant gender",
+                                "ApplicantMaritalStatus" => "Marital status",
+                                "Occupation" => "Occupation",
+                                _ => "Unrecognized submission field"
+                            };
+                            string reason = "rejected by destination validation";
+                            if (field.Value.ValueKind == JsonValueKind.Array &&
+                                field.Value.GetArrayLength() > 0 &&
+                                field.Value[0].ValueKind == JsonValueKind.String)
+                            {
+                                string message = field.Value[0].GetString() ?? "";
+                                if (message == "The applicant telephone requires correction before transfer.")
+                                    reason = "requires correction before transfer";
+                                else if (message.Contains("required", StringComparison.OrdinalIgnoreCase))
+                                    reason = "is required";
+                                else if (message.Contains("invalid", StringComparison.OrdinalIgnoreCase))
+                                    reason = "has an invalid value";
+                            }
+                            rejected.Add(name + ": " + reason);
+                        }
+                        string diagnosis = rejected.Count == 0
+                            ? "The destination rejected the submission fields without a specific field name."
+                            : "The destination rejected: " + string.Join("; ", rejected) + ".";
+                        string code = errors.TryGetProperty("PrimaryTelephone", out _) ? "VALIDATION_PRIMARY_TELEPHONE"
+                            : errors.TryGetProperty("SecondaryTelephone", out _) ? "VALIDATION_SECONDARY_TELEPHONE"
+                            : errors.TryGetProperty("Parish", out _) ? "VALIDATION_PARISH" : "VALIDATION";
+                        var failure = TransferFailures.For("BridgeValidation", code) with { Explanation = diagnosis };
+                        throw new IntegrationTransferException(failure);
+                    }
+                    // Structured, classified bridge failures are safe only after code
+                    // and diagnostic stage have been validated against our contract.
+                    if (root.TryGetProperty("code", out JsonElement codeElement) && codeElement.ValueKind == JsonValueKind.String)
+                    {
+                        string code = codeElement.GetString() ?? "";
+                        if (code.Length is > 0 and <= 40 &&
+                            code.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c) || c == '_'))
+                        {
+                            var failure = TransferFailures.For("Bridge", code);
+                            if (code.StartsWith("SQL_", StringComparison.Ordinal) &&
+                                int.TryParse(code.AsSpan(4), out int number))
+                                failure = TransferFailures.Sql("SqlServer", number);
+                            throw new IntegrationTransferException(failure);
+                        }
+                    }
+                }
             }
-            catch(JsonException) { }
+            catch (JsonException) { /* Not structured JSON; report transport without logging its content. */ }
         }
-        if (response.Content.Headers.ContentType?.MediaType == "application/json")
-        {
-            try
-            {
-                var failure = await response.Content.ReadFromJsonAsync<TransferFailure>(cancellationToken: cancellationToken);
-                if (failure?.Code is { } code)
-                    throw new IntegrationTransferException(TransferFailures.For("Bridge", code));
-            }
-            catch (JsonException) { }
-        }
-        throw new HttpRequestException($"FFP Manager bridge returned HTTP {(int)response.StatusCode}.", null, response.StatusCode);
+        throw new HttpRequestException($"FFP Manager bridge returned HTTP {(int)response.StatusCode}; no recognized structured failure details.", null, response.StatusCode);
     }
 }
