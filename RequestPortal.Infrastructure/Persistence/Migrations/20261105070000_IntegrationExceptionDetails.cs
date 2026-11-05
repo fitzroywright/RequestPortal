@@ -8,7 +8,7 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(RequestPortalDbContext))]
 [Migration("20261105070000_IntegrationExceptionDetails")]
-public sealed class IntegrationExceptionDetails : Migration
+public sealed partial class IntegrationExceptionDetails : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
