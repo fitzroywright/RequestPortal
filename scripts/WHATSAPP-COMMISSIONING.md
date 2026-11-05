@@ -36,12 +36,18 @@ authorized operator installs and explicitly executes the script below.
 
 ## Operator installation and preflight on Kratos
 
-After comparing the archive checksum with the reviewed handoff, run:
+Copy the archive into a root-owned location, then check that immutable copy against
+the checksum in the reviewed handoff before extracting it. Run these commands
+interactively; stop if any command fails:
 
 ```sh
 sudo install -d -o root -g root -m 0755 \
   /usr/local/lib/aegis-requestportal-whatsapp-commissioning
-sudo tar --no-same-owner -xzf /tmp/requestportal-whatsapp-commissioning.tgz \
+sudo install -o root -g root -m 0600 /tmp/requestportal-whatsapp-commissioning.tgz \
+  /usr/local/lib/aegis-requestportal-whatsapp-commissioning/bundle.tgz
+# Compare this digest with the reviewed handoff before running tar:
+sudo sha256sum /usr/local/lib/aegis-requestportal-whatsapp-commissioning/bundle.tgz
+sudo tar --no-same-owner -xzf /usr/local/lib/aegis-requestportal-whatsapp-commissioning/bundle.tgz \
   -C /usr/local/lib/aegis-requestportal-whatsapp-commissioning
 
 sudo /usr/bin/python3 /usr/local/lib/aegis-requestportal-whatsapp-commissioning/Commission-WhatsApp-Kratos.py --preflight
