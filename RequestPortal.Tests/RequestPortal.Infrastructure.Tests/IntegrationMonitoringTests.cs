@@ -25,6 +25,27 @@ namespace RequestPortal.Infrastructure.Tests;
 
 public sealed class IntegrationMonitoringTests
 {
+    [Fact]
+    public void CapturedIntegrationExceptionsRetainSafeTypeStageAndDiagnostic()
+    {
+        var classifier = typeof(FfpManagerIntegrationService).Assembly.GetType(
+            "RequestPortal.Infrastructure.Integration.IntegrationFailureClassifier")!;
+        var classify = classifier.GetMethod("Classify", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
+        TransferFailure Classified(Exception error, string stage)
+            => Assert.IsType<TransferFailure>(classify.Invoke(null, [error, stage]));
+        var timeout = Classified(new TimeoutException("secret=TOP-SECRET; applicant=Private"), "BridgeSubmission");
+        Assert.Contains("TimeoutException during BridgeSubmission", timeout.Explanation);
+        Assert.DoesNotContain("TOP-SECRET", timeout.Explanation);
+        Assert.DoesNotContain("Private", timeout.Explanation);
+        var source = Classified(new InvalidOperationException("Draft requests cannot be sent to FFP Manager."), "Preparation");
+        Assert.Contains("Draft requests cannot be sent to FFP Manager.", source.Explanation);
+        var structured = TransferFailures.For("SqlSubmission", "SQL_CONSTRAINT");
+        var bridge = Classified(new IntegrationTransferException(structured,
+            new Exception("password=TOP-SECRET")), "SqlSubmission");
+        Assert.Equal(structured.Explanation, bridge.Explanation);
+        Assert.DoesNotContain("TOP-SECRET", bridge.Explanation);
+    }
+
     private static readonly FfpManagerBridgeOptions OptionsValue = new() { Enabled = true };
     private static readonly IClock Clock = new SystemClock();
 
