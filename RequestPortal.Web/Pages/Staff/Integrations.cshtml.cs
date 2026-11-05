@@ -48,7 +48,7 @@ public sealed class IntegrationsModel : PageModel
     [BindProperty(SupportsGet = true)] public string? Status { get; set; }
     [BindProperty(SupportsGet = true)] public DateOnly? From { get; set; }
     [BindProperty(SupportsGet = true)] public DateOnly? Through { get; set; }
-    [BindProperty(SupportsGet = true)] public string? Sort { get; set; } = "received";
+    [BindProperty(SupportsGet = true)] public string? Sort { get; set; } = "activity";
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
     [BindProperty(SupportsGet = true)] public Guid? RequestId { get; set; }
     public bool CanOperate => User.HasClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ManageSecurity);
@@ -56,11 +56,41 @@ public sealed class IntegrationsModel : PageModel
         RequestPortal.Domain.Integration.SynchronizationStatus.ReconciliationRequired => "Reconciliation Required",
         RequestPortal.Domain.Integration.SynchronizationStatus.NotSent => "Pending", _ => status.ToString() };
     public Dictionary<string,string> Routes(int page) => new() { ["Search"] = Search ?? "", ["Status"] = Status ?? "",
-        ["From"] = From?.ToString("yyyy-MM-dd") ?? "", ["Through"] = Through?.ToString("yyyy-MM-dd") ?? "", ["Sort"] = Sort ?? "received", ["PageNumber"] = page.ToString() };
+        ["From"] = From?.ToString("yyyy-MM-dd") ?? "", ["Through"] = Through?.ToString("yyyy-MM-dd") ?? "", ["Sort"] = Sort ?? "activity", ["PageNumber"] = page.ToString() };
     private IntegrationMonitorQuery Query(int? page = null) => new(Search, Status,
         From.HasValue ? new DateTimeOffset(From.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
         Through.HasValue ? Through.Value == DateOnly.MaxValue ? DateTimeOffset.MaxValue : new DateTimeOffset(Through.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
-        Sort ?? "received", page ?? PageNumber);
+        Sort ?? "activity", page ?? PageNumber);
+    public static string StatusClass(RequestPortal.Domain.Integration.SynchronizationStatus status) => status switch {
+        RequestPortal.Domain.Integration.SynchronizationStatus.Failed => "failed",
+        RequestPortal.Domain.Integration.SynchronizationStatus.Retrying => "retrying",
+        RequestPortal.Domain.Integration.SynchronizationStatus.Synchronized => "synchronized",
+        RequestPortal.Domain.Integration.SynchronizationStatus.ReconciliationRequired => "reconciliation",
+        _ => "pending"
+    };
+    public static string DiagnosticTitle(IntegrationTransferRow transfer) {
+        string text = transfer.RecordedError ?? transfer.Explanation ?? transfer.ErrorCode ?? StatusLabel(transfer.Status);
+        int sentence = text.IndexOf(". ", StringComparison.Ordinal);
+        return sentence < 0 ? text : text[..(sentence + 1)];
+    }
+    public static string? DiagnosticDescription(IntegrationTransferRow transfer) {
+        string? text = transfer.RecordedError ?? transfer.Explanation;
+        if (text is null) return null;
+        int sentence = text.IndexOf(". ", StringComparison.Ordinal);
+        return sentence < 0 ? null : text[(sentence + 2)..];
+    }
+    public static bool CanRetry(IntegrationTransferRow transfer) => transfer.LinkId.HasValue &&
+        transfer.Status == RequestPortal.Domain.Integration.SynchronizationStatus.Failed;
+    public static DateTimeOffset LastActivity(IntegrationTransferRow transfer) =>
+        new[] { transfer.SubmittedUtc, transfer.LastAttemptUtc ?? DateTimeOffset.MinValue,
+            transfer.SynchronizedUtc ?? DateTimeOffset.MinValue, transfer.VerifiedUtc ?? DateTimeOffset.MinValue }.Max();
+    public Dictionary<string,string> DetailRoutes(Guid requestId) {
+        var routes = Routes(Transfers.Page);
+        routes["RequestId"] = requestId.ToString();
+        return routes;
+    }
+    private object ReturnRoutes() => new { Search, Status, From = From?.ToString("yyyy-MM-dd"),
+        Through = Through?.ToString("yyyy-MM-dd"), Sort, PageNumber, RequestId };
     private bool ValidFilters => ModelState.IsValid && (Search?.Length ?? 0) <= 200 && (!From.HasValue || !Through.HasValue || From <= Through) &&
         (string.IsNullOrWhiteSpace(Status) || Enum.TryParse<RequestPortal.Domain.Integration.SynchronizationStatus>(Status,true,out var status) && Enum.IsDefined(status));
     public IReadOnlyList<DeadLetterWorkItem> DeadLetters { get; private set; } = Array.Empty<DeadLetterWorkItem>();
@@ -84,6 +114,13 @@ public sealed class IntegrationsModel : PageModel
         catch (Exception exception) when (exception is HttpRequestException or IntegrationTransferException or NotSupportedException or TaskCanceledException)
         { ReturnOutboxError = "Return-event diagnostics could not be read. Initial submission status is shown separately; inspect bridge readiness and callback delivery."; }
         return Page();
+    }
+
+    public async Task<IActionResult> OnGetDiagnosticsAsync(Guid requestId)
+    {
+        Response.Headers.CacheControl = "no-store";
+        Selected = await integrationStatusService.GetRequestAsync(requestId, HttpContext.RequestAborted);
+        return Selected is null ? NotFound() : Partial("_IntegrationDiagnostics", this);
     }
 
     public async Task<IActionResult> OnPostTestSharePointAsync()
@@ -124,8 +161,13 @@ public sealed class IntegrationsModel : PageModel
         {
             TempData["Error"] = exception.Message;
         }
+        catch (Exception exception) when (exception is HttpRequestException or TimeoutException ||
+            exception is TaskCanceledException && !HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            TempData["Error"] = "The integration service could not be reached. The outcome is unconfirmed; recheck the destination before retrying. Reference: " + HttpContext.TraceIdentifier;
+        }
 
-        return RedirectToPage(new { RequestId });
+        return RedirectToPage(ReturnRoutes());
     }
 
     public async Task<IActionResult> OnPostReconcileAsync(Guid linkId)
@@ -143,14 +185,19 @@ public sealed class IntegrationsModel : PageModel
             if (RequestId.HasValue)
                 await integrationStatusService.ReconcileRequestAsync(staffUser.Id, RequestId.Value, HttpContext.RequestAborted);
             else await integrationStatusService.ReconcileAsync(staffUser.Id, linkId, HttpContext.RequestAborted);
-            TempData["Success"] = "Integration reconciled with the external system.";
+            TempData["Success"] = "Destination rechecked. Review the current synchronization status and recorded outcome.";
         }
         catch (Exception exception) when (exception is InvalidOperationException or IntegrationTransferException)
         {
             TempData["Error"] = exception.Message;
         }
+        catch (Exception exception) when (exception is HttpRequestException or TimeoutException ||
+            exception is TaskCanceledException && !HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            TempData["Error"] = "The integration service could not be reached. The outcome is unconfirmed; recheck the destination before retrying. Reference: " + HttpContext.TraceIdentifier;
+        }
 
-        return RedirectToPage(new { RequestId });
+        return RedirectToPage(ReturnRoutes());
     }
 
     public async Task<IActionResult> OnPostReplayDeadLetterAsync(Guid messageId)

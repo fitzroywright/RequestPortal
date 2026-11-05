@@ -1,0 +1,107 @@
+@model RequestPortal.Web.Pages.Staff.IntegrationsModel
+<section aria-labelledby="return-events-title" class="integration-subsection">
+<h2 id="return-events-title">Return-event outbox</h2><p class="muted">FFP Manager → Request Portal callbacks. These are separate from initial application submissions.</p>
+@if (Model.ReturnOutbox is { } callbacks) {
+<dl class="integration-summary"><div><dt>Pending</dt><dd>@callbacks.Pending</dd></div><div><dt>Failed</dt><dd>@callbacks.Failed</dd></div><div><dt>Locked</dt><dd>@callbacks.Locked</dd></div><div><dt>Oldest pending</dt><dd>@(callbacks.OldestPendingUtc?.ToString("u") ?? "None")</dd></div></dl>
+} else { <p role="status">@Model.ReturnOutboxError</p> }
+<details><summary>Recorded return-event health changes</summary>
+<p class="muted">Latest 100 state changes. History is retained after callbacks recover; unchanged states do not create repeated entries.</p>
+<ul>@foreach(var observation in Model.ReturnHistory) {
+<li>@observation.ObservedUtc.ToString("u") — @if(observation.Snapshot is { } prior) { <span>Pending @prior.Pending · Failed @prior.Failed · Locked @prior.Locked</span> } else { <span>@observation.ErrorCode</span> }</li>
+}</ul></details>
+</section>
+@if(Model.CanOperate) {
+<form method="post" asp-page-handler="TestSharePoint" class="operational-toolbar">
+<button class="button button-small" type="submit">Test SharePoint</button><span>Test the configured Graph connection, library and document round trip.</span>
+</form>
+}
+
+<section class="integration-subsection">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Dead-letter messages</h2>
+            <p>Terminal failures and exhausted retries appear here. FFP Manager transfers require destination reconciliation before recovery; other manual replays are audited.</p>
+        </div>
+        @if (Model.DeadLetters.Count == 0)
+        {
+            <div class="card"><p>No dead-letter messages.</p></div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Occurred</th>
+                            <th>Message type</th>
+                            <th>Attempts</th>
+                            <th>Last error</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (RequestPortal.Application.Administration.DeadLetterWorkItem item in Model.DeadLetters)
+                    {
+                        <tr>
+                            <td>@item.OccurredUtc.ToString("u")</td>
+                            <td>@item.MessageType</td>
+                            <td>@item.AttemptCount</td>
+                            <td>@(item.LastError is null ? "None" : "Delivery failed. Inspect protected diagnostics using the message reference.")</td>
+                            <td>
+                                @if(item.MessageType.EndsWith("FfpManagerSubmissionRequestedMessage",StringComparison.Ordinal)) { <a asp-page="/Staff/Integrations" asp-route-requestId="@item.RequestId" asp-fragment="transfer-details">Review transfer</a> }
+                                else if(Model.CanOperate) { <form method="post" asp-page-handler="ReplayDeadLetter">
+                                    <input type="hidden" name="messageId" value="@item.MessageId" />
+                                    <button class="button button-small" type="submit">Replay</button>
+                                </form> }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="integration-subsection">
+    <div class="shell">
+        <div class="section-heading">
+            <h2>Failed notification deliveries</h2>
+            <p>Recent failed and terminal outbound notification attempts.</p>
+        </div>
+        @if (Model.FailedNotificationDeliveries.Count == 0)
+        {
+            <div class="card"><p>No failed notification deliveries.</p></div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Created</th>
+                            <th>Channel</th>
+                            <th>Destination</th>
+                            <th>Subject</th>
+                            <th>Status</th>
+                            <th>Last error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (RequestPortal.Application.Administration.NotificationDeliveryWorkItem item in Model.FailedNotificationDeliveries)
+                    {
+                        <tr>
+                            <td>@item.CreatedUtc.ToString("u")</td>
+                            <td>@item.Channel</td>
+                            <td>@item.Destination</td>
+                            <td>@item.Subject</td>
+                            <td>@item.Status</td>
+                            <td>@(item.LastError is null ? "None" : "Delivery failed. Provider details remain in protected diagnostics.")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>

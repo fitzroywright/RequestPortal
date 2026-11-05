@@ -34,6 +34,8 @@ public sealed partial class IntegrationStatusService
                        : user == null ? "Name not provided" : ((user.FirstName ?? "") + " " + (user.LastName ?? "")).Trim() == ""
                            ? user.DisplayName : ((user.FirstName ?? "") + " " + (user.LastName ?? "")).Trim(),
                    Source = intake == null ? "Request Portal" : "Quick Intake", SubmittedUtc = received,
+                   ApplicantTrn = user == null ? null : user.NationalIdTrn,
+                   RecordedError = link == null || link.ErrorCode == null ? null : link.LastError,
                    Status = stalePending || staleRetry || unverified || (link == null && received < stale) || (missingQueue && received < stale)
                        ? SynchronizationStatus.ReconciliationRequired : link == null || link.Status == SynchronizationStatus.NotSent ? SynchronizationStatus.Pending
                            : link.FailureClassification == "Ambiguous" ? SynchronizationStatus.ReconciliationRequired
@@ -65,7 +67,9 @@ public sealed partial class IntegrationStatusService
                 string pattern = "%" + term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
                 rows = rows.Where(item => EF.Functions.ILike(item.ApplicantName, pattern, "\\") ||
                     EF.Functions.ILike(item.PublicReference, pattern, "\\") ||
-                    (item.ApplicationNumber != null && EF.Functions.ILike(item.ApplicationNumber, pattern, "\\")));
+                    (item.ApplicationNumber != null && EF.Functions.ILike(item.ApplicationNumber, pattern, "\\")) ||
+                    (item.ApplicationId != null && EF.Functions.ILike(item.ApplicationId, pattern, "\\")) ||
+                    (item.ApplicantTrn != null && EF.Functions.ILike(item.ApplicantTrn, pattern, "\\")));
             }
         }
         if (query.FromUtc.HasValue) rows = rows.Where(item => item.SubmittedUtc >= query.FromUtc.Value);
@@ -79,6 +83,10 @@ public sealed partial class IntegrationStatusService
         int size = query.PageSize is 25 or 50 or 100 ? query.PageSize : 25;
         int page = Math.Clamp(query.Page, 1, Math.Max(1, (int)Math.Ceiling(total / (double)size)));
         var sorted = query.Sort switch {
+            "activity" => rows.OrderByDescending(item =>
+                (item.VerifiedUtc ?? item.SubmittedUtc) > (item.LastAttemptUtc ?? item.SubmittedUtc)
+                    ? ((item.VerifiedUtc ?? item.SubmittedUtc) > (item.SynchronizedUtc ?? item.SubmittedUtc) ? item.VerifiedUtc ?? item.SubmittedUtc : item.SynchronizedUtc ?? item.SubmittedUtc)
+                    : ((item.LastAttemptUtc ?? item.SubmittedUtc) > (item.SynchronizedUtc ?? item.SubmittedUtc) ? item.LastAttemptUtc ?? item.SubmittedUtc : item.SynchronizedUtc ?? item.SubmittedUtc)),
             "oldest" => rows.OrderBy(item => item.SubmittedUtc),
             "applicant" => rows.OrderBy(item => item.ApplicantName),
             "status" => rows.OrderBy(item => item.Status),
@@ -120,7 +128,7 @@ public sealed partial class IntegrationStatusService
 
     private IntegrationTransferRow ToView(MonitorRow row) => new(row.RequestId, row.LinkId, row.PublicReference, row.ApplicantName,
         row.Source, ffpManagerOptions.SystemName, row.TargetServer == null ? "JMDB01 / FFPJM (expected; unverified)" : $"{row.TargetServer} / {row.TargetDatabase}",
-        row.Status, row.Stage, row.Classification, row.Code, row.Code switch {
+        row.Status, row.Stage, row.Classification, row.Code, row.RecordedError ?? (row.Code switch {
             "LEGACY_FAILURE" => "A historical failure was recorded before persistent attempt diagnostics were installed. Reconcile using protected production evidence before retrying.",
             "MISSING_LINK" => "No durable integration link exists. Reconcile the immutable request ID before recovery.",
             "MISSING_QUEUE" => "No submission queue record exists. Reconcile the destination before an authorized retry.",
@@ -130,8 +138,22 @@ public sealed partial class IntegrationStatusService
             "DESTINATION_NOT_FOUND" => "No active destination record matches this immutable request ID. An authorized retry can submit it.",
             null => null,
             _ => TransferFailures.For(row.Stage ?? "Unknown", row.Code).Explanation
-        }, row.SubmittedUtc, row.LastAttemptUtc, row.AttemptCount, row.NextRetryUtc, row.SynchronizedUtc,
-        row.VerifiedUtc, row.ApplicationId, row.ApplicationNumber, row.HasQueuedSubmission);
+        }), row.SubmittedUtc, row.LastAttemptUtc, row.AttemptCount, row.NextRetryUtc, row.SynchronizedUtc,
+        row.VerifiedUtc, row.ApplicationId, row.ApplicationNumber, row.HasQueuedSubmission) { RecordedError = row.RecordedError, RecoveryAction = RecoveryAction(row) };
+
+    private static string? RecoveryAction(MonitorRow row)
+    {
+        if (row.Code is null) return null;
+        // Use the existing diagnostic catalog only when it recognizes this stored code.
+        // Unknown or historical failures must not acquire invented recovery instructions.
+        var guidance = TransferFailures.For(row.Stage ?? "Unknown", row.Code);
+        if (guidance.Code != row.Code || guidance.Code == "UNCLASSIFIED") return null;
+        string text = guidance.Explanation;
+        int sqlNumber = text.IndexOf(" SQL error number:", StringComparison.Ordinal);
+        if (sqlNumber >= 0) text = text[..sqlNumber];
+        int description = text.IndexOf(". ", StringComparison.Ordinal);
+        return description >= 0 ? text[(description + 2)..] : text;
+    }
 
     private sealed class MonitorRow
     {
@@ -140,6 +162,8 @@ public sealed partial class IntegrationStatusService
         public string PublicReference { get; set; } = "";
         public string ApplicantName { get; set; } = "";
         public string Source { get; set; } = "";
+        public string? ApplicantTrn { get; set; }
+        public string? RecordedError { get; set; }
         public SynchronizationStatus Status { get; set; }
         public string? Code { get; set; }
         public string? Stage { get; set; }

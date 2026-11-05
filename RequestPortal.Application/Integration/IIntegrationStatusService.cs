@@ -44,7 +44,12 @@ public sealed record IntegrationTransferRow(Guid RequestId, Guid? LinkId, string
     string Source, string SystemName, string Target, SynchronizationStatus Status, string? FailureStage,
     string? FailureClassification, string? ErrorCode, string? Explanation, DateTimeOffset SubmittedUtc,
     DateTimeOffset? LastAttemptUtc, int AttemptCount, DateTimeOffset? NextRetryUtc, DateTimeOffset? SynchronizedUtc,
-    DateTimeOffset? VerifiedUtc, string? ApplicationId, string? ApplicationNumber, bool HasQueuedSubmission);
+    DateTimeOffset? VerifiedUtc, string? ApplicationId, string? ApplicationNumber, bool HasQueuedSubmission)
+{
+    // Only classified, sanitized failures may be exposed; legacy provider payloads stay protected.
+    public string? RecordedError { get; init; }
+    public string? RecoveryAction { get; init; }
+}
 public sealed record IntegrationMonitorCounts(int Failed, int Pending, int Retrying, int Synchronized, int ReconciliationRequired)
 { public int NeedsAttention => Failed + ReconciliationRequired; }
 public sealed record IntegrationMonitorPage(IReadOnlyList<IntegrationTransferRow> Items, int TotalCount, int Page, int PageSize,

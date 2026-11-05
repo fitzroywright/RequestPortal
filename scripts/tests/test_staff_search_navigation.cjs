@@ -67,9 +67,10 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
    for(const reviewer of [false,true]) {
     await page.goto('http://127.0.0.1:5499/Staff/Integrations'+(reviewer?'?fixtureReviewer=true':''));
     assert.equal(await page.getByRole('heading',{name:'Integrations',exact:true}).count(),1);
+    await page.getByRole('button',{name:'View Full Diagnostics',exact:true}).click();
     assert.equal(await page.getByRole('heading',{name:'Attempt history',exact:true}).count(),1);
-    assert.equal(await page.getByRole('heading',{name:'Return-event outbox',exact:true}).count(),1);
-    assert.equal(await page.getByRole('button',{name:'Verify destination and retry',exact:true}).count(),reviewer?0:1);
+    assert.equal(await page.locator('#return-events-title').count(),1);
+    assert.equal(await page.getByRole('button',{name:'Retry Integration',exact:true}).count(),reviewer?0:1);
     assert.equal(await page.getByRole('link',{name:/export.*csv|export complete attempt history/i}).count(),0);
     assert.equal(await page.locator('a[href*="handler=Export"],a[href*="handler=HistoryExport"]').count(),0);
     const requestLink=await page.getByRole('link',{name:'Open original request',exact:true}).getAttribute('href');
