@@ -114,6 +114,15 @@ public sealed partial class IntegrationStatusService
         return new(ToView(row), attempts, events, attemptTotal);
     }
 
+    public async Task<string?> GetExceptionDetailsAsync(Guid requestId, CancellationToken cancellationToken = default)
+        => await (from attempt in dbContext.IntegrationAttempts.AsNoTracking()
+                  join link in dbContext.IntegrationLinks.AsNoTracking() on attempt.LinkId equals link.Id
+                  where link.RequestId == requestId && link.SystemName == ffpManagerOptions.SystemName &&
+                        attempt.ExceptionDetails != null
+                  orderby attempt.StartedUtc descending, attempt.Id descending
+                  select attempt.ExceptionDetails)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<IntegrationAttemptView>> GetAttemptPageAsync(Guid linkId, int page, CancellationToken cancellationToken = default)
         => await dbContext.IntegrationAttempts.AsNoTracking().Where(item => item.LinkId == linkId)
             .OrderByDescending(item => item.StartedUtc).ThenBy(item => item.Id).Skip((Math.Max(1,page)-1)*100).Take(100)
