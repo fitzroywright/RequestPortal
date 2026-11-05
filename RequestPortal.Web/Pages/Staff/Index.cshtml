@@ -24,13 +24,6 @@
         {
         <div class="portal-workspace-grid staff-requests-grid" style="grid-template-columns:minmax(0,1fr) 300px">
             <main class="workspace-panel request-panel">
-                <div class="panel-titlebar">
-                    <div>
-                        <strong>Requests</strong>
-                        <small>@Model.Queue.TotalCount requests matching the filters</small>
-                    </div>
-                </div>
-
                 <form id="requests-grid-filters" method="get" asp-page="/Staff/Index" data-requests-grid-filters><input type="hidden" name="PageSize" value="@Model.PageSize" /></form>
                 <div class="table-wrap workspace-table-wrap">
                         <table class="workspace-table">
