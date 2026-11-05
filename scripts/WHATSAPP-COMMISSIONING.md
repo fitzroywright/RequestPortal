@@ -60,6 +60,11 @@ units. Do not run during a deployment or another configuration change. Required:
 Debian Kratos, root-owned non-writable tooling and configuration, a private
 root-owned `/etc/aegis/requestportal.env`, .NET 10 ASP.NET runtime, systemd-run,
 busctl, nginx, journal access, HTTPS connectivity and healthy portal/nginx services.
+The staff authentication check requires HTTP 302 to the exact
+`/Account/StaffLogin` path, either root-relative or an absolute HTTPS URL on
+`requestportal.ffpja.org` (default port 443). A query such as `ReturnUrl=%2FStaff`
+is permitted. External hosts, HTTP redirects, credentials, unexpected paths,
+fragments and malformed URLs fail closed; the check never follows the redirect.
 The existing fixed service user/group, executable, working directory and single
 environment-file composition must match. Unsupported multiline environment
 assignments, extra credential mounts or environment inheritance fail closed.

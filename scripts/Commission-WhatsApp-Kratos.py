@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -178,6 +179,28 @@ def service_context():
     return "".join(prefix).encode()
 
 
+def staff_login_redirect_is_safe(location):
+    # urlsplit tolerates whitespace/control characters; reject them before parsing.
+    # Allow only URL characters and well-formed escapes, never browser backslashes.
+    if not re.fullmatch(r"[A-Za-z0-9._~:/?\[\]@!$&'()*+,;=%-]+", location):
+        return False
+    if re.search(r"%(?![0-9A-Fa-f]{2})", location):
+        return False
+    if re.search(r"%(?:0[0-9a-f]|1[0-9a-f]|7f|5c)", location, re.IGNORECASE):
+        return False
+    try:
+        target = urllib.parse.urlsplit(location)
+    except ValueError:
+        return False
+    if target.path != "/Account/StaffLogin" or target.fragment:
+        return False
+    if location.startswith("/Account/StaffLogin"):
+        return not target.scheme and not target.netloc
+    # An explicit default TLS port is the same origin. No userinfo or other ports.
+    return target.scheme == "https" and target.netloc.lower() in (
+        "requestportal.ffpja.org", "requestportal.ffpja.org:443")
+
+
 def health():
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, *args):
@@ -202,7 +225,7 @@ def health():
         response = urllib.request.build_opener(NoRedirect).open("https://requestportal.ffpja.org/Staff", timeout=15)
     except urllib.error.HTTPError as error:
         response = error
-    if response.status != 302 or not response.headers.get("Location", "").startswith("/Account/StaffLogin"):
+    if response.status != 302 or not staff_login_redirect_is_safe(response.headers.get("Location", "")):
         raise Stop("Staff authentication enforcement changed.")
     for service in (SERVICE, "nginx"):
         native(["/usr/bin/systemctl", "is-active", "--quiet", service])

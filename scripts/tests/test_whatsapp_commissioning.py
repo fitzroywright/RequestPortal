@@ -14,6 +14,75 @@ c = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(c)
 
 
+class StaffRedirectTests(unittest.TestCase):
+    def test_accepts_exact_relative_or_same_origin_https_login(self):
+        for location in [
+            '/Account/StaffLogin', '/Account/StaffLogin?ReturnUrl=%2FStaff',
+            'https://requestportal.ffpja.org/Account/StaffLogin',
+            'https://requestportal.ffpja.org/Account/StaffLogin?ReturnUrl=%2FStaff',
+            'https://REQUESTPORTAL.FFPJA.ORG:443/Account/StaffLogin',
+        ]:
+            with self.subTest(location=location):
+                self.assertTrue(c.staff_login_redirect_is_safe(location))
+
+    def test_rejects_untrusted_insecure_unexpected_or_malformed_targets(self):
+        for location in [
+            '', '/Staff', '/Account/StaffLoginExtra', '/Account/StaffLogin/extra',
+            '/Account/StaffLogin/', '/account/stafflogin', 'Account/StaffLogin',
+            '//requestportal.ffpja.org/Account/StaffLogin',
+            '///Account/StaffLogin', '/Account/%53taffLogin',
+            'https://external.example/Account/StaffLogin',
+            'https://requestportal.ffpja.org.external.example/Account/StaffLogin',
+            'https://requestportal.ffpja.org./Account/StaffLogin',
+            'http://requestportal.ffpja.org/Account/StaffLogin',
+            'https://requestportal.ffpja.org:444/Account/StaffLogin',
+            'https://requestportal.ffpja.org:/Account/StaffLogin',
+            'https://requestportal.ffpja.org:invalid/Account/StaffLogin',
+            'https://user@requestportal.ffpja.org/Account/StaffLogin',
+            'https://requestportal.ffpja.org@external.example/Account/StaffLogin',
+            'https://requestportal.ffpja.org/Staff',
+            'https:/requestportal.ffpja.org/Account/StaffLogin',
+            'https:///Account/StaffLogin',
+            'https://[requestportal.ffpja.org/Account/StaffLogin',
+            'https://requestportal.ffpja.org\\@external.example/Account/StaffLogin',
+            '/Account/StaffLogin#fragment', '/Account/StaffLogin#',
+            ' /Account/StaffLogin', '/Account/StaffLogin ',
+            '\n/Account/StaffLogin', '/Account/Staff\tLogin',
+            '/Account/StaffLogin?x=\r\nLocation:https://external.example',
+            '/Account/StaffLogin?x=\x00', '/Account/StaffLogin?x=%',
+            '/Account/StaffLogin?x=%GG', '/Account/StaffLogin?x=%0d%0a',
+            '/Account/StaffLogin?x=%00', '/Account/StaffLogin?x=%5c',
+        ]:
+            with self.subTest(location=location):
+                self.assertFalse(c.staff_login_redirect_is_safe(location))
+
+    def check_health(self, status, location):
+        responses = [io.BytesIO(b'{"status":"Healthy"}'), io.BytesIO(), io.BytesIO()]
+        for response in responses:
+            response.status = 200
+        error = c.urllib.error.HTTPError('https://requestportal.ffpja.org/Staff',
+                                         status, 'fixture', {'Location': location}, None)
+        with patch.object(c.urllib.request, 'urlopen', side_effect=responses), \
+             patch.object(c.urllib.request, 'build_opener') as build, patch.object(c, 'native'):
+            build.return_value.open.side_effect = error
+            c.health()
+            build.return_value.open.assert_called_once_with('https://requestportal.ffpja.org/Staff', timeout=15)
+            self.assertIsNone(build.call_args.args[0]().redirect_request(None, None, 302, '', {}, location))
+
+    def test_health_accepts_both_302_login_forms_without_following(self):
+        for location in ['/Account/StaffLogin?ReturnUrl=%2FStaff',
+                         'https://requestportal.ffpja.org/Account/StaffLogin']:
+            with self.subTest(location=location):
+                self.check_health(302, location)
+
+    def test_health_still_requires_302_and_trusted_login(self):
+        cases = [(status, '/Account/StaffLogin') for status in (200, 301, 303, 307, 308, 401, 403)]
+        cases += [(302, 'https://external.example/Account/StaffLogin'), (302, '/Account/StaffLoginExtra')]
+        for status, location in cases:
+            with self.subTest(status=status, location=location), self.assertRaisesRegex(c.Stop, 'Staff authentication enforcement changed'):
+                self.check_health(status, location)
+
+
 class ConfigurationTests(unittest.TestCase):
     def test_preserves_unrelated_bytes_and_is_idempotent(self):
         original = b'# unrelated\r\nSECRET="fixture-only $() `command`"\r\nNotifications__WhatsAppEnabled=false\n'
