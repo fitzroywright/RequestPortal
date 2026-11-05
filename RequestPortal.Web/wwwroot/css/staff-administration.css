@@ -107,13 +107,6 @@
 }
 
 /* Compact name and role columns to reserve space for unwrapped identities. */
-.staff-administration .staff-directory-toolbar{
-    display:flex;
-    justify-content:flex-end;
-    align-items:center;
-    margin:0 0 .4rem;
-}
-.staff-administration .staff-directory-toolbar .button{white-space:nowrap}
 .staff-administration .staff-directory-table{
     width:100%;
     min-width:1250px;
@@ -158,3 +151,14 @@
     min-width:145px;
     white-space:nowrap;
 }
+
+/* Match the title and creation action on one line without another toolbar. */
+.staff-administration .staff-page-heading{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    margin-bottom:1rem;
+}
+.staff-administration .staff-page-heading h1{margin:0;min-width:0}
+.staff-administration .staff-page-heading .button{flex:none;white-space:nowrap}
