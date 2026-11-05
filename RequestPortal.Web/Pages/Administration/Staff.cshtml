@@ -61,6 +61,7 @@ else { <details><summary>Details</summary><p>@entry.Action</p></details> }
 else
 {
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
+<div class="staff-directory-toolbar"><a class="button button-small" asp-page="AddStaff">Add Staff</a></div>
 <form method="get" class="staff-directory-form" data-staff-directory-filters>
 <input type="hidden" name="Sort" value="@(Model.Sort ?? "name")"/>
 <div class="card staff-table-scroll staff-directory-scroll" role="region" aria-label="Staff directory, scroll to view more staff and columns" tabindex="0"><table class="staff-directory-table"><thead><tr>
@@ -71,10 +72,9 @@ else
 <th scope="col" class="staff-role-header"><select asp-for="Role" aria-label="Filter by staff role"><option value="">All roles</option>@foreach(var role in Model.Roles) { <option value="@role.Key">@role.Name</option> }</select></th>
 <th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="last">Last sign-in</a></th>
 <th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="registered">Registered</a></th>
-<th scope="col" class="staff-add-header"><a class="button button-small" asp-page="AddStaff">Add Staff</a></th>
 </tr></thead><tbody>
 @foreach(var entry in Model.Entries) {
-<tr class="staff-select-row @(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "staff-pending-row" : "")" data-staff-row data-staff-url="@Url.Page("/Administration/Staff", new { Id = entry.Account.Id })" tabindex="0" aria-label="Open staff details for @entry.Account.DisplayName@(entry.Account.Status == SecurityAccountStatus.PendingAccess ? " — pending access review" : "")"><td><a asp-page="Staff" asp-route-Id="@entry.Account.Id">@entry.Account.DisplayName</a></td><td>@entry.Account.LoginName</td><td>@entry.Email</td><td>@StaffModel.StatusLabel(entry.Account.Status)</td><td>@string.Join(", ",entry.Roles.Where(x=>x==PortalRoles.Administrator||x==PortalRoles.Reviewer))</td><td>@(entry.LastSignIn.HasValue ? StaffModel.DisplayTime(entry.LastSignIn) : "Never signed in")</td><td>@StaffModel.DisplayTime(entry.Registered)</td><td class="staff-row-indicator"><span aria-hidden="true">›</span></td></tr>
+<tr class="staff-select-row @(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "staff-pending-row" : "")" data-staff-row data-staff-url="@Url.Page("/Administration/Staff", new { Id = entry.Account.Id })" tabindex="0" aria-label="Open staff details for @entry.Account.DisplayName@(entry.Account.Status == SecurityAccountStatus.PendingAccess ? " — pending access review" : "")"><td><a asp-page="Staff" asp-route-Id="@entry.Account.Id">@entry.Account.DisplayName</a></td><td>@entry.Account.LoginName</td><td>@entry.Email</td><td>@StaffModel.StatusLabel(entry.Account.Status)</td><td>@string.Join(", ",entry.Roles.Where(x=>x==PortalRoles.Administrator||x==PortalRoles.Reviewer))</td><td>@(entry.LastSignIn.HasValue ? StaffModel.DisplayTime(entry.LastSignIn) : "Never signed in")</td><td>@StaffModel.DisplayTime(entry.Registered)</td></tr>
 }
 </tbody></table>@if (Model.Entries.Count == 0) { <p>No staff match these filters.</p> }</div></form>
 
