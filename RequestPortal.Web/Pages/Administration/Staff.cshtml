@@ -61,7 +61,7 @@ else { <details><summary>Details</summary><p>@entry.Action</p></details> }
 else
 {
 <p class="action-row"><a class="button button-small" asp-page="AddStaff">Add Staff</a></p>
-<p><a asp-page="Staff">All staff</a> · <a asp-page="Staff" asp-route-Status="PendingAccess">Pending Access (@Model.PendingCount)</a> · <a href="#roles">Roles</a></p>
+<p><a asp-page="Staff">All staff</a> · <a asp-page="Staff" asp-route-Status="PendingAccess">Pending Access (@Model.PendingCount)</a></p>
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
 <form method="get" class="staff-directory-form" data-staff-directory-filters>
 <input type="hidden" name="Sort" value="@(Model.Sort ?? "name")"/>
@@ -79,9 +79,7 @@ else
 <tr><td><a asp-page="Staff" asp-route-Id="@entry.Account.Id">@entry.Account.DisplayName</a></td><td>@entry.Account.LoginName</td><td>@entry.Email</td><td>@StaffModel.StatusLabel(entry.Account.Status)</td><td>@string.Join(", ",entry.Roles.Where(x=>x==PortalRoles.Administrator||x==PortalRoles.Reviewer))</td><td>@(entry.LastSignIn.HasValue ? StaffModel.DisplayTime(entry.LastSignIn) : "Never signed in")</td><td>@StaffModel.DisplayTime(entry.Registered)</td><td><a class="button button-small @(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "" : "button-outline")" asp-page="Staff" asp-route-Id="@entry.Account.Id">@(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "Review access" : "Manage")</a></td></tr>
 }
 </tbody></table>@if (Model.Entries.Count == 0) { <p>No staff match these filters.</p> }</div></form>
-<section class="card" id="roles"><h2>Roles</h2>
-@foreach(var role in Model.Roles) { <h3><a asp-page="Staff" asp-route-Role="@role.Key">@role.Name</a></h3><p>@(role.Key == PortalRoles.Administrator ? "Manage staff access and administer the portal." : "Review requests and view management dashboards.")</p> }
-</section>
+
 }
 </div></section>
 @section Scripts { <script src="~/js/staff-administration.js" asp-append-version="true"></script> }
