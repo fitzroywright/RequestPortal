@@ -82,6 +82,27 @@ public sealed class IntegrationMonitoringTests
     }
 
     [Fact]
+    public async Task AuthenticatedBridgeStructuredFailureRetainsRootEvidence()
+    {
+        var method = typeof(FfpManagerBridgeClient).GetMethod(
+            "EnsureSuccessAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var failure = TransferFailures.For("Validation", "VALIDATION_PRIMARY_TELEPHONE") with
+        {
+            TechnicalDetails = "Exception: ExternalApplicationValidationException\nStage: Validation\nRejected field: PrimaryTelephone"
+        };
+        using var response = new HttpResponseMessage(System.Net.HttpStatusCode.UnprocessableEntity)
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(failure)
+        };
+        async Task Call() => await (Task)method.Invoke(null, [response, TestContext.Current.CancellationToken])!;
+        var error = await Assert.ThrowsAsync<IntegrationTransferException>(Call);
+        Assert.Equal("VALIDATION_PRIMARY_TELEPHONE", error.Failure.Code);
+        Assert.Contains("Primary telephone", error.Failure.Explanation);
+        Assert.Contains("ExternalApplicationValidationException", error.Failure.TechnicalDetails);
+        Assert.DoesNotContain("HTTP 422", error.Failure.Explanation);
+    }
+
+    [Fact]
     public void RestrictedExceptionCaptureOmitsUntrustedMessagesAndSourcePaths()
     {
         var unsafeException = new InvalidOperationException(
