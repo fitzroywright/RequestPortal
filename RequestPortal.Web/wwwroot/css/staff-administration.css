@@ -91,32 +91,7 @@
     .staff-administration .staff-directory-form>.staff-directory-scroll{height:220px;max-height:calc(100dvh - 12px)}
 }
 
-/* Action column heading is the creation action, kept on the same sticky header row. */
-.staff-administration .staff-directory-table thead .staff-add-header{text-align:center;vertical-align:middle}
-.staff-administration .staff-directory-table thead .staff-add-header .button{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;min-height:32px;text-decoration:none}
-
-/* Keep per-staff actions visible even when the directory scrolls horizontally. */
-.staff-administration .staff-directory-scroll .staff-directory-table thead th:last-child{
-    position:sticky;
-    right:0;
-    z-index:4;
-    background:var(--surface-muted,#eaf0f5);
-    box-shadow:-1px 0 0 var(--border,#d8e0e8),0 1px 0 var(--border,#d8e0e8);
-}
-.staff-administration .staff-directory-scroll .staff-directory-table tbody td:last-child{
-    position:sticky;
-    right:0;
-    z-index:1;
-    background:var(--surface,#fff);
-    box-shadow:-1px 0 0 var(--border,#d8e0e8);
-    white-space:nowrap;
-    text-align:center;
-}
-.staff-administration .staff-directory-scroll .staff-directory-table tbody tr:hover td:last-child{
-    background:var(--surface-muted,#eaf0f5);
-}
-
-/* Entire staff rows open details. Keep the Add Staff header visible on horizontal scroll. */
+/* Entire staff rows open details. */
 .staff-administration .staff-directory-scroll .staff-directory-table tbody tr.staff-select-row{cursor:pointer}
 .staff-administration .staff-directory-scroll .staff-directory-table tbody tr.staff-select-row:hover>td,
 .staff-administration .staff-directory-scroll .staff-directory-table tbody tr.staff-select-row:focus-visible>td{
@@ -126,12 +101,60 @@
     outline:2px solid var(--accent,#1464bc);
     outline-offset:-2px;
 }
-.staff-administration .staff-directory-scroll .staff-directory-table tbody .staff-row-indicator{
-    color:var(--muted,#526578);
-    font-size:1.5rem;
-    font-weight:600;
-    line-height:1;
-}
+
 .staff-administration .staff-directory-scroll .staff-directory-table tbody .staff-pending-row>td:first-child{
     font-weight:700;
+}
+
+/* Compact name and role columns to reserve space for unwrapped identities. */
+.staff-administration .staff-directory-toolbar{
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    margin:0 0 .4rem;
+}
+.staff-administration .staff-directory-toolbar .button{white-space:nowrap}
+.staff-administration .staff-directory-table{
+    width:100%;
+    min-width:1250px;
+    table-layout:auto;
+}
+.staff-administration .staff-directory-table thead th.staff-name-header{
+    min-width:230px;
+    width:19%;
+}
+.staff-administration .staff-directory-table thead .staff-name-header .staff-header-inline{
+    gap:.35rem;
+}
+.staff-administration .staff-directory-table thead .staff-name-header input{
+    min-width:105px;
+    max-width:180px;
+}
+.staff-administration .staff-directory-table :is(th,td):nth-child(2){
+    min-width:190px;
+    width:17%;
+    white-space:nowrap;
+    overflow-wrap:normal;
+}
+.staff-administration .staff-directory-table :is(th,td):nth-child(3){
+    min-width:260px;
+    width:23%;
+    white-space:nowrap;
+    overflow-wrap:normal;
+}
+.staff-administration .staff-directory-table thead th.staff-status-header{
+    min-width:130px;
+    width:11%;
+}
+.staff-administration .staff-directory-table thead th.staff-role-header{
+    min-width:110px;
+    width:9%;
+}
+.staff-administration .staff-directory-table thead .staff-role-header select{
+    max-width:130px;
+}
+.staff-administration .staff-directory-table :is(th,td):nth-child(6),
+.staff-administration .staff-directory-table :is(th,td):nth-child(7){
+    min-width:145px;
+    white-space:nowrap;
 }
