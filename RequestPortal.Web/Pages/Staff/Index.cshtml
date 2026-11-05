@@ -205,6 +205,34 @@
                         <span>@Model.Operations.FailedNotificationDeliveries.Count failed deliveries</span>
                     </a>
                 </div>
+
+                <section class="staff-waiting-action" aria-labelledby="staff-waiting-title">
+                    <div class="panel-titlebar panel-titlebar-secondary">
+                        <div>
+                            <strong id="staff-waiting-title">Waiting on requester action</strong>
+                            <small>@Model.Operations.ActionRequiredRequests.Count awaiting additional information</small>
+                        </div>
+                    </div>
+                    @if (Model.Operations.ActionRequiredRequests.Count == 0)
+                    {
+                        <div class="workspace-empty compact">
+                            <p>No requests are currently waiting on additional information.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="staff-waiting-list">
+                            @foreach (RequestWorkItem item in Model.Operations.ActionRequiredRequests)
+                            {
+                                <a class="staff-waiting-row" asp-page="/Staff/Review" asp-route-id="@item.RequestId">
+                                    <strong>@item.PublicReference</strong>
+                                    <span>@item.OrganizationName</span>
+                                    <small>@item.Status · @item.AgeDays day(s)</small>
+                                </a>
+                            }
+                        </div>
+                    }
+                </section>
             </aside>
         </div>
         }
@@ -212,52 +240,14 @@
 </section>
 
 
-@if (Model.SearchResults is null)
-{
-<section class="section section-muted">
-    <div class="shell">
-        <div class="section-heading">
-            <h2>Waiting on requester action</h2>
-            <p>Requests that currently require additional information from the applicant remain visible here for follow-up.</p>
-        </div>
-        @if (Model.Operations.ActionRequiredRequests.Count == 0)
-        {
-            <div class="card"><p>No requests are currently waiting on additional information.</p></div>
-        }
-        else
-        {
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Reference</th>
-                            <th>Organization</th>
-                            <th>Status</th>
-                            <th class="staff-age-column">Age</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (RequestWorkItem item in Model.Operations.ActionRequiredRequests)
-                    {
-                        <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Review", new { id = item.RequestId })" role="link" tabindex="0">
-                            <td><strong>@item.PublicReference</strong></td>
-                            <td>@item.OrganizationName</td>
-                            <td>@item.Status</td>
-                            <td class="staff-age-column">@item.AgeDays day(s)</td>
-                            <td><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open</a></td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
-</section>
-
-}
 
 <style>
+.staff-waiting-action{min-width:0}
+.staff-waiting-list{display:grid;max-height:360px;overflow-y:auto;overscroll-behavior:contain}
+.staff-waiting-row{display:grid;gap:3px;padding:12px 14px;border-bottom:1px solid var(--border,#d8e0e8);text-decoration:none;min-width:0}
+.staff-waiting-row:hover,.staff-waiting-row:focus-visible{background:var(--surface-muted,#f1f5f9)}
+.staff-waiting-row strong,.staff-waiting-row span{overflow-wrap:anywhere}
+.staff-waiting-row small{color:var(--muted,#64748b)}
 .staff-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px}.staff-pagination form{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.staff-pagination nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.staff-pagination select{padding:6px}.staff-pagination [aria-disabled="true"]{color:#637083}
 .staff-age-column{width:96px;min-width:96px;white-space:nowrap}
 </style>
