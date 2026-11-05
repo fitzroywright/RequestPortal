@@ -84,6 +84,33 @@ class StaffRedirectTests(unittest.TestCase):
 
 
 class ConfigurationTests(unittest.TestCase):
+    def test_service_environment_serializes_real_newlines_and_systemd_quotes(self):
+        properties = {'User': 'aegis', 'Group': 'aegis', 'WorkingDirectory': str(c.APP),
+                      'EnvironmentFiles': str(c.ENV) + ' (ignore_errors=no)',
+                      'ExecStart': 'path=/usr/bin/dotnet ; argv[]=/usr/bin/dotnet /opt/aegis/requestportal/RequestPortal.Web.dll ;',
+                      'Environment': c.shlex.join(['ASPNETCORE_ENVIRONMENT=Production', 'FIXTURE=space "quote" \\ $literal `literal`'])}
+        def native(args):
+            return json.dumps({'data': ['/fixture']}) if 'call' in args else json.dumps({'type': 'a(ss)', 'data': []})
+        with patch.object(c, 'property_value', side_effect=lambda name: properties.get(name, '')), \
+             patch.object(c, 'native', side_effect=native):
+            prefix = c.service_context()
+        self.assertEqual(b'ASPNETCORE_ENVIRONMENT="Production"\nFIXTURE="space \\"quote\\" \\\\ $literal `literal`"\n', prefix)
+        self.assertEqual(2, len(prefix.splitlines()))
+
+    def test_only_allowlisted_configuration_diagnostics_are_exposed(self):
+        for rule in ['AspNetCoreEnvironmentProduction', 'RequestLoggingSafe', 'PRIVATE', {'PRIVATE': 'PRIVATE'}]:
+            with self.subTest(rule=rule), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                output = json.dumps({'status': 'failed', 'phase': 'configuration', 'rule': rule, 'message': 'PRIVATE'})
+                result = types.SimpleNamespace(returncode=1, stdout=output, stderr='PRIVATE')
+                with patch.object(c.subprocess, 'run', return_value=result), self.assertRaises(c.Stop) as error:
+                    c.run_probe(root, root, b'', b'BOOTSTRAP=PRIVATE\n', 'preflight', 1)
+                text = str(error.exception)
+                self.assertNotIn('PRIVATE', text)
+                if isinstance(rule, str) and rule in c.CONFIGURATION_RULES:
+                    self.assertIn('(' + rule + ')', text)
+                self.assertEqual([], list(root.glob('*.env')))
+
     def test_preserves_unrelated_bytes_and_is_idempotent(self):
         original = b'# unrelated\r\nSECRET="fixture-only $() `command`"\r\nNotifications__WhatsAppEnabled=false\n'
         original += b'NOTIFICATIONS__WHATSAPPWEBHOOKENABLED=false\n'

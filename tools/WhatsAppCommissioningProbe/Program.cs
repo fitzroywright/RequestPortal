@@ -28,22 +28,8 @@ internal static class Program
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(90));
             var ct = deadline.Token;
             phase = "configuration";
-            var initial = new ConfigurationBuilder().SetBasePath("/opt/aegis/requestportal")
-                .AddJsonFile("appsettings.json").AddJsonFile("appsettings.Production.json").AddEnvironmentVariables().Build();
-            var overrides = new Dictionary<string, string?> { ["CommonSecrets:OpenBao:DeleteSecretIdFileAfterRead"] = "false" };
-            foreach (var definition in initial.GetSection("CommonSecrets:Providers").GetChildren())
-                overrides[$"CommonSecrets:Providers:{definition.Key}:Settings:DeleteSecretIdFileAfterRead"] = "false";
-            var config = new ConfigurationBuilder().AddConfiguration(initial).AddInMemoryCollection(overrides).Build();
-            if (config.GetValue("Notifications:WhatsAppEnabled", false) || config["ASPNETCORE_ENVIRONMENT"] != "Production" ||
-                !config.GetValue("Notifications:WhatsAppWebhookEnabled", false) ||
-                config["Notifications:WhatsAppPhoneNumberId"] != Phone || config["Notifications:WhatsAppBusinessAccountId"] != Account ||
-                config["Notifications:WhatsAppAccessTokenSecretName"] != "messaging/whatsapp/api-token" ||
-                config["Notifications:WhatsAppVerificationTokenSecretName"] != "messaging/whatsapp/verification-token" ||
-                config["Notifications:WhatsAppAppSecretName"] != "messaging/whatsapp/app-secret") throw new InvalidOperationException();
-            var order = config.GetSection("CommonSecrets:ProviderOrder").Get<string[]>();
-            if (order is not ["OpenBao"] || config["CommonSecrets:Mode"] != "Production") throw new InvalidOperationException();
-            // Fail closed if request logging could disclose a verification query string.
-            if (!RequestLoggingIsSafe(config)) throw new InvalidOperationException();
+            var config = LoadConfiguration("/opt/aegis/requestportal");
+            ValidateConfiguration(config);
             phase = "approle-secret-read";
             await using var runtime = CommonSecretsBootstrapRuntime.Create(config);
             // Use the actual OpenBao provider, never a development fallback provider.
@@ -85,12 +71,70 @@ internal static class Program
                 outboundEnabled = false, credentialValidity = "not-tested-no-outbound-send", databaseReadOnly = true }));
             return 0;
         }
-        catch
+        catch (Exception error)
         {
             // No exception messages, URIs, response bodies, connection strings or values.
-            Console.WriteLine(JsonSerializer.Serialize(new { status = "failed", phase }));
+            Console.WriteLine(FailureJson(error, phase));
             return 1;
         }
+    }
+
+    internal enum ConfigurationRule
+    {
+        ConfigurationLoad, SecretIdPreservation,
+        WhatsAppOutboundDisabled, AspNetCoreEnvironmentProduction, WhatsAppWebhookEnabled,
+        WhatsAppPhoneNumberId, WhatsAppBusinessAccountId, WhatsAppAccessTokenReference,
+        WhatsAppVerificationTokenReference, WhatsAppAppSecretReference,
+        OpenBaoProviderOrder, CommonSecretsProductionMode, RequestLoggingSafe
+    }
+
+    internal sealed class ConfigurationFailure(ConfigurationRule rule) : Exception("Configuration validation failed.")
+    {
+        public ConfigurationRule Rule { get; } = rule;
+    }
+
+    internal static string FailureJson(Exception error, string failurePhase) => JsonSerializer.Serialize(new {
+        status = "failed", phase = failurePhase,
+        rule = error is ConfigurationFailure failure ? failure.Rule.ToString() : null
+    });
+
+    internal static IConfigurationRoot LoadConfiguration(string basePath)
+    {
+        var rule = ConfigurationRule.ConfigurationLoad;
+        try
+        {
+            var initial = new ConfigurationBuilder().SetBasePath(basePath)
+                .AddJsonFile("appsettings.json").AddJsonFile("appsettings.Production.json").AddEnvironmentVariables().Build();
+            rule = ConfigurationRule.SecretIdPreservation;
+            var overrides = new Dictionary<string, string?> { ["CommonSecrets:OpenBao:DeleteSecretIdFileAfterRead"] = "false" };
+            foreach (var definition in initial.GetSection("CommonSecrets:Providers").GetChildren())
+                overrides[$"CommonSecrets:Providers:{definition.Key}:Settings:DeleteSecretIdFileAfterRead"] = "false";
+            return new ConfigurationBuilder().AddConfiguration(initial).AddInMemoryCollection(overrides).Build();
+        }
+        catch (Exception) { throw new ConfigurationFailure(rule); }
+    }
+
+    internal static void ValidateConfiguration(IConfiguration config)
+    {
+        static void Require(ConfigurationRule rule, Func<bool> valid)
+        {
+            bool passed;
+            try { passed = valid(); }
+            catch (Exception) { throw new ConfigurationFailure(rule); }
+            if (!passed) throw new ConfigurationFailure(rule);
+        }
+        Require(ConfigurationRule.WhatsAppOutboundDisabled, () => !config.GetValue("Notifications:WhatsAppEnabled", false));
+        Require(ConfigurationRule.AspNetCoreEnvironmentProduction, () => config["ASPNETCORE_ENVIRONMENT"] == "Production");
+        Require(ConfigurationRule.WhatsAppWebhookEnabled, () => config.GetValue("Notifications:WhatsAppWebhookEnabled", false));
+        Require(ConfigurationRule.WhatsAppPhoneNumberId, () => config["Notifications:WhatsAppPhoneNumberId"] == Phone);
+        Require(ConfigurationRule.WhatsAppBusinessAccountId, () => config["Notifications:WhatsAppBusinessAccountId"] == Account);
+        Require(ConfigurationRule.WhatsAppAccessTokenReference, () => config["Notifications:WhatsAppAccessTokenSecretName"] == "messaging/whatsapp/api-token");
+        Require(ConfigurationRule.WhatsAppVerificationTokenReference, () => config["Notifications:WhatsAppVerificationTokenSecretName"] == "messaging/whatsapp/verification-token");
+        Require(ConfigurationRule.WhatsAppAppSecretReference, () => config["Notifications:WhatsAppAppSecretName"] == "messaging/whatsapp/app-secret");
+        Require(ConfigurationRule.OpenBaoProviderOrder, () => config.GetSection("CommonSecrets:ProviderOrder").Get<string[]>() is ["OpenBao"]);
+        Require(ConfigurationRule.CommonSecretsProductionMode, () => config["CommonSecrets:Mode"] == "Production");
+        // Fail closed if request logging could disclose a verification query string.
+        Require(ConfigurationRule.RequestLoggingSafe, () => RequestLoggingIsSafe(config));
     }
 
     internal static bool RequestLoggingIsSafe(IConfiguration config)

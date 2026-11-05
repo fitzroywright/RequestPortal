@@ -30,6 +30,13 @@ NGINX = "/usr/sbin/nginx"
 BASE_SITE_HASH = "948774fab5f720e90c298a86341e028e75dd3efe84917323c89bcf64f38a969b"
 ASSEMBLY_HASH = "9fb70e1900f91e48f513c8f8897517e5e9e96206a554ee62137dcd545304b183"
 DEPLOYED_COMMIT = "6b09c4452fb2c62c8daac5b91fa0aecc50dc53a3"
+CONFIGURATION_RULES = {
+    "ConfigurationLoad", "SecretIdPreservation",
+    "WhatsAppOutboundDisabled", "AspNetCoreEnvironmentProduction", "WhatsAppWebhookEnabled",
+    "WhatsAppPhoneNumberId", "WhatsAppBusinessAccountId", "WhatsAppAccessTokenReference",
+    "WhatsAppVerificationTokenReference", "WhatsAppAppSecretReference", "OpenBaoProviderOrder",
+    "CommonSecretsProductionMode", "RequestLoggingSafe",
+}
 EXPECTED = {
     "Notifications__WhatsAppWebhookEnabled": "true",
     "Notifications__WhatsAppPhoneNumberId": "1427917097069650",
@@ -273,7 +280,9 @@ def run_probe(bundle, work, prefix, environment, mode, since):
             phase = results[-1].get("phase") if results else None
             allowed = {"arguments", "configuration", "approle-secret-read", "approle-verification-token-read",
                        "approle-app-secret-read", "approle-api-token-read", "database-read", "https-verification", "log-privacy"}
-            raise Stop("Protected validation probe failed at " + (phase if phase in allowed else "unclassified-stage") + "; raw output withheld.")
+            rule = results[-1].get("rule") if results else None
+            detail = " (" + rule + ")" if phase == "configuration" and isinstance(rule, str) and rule in CONFIGURATION_RULES else ""
+            raise Stop("Protected validation probe failed at " + (phase if phase in allowed else "unclassified-stage") + detail + "; raw output withheld.")
         if not results or results[-1].get("status") != "ok" or results[-1].get("mode") != mode:
             raise Stop("Protected validation probe failed.")
         return results

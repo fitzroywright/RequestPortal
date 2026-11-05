@@ -155,6 +155,31 @@ existing verification token and select **Verify and save**, then subscribe to
 
 ## Failure and rollback
 
+Configuration failures now include a fixed rule code, never a configuration value
+or raw exception. `ConfigurationLoad` covers required JSON file access/parsing and
+environment-provider loading; `SecretIdPreservation` covers the existing in-memory
+secret-ID preservation overrides. The remaining codes identify the unchanged checks:
+
+- `WhatsAppOutboundDisabled`: outbound must be false; invalid Boolean syntax fails.
+- `AspNetCoreEnvironmentProduction`: explicit `ASPNETCORE_ENVIRONMENT` must be Production.
+- `WhatsAppWebhookEnabled`: the candidate webhook flag must be true; invalid Boolean syntax fails.
+- `WhatsAppPhoneNumberId` and `WhatsAppBusinessAccountId`: the approved IDs must match.
+- `WhatsAppAccessTokenReference`, `WhatsAppVerificationTokenReference` and
+  `WhatsAppAppSecretReference`: the existing secret reference names must match.
+- `OpenBaoProviderOrder`: the order must contain exactly the configured OpenBao instance.
+- `CommonSecretsProductionMode`: the secrets mode must be Production.
+- `RequestLoggingSafe`: ASP.NET request logging and category/provider overrides
+  must satisfy the existing query-string privacy checks.
+
+The probe loads `/opt/aegis/requestportal/appsettings.json`, then
+`appsettings.Production.json`, then the transient unit environment. The latter
+comes from a private root-owned snapshot containing service `Environment=`
+assignments followed by the candidate environment file. Snapshot assignments use
+systemd double-quoted values and actual newline separators; no shell is invoked.
+Do not change a production setting merely to clear a diagnostic code: review the
+failed rule first. An unspecified framework hosting environment default does not
+satisfy the probe's existing explicit environment-name check.
+
 Preflight failure makes no production configuration changes. Apply failures attempt
 automatic rollback of both files, `nginx -t`, nginx reload, portal restart and health.
 `rolled-back` means this succeeded. `rollback-needs-operator-attention` requires
