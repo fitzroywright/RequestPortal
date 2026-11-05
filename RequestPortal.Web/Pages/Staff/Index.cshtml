@@ -32,16 +32,7 @@
                 </div>
 
                 <form id="requests-grid-filters" method="get" asp-page="/Staff/Index" data-requests-grid-filters><input type="hidden" name="PageSize" value="@Model.PageSize" /></form>
-                @if (Model.SubmittedRequests.Count == 0)
-                {
-                    <div class="workspace-empty">
-                        <strong>No requests match the current filters.</strong>
-                        <p>Try clearing the applicant, organization, or work status filters.</p>
-                    </div>
-                }
-                else
-                {
-                    <div class="table-wrap workspace-table-wrap">
+                <div class="table-wrap workspace-table-wrap">
                         <table class="workspace-table">
                             <thead>
                                 <tr>
@@ -80,11 +71,13 @@
                                     </td>
                                 </tr>
                             }
+                            @if (Model.SubmittedRequests.Count == 0)
+                            {
+                                <tr><td colspan="7" class="workspace-empty">No requests match the current filters. Adjust or clear the filters above.</td></tr>
+                            }
                             </tbody>
                         </table>
                     </div>
-
-                }
                 <partial name="_RequestPagination" model="Model" />
             </main>
 
