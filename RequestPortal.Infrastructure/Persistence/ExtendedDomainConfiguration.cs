@@ -123,6 +123,7 @@ internal sealed class IntegrationAttemptConfiguration : IEntityTypeConfiguration
         builder.Property(item => item.Classification).HasMaxLength(64);
         builder.Property(item => item.ErrorCode).HasMaxLength(100);
         builder.Property(item => item.Explanation).HasMaxLength(1000);
+        builder.Property(item => item.ExceptionDetails).HasMaxLength(4000);
     }
 }
 
