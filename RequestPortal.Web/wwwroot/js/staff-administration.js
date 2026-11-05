@@ -31,6 +31,24 @@
                 }
             });
         }
+        // Each staff row opens the same details view previously used by Manage / Review access.
+        // Preserve native links and do not intercept header filter or sort controls.
+        const staffGrid = directory.querySelector('.staff-directory-table tbody');
+        if (staffGrid) {
+            staffGrid.addEventListener('click', event => {
+                const row = event.target.closest('[data-staff-row]');
+                if (!row || !staffGrid.contains(row) || event.target.closest('a,button,input,select,textarea')) return;
+                if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                if (row.dataset.staffUrl) window.location.assign(row.dataset.staffUrl);
+            });
+            staffGrid.addEventListener('keydown', event => {
+                if (event.target.matches('[data-staff-row]') &&
+                    (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    if (event.target.dataset.staffUrl) window.location.assign(event.target.dataset.staffUrl);
+                }
+            });
+        }
         const viewport = directory.querySelector('.staff-directory-scroll');
         if (viewport) {
             // Measure its actual screen position instead of assuming a fixed shell height.
