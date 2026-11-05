@@ -63,17 +63,25 @@ else
 <p class="action-row"><a class="button button-small" asp-page="AddStaff">Add Staff</a></p>
 <p><a asp-page="Staff">All staff</a> · <a asp-page="Staff" asp-route-Status="PendingAccess">Pending Access (@Model.PendingCount)</a> · <a href="#roles">Roles</a></p>
 @if (!Model.Provisioned) { <p class="flash">Initial administrator provisioning has not been recorded. See the administrator provisioning runbook.</p> }
-<form method="get" class="card staff-directory-filters">
-<div class="field"><label asp-for="Search">Search staff</label><input asp-for="Search"/></div>
-<div class="field"><label asp-for="Status">Account status</label><select asp-for="Status"><option value="">All statuses</option>@foreach(var status in Enum.GetValues<SecurityAccountStatus>()) { <option value="@status">@StaffModel.StatusLabel(status)</option> }</select></div>
-<div class="field"><label asp-for="Role">Role</label><select asp-for="Role"><option value="">All roles</option>@foreach(var role in Model.Roles) { <option value="@role.Key">@role.Name</option> }</select></div>
-<div class="field"><label asp-for="Sort">Sort by</label><select asp-for="Sort"><option value="name">Name</option><option value="username">Username</option><option value="email">Email</option><option value="provider">Provider</option><option value="status">Status</option><option value="last">Last sign-in</option><option value="registered">Date registered</option></select></div><button class="button">Apply</button>
-</form>
-<div class="card staff-table-scroll"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Provider</th><th>Status</th><th>Roles</th><th>Last sign-in</th><th>Registered</th><th>Actions</th></tr></thead><tbody>
+<form method="get" class="staff-directory-form" data-staff-directory-filters>
+<input type="hidden" name="Sort" value="@(Model.Sort ?? "name")"/>
+<div class="card staff-table-scroll"><table class="staff-directory-table"><thead><tr>
+<th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="name">Name</a>
+<input asp-for="Search" type="search" aria-label="Search staff by name, username, email or provider" placeholder="Search staff…" autocomplete="off"/></th>
+<th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="username">Username</a></th>
+<th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="email">Email</a></th>
+<th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="provider">Provider</a></th>
+<th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="status">Status</a>
+<select asp-for="Status" aria-label="Filter by account status"><option value="">All statuses</option>@foreach(var status in Enum.GetValues<SecurityAccountStatus>()) { <option value="@status">@StaffModel.StatusLabel(status)</option> }</select></th>
+<th scope="col"><span>Roles</span><select asp-for="Role" aria-label="Filter by staff role"><option value="">All roles</option>@foreach(var role in Model.Roles) { <option value="@role.Key">@role.Name</option> }</select></th>
+<th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="last">Last sign-in</a></th>
+<th scope="col"><a class="staff-header-sort" asp-page="Staff" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-Role="@Model.Role" asp-route-Sort="registered">Registered</a></th>
+<th scope="col"><span>Actions</span><div class="staff-filter-actions"><button class="button button-small" type="submit">Apply</button><a asp-page="Staff" class="staff-filter-clear">Clear</a></div></th>
+</tr></thead><tbody>
 @foreach(var entry in Model.Entries) {
 <tr><td><a asp-page="Staff" asp-route-Id="@entry.Account.Id">@entry.Account.DisplayName</a></td><td>@entry.Account.LoginName</td><td>@entry.Email</td><td>@string.Join(", ",entry.Identities.Select(x=>x.Key.ProviderId))</td><td>@StaffModel.StatusLabel(entry.Account.Status)</td><td>@string.Join(", ",entry.Roles.Where(x=>x==PortalRoles.Administrator||x==PortalRoles.Reviewer))</td><td>@(entry.LastSignIn.HasValue ? StaffModel.DisplayTime(entry.LastSignIn) : "Never signed in")</td><td>@StaffModel.DisplayTime(entry.Registered)</td><td><a class="button button-small @(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "" : "button-outline")" asp-page="Staff" asp-route-Id="@entry.Account.Id">@(entry.Account.Status == SecurityAccountStatus.PendingAccess ? "Review access" : "Manage")</a></td></tr>
 }
-</tbody></table>@if (Model.Entries.Count == 0) { <p>No staff match these filters.</p> }</div>
+</tbody></table>@if (Model.Entries.Count == 0) { <p>No staff match these filters.</p> }</div></form>
 <section class="card" id="roles"><h2>Roles</h2>
 @foreach(var role in Model.Roles) { <h3><a asp-page="Staff" asp-route-Role="@role.Key">@role.Name</a></h3><p>@(role.Key == PortalRoles.Administrator ? "Manage staff access and administer the portal." : "Review requests and view management dashboards.")</p> }
 </section>
