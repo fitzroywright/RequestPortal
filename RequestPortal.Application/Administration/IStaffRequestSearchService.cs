@@ -15,6 +15,7 @@ public sealed class StaffRequestSearchRow
     public string Summary { get; init; } = "";
     public DateTimeOffset CreatedUtc { get; init; }
     public DateTimeOffset ReceivedUtc { get; init; }
+    public DateTimeOffset? SubmittedUtc { get; init; }
     public RequestStatus Status { get; init; }
 }
 
