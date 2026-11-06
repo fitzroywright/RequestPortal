@@ -116,6 +116,7 @@ public sealed class ManagementDashboardPageTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, fixture.Service.Calls);
+        Assert.Matches("<a class=\"brand[^\"]*\" href=\"/Staff\"", html);
         foreach (var title in new[] { "Service Reach Across Jamaica", "Operational Insights", "Request Status", "Delivery / Proof of Delivery", "Delivery by Organization", "Delivery by Program", "Delivery by Parish", "Delivery Outcome Trend", "Requests by Category", "Requests by Program", "Received vs. Completed" }) Assert.Contains(title, html);
         Assert.Contains("/Management/Requests?period=today", html); Assert.Contains("/Management/Requests?attention=missing-docs", html);
         Assert.Contains("/Management/Requests?status=under-review", html); Assert.Contains("/Management/Deliveries?status=Ready", html);

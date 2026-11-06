@@ -89,8 +89,11 @@ public sealed class WhatsAppSettingsUiTests
             using var denied=await f.Client.GetAsync(path,ct);Assert.Equal(HttpStatusCode.Forbidden,denied.StatusCode);
         }
         using var home=await f.Client.GetAsync("/",ct);
-        Assert.Equal(HttpStatusCode.OK,home.StatusCode);
-        Assert.DoesNotContain("href=\"/Administration/WhatsAppSettings\"",await home.Content.ReadAsStringAsync(ct));
+        Assert.Equal(HttpStatusCode.Redirect,home.StatusCode);
+        Assert.Equal("/Staff",home.Headers.Location!.OriginalString);
+        using var deniedPage=await f.Client.GetAsync("/Account/StaffAccessDenied",ct);
+        Assert.Equal(HttpStatusCode.OK,deniedPage.StatusCode);
+        Assert.DoesNotContain("href=\"/Administration/WhatsAppSettings\"",await deniedPage.Content.ReadAsStringAsync(ct));
         Assert.Equal(0,f.Meta.Posts);
     }
     [Theory]
