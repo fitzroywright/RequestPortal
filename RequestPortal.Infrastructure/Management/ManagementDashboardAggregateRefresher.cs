@@ -6,7 +6,12 @@ using RequestPortal.Infrastructure.Persistence;
 namespace RequestPortal.Infrastructure.Management;
 
 /// <summary>Consumes only dashboard messages from the existing durable outbox.</summary>
-public sealed class ManagementDashboardAggregateRefresher(RequestPortalDbContext db, ManagementDashboardService calculator, TimeProvider? clock=null)
+public interface IManagementDashboardAggregateRefresher
+{
+    Task<bool> RefreshAsync(CancellationToken ct=default);
+}
+
+public sealed class ManagementDashboardAggregateRefresher(RequestPortalDbContext db, ManagementDashboardService calculator, TimeProvider? clock=null) : IManagementDashboardAggregateRefresher
 {
     public const string MessageType="RequestPortal.ManagementDashboardRefreshRequested.v1";
     // Transaction-scoped, cluster-wide mutex. Released on commit, rollback, connection loss or process death.
@@ -22,7 +27,12 @@ public sealed class ManagementDashboardAggregateRefresher(RequestPortalDbContext
         {
             await using var transaction=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
             if(!await LockAsync(ct)) return false;
-            var row=await db.ManagementDashboardAggregates.SingleAsync(x=>x.Id==1,ct);
+            var row=await db.ManagementDashboardAggregates.SingleOrDefaultAsync(x=>x.Id==1,ct);
+            if(row is null)
+            {
+                row=new ManagementDashboardAggregate {CreatedUtc=Now};
+                db.ManagementDashboardAggregates.Add(row);
+            }
             attemptedVersion=row.SnapshotVersion;
             var now=Now;
             if(row.AttemptCount>0 && row.NextRefreshUtc>now) return false;
@@ -34,8 +44,7 @@ public sealed class ManagementDashboardAggregateRefresher(RequestPortalDbContext
             string json=JsonSerializer.Serialize(snapshot);
             var check=JsonSerializer.Deserialize<RequestPortal.Application.Management.ManagementDashboardSnapshot>(json)
                 ?? throw new InvalidOperationException("Aggregate verification failed.");
-            if(check.Parishes.Sum(x=>x.Requests)!=check.Statuses.Sum(x=>x.Count))
-                throw new InvalidOperationException("Aggregate totals do not reconcile.");
+            PersistentManagementDashboardService.Validate(check);
             row.AggregateData=json;row.SnapshotVersion++;row.LastUpdatedUtc=Now;
             if(row.LastReconciledUtc is null || row.LastReconciledUtc<=now.AddMinutes(-15)) row.LastReconciledUtc=Now;
             row.RefreshStatus="Current";row.LastError=null;row.AttemptCount=0;row.NextRefreshUtc=Now.AddMinutes(1);

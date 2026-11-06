@@ -144,6 +144,8 @@ internal static class ApplicationServiceRegistration
 
         builder.Services.AddScoped<ManagementDashboardService>();
         builder.Services.AddScoped<ManagementDashboardAggregateRefresher>();
+        builder.Services.AddScoped<IManagementDashboardAggregateRefresher>(services => services.GetRequiredService<ManagementDashboardAggregateRefresher>());
+        builder.Services.AddSingleton<RequestPortal.Web.Services.ManagementDashboardWorkerState>();
         builder.Services.AddHostedService<RequestPortal.Web.Services.ManagementDashboardAggregateWorker>();
         builder.Services.AddScoped<
             IManagementDashboardService

@@ -125,6 +125,26 @@ internal static class PostgresDeploymentPreflight
         await transaction.RollbackAsync(ct);
         return new {readOnly=true,status="backup-created-awaiting-isolated-restore",source,clientMajor,migrations,privileges,tables=counts,archiveSha256=sha,archiveBytes=new FileInfo(archive).Length,observedUtc=DateTimeOffset.UtcNow};
     }
+    internal static async Task<object> VerifyCatalogueAsync(ISecretProvider secrets,CancellationToken ct)
+    {
+        Stage="verify-catalogue";
+        string value=await secrets.GetRequiredAsync("ConnectionStrings:RequestPortal",ct);
+        var settings=new NpgsqlConnectionStringBuilder(value);await VerifyEndpointAsync(settings,ct);
+        await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(
+            new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>().UseNpgsql(value).Options);
+        await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
+        await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
+        bool target=await db.Database.SqlQueryRaw<bool>("SELECT current_database()='requestportal' AND NOT pg_is_in_recovery() AND current_setting('server_version_num')::int/10000 BETWEEN 13 AND 18 AS \"Value\"").SingleAsync(ct);
+        if(!target)throw Stop("PG_ACTUAL_TARGET_GUARD",new {databaseMatches=false});
+        var evidence=await RequestPortal.Infrastructure.Management.ManagementDashboardSourceVerification.ReadAsync(db,null,ct);
+        if(!evidence.MigrationPrivileges || evidence.DashboardTriggers!=10 || !evidence.TriggerFunctionPresent)
+            throw Stop("PG_SCHEMA_VERIFICATION",new {evidence.MigrationPrivileges,evidence.DashboardTriggers,evidence.TriggerFunctionPresent});
+        var applied=await db.Database.GetAppliedMigrationsAsync(ct);
+        if(!applied.Contains("20261106170310_ManagementDashboardAggregate"))throw Stop("PG_BASELINE_MISSING",new {required="20261106170310_ManagementDashboardAggregate"});
+        await tx.RollbackAsync(ct);
+        return new {readOnly=true,status="catalogue-verified",evidence,migration="20261106170310_ManagementDashboardAggregate"};
+    }
+
     internal static async Task<object> VerifyDashboardAsync(ISecretProvider secrets,CancellationToken ct)
     {
         Stage="verify-aggregate";
@@ -148,12 +168,18 @@ internal static class PostgresDeploymentPreflight
             throw Stop("PG_AGGREGATE_TOTALS",new {first.SnapshotVersion});
         if(first.RefreshStatus!="Current" || first.LastUpdatedUtc is null || first.LastUpdatedUtc<DateTimeOffset.UtcNow.AddMinutes(-2))
             throw Stop("PG_AGGREGATE_STALE",new {first.SnapshotVersion,first.RefreshStatus,first.LastUpdatedUtc});
+        var sourceEvidence=await RequestPortal.Infrastructure.Management.ManagementDashboardSourceVerification.ReadAsync(db,first,ct);
+        if(!sourceEvidence.Reconciled)throw Stop("PG_SOURCE_TOTALS",new {first.SnapshotVersion});
+        if(!sourceEvidence.MigrationPrivileges || sourceEvidence.DashboardTriggers!=10 || !sourceEvidence.TriggerFunctionPresent)
+            throw Stop("PG_SCHEMA_VERIFICATION",new {sourceEvidence.MigrationPrivileges,sourceEvidence.DashboardTriggers,sourceEvidence.TriggerFunctionPresent});
+        var applied=await db.Database.GetAppliedMigrationsAsync(ct);
+        if(!applied.Contains("20261106170310_ManagementDashboardAggregate"))throw Stop("PG_BASELINE_MISSING",new {required="20261106170310_ManagementDashboardAggregate"});
         int pending=await db.OutboxMessages.CountAsync(x=>x.MessageType==RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType && x.ProcessedUtc==null,ct);
         await tx.RollbackAsync(ct);
         return new {readOnly=true,status="dashboard-verified",database=settings.Database,host=settings.Host,
             first.SnapshotVersion,first.GeneratedUtc,first.LastUpdatedUtc,first.LastReconciledUtc,first.RefreshStatus,
             totals=new {requests=first.Statuses.Sum(x=>x.Count),outstanding=first.Executive.Outstanding,completed=first.Executive.Completed},
-            pendingRefreshes=pending,coldServiceMs=cold,warmServiceMs=warm,storageReads=0,
+            sourceEvidence,migration="20261106170310_ManagementDashboardAggregate",pendingRefreshes=pending,coldServiceMs=cold,warmServiceMs=warm,storageReads=0,
             measuredBrowserLoading=false,observedUtc=DateTimeOffset.UtcNow};
     }
     private sealed class NoStorage : Common.Storage.IFileStorage
