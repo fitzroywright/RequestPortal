@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Identity;
+using RequestPortal.Common.Contacts;
+using RequestPortal.Common.Validation;
 using RequestPortal.Infrastructure.Identity;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
@@ -48,9 +50,9 @@ public sealed class QuickIntakeModel : PageModel
         Input.Gender = string.Equals(user.Gender, "Non-Binary", StringComparison.OrdinalIgnoreCase)
             ? "Prefer not to Say" : user.Gender ?? "";
         Input.MaritalStatus = user.MaritalStatus ?? "";
-        Input.Telephone = user.PhoneNumber ?? "";
+        Input.Telephone = ApplicantTelephone.Display(user.PhoneNumber) ?? "";
         Input.Email = user.Email;
-        Input.SecondaryTelephone = user.AlternativePhoneNumber;
+        Input.SecondaryTelephone = ApplicantTelephone.Display(user.AlternativePhoneNumber);
         Input.StreetAddress = user.HomeAddress ?? "";
         Input.CommunityDistrict = user.DistrictArea ?? user.Town ?? "";
         Input.Parish = user.Parish ?? "";
@@ -74,9 +76,11 @@ public sealed class QuickIntakeModel : PageModel
 
     private void ValidateWeeklyIncome()
     {
+        InputContactNormalization.Apply(Input,ModelState,nameof(Input));
         string raw = Request.Form["Input.MonthlyIncome"].ToString();
-        if (!System.Text.RegularExpressions.Regex.IsMatch(raw, @"^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?$"))
-            ModelState.AddModelError("Input.MonthlyIncome", "Enter weekly income without leading zeros (for example, 0 or 1250.50).");
+        if (!WeeklyIncome.TryParse(raw, out var weekly))
+            ModelState.AddModelError("Input.MonthlyIncome", "Enter weekly income in JMD, with no leading zeros and at most two decimal places (for example, 0 or 1250.50).");
+        else Input.MonthlyIncome=weekly;
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -122,7 +126,7 @@ public sealed class QuickIntakeModel : PageModel
                     Input.CommunityDistrict,
                     Input.Parish,
                     Input.EmploymentStatus,
-                    decimal.Round(Input.MonthlyIncome * 52m / 12m, 2),
+                    WeeklyIncome.ToMonthly(Input.MonthlyIncome),
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms,
@@ -148,7 +152,7 @@ public sealed class QuickIntakeModel : PageModel
                     AttachmentWarning = "Your request was received, but one or more attachments could not be saved. Please quote your reference when contacting us.";
                 }
             }
-            Telephone = result.Telephone;
+            Telephone = ApplicantTelephone.Display(result.Telephone);
             Input = new InputModel();
             return Page();
         }
@@ -166,6 +170,7 @@ public sealed class QuickIntakeModel : PageModel
 
     public async Task<IActionResult> OnPostStartAsync()
     {
+        ValidateWeeklyIncome();
         if (SubmissionId == Guid.Empty || !string.IsNullOrWhiteSpace(Input.Website))
             return BadRequest(new { error = "Invalid submission." });
         if (Input.DateOfBirth is null)
@@ -179,14 +184,16 @@ public sealed class QuickIntakeModel : PageModel
             ModelState.AddModelError("Input.VictimCircumstances", exception.Message);
         }
         if (!ModelState.IsValid)
-            return BadRequest(new { error = "Please correct the required fields." });
+            return BadRequest(new { error = "Please correct the highlighted fields.",
+                errors=ModelState.Where(entry=>entry.Value?.Errors.Count>0).ToDictionary(entry=>entry.Key,
+                    entry=>entry.Value!.Errors.Select(error=>string.IsNullOrWhiteSpace(error.ErrorMessage)?"Enter a valid value.":error.ErrorMessage).ToArray()) });
         try
         {
             var result = await quickIntakeService.CreateAsync(
                 new QuickIntakeSubmission(Input.FirstName, Input.LastName, Input.DateOfBirth!.Value,
                     Input.Gender, Input.MaritalStatus, Input.Telephone, Input.Email,
                     Input.StreetAddress, Input.CommunityDistrict, Input.Parish,
-                    Input.EmploymentStatus, decimal.Round(Input.MonthlyIncome * 52m / 12m, 2),
+                    Input.EmploymentStatus, WeeklyIncome.ToMonthly(Input.MonthlyIncome),
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
@@ -237,13 +244,13 @@ public sealed class QuickIntakeModel : PageModel
         [Required, RegularExpression("Single|Married|Divorced|Widowed")]
         public string MaritalStatus { get; set; } = string.Empty;
 
-        [Required, StringLength(40)]
+        [Required, ContactTelephone, StringLength(40)]
         public string Telephone { get; set; } = string.Empty;
 
-        [StringLength(40)]
+        [ContactTelephone, StringLength(40)]
         public string? SecondaryTelephone { get; set; }
 
-        [EmailAddress, StringLength(320)]
+        [ContactEmail, StringLength(320)]
         public string? Email { get; set; }
 
         [Required, StringLength(250)]

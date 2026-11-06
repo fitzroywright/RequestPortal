@@ -85,7 +85,7 @@
                             <select asp-for="Input.EmploymentStatus"><option value="">Select</option><option>Employed</option><option>Self Employed</option><option>Unemployed</option><option>Student</option></select>
                             <span asp-validation-for="Input.EmploymentStatus"></span>
                         </label>
-                        <label><span>Weekly Income <b>*</b></span><input asp-for="Input.MonthlyIncome" type="text" inputmode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?" title="Enter a non-negative amount without leading zeros (for example, 0 or 1250.50)." maxlength="15" required /><span asp-validation-for="Input.MonthlyIncome"></span></label>
+                        <label><span>Weekly Income (JMD) <b>*</b></span><input asp-for="Input.MonthlyIncome" type="number" min="0" max="230769230769.22" step="0.01" inputmode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?" title="Enter a non-negative amount without leading zeros (for example, 0 or 1250.50)." maxlength="15" required /><span asp-validation-for="Input.MonthlyIncome"></span></label>
                     </div>
                     <label><span>Do you have any children under 18 years of age that live with you full time? <b>*</b></span>
                         <select asp-for="Input.HasChildrenUnder18LivingFullTime"><option value="">Select</option><option>Yes</option><option>No</option></select>
@@ -241,9 +241,15 @@ a.quick-intake-primary{display:inline-flex;align-items:center;justify-content:ce
         xhr.open('POST', form.action.split('?')[0] + '?handler=' + handler);
         xhr.setRequestHeader('RequestVerificationToken', token);
         xhr.responseType = 'json';
-        xhr.onload = () => xhr.status >= 200 && xhr.status < 300
-            ? resolve(xhr.response)
-            : reject(new Error(xhr.response?.error || 'The server could not complete this step.'));
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) { resolve(xhr.response); return; }
+            const errors = xhr.response?.errors || {};
+            for (const span of form.querySelectorAll('[data-valmsg-for]')) {
+                const messages = errors[span.getAttribute('data-valmsg-for')];
+                span.textContent = messages ? messages.join(' ') : '';
+            }
+            reject(new Error(xhr.response?.error || 'The server could not complete this step.'));
+        };
         xhr.onerror = () => reject(new Error('Connection lost. Please retry.'));
         xhr.ontimeout = () => reject(new Error('The request timed out. Please retry.'));
         xhr.timeout = 120000;
@@ -324,3 +330,5 @@ a.quick-intake-primary{display:inline-flex;align-items:center;justify-content:ce
 </script>
 
 <script src="~/js/intake-exclusive-none.js" asp-append-version="true" defer></script>
+
+<script src="~/js/weekly-income.js" asp-append-version="true" defer></script>

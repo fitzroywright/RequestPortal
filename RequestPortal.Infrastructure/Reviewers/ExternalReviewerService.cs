@@ -64,6 +64,8 @@ public sealed class ExternalReviewerService : IExternalReviewerService
         DateTimeOffset? toUtc,
         CancellationToken cancellationToken = default)
     {
+        email=RequestPortal.Common.Contacts.ContactEmail.Normalize(email)
+            ?? throw new ArgumentException("Reviewer email is required.");
         ValidateScope(scope, organizationId, requestId, fromUtc, toUtc);
 
         if (organizationId.HasValue)

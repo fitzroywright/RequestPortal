@@ -77,6 +77,15 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
             .ToListAsync(cancellationToken);
     }
 
+    public static string NormalizeDestination(NotificationChannel channel,string destination) => channel switch
+    {
+        NotificationChannel.Email => RequestPortal.Common.Contacts.ContactEmail.Normalize(destination)
+            ?? throw new ArgumentException("An email address is required."),
+        NotificationChannel.WhatsApp => RequestPortal.Common.Contacts.ApplicantTelephone.NormalizeNew(destination)
+            ?? throw new ArgumentException("A telephone number is required."),
+        _ => destination.Trim()
+    };
+
     public async Task SavePreferenceAsync(
         Guid userId,
         NotificationChannel channel,
@@ -84,6 +93,7 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
         bool enabled,
         CancellationToken cancellationToken = default)
     {
+        destination=NormalizeDestination(channel,destination);
         if (enabled && !IsCommissioned(channel))
         {
             throw new InvalidOperationException($"{channel} notifications are not commissioned in this Request Portal deployment.");

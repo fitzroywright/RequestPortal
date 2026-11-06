@@ -1,6 +1,5 @@
 using Common.Storage;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Management;
 using RequestPortal.Domain.Documents;
@@ -36,53 +35,30 @@ public sealed class ManagementDashboardService : IManagementDashboardService
     private readonly RequestPortalDbContext dbContext;
     private readonly IFileStorage storage;
     private readonly ManagementDashboardOptions options;
-    private readonly IMemoryCache? cache;
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IMemoryCache, SemaphoreSlim> RefreshLocks = new();
-    private const string DefaultDashboardCacheKey = "ManagementDashboard:Default";
-
-    public ManagementDashboardService(
-        RequestPortalDbContext dbContext,
-        IFileStorage storage,
-        IOptions<ManagementDashboardOptions> options,
-        IMemoryCache? cache = null)
+    private readonly TimeProvider clock;
+    public ManagementDashboardService(RequestPortalDbContext dbContext, IFileStorage storage,
+        IOptions<ManagementDashboardOptions> options, TimeProvider? clock=null)
     {
-        this.dbContext = dbContext;
-        this.storage = storage;
-        this.options = options.Value;
-        this.cache = cache;
+        this.clock=clock ?? TimeProvider.System;
+        this.dbContext = dbContext; this.storage = storage; this.options = options.Value;
     }
 
-    public async Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default)
+    // Used by the aggregate worker and explicitly scoped drilldowns, never by the default HTTP page.
+    public Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default) =>
+        GetDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
+
+    public Task<ManagementDashboardSnapshot> GetDashboardAsync(ManagementDashboardFilter filter,
+        CancellationToken cancellationToken = default) => BuildDashboardAsync(filter, false, cancellationToken);
+
+    public Task<ManagementDashboardSnapshot> BuildAggregateAsync(CancellationToken cancellationToken = default) =>
+        BuildDashboardAsync(new ManagementDashboardFilter(), true, cancellationToken);
+
+    private async Task<ManagementDashboardSnapshot> BuildDashboardAsync(
+        ManagementDashboardFilter filter, bool strictStorage,
+        CancellationToken cancellationToken)
     {
-        if (cache is null)
-            return await GetDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
-
-        if (cache.TryGetValue(DefaultDashboardCacheKey, out ManagementDashboardSnapshot? cached) && cached is not null)
-            return cached;
-
-        // Only one request performs the expensive location/storage scan at a time.
-        SemaphoreSlim refresh = RefreshLocks.GetValue(cache, static _ => new SemaphoreSlim(1, 1));
-        await refresh.WaitAsync(cancellationToken);
-        try
-        {
-            if (cache.TryGetValue(DefaultDashboardCacheKey, out cached) && cached is not null)
-                return cached;
-            ManagementDashboardSnapshot result = await GetDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
-            cache.Set(DefaultDashboardCacheKey, result, TimeSpan.FromSeconds(45));
-            return result;
-        }
-        finally
-        {
-            refresh.Release();
-        }
-    }
-
-    public async Task<ManagementDashboardSnapshot> GetDashboardAsync(
-        ManagementDashboardFilter filter,
-        CancellationToken cancellationToken = default)
-    {
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        List<ManagementRequestRow> rows = await LoadRowsAsync(now, filter, cancellationToken);
+        DateTimeOffset now = clock.GetUtcNow();
+        List<ManagementRequestRow> rows = await LoadRowsAsync(now, filter, cancellationToken, strictStorage);
         Guid[] scopedRequestIds = rows.Select(row => row.Id).ToArray();
         List<LifecycleTiming> timings = await LoadLifecycleTimingsAsync(scopedRequestIds, cancellationToken);
 
@@ -208,7 +184,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         ManagementRequestFilter filter,
         CancellationToken cancellationToken = default)
     {
-        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = clock.GetUtcNow();
         ManagementDashboardFilter dashboardFilter = new(
             filter.OrganizationId,
             filter.RequestId,
@@ -240,7 +216,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         ManagementDeliveryFilter filter,
         CancellationToken cancellationToken = default)
     {
-        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = clock.GetUtcNow();
         IReadOnlyList<ManagementRequestRow> requests = await LoadRowsAsync(
             now,
             new ManagementDashboardFilter(),
@@ -314,7 +290,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
     private async Task<List<ManagementRequestRow>> LoadRowsAsync(
         DateTimeOffset now,
         ManagementDashboardFilter filter,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool strictStorage=false)
     {
         var query =
             from request in dbContext.AssistanceRequests.AsNoTracking()
@@ -369,7 +345,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         await Parallel.ForEachAsync(baseRows, new ParallelOptions { MaxDegreeOfParallelism = Math.Clamp(options.LocationReadConcurrency, 1, 32), CancellationToken = cancellationToken },
             async (row, token) =>
             {
-                RequestLocationSnapshot? location = await ReadLocationSafeAsync(row.Id, token)
+                RequestLocationSnapshot? location = await ReadLocationSafeAsync(row.Id, token, strictStorage)
                     ?? RequestLocationService.ResolveExisting(row.Id, row.Location);
                 if (location is not null) geo[row.Id] = location;
             });
@@ -409,13 +385,13 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         }).ToList();
     }
 
-    private async Task<RequestLocationSnapshot?> ReadLocationSafeAsync(Guid requestId, CancellationToken cancellationToken)
+    private async Task<RequestLocationSnapshot?> ReadLocationSafeAsync(Guid requestId, CancellationToken cancellationToken, bool strictStorage)
     {
         try
         {
             return await RequestLocationStorage.ReadAsync(storage, requestId, cancellationToken);
         }
-        catch (StorageException)
+        catch (StorageException) when (!strictStorage)
         {
             return null;
         }

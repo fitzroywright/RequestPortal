@@ -28,7 +28,7 @@ public sealed class ExternalReviewerInvitation
         if (expiresUtc <= createdUtc) throw new ArgumentException("Reviewer access must expire after it is created.", nameof(expiresUtc));
 
         Id = id;
-        Email = email.Trim().ToLowerInvariant();
+        Email = email.Trim();
         DisplayName = displayName.Trim();
         Scope = scope.Trim();
         TokenHash = tokenHash;

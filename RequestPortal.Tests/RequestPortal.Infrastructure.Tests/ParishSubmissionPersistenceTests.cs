@@ -95,7 +95,7 @@ public sealed class ParishSubmissionPersistenceTests
         Assert.Equal(first.ApplicationId, link.ExternalReference);
         Assert.Equal(first.ApplicationNumber, link.ApplicationNumber);
         // Submission, Client Relations email and applicant confirmation are each queued once.
-        Assert.Equal(3, await database.Db.OutboxMessages.CountAsync(token));
+        Assert.Equal(3, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
         Assert.Equal("Kingston", (await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token)).Parish);
     }
 

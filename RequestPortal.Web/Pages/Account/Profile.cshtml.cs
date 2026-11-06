@@ -1,3 +1,4 @@
+using RequestPortal.Common.Contacts;
 using RequestPortal.Application.Requests;
 using System.ComponentModel.DataAnnotations;
 using Common.Storage;
@@ -91,6 +92,7 @@ public sealed class ProfileModel : PageModel
     {
         ApplicationUser user = await GetUserAsync();
         KeepValidationFor(nameof(ProfileInput));
+        InputContactNormalization.Apply(ProfileInput,ModelState,nameof(ProfileInput));
 
         {
             try { ProfileIntakeChoices.NormalizePrograms(ProfileInput.AssistancePrograms); }
@@ -277,6 +279,9 @@ public sealed class ProfileModel : PageModel
 
     public async Task<IActionResult> OnPostPreferenceAsync()
     {
+        try {Preference.Destination=RequestPortal.Infrastructure.Notifications.NotificationPreferenceService.NormalizeDestination(Preference.Channel,Preference.Destination);}
+        catch(ArgumentException error) {ModelState.AddModelError("Preference.Destination",error.Message);}
+
         ApplicationUser user = await GetUserAsync();
         KeepValidationFor(nameof(Preference));
         LoadAvailability();
@@ -366,7 +371,7 @@ public sealed class ProfileModel : PageModel
                 VictimCircumstances = ProfileIntakeChoices.Parse(user.VictimCircumstances, ';'),
                 DisplayName = user.DisplayName,
                 Email = user.Email ?? string.Empty,
-                PhoneNumber = user.PhoneNumber,
+                PhoneNumber = ApplicantTelephone.Display(user.PhoneNumber),
                 DateOfBirth = user.DateOfBirth,
                 Gender = user.Gender ?? string.Empty,
                 NationalIdTrn = user.NationalIdTrn ?? string.Empty,
@@ -376,7 +381,7 @@ public sealed class ProfileModel : PageModel
                 Town = user.Town ?? string.Empty,
                 Parish = user.Parish ?? string.Empty,
                 DistrictArea = user.DistrictArea ?? string.Empty,
-                AlternativePhoneNumber = user.AlternativePhoneNumber,
+                AlternativePhoneNumber = ApplicantTelephone.Display(user.AlternativePhoneNumber),
                 EmploymentStatus = user.EmploymentStatus ?? string.Empty,
                 EmployerInstitution = user.EmployerInstitution,
                 MonthlyHouseholdIncome = user.MonthlyHouseholdIncome,
@@ -466,10 +471,10 @@ public sealed class ProfileModel : PageModel
         [Required, StringLength(250, MinimumLength = 2)]
         public string DisplayName { get; set; } = string.Empty;
 
-        [Required, EmailAddress, StringLength(320)]
+        [Required, ContactEmail, StringLength(320)]
         public string Email { get; set; } = string.Empty;
 
-        [Required, Phone, StringLength(100)]
+        [Required, ContactTelephone, StringLength(100)]
         public string? PhoneNumber { get; set; }
 
         [Required]
@@ -499,7 +504,7 @@ public sealed class ProfileModel : PageModel
         [Required, StringLength(200)]
         public string DistrictArea { get; set; } = string.Empty;
 
-        [Phone, StringLength(100)]
+        [ContactTelephone, StringLength(100)]
         public string? AlternativePhoneNumber { get; set; }
 
         [Required, StringLength(100)]

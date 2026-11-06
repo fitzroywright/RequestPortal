@@ -65,6 +65,7 @@ public sealed class ReviewModel : PageModel
         User.HasClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ReviewRequests);
 
     [BindProperty]
+    [RequestPortal.Common.Contacts.ContactEmail]
     public string? ConversionEmail { get; set; }
 
     [BindProperty(SupportsGet = true)]
@@ -87,6 +88,8 @@ public sealed class ReviewModel : PageModel
             return await LoadPageAsync(staffUser, id);
         }
 
+        RequestPortal.Common.Contacts.InputContactNormalization.Apply(this,ModelState);
+        if(!ModelState.IsValid)return await LoadPageAsync(staffUser,id);
         ApplicationUser? individual = await userManager.FindByEmailAsync(ConversionEmail.Trim());
         if (individual is null || individual.IsInternalStaff)
         {

@@ -1,3 +1,4 @@
+using RequestPortal.Common.Contacts;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -37,6 +38,7 @@ public sealed class ReviewersModel : PageModel
         Array.Empty<ReviewerInvitationRow>();
 
     [BindProperty]
+    [ContactEmail]
     public string Email { get; set; } = string.Empty;
 
     [BindProperty]
@@ -64,6 +66,7 @@ public sealed class ReviewersModel : PageModel
 
     public async Task<IActionResult> OnPostInviteAsync()
     {
+        InputContactNormalization.Apply(this,ModelState);
         Guid staffUserId = GetActorId();
         int hours = Math.Clamp(ExpiresInHours, 1, 168);
         DateTimeOffset? fromUtc = FromDate.HasValue

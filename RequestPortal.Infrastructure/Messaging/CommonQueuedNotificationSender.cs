@@ -26,6 +26,13 @@ public sealed class CommonQueuedNotificationSender : RequestPortal.Common.Messag
         ArgumentNullException.ThrowIfNull(notification);
         ArgumentException.ThrowIfNullOrWhiteSpace(notification.Recipient);
 
+        if(notification.Transport==NotificationTransport.Email)
+        {
+            notification=notification with {Recipient=RequestPortal.Common.Contacts.ContactEmail.Normalize(notification.Recipient)
+                ?? throw new ArgumentException("Email recipient is required.")};
+            if(notification.Subject.Any(char.IsControl))throw new ArgumentException("Email subject contains control characters.");
+        }
+
         bool graphEmailEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
         MessageChannel channel = notification.Transport switch
         {

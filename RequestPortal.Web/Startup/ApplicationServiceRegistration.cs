@@ -142,11 +142,12 @@ internal static class ApplicationServiceRegistration
                 builder.Configuration.GetSection(
                     ManagementDashboardOptions.SectionName));
 
-        // Cache the expensive Management Dashboard snapshot briefly across requests.
-        builder.Services.AddMemoryCache();
+        builder.Services.AddScoped<ManagementDashboardService>();
+        builder.Services.AddScoped<ManagementDashboardAggregateRefresher>();
+        builder.Services.AddHostedService<RequestPortal.Web.Services.ManagementDashboardAggregateWorker>();
         builder.Services.AddScoped<
             IManagementDashboardService
-            , ManagementDashboardService>();
+            , PersistentManagementDashboardService>();
 
         builder.Services.AddScoped<
             IRequestLocationService

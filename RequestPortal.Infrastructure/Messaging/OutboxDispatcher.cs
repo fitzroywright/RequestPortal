@@ -65,7 +65,8 @@ public sealed class OutboxDispatcher
         List<OutboxMessage> candidates = await dbContext.OutboxMessages
             .Where(message => message.ProcessedUtc == null && !message.IsTerminal && message.AttemptCount < MaxAttempts &&
                 (message.NextAttemptUtc == null || message.NextAttemptUtc <= now) &&
-                message.MessageType != QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType)
+                message.MessageType != QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType &&
+                message.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType)
             .OrderBy(message => message.OccurredUtc)
             .Take(Math.Max(batchSize * 4, batchSize))
             .ToListAsync(cancellationToken);
