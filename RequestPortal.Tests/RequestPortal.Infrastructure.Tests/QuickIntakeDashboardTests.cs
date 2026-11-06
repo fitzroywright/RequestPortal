@@ -80,13 +80,16 @@ public sealed class QuickIntakeDashboardTests
         var result=await Service(db).GetAsync(Range,ct);Assert.Equal(5,result.Ages.Items.Single(c=>c.Name==expected).Count);
     }
     [Fact]
-    public async Task SmallSensitiveGroupsWithholdWholeDimensionAndCannotLeakThroughInsights()
+    public async Task SmallGroupsRemainVisibleInAuthorizedDashboardAggregates()
     {
         var ct=TestContext.Current.CancellationToken;await using var db=await PostgreSqlTestDatabase.CreateAsync(ct);
         db.Db.QuickIntakes.AddRange(Enumerable.Range(0,6).Select(i=>Intake(i,gender:i==0?"Female":"Male",employment:i==0?"Student":"Employed",income:i==0?0:50000,dob:i==0?new(2000,1,1):new(1990,1,1))));await db.Db.SaveChangesAsync(ct);
         var result=await Service(db).GetAsync(Range,ct);
-        foreach(var dimension in new[]{result.Gender,result.Employment,result.Income,result.Ages}) {Assert.True(dimension.Suppressed);Assert.All(dimension.Items,c=>{Assert.Null(c.Count);Assert.Null(c.Percent);});}
-        Assert.DoesNotContain(result.Insights,s=>s.Contains("Female")||s.Contains("83.3")||s.Contains("no income"));
+        foreach(var dimension in new[]{result.Gender,result.Employment,result.Income,result.Ages}) {Assert.False(dimension.Suppressed);Assert.Equal(6,dimension.Items.Sum(c=>c.Count));}
+        Assert.Equal(1,result.Gender.Items.Single(c=>c.Name=="Female").Count);
+        Assert.Equal(1,result.Employment.Items.Single(c=>c.Name=="Student").Count);
+        Assert.Equal(1,result.Income.Items.Single(c=>c.Name=="No income").Count);
+        Assert.Equal(1,result.Ages.Items.Single(c=>c.Name=="25–34").Count);
     }
     [Fact]
     public async Task LegacyBackfillDefaultsDoNotBecomeFoodUnemployedOrNoIncomeStatistics()
