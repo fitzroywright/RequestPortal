@@ -111,6 +111,13 @@ def run_reader(arguments, env):
     return report
 
 
+def backup_client_major(server_major):
+    if type(server_major) is not int or not 13 <= server_major <= 18:
+        raise RuntimeError('Unsupported PostgreSQL server major version.')
+    # Client 17 is available in Kratos's existing trusted Debian repositories and can dump server 13.
+    return max(17, server_major)
+
+
 def main():
     if len(sys.argv) != 1 or os.geteuid() != 0 or socket.gethostname().split('.')[0] != 'kratos':
         raise RuntimeError('Run the installed no-argument administrator command on Kratos.')
@@ -118,9 +125,7 @@ def main():
     validate_bundle()
     env = service_environment()
     preflight = run_reader(['database-preflight'], env)
-    major = preflight['source']['major']
-    if type(major) is not int or not 14 <= major <= 18:
-        raise RuntimeError('Unsupported PostgreSQL client major version.')
+    major = backup_client_major(preflight['source']['major'])
     client = Path('/usr/lib/postgresql', str(major), 'bin', 'pg_dump')
     if not client.is_file():
         result = subprocess.run(['/usr/bin/apt-get', 'install', '-y', '--no-install-recommends', 'postgresql-client-' + str(major)],

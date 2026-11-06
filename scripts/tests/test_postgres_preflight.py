@@ -14,6 +14,13 @@ runner=module('Run-RequestPortalPostgresPreflight-Kratos')
 verify=module('Verify-RequestPortalPostgresBackup')
 
 class PreflightTests(unittest.TestCase):
+    def test_postgres13_uses_available_newer_client_and_never_an_older_client(self):
+        for source in range(13, 19):
+            self.assertEqual(max(17, source), runner.backup_client_major(source))
+            self.assertGreaterEqual(runner.backup_client_major(source), source)
+    def test_client_selection_rejects_unknown_or_untyped_server_versions(self):
+        for source in (12, 19, '13', True, None):
+            with self.assertRaises(RuntimeError): runner.backup_client_major(source)
     def test_manifest_rejects_tampered_and_extra_dependencies(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);binary=root/'RequestPortal.IntegrationAudit.dll';binary.write_bytes(b'reviewed')

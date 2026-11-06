@@ -56,7 +56,7 @@ internal static class PostgresDeploymentPreflight
             await reader.ReadAsync(ct);source=new(settings.Host!,endpoint,reader.IsDBNull(0)?null:reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.GetInt32(3),reader.GetBoolean(4));
         }
         // inet_server_addr describes the backend side of this connection, not necessarily the client-facing endpoint.
-        if(source.Database!="requestportal" || source.Recovery || source.Major is <14 or >18)
+        if(source.Database!="requestportal" || source.Recovery || source.Major is <13 or >18)
             throw Stop("PG_ACTUAL_TARGET_GUARD",new {source.Address,source.Database,source.Major,source.Recovery});
         Stage="migration-history";
         var migrations=new List<string>();
@@ -96,8 +96,11 @@ internal static class PostgresDeploymentPreflight
             await using var command=new NpgsqlCommand("SELECT COUNT(*) FROM "+quote.QuoteIdentifier(name.Schema)+"."+quote.QuoteIdentifier(name.Name),connection,transaction);
             counts.Add(new(name.Schema,name.Name,(long)(await command.ExecuteScalarAsync(ct))!));
         }
-        var start=new ProcessStartInfo($"/usr/lib/postgresql/{source.Major}/bin/pg_dump") {UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
-        foreach(var argument in new[]{"--format=custom","--no-password","--lock-wait-timeout=5s","--snapshot="+snapshot,"--file="+archive})start.ArgumentList.Add(argument);
+        // Debian 13 supplies client 17, which supports older servers including the verified production server 13.
+        // Never use a client older than the source server. The archive is verified on the isolated PostgreSQL 18 host.
+        int clientMajor=Math.Max(17,source.Major);
+        var start=new ProcessStartInfo($"/usr/lib/postgresql/{clientMajor}/bin/pg_dump") {UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
+        foreach(var argument in new[]{"--format=custom","--quote-all-identifiers","--no-password","--lock-wait-timeout=5s","--snapshot="+snapshot,"--file="+archive})start.ArgumentList.Add(argument);
         foreach(string key in start.Environment.Keys.Where(key=>key.StartsWith("PG",StringComparison.Ordinal)).ToArray())start.Environment.Remove(key);
         start.Environment["PGHOST"]=settings.Host;start.Environment["PGPORT"]=settings.Port.ToString(CultureInfo.InvariantCulture);
         start.Environment["PGDATABASE"]=settings.Database;start.Environment["PGUSER"]=settings.Username;
@@ -120,7 +123,7 @@ internal static class PostgresDeploymentPreflight
         await using var backupStream=File.OpenRead(archive);
         string sha=Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(backupStream,ct));
         await transaction.RollbackAsync(ct);
-        return new {readOnly=true,status="backup-created-awaiting-isolated-restore",source,migrations,privileges,tables=counts,archiveSha256=sha,archiveBytes=new FileInfo(archive).Length,observedUtc=DateTimeOffset.UtcNow};
+        return new {readOnly=true,status="backup-created-awaiting-isolated-restore",source,clientMajor,migrations,privileges,tables=counts,archiveSha256=sha,archiveBytes=new FileInfo(archive).Length,observedUtc=DateTimeOffset.UtcNow};
     }
     internal static async Task<object> VerifyDashboardAsync(ISecretProvider secrets,CancellationToken ct)
     {
