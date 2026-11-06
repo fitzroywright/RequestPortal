@@ -69,7 +69,7 @@
     chart('qi-gender', 'gender', 'doughnut', false, 'gender', ['#2e82ff', '#9951ff', '#c6bbff', '#cbd1db']);
     chart('qi-ages', 'ages', 'bar');
     const metrics = new Map(data.parishes.map(p => [p.name, p.count]));
-    const fills = ['#d8e9ff', '#a7d1ff', '#64a7ff', '#1565de', '#092e7f'];
+    const fills = ['#f2f8ff', '#dfedff', '#c5dfff', '#95c5f2', '#559ad8'];
     const color = count => fills[count >= 10 ? 4 : count >= 6 ? 3 : count >= 3 ? 2 : count >= 1 ? 1 : 0];
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
@@ -102,7 +102,7 @@
                 const center = name === 'Kingston' ? L.latLng(17.97, -76.79) : layer.getBounds().getCenter();
                 const offsets = { 'St. Andrew': [15, -5], 'St. Catherine': [-12, -5], 'Kingston': [3, 17], 'Manchester': [3, 8] };
                 const [dx, dy] = offsets[name] || [0, 0];
-                L.marker(center, { interactive: false, icon: L.divIcon({ html: element, className: `qi-map-label${count >= 6 ? ' qi-map-label-dark' : ''}`, iconSize: [75, 26], iconAnchor: [37 - dx, 13 - dy] }) }).addTo(labels);
+                L.marker(center, { interactive: false, icon: L.divIcon({ html: element, className: 'qi-map-label', iconSize: [75, 26], iconAnchor: [37 - dx, 13 - dy] }) }).addTo(labels);
             });
         };
         const legendControl = L.control({ position: 'bottomleft' });
