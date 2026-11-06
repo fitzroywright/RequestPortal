@@ -1,5 +1,6 @@
 using Common.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Management;
 using RequestPortal.Domain.Documents;
@@ -35,19 +36,45 @@ public sealed class ManagementDashboardService : IManagementDashboardService
     private readonly RequestPortalDbContext dbContext;
     private readonly IFileStorage storage;
     private readonly ManagementDashboardOptions options;
+    private readonly IMemoryCache? cache;
+    private static readonly SemaphoreSlim DashboardRefresh = new(1, 1);
+    private const string DefaultDashboardCacheKey = "ManagementDashboard:Default";
 
     public ManagementDashboardService(
         RequestPortalDbContext dbContext,
         IFileStorage storage,
-        IOptions<ManagementDashboardOptions> options)
+        IOptions<ManagementDashboardOptions> options,
+        IMemoryCache? cache = null)
     {
         this.dbContext = dbContext;
         this.storage = storage;
         this.options = options.Value;
+        this.cache = cache;
     }
 
-    public Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default) =>
-        GetDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
+    public async Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        if (cache is null)
+            return await GetDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
+
+        if (cache.TryGetValue(DefaultDashboardCacheKey, out ManagementDashboardSnapshot? cached) && cached is not null)
+            return cached;
+
+        // Only one request performs the expensive location/storage scan at a time.
+        await DashboardRefresh.WaitAsync(cancellationToken);
+        try
+        {
+            if (cache.TryGetValue(DefaultDashboardCacheKey, out cached) && cached is not null)
+                return cached;
+            ManagementDashboardSnapshot result = await GetDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
+            cache.Set(DefaultDashboardCacheKey, result, TimeSpan.FromSeconds(45));
+            return result;
+        }
+        finally
+        {
+            DashboardRefresh.Release();
+        }
+    }
 
     public async Task<ManagementDashboardSnapshot> GetDashboardAsync(
         ManagementDashboardFilter filter,
