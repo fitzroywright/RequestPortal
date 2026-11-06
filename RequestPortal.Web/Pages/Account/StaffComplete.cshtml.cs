@@ -33,15 +33,6 @@ public sealed class StaffCompleteModel : PageModel
             $"name={User.Identity?.Name}",
             HttpContext.RequestAborted);
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl);
-        bool canViewManagement = User.HasClaim(
-            StaffOidcOptions.PermissionClaim,
-            RequestPortalPermissions.ViewManagementDashboard);
-
-        if (canViewManagement)
-        {
-            return RedirectToPage("/Management/Index");
-        }
-
         return RedirectToPage("/Staff/Index");
     }
 }
