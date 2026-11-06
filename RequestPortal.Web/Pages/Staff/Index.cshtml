@@ -58,12 +58,13 @@
                                     <td>@request.OrganizationName</td>
                                     <td>@request.Summary</td>
                                     <td><span class="status">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(request.Status.ToString())</span></td>
+                                    <td class="staff-submitted-column">@(request.SubmittedUtc.HasValue ? request.SubmittedUtc.Value.ToString("dd MMM yyyy") : "—")</td>
                                     <td class="staff-age-column">@ageDays d</td>
                                 </tr>
                             }
                             @if (Model.SubmittedRequests.Count == 0)
                             {
-                                <tr><td colspan="6" class="workspace-empty">No requests match the current filters. Adjust or clear the filters above.</td></tr>
+                                <tr><td colspan="7" class="workspace-empty">No requests match the current filters. Adjust or clear the filters above.</td></tr>
                             }
                             </tbody>
                         </table>
@@ -192,5 +193,6 @@
 .staff-waiting-row strong,.staff-waiting-row span{overflow-wrap:anywhere}
 .staff-waiting-row small{color:var(--muted,#64748b)}
 .staff-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px}.staff-pagination form{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.staff-pagination nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.staff-pagination select{padding:6px}.staff-pagination [aria-disabled="true"]{color:#637083}
+.staff-submitted-column{width:122px;min-width:122px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .staff-age-column{width:96px;min-width:96px;white-space:nowrap}
 </style>
