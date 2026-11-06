@@ -6,7 +6,19 @@ using RequestPortal.Web.Configuration;
 using RequestPortal.Web.Startup;
 
 WebApplicationBuilder builder =
-    WebApplication.CreateBuilder(args.FirstOrDefault() is "provision-staff" or "inspect-staff-directory" or "verify-staff-directory" ? [] : args);
+    WebApplication.CreateBuilder(args.FirstOrDefault() is "provision-staff" or "inspect-staff-directory" or "verify-staff-directory" or "inspect-whatsapp-outbound" ? [] : args);
+
+if (args.FirstOrDefault() == "inspect-whatsapp-outbound")
+{
+    if (args.Length != 1)
+    {
+        Console.WriteLine("{\"status\":\"blocked-no-send\",\"phase\":\"arguments\"}");
+        Environment.ExitCode = 2;
+        return;
+    }
+    Environment.ExitCode = await RequestPortal.Web.Services.WhatsAppCommissioning.CommissioningCommand.InspectAsync(builder);
+    return;
+}
 
 if (args.Length == 1 && args[0] is "inspect-staff-directory" or "verify-staff-directory")
 {

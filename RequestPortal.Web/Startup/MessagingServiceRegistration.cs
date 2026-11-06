@@ -10,6 +10,13 @@ internal static class MessagingServiceRegistration
     public static void Add(WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<IWhatsAppWebhookStore, WhatsAppWebhookStore>();
+        builder.Services.AddScoped<RequestPortal.Web.Services.WhatsAppCommissioning.ICommissioningJournal,
+            RequestPortal.Web.Services.WhatsAppCommissioning.CommissioningJournal>();
+        builder.Services.AddScoped<RequestPortal.Web.Services.WhatsAppCommissioning.CommissioningService>();
+        builder.Services.AddHttpClient<RequestPortal.Web.Services.WhatsAppCommissioning.CommissioningGateway>(client =>
+            client.Timeout = TimeSpan.FromSeconds(25))
+            .RemoveAllLoggers()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
         builder.Services
             .AddOptions<NotificationOptions>()
             .Bind(
