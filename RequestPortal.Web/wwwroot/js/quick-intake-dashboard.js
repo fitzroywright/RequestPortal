@@ -45,7 +45,6 @@
         const canvas = document.getElementById(id);
         const container = root.querySelector(`[data-dimension="${dimension}"]`) || canvas.closest('.qi-doughnut-layout');
         const group = dimension === 'types' ? { items: data.requestTypes } : data[dimension];
-        if (group.suppressed) { empty(container, 'Withheld to protect groups smaller than 5.'); return; }
         if (!data.total) { empty(container, 'No Quick Intakes in this date range.'); return; }
         if (!window.Chart) { empty(container, 'Chart unavailable. Use the accessible data table below.'); return; }
         const items = group.items.filter(item => item.count > 0 || item.name !== "Not provided / unknown");
