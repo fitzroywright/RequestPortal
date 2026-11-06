@@ -11,7 +11,7 @@ public interface IManagementDashboardAggregateRefresher
     Task<bool> RefreshAsync(CancellationToken ct=default);
 }
 
-public sealed class ManagementDashboardAggregateRefresher(RequestPortalDbContext db, ManagementDashboardService calculator, TimeProvider? clock=null) : IManagementDashboardAggregateRefresher
+public sealed class ManagementDashboardAggregateRefresher(RequestPortalDbContext db, IManagementDashboardSnapshotBuilder calculator, TimeProvider? clock=null) : IManagementDashboardAggregateRefresher
 {
     public const string MessageType="RequestPortal.ManagementDashboardRefreshRequested.v1";
     // Transaction-scoped, cluster-wide mutex. Released on commit, rollback, connection loss or process death.

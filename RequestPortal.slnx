@@ -16,4 +16,5 @@
   <Project Path="../Common/Common.Messaging/Common.Messaging.Hosting/Common.Messaging.Hosting.csproj" />
   <Project Path="../Common/Common.Registration/Common.Registration.csproj" />
   <Project Path="RequestPortal.SecurityMigration/RequestPortal.SecurityMigration.csproj" />
+  <Project Path="tools/RequestPortal.StorageMigration/RequestPortal.StorageMigration.csproj" />
 </Solution>

@@ -8,7 +8,7 @@ namespace RequestPortal.Infrastructure.Management;
 public static class ManagementDashboardSourceVerification
 {
     public sealed record Evidence(int Requests, int Outstanding, int Completed, bool Reconciled,
-        string SchemaOwner, bool MigrationPrivileges, int DashboardTriggers, bool TriggerFunctionPresent);
+        string SchemaOwner, bool MigrationPrivileges, int DashboardTriggers, bool TriggerFunctionPresent, int ExpectedDashboardTriggers, bool TriggerSetValid);
 
     public static async Task<Evidence> ReadAsync(RequestPortalDbContext db,
         RequestPortal.Application.Management.ManagementDashboardSnapshot? snapshot, CancellationToken ct)
@@ -37,12 +37,26 @@ public static class ManagementDashboardSourceVerification
             WHERE n.nspname=current_schema() AND NOT t.tgisinternal AND t.tgenabled<>'D'
               AND t.tgname='requestportal_dashboard_refresh'
             """).SingleAsync(ct);
+        bool locations = await db.Database.SqlQueryRaw<bool>("SELECT to_regclass('request_locations') IS NOT NULL AS \"Value\"").SingleAsync(ct);
+        int expected = locations ? 11 : 10;
+        bool triggerSetValid = await db.Database.SqlQueryRaw<bool>("""
+            SELECT NOT EXISTS (
+              SELECT required.name FROM (VALUES ('assistance_requests'),('request_status_history'),('quick_intakes'),('documents'),
+                ('deliveries'),('delivery_returns'),('organizations'),('request_categories'),('program_classifications'),('integration_links'),
+                ('request_locations')) AS required(name)
+              WHERE (required.name<>'request_locations' OR to_regclass('request_locations') IS NOT NULL)
+                AND NOT EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+                  JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
+                  WHERE n.nspname=current_schema() AND c.relname=required.name
+                    AND t.tgname='requestportal_dashboard_refresh' AND t.tgenabled<>'D'
+                    AND p.proname='requestportal_queue_dashboard_refresh')) AS "Value"
+            """).SingleAsync(ct);
         bool function = await db.Database.SqlQueryRaw<bool>("""
             SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
               WHERE n.nspname=current_schema() AND p.proname='requestportal_queue_dashboard_refresh') AS "Value"
             """).SingleAsync(ct);
         return new(requests, outstanding, completed, snapshot is not null && requests == snapshot.Statuses.Sum(x => x.Count) &&
             outstanding == snapshot.Executive.Outstanding && completed == snapshot.Executive.Completed,
-            owner, privileges, triggers, function);
+            owner, privileges, triggers, function, expected, triggerSetValid);
     }
 }

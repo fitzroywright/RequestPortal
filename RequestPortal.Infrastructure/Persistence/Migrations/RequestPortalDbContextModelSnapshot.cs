@@ -2182,6 +2182,101 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 #pragma warning restore 612, 618
+            modelBuilder.Entity("RequestPortal.Infrastructure.Management.PersistedRequestLocation", b =>
+                {
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Community")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImportedSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ImportedStorageKey")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ImportedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("Latitude")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Parish")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Precision")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ResolvedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceText")
+                        .HasColumnType("text");
+
+                    b.HasKey("RequestId");
+
+                    b.ToTable("request_locations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_request_location_coordinates", "(\"Latitude\" IS NULL) = (\"Longitude\" IS NULL) AND (\"Latitude\" IS NULL OR \"Latitude\" BETWEEN -90 AND 90) AND (\"Longitude\" IS NULL OR \"Longitude\" BETWEEN -180 AND 180)");
+
+                            t.HasCheckConstraint("CK_request_location_parish", "length(btrim(\"Parish\")) > 0");
+
+                            t.HasCheckConstraint("CK_request_location_precision", "\"Precision\" BETWEEN 0 AND 3");
+                        });
+                });
+
+            modelBuilder.Entity("RequestPortal.Infrastructure.Management.PersistedRequestLocation", b =>
+                {
+                    b.HasOne("RequestPortal.Domain.Requests.AssistanceRequest", null)
+                        .WithOne()
+                        .HasForeignKey("RequestPortal.Infrastructure.Management.PersistedRequestLocation", "RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RequestPortal.Infrastructure.Management.RequestLocationImportState", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AuthorizedPlanSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("DerivedLocations")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ImportedLocations")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReferenceFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SourceFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("VerifiedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("request_location_import_state", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_request_location_import_singleton", "\"Id\" = 1");
+                        });
+                });
         }
     }
 }

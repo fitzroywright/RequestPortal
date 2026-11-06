@@ -1,0 +1,20 @@
+# Render only from verified mount/layout evidence and an explicitly authorized cutover plan.
+# No group membership, shared-mount mode, Bridge configuration, or FFP Manager directory permission is changed.
+[Unit]
+RequiresMountsFor=/mnt/ffpmanager-data
+After=mnt-ffpmanager\x2ddata.mount
+BindsTo=mnt-ffpmanager\x2ddata.mount
+ConditionPathIsMountPoint=/mnt/ffpmanager-data
+
+[Service]
+User=aegis-requestportal
+Group=aegis-requestportal
+SupplementaryGroups=aegis-ffpmanager-bridge
+BindPaths="__VERIFIED_REQUESTPORTAL_FILES_ROOT__:/var/lib/aegis/requestportal/supporting-documents"
+InaccessiblePaths=/mnt/ffpmanager-data
+NoExecPaths=/var/lib/aegis/requestportal/supporting-documents
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictNamespaces=yes
+UMask=0077

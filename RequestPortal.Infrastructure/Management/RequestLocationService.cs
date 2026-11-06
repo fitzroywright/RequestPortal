@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Common.Storage;
+using Microsoft.EntityFrameworkCore;
 using RequestPortal.Application.Management;
 
 namespace RequestPortal.Infrastructure.Management;
@@ -82,16 +83,11 @@ public sealed class RequestLocationService : IRequestLocationService
         new("St. Catherine", 18.0000m, -77.0000m, ["st catherine", "st. catherine", "saint catherine"])
     ];
 
-    private readonly IFileStorage storage;
-    private readonly RequestPortal.Infrastructure.Persistence.RequestPortalDbContext? db;
+    private readonly RequestPortal.Infrastructure.Persistence.RequestPortalDbContext db;
 
-    public RequestLocationService(IFileStorage storage, RequestPortal.Infrastructure.Persistence.RequestPortalDbContext? db=null)
-    {
-        this.db=db;
-        this.storage = storage;
-    }
+    public RequestLocationService(RequestPortal.Infrastructure.Persistence.RequestPortalDbContext db) => this.db = db;
 
-    internal static RequestLocationSnapshot? ResolveExisting(Guid requestId, string? locationText)
+    public static RequestLocationSnapshot? ResolveExisting(Guid requestId, string? locationText)
     {
         if (requestId == Guid.Empty || string.IsNullOrWhiteSpace(locationText)) return null;
         ResolvedLocation? resolved = Resolve(locationText, null, null);
@@ -130,34 +126,11 @@ public sealed class RequestLocationService : IRequestLocationService
             resolved.Precision,
             DateTimeOffset.UtcNow);
 
-        byte[] payload = RequestLocationStorage.Serialize(snapshot);
-        await using MemoryStream stream = new(payload, writable: false);
-        Dictionary<string, string> metadata = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["RequestId"] = requestId.ToString("D"),
-            ["Parish"] = snapshot.Parish,
-            ["Precision"] = snapshot.Precision.ToString()
-        };
-        if (!string.IsNullOrWhiteSpace(snapshot.Community)) metadata["Community"] = snapshot.Community;
-
-        await storage.StoreAsync(
-            new StorageWriteRequest(
-                RequestLocationStorage.Key(requestId),
-                stream,
-                "application/json",
-                "resolved-location.json",
-                "RequestPortal.LocationResolver",
-                metadata,
-                MaximumBytes: 32 * 1024),
-            cancellationToken);
-
-        if(db is not null)
-        {
-            db.OutboxMessages.Add(new RequestPortal.Infrastructure.Persistence.OutboxMessage {
-                Id=Guid.NewGuid(),MessageType=ManagementDashboardAggregateRefresher.MessageType,
-                Payload="{}",OccurredUtc=DateTimeOffset.UtcNow,RequestId=requestId });
-            await db.SaveChangesAsync(cancellationToken);
-        }
+        var row = await db.RequestLocations.SingleOrDefaultAsync(x => x.RequestId == requestId, cancellationToken);
+        if (row is null) { row = new PersistedRequestLocation(); db.RequestLocations.Add(row); }
+        row.Apply(snapshot);
+        // The PostgreSQL statement trigger appends the dashboard event in this same transaction.
+        await db.SaveChangesAsync(cancellationToken);
         return snapshot;
     }
 
