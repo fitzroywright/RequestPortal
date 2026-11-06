@@ -64,6 +64,7 @@
         if (legendKey) legend(legendKey, items, colors);
     }
     chart('qi-types', 'types', 'doughnut', false, 'types');
+    chart('qi-children-under-18', 'childrenUnder18', 'bar', true);
     chart('qi-employment', 'employment', 'bar', true);
     chart('qi-income', 'income', 'bar', true);
     chart('qi-gender', 'gender', 'doughnut', false, 'gender', ['#2e82ff', '#9951ff', '#c6bbff', '#cbd1db']);
