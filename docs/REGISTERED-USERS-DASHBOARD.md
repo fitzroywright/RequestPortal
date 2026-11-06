@@ -10,7 +10,7 @@ Exact order:
 2. Registered Users — `/Management/RegisteredUsers`
 3. Management — `/Management`
 4. Requests — `/Staff/Reports`
-5. Reviewers — `/Staff/Reviewers`
+5. Invite Reviewers — `/Staff/Reviewers`
 
 Both Reports and Admin dropdowns close on an outside click, when another dropdown opens, or with Escape. The existing Management Dashboard and Requests reports implementations are untouched.
 
