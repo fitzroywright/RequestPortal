@@ -18,7 +18,7 @@ That command accepts no arguments and only runs on Kratos. It:
    drops to its existing aegis identity and resolves the existing PostgreSQL secret.
 3. Verifies axios.fftpj.local, 10.10.0.226, requestportal, primary-server status,
    migration history and the privileges required by the additive migration.
-4. Installs only the matching PostgreSQL client package if absent, using existing
+4. Installs only a compatible PostgreSQL client package if absent, using existing
    trusted APT repositories. It installs no database server and changes no SSH trust.
 5. Exports a read-only repeatable-read snapshot, records table counts and migration
    history, and runs pg_dump against that same snapshot. This makes verification
@@ -84,3 +84,14 @@ The isolated verifier checks the approved endpoint and records backend metadata
 without incorrectly requiring both addresses to be equal. PostgreSQL documents
 that function as the address on which the backend accepted its connection:
 https://www.postgresql.org/docs/16/functions-info.html.
+
+The live preflight identified PostgreSQL 13 on the approved primary. The version
+guard accepts 13–18; it does not require or perform a database upgrade. Kratos's
+existing Debian 13 repositories provide client 17, so source versions 13–17 use
+that client and source 18 uses client 18. The C# backup process and Python package
+selection use the same rule. The archive records both server and client versions
+and quotes all identifiers. PostgreSQL documents newer clients dumping older
+servers: https://www.postgresql.org/docs/17/app-pgdump.html#APP-PGDUMP-NOTES.
+The isolated restore is verified on PostgreSQL 18, not claimed as a same-version
+13 recovery test; PostgreSQL does not guarantee loading a newer client's output
+into an older server. No production server upgrade is part of this deployment.
