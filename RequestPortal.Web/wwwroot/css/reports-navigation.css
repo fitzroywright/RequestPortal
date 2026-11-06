@@ -1,0 +1,42 @@
+.authenticated-app .app-main-nav .staff-admin-menu-panel {
+    padding: 7px;
+    border: 1px solid #d8e2ee;
+    border-radius: 10px;
+    background: #fff;
+    color: #172a44;
+    box-shadow: 0 16px 38px rgba(13,36,64,.18);
+    min-width: 240px;
+}
+.authenticated-app .app-main-nav .staff-admin-menu > summary {
+    gap: 7px; border-radius: 7px; transition: background-color .15s ease;
+}
+.authenticated-app .app-main-nav .staff-admin-menu > summary:hover,
+.authenticated-app .app-main-nav .staff-admin-menu[open] > summary {
+    background: rgba(255,255,255,.16);
+}
+.authenticated-app .app-main-nav .staff-admin-menu-panel a {
+    display: flex; gap: 10px; align-items: center;
+    font-size: 13px; font-weight: 600; line-height: 1.4;
+    padding: 10px 11px; border-radius: 7px;
+    color: #1c344f; text-decoration: none;
+}
+.authenticated-app .app-main-nav .staff-admin-menu-panel a:hover,
+.authenticated-app .app-main-nav .staff-admin-menu-panel a:focus-visible {
+    background: #eaf3ff; color: #0a56b5;
+}
+.authenticated-app .app-main-nav .staff-admin-menu-panel a[aria-current="page"] {
+    background: #dcecff; color: #084ca9;
+}
+.authenticated-app .app-main-nav .staff-admin-menu-panel a .rp-report-icon {
+    display: inline-grid; flex: 0 0 21px; width: 21px; height: 21px;
+    place-items: center; font-size: 17px; font-weight: 600; color: #3175b8;
+}
+.authenticated-app .app-main-nav .staff-admin-menu-panel a:focus-visible,
+.authenticated-app .app-main-nav .staff-admin-menu > summary:focus-visible {
+    outline: 2px solid #f4b957; outline-offset: 2px;
+}
+@media(max-width:800px) {
+    .authenticated-app .app-main-nav .staff-admin-menu-panel{
+        max-width:calc(100vw - 24px);
+    }
+}
