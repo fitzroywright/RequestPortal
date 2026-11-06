@@ -72,8 +72,6 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
                 var noIncome = incomes.Items[0];
                 if (noIncome.Count > 0) insights.Add($"{noIncome.Percent:0.#}% report no income.");
             }
-            if (employment.Suppressed || gender.Suppressed || incomes.Suppressed || ageGroups.Suppressed)
-                insights.Add("Some demographic statistics are withheld to protect small groups.");
             if (insights.Count == 0) insights.Add("No sufficiently complete statistical observations are available.");
         }
         await transaction.CommitAsync(ct);
@@ -105,10 +103,8 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
     }
     private static QuickIntakeDistribution Protect(QuickIntakeCount[] items)
     {
-        // Withhold the entire sensitive dimension if any positive cell is <5.
-        // This also prevents reconstruction by subtracting visible cells from totals.
-        bool suppressed = items.Any(c => c.Count is > 0 and < 5);
-        return new(suppressed ? items.Select(c => c with { Count = null, Percent = null }).ToArray() : items, suppressed);
+        // Authorized staff reports show complete aggregates, including small groups.
+        return new(items, false);
     }
     private static void AddLargest(List<string> insights, QuickIntakeDistribution data, string label, string[] exclude)
     {
