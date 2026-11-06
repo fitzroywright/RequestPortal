@@ -57,6 +57,7 @@
     }
     <link rel="stylesheet" href="~/css/operational-workspace.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/application-shell.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/reports-navigation.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="@(useApplicationShell ? "authenticated-app" : "public-site") @ViewData["BodyClass"]">
@@ -106,13 +107,15 @@
                                 <div class="staff-admin-menu-panel">
                                     @if (canViewManagement)
                                     {
-                                        <a asp-page="/Management/QuickIntakeDashboard">Quick Intake Dashboard</a>
-                                        <a asp-page="/Management/Index">Management Dashboard</a>
+                                        <a asp-page="/Management/QuickIntakeDashboard" aria-current="@(currentPage == "/Management/QuickIntakeDashboard" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">▤</span>Quick Intakes</a>
+                                        <a asp-page="/Management/RegisteredUsers" aria-current="@(currentPage == "/Management/RegisteredUsers" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">♧</span>Registered Users</a>
+                                        <a asp-page="/Management/Index" aria-current="@(currentPage == "/Management/Index" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">▥</span>Management</a>
                                     }
-                                    <a asp-page="/Staff/Reports">Request Reports</a>
+                                    <a asp-page="/Staff/Reports" aria-current="@(currentPage == "/Staff/Reports" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">▣</span>Requests</a>
+                                    <div class="rp-report-divider" role="separator" aria-hidden="true"></div>
+                                    <a asp-page="/Staff/Reviewers" aria-current="@(currentPage == "/Staff/Reviewers" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">♙</span>Invite Reviewers</a>
                                 </div>
                             </details>
-                            <a asp-page="/Staff/Reviewers">Reviewers</a>
                             <details class="staff-admin-menu">
                                 <summary aria-label="Administration menu">Admin <span aria-hidden="true">▾</span></summary>
                                 <div class="staff-admin-menu-panel">
@@ -255,6 +258,26 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
         <script src="~/js/messages.js" asp-append-version="true"></script>
     }
+    <script>
+    (() => {
+        const menus = [...document.querySelectorAll(".staff-admin-menu")];
+        const closeAll = except => {
+            for (const menu of menus) if (menu !== except) menu.open = false;
+        };
+        menus.forEach(menu => {
+            menu.addEventListener("toggle", () => { if (menu.open) closeAll(menu); });
+        });
+        document.addEventListener("pointerdown", event => {
+            if (!event.target.closest(".staff-admin-menu")) closeAll();
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key !== "Escape") return;
+            const open = menus.find(menu => menu.open);
+            closeAll();
+            if (open) { event.preventDefault(); open.querySelector("summary")?.focus(); }
+        });
+    })();
+    </script>
     <script>
     (() => {
         const trigger = document.querySelector("[data-profile-menu-trigger]");
