@@ -116,20 +116,21 @@
                                     <a asp-page="/Staff/Reviewers" aria-current="@(currentPage == "/Staff/Reviewers" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">♙</span>Invite Reviewers</a>
                                 </div>
                             </details>
-                            <details class="staff-admin-menu">
+                            <details class="staff-admin-menu admin-menu">
                                 <summary aria-label="Administration menu">Admin <span aria-hidden="true">▾</span></summary>
-                                <div class="staff-admin-menu-panel">
+                                <div class="staff-admin-menu-panel admin-menu-panel">
                                     @if (User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.PermissionClaim, RequestPortal.Infrastructure.Security.RequestPortalPermissions.ManageSecurity))
                                     {
-                                        <a asp-page="/Administration/Staff">Staff &amp; Roles</a>
-                                        <a asp-page="/Administration/ApplicantAccounts">Accounts and Identity</a>
-                                        <a asp-page="/Administration/NotificationRouting">Notification Routing</a>
+                                        <a asp-page="/Administration/Staff" aria-current="@(currentPage == "/Administration/Staff" ? "page" : null)"><span class="rp-admin-icon" aria-hidden="true">♙</span>Staff &amp; Roles</a>
+                                        <a asp-page="/Administration/ApplicantAccounts" aria-current="@(currentPage == "/Administration/ApplicantAccounts" ? "page" : null)"><span class="rp-admin-icon" aria-hidden="true">♧</span>Accounts and Identity</a>
+                                        <a asp-page="/Administration/NotificationRouting" aria-current="@(currentPage == "/Administration/NotificationRouting" ? "page" : null)"><span class="rp-admin-icon" aria-hidden="true">✉</span>Notification Routing</a>
                                         @if ((await NavigationAuthorization.AuthorizeAsync(User, null, RequestPortal.Web.Security.WhatsAppSettingsAdministratorRequirement.Policy)).Succeeded)
                                         {
-                                            <a asp-page="/Administration/WhatsAppSettings">WhatsApp Settings</a>
+                                            <a asp-page="/Administration/WhatsAppSettings" aria-current="@(currentPage == "/Administration/WhatsAppSettings" ? "page" : null)"><span class="rp-admin-icon" aria-hidden="true">◉</span>WhatsApp Settings</a>
                                         }
+                                        <div class="rp-admin-divider" role="separator" aria-hidden="true"></div>
                                     }
-                                    <a asp-page="/Staff/Integrations">Integrations</a>
+                                    <a asp-page="/Staff/Integrations" aria-current="@(currentPage == "/Staff/Integrations" ? "page" : null)"><span class="rp-admin-icon" aria-hidden="true">⇄</span>Integrations</a>
                                 </div>
                             </details>
                         }
