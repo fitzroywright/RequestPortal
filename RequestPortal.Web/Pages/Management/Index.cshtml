@@ -5,7 +5,15 @@
 @using System.Globalization
 @{
     ViewData["Title"] = "Management Dashboard";
+    if (Model.IsInitializing)
+    {
+        <div class="shell"><h1>Management Dashboard</h1>
+            <p role="status">The dashboard is initializing. Please check again shortly. Other Request Portal pages remain available.</p>
+        </div>
+        return;
+    }
     var dashboard = Model.Dashboard;
+    var lastUpdated = dashboard.LastUpdatedUtc ?? dashboard.GeneratedUtc;
     int maxStatus = Math.Max(1, dashboard.Statuses.Select(item => item.Count).DefaultIfEmpty().Max());
     var unknown = dashboard.Parishes.FirstOrDefault(item => item.Parish == JamaicaParishes.Unknown);
     var clientData = new {
@@ -25,8 +33,8 @@
     <header class="mg-heading">
         <div><div class="eyebrow">FFP JAMAICA MANAGEMENT</div><h1>Management Dashboard</h1>
             <p>Operational overview of assistance requests, processing, delivery, and geographic reach.</p></div>
-        <div class="mg-refresh"><span>Last successful refresh</span><time datetime="@dashboard.GeneratedUtc.ToString("O")">@dashboard.GeneratedUtc.ToLocalTime().ToString("g")</time>
-            @if (dashboard.RefreshStatus == "Failed" || dashboard.GeneratedUtc < DateTimeOffset.UtcNow.AddMinutes(-2))
+        <div class="mg-refresh"><span>Last successful refresh</span><time datetime="@lastUpdated.ToString("O")">@lastUpdated.ToLocalTime().ToString("g")</time>
+            @if (dashboard.RefreshStatus == "Failed" || lastUpdated < DateTimeOffset.UtcNow.AddMinutes(-2))
             { <small role="status">Refresh delayed. Showing the last successful snapshot.</small> }
         </div>
     </header>

@@ -39,10 +39,20 @@ and LastReconciledUtc are persisted. The existing refresh display identifies the
 snapshot timestamp and warns if refresh failed or the data is older than two
 minutes. Retry delays or outages can increase staleness; this is shown, not hidden.
 
-Startup applies the migration and initializes/verifies a snapshot before the HTTP
-server starts. A valid previous snapshot survives refresh failure. First startup
-fails closed after 90 seconds if no verified snapshot can be built, allowing the
-existing deployment health/rollback procedure to restore application binaries.
+Startup still applies migrations and checks PostgreSQL before serving traffic.
+After Kestrel starts, the existing hosted worker initializes the aggregate using
+its ordinary advisory lock, publication transaction, persisted retry schedule and
+scheduled reconciliation. A valid previous snapshot remains readable during a
+rebuild or failure. Without a valid snapshot, the dashboard shows an initialization
+message; its request never performs a historical scan. Other pages remain available.
+
+The existing `/health` keeps its critical dependency checks and is independent of
+aggregate rebuilding. `/health/dashboard` exposes only operational metadata:
+initialized state, snapshot version/age, last successful refresh, refresh failure
+status and worker state. It returns 503 until a valid recent snapshot is available,
+and after refresh failure or worker shutdown. Database query errors propagate as
+failures; they are never converted to an initialization or healthy response.
+Neither endpoint triggers a rebuild.
 
 ## Input validation
 

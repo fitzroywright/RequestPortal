@@ -73,6 +73,95 @@ public sealed class ManagementDashboardAggregateTests(ITestOutputHelper output)
         public override DateTimeOffset GetUtcNow()=>Now;
     }
     [Fact]
+    public async Task OperatorSourceCountsCatalogChecksAndReadOnlyTransactionReconcile()
+    {
+        var ct=TestContext.Current.CancellationToken;await using var fixture=await PostgreSqlTestDatabase.CreateAsync(ct);await Seed(fixture,2);
+        var storage=(Storage)DispatchProxy.Create<IFileStorage,Storage>();
+        await Refresher(fixture,storage).RefreshAsync(ct);
+        var snapshot=await Reader(fixture,storage).GetDashboardAsync(ct);
+        await using var tx=await fixture.Db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead,ct);
+        await fixture.Db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY",ct);
+        var evidence=await ManagementDashboardSourceVerification.ReadAsync(fixture.Db,snapshot,ct);
+        Assert.True(evidence.Reconciled);Assert.Equal(2,evidence.Requests);Assert.Equal(2,evidence.Outstanding);
+        Assert.True(evidence.MigrationPrivileges);Assert.Equal(10,evidence.DashboardTriggers);Assert.True(evidence.TriggerFunctionPresent);
+        Assert.False(string.IsNullOrWhiteSpace(evidence.SchemaOwner));
+        var invalid=snapshot with {Executive=snapshot.Executive with {Outstanding=99}};
+        Assert.False((await ManagementDashboardSourceVerification.ReadAsync(fixture.Db,invalid,ct)).Reconciled);
+        await tx.RollbackAsync(ct);
+    }
+
+    [Fact]
+    public async Task ReadinessReportsSnapshotAgeFailureAndWorkerWithoutRebuilding()
+    {
+        var ct=TestContext.Current.CancellationToken;await using var fixture=await PostgreSqlTestDatabase.CreateAsync(ct);
+        var storage=(Storage)DispatchProxy.Create<IFileStorage,Storage>();
+        var state=new RequestPortal.Web.Services.ManagementDashboardWorkerState();
+        state.Set("Waiting",DateTimeOffset.UtcNow);
+        var empty=await RequestPortal.Web.Services.ManagementDashboardReadiness.ReadAsync(fixture.Db,state,ct);
+        Assert.False(empty.Ready);Assert.False(empty.AggregateInitialized);Assert.Equal(0,empty.SnapshotVersion);
+        await Refresher(fixture,storage).RefreshAsync(ct);
+        var ready=await RequestPortal.Web.Services.ManagementDashboardReadiness.ReadAsync(fixture.Db,state,ct);
+        Assert.True(ready.Ready);Assert.True(ready.AggregateInitialized);Assert.Equal(1,ready.SnapshotVersion);
+        Assert.NotNull(ready.LastSuccessfulRefreshUtc);Assert.InRange(ready.SnapshotAgeSeconds!.Value,0,120);
+        await fixture.Db.ManagementDashboardAggregates.ExecuteUpdateAsync(set=>set.SetProperty(x=>x.LastUpdatedUtc,DateTimeOffset.UtcNow.AddMinutes(-3)),ct);
+        Assert.False((await RequestPortal.Web.Services.ManagementDashboardReadiness.ReadAsync(fixture.Db,state,ct)).Ready);
+        await fixture.Db.ManagementDashboardAggregates.ExecuteUpdateAsync(set=>set.SetProperty(x=>x.RefreshStatus,"Failed"),ct);
+        Assert.True((await RequestPortal.Web.Services.ManagementDashboardReadiness.ReadAsync(fixture.Db,state,ct)).RefreshFailed);
+        Assert.Equal(0,storage.Reads); // Empty source has no location work; probes never invoke it.
+    }
+
+    [Fact]
+    public async Task MissingSingletonIsInitializedByWorkerRefreshOnly()
+    {
+        var ct=TestContext.Current.CancellationToken;await using var fixture=await PostgreSqlTestDatabase.CreateAsync(ct);
+        await fixture.Db.ManagementDashboardAggregates.ExecuteDeleteAsync(ct);
+        var storage=(Storage)DispatchProxy.Create<IFileStorage,Storage>();
+        await Assert.ThrowsAsync<ManagementDashboardInitializingException>(()=>Reader(fixture,storage).GetDashboardAsync(ct));
+        Assert.True(await Refresher(fixture,storage).RefreshAsync(ct));
+        Assert.Equal(1,(await Reader(fixture,storage).GetDashboardAsync(ct)).SnapshotVersion);
+    }
+
+    [Fact]
+    public async Task NoSnapshotAndInvalidJsonNeverTriggerHistoricalReadsOrHideDatabaseFailures()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await using var fixture=await PostgreSqlTestDatabase.CreateAsync(ct);
+        var storage=(Storage)DispatchProxy.Create<IFileStorage,Storage>();
+        await Assert.ThrowsAsync<ManagementDashboardInitializingException>(()=>Reader(fixture,storage).GetDashboardAsync(ct));
+        Assert.Equal(0,storage.Reads);
+        foreach (string json in new[] { "{}", "null", "[]" })
+        {
+            await fixture.Db.ManagementDashboardAggregates.ExecuteUpdateAsync(set=>set.SetProperty(x=>x.SnapshotVersion,1).SetProperty(x=>x.AggregateData,json),ct);
+            await Assert.ThrowsAsync<ManagementDashboardInitializingException>(()=>Reader(fixture,storage).GetDashboardAsync(ct));
+        }
+        Assert.Equal(0,storage.Reads);
+        await fixture.Db.Database.ExecuteSqlRawAsync("DROP TABLE management_dashboard_aggregate",ct);
+        await Assert.ThrowsAsync<Npgsql.PostgresException>(()=>Reader(fixture,storage).GetDashboardAsync(ct));
+    }
+
+    [Fact]
+    public async Task PublishedSnapshotRemainsReadableWhileRebuildIsBlocked()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await using var fixture=await PostgreSqlTestDatabase.CreateAsync(ct);await Seed(fixture,1);
+        var storage=(Storage)DispatchProxy.Create<IFileStorage,Storage>();var clock=new Clock();
+        await Refresher(fixture,storage,clock).RefreshAsync(ct);
+        var before=await Reader(fixture,storage).GetDashboardAsync(ct);
+        clock.Now=clock.Now.AddMinutes(2);
+        storage.Entered=new(TaskCreationOptions.RunContinuationsAsynchronously);storage.Release=new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rebuild=Refresher(fixture,storage,clock).RefreshAsync(ct);
+        await storage.Entered.Task.WaitAsync(ct);
+        try
+        {
+            var read=await Reader(fixture,storage).GetDashboardAsync(ct).WaitAsync(TimeSpan.FromSeconds(2),ct);
+            Assert.Equal(before.SnapshotVersion,read.SnapshotVersion);
+            Assert.Equal(before.LastUpdatedUtc,read.LastUpdatedUtc);
+        }
+        finally {storage.Release.TrySetResult();}
+        Assert.True(await rebuild);
+    }
+
+    [Fact]
     public async Task InitialBuildCoalescesEventsAndHttpReadsOnlyPublishedJson()
     {
         var ct=TestContext.Current.CancellationToken;await using var fixture=await PostgreSqlTestDatabase.CreateAsync(ct);await Seed(fixture,32);

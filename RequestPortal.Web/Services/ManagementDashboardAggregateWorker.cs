@@ -2,38 +2,74 @@ using RequestPortal.Infrastructure.Management;
 
 namespace RequestPortal.Web.Services;
 
-public sealed class ManagementDashboardAggregateWorker(IServiceScopeFactory scopes,ILogger<ManagementDashboardAggregateWorker> logger) : BackgroundService
+public sealed record ManagementDashboardWorkerStatus(
+    string Status = "WaitingForApplication", DateTimeOffset? LastAttemptUtc = null,
+    DateTimeOffset? LastPublishedUtc = null, DateTimeOffset? LastFailureUtc = null,
+    string? FailureType = null);
+
+public sealed class ManagementDashboardWorkerState
 {
-    public static async Task InitializeAsync(IServiceProvider services,ILogger logger,CancellationToken cancellationToken)
+    private ManagementDashboardWorkerStatus current = new();
+    public ManagementDashboardWorkerStatus Current => Volatile.Read(ref current);
+    internal void Set(string status, DateTimeOffset now, bool published = false, string? failureType = null)
     {
-        // Initialization is a startup gate, never a fallback calculation in the HTTP request.
-        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(90));
-        while(true)
+        var previous = Current;
+        Volatile.Write(ref current, previous with
         {
-            await using var scope=services.CreateAsyncScope();
-            try {await scope.ServiceProvider.GetRequiredService<ManagementDashboardAggregateRefresher>().RefreshAsync(timeout.Token);}
-            catch(Exception error) when(error is not OperationCanceledException)
-            {logger.LogError(error,"Management Dashboard startup refresh failed; checking the last valid snapshot.");}
-            var db=scope.ServiceProvider.GetRequiredService<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>();
-            db.ChangeTracker.Clear();
-            var row=await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleAsync(db.ManagementDashboardAggregates,x=>x.Id==1,timeout.Token);
-            if(row.SnapshotVersion>0) {PersistentManagementDashboardService.Read(row);break;}
-            await Task.Delay(TimeSpan.FromSeconds(2),timeout.Token);
-        }
+            Status = status,
+            LastAttemptUtc = status == "Refreshing" ? now : previous.LastAttemptUtc,
+            LastPublishedUtc = published ? now : previous.LastPublishedUtc,
+            LastFailureUtc = failureType is not null ? now : previous.LastFailureUtc,
+            FailureType = published ? null : failureType ?? previous.FailureType
+        });
     }
+}
+
+public sealed class ManagementDashboardAggregateWorker(
+    IServiceScopeFactory scopes, ILogger<ManagementDashboardAggregateWorker> logger,
+    IHostApplicationLifetime lifetime, ManagementDashboardWorkerState state,
+    TimeProvider? clock = null) : BackgroundService
+{
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while(!stoppingToken.IsCancellationRequested)
+        var time = clock ?? TimeProvider.System;
+        int failures = 0;
+        try
         {
-            try
+            // Kestrel and the ordinary health endpoint must be available before any rebuild.
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var registration = lifetime.ApplicationStarted.Register(() => started.TrySetResult());
+            await started.Task.WaitAsync(stoppingToken);
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await using var scope=scopes.CreateAsyncScope();
-                await scope.ServiceProvider.GetRequiredService<ManagementDashboardAggregateRefresher>().RefreshAsync(stoppingToken);
+                int delaySeconds = 2;
+                try
+                {
+                    state.Set("Refreshing", time.GetUtcNow());
+                    await using var scope = scopes.CreateAsyncScope();
+                    bool published = await scope.ServiceProvider.GetRequiredService<IManagementDashboardAggregateRefresher>()
+                        .RefreshAsync(stoppingToken);
+                    if (published)
+                    {
+                        failures = 0;
+                        logger.LogInformation("Management Dashboard snapshot published successfully.");
+                    }
+                    state.Set("Waiting", time.GetUtcNow(), published);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+                catch (Exception error)
+                {
+                    failures = Math.Min(failures + 1, 8);
+                    delaySeconds = Math.Min(300, 1 << failures);
+                    state.Set("Retrying", time.GetUtcNow(), failureType: error.GetType().Name);
+                    // Persisted snapshot and outbox remain authoritative. Never log provider secrets here.
+                    logger.LogWarning("Management Dashboard refresh failed ({FailureType}); retrying in {DelaySeconds} seconds.",
+                        error.GetType().Name, delaySeconds);
+                }
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds), time, stoppingToken);
             }
-            catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested) {break;}
-            catch(Exception error) {logger.LogError(error,"Management Dashboard refresh failed; durable requests will retry.");}
-            try {await Task.Delay(TimeSpan.FromSeconds(2),stoppingToken);}catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested) {break;}
         }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        finally { state.Set("Stopped", time.GetUtcNow()); }
     }
 }

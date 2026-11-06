@@ -95,3 +95,34 @@ servers: https://www.postgresql.org/docs/17/app-pgdump.html#APP-PGDUMP-NOTES.
 The isolated restore is verified on PostgreSQL 18, not claimed as a same-version
 13 recovery test; PostgreSQL does not guarantee loading a newer client's output
 into an older server. No production server upgrade is part of this deployment.
+
+## Startup recovery verification
+
+The 2026-11-06 private recovery evidence confirmed that the aggregate migration
+completed and Kestrel started at 19:03:00.578 UTC. The deployer's final failed probe
+preceded the listener, and rollback stopped the healthy candidate at 19:03:01.258
+UTC. This was a startup/readiness timing mismatch, not a migration or Kestrel
+exception. The database retained the additive migration after binary rollback.
+
+The startup fix moves aggregate initialization into the existing hosted worker,
+after ApplicationStarted, without changing the deployment health limits.
+`deployment-catalogue-verification` performs fixed read-only schema ownership,
+permission, trigger/function and migration checks. The enhanced
+`dashboard-verification` also reconciles stored totals with source-table counts
+inside one read-only repeatable-read transaction. Neither mode starts the website,
+rebuilds aggregates or processes queues, and neither accesses FFPJM.
+
+`Recover-RequestPortalStartup-Kratos.py` is a one-shot administrator launcher,
+not a sudo grant. Its staged version must pin a validated plan containing the exact
+GitHub main commit, every published artifact hash and matching existing backup/
+restore evidence. The source template intentionally cannot run with its unset plan
+pin. It verifies the protected backup in place, copies reviewed binaries into
+root-owned staging, drops to aegis for SQL verification, and invokes only the
+matching installed Aegis deployer with `--apps requestportal`. It creates no new
+database backup, changes no environment or deployer, and performs no database
+rollback. The deployer retains its normal application backup and rollback logic.
+
+After deployment it verifies HTTPS health, dashboard readiness, source totals,
+subsequent publication and sanitized startup/worker evidence. Raw deployer output
+remains private; only a checksummed structural report is exported to the operator.
+It does not impersonate a staff member or claim authenticated browser verification.
