@@ -1,0 +1,113 @@
+@page
+@model RequestPortal.Web.Pages.Management.RegisteredUsersModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Registered Users Dashboard";
+    var d = Model.Dashboard;
+    var json = JsonSerializer.Serialize(d, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+}
+@section Styles {
+    <link rel="stylesheet" href="~/lib/leaflet/1.9.4/leaflet.css" />
+    <link rel="stylesheet" href="~/css/registered-users-dashboard.css" asp-append-version="true" />
+}
+<div class="ru-dashboard shell" data-registered-users data-geography-url="@Url.Content("~/data/jamaica-parishes.528b7394d3b3.geojson")">
+    <header class="ru-heading">
+        <div class="ru-heading-title">
+            <span class="ru-main-icon" aria-hidden="true">♙</span>
+            <div>
+                <h1>Registered Users Dashboard</h1>
+                <p>Registration, accounts and participation. Quick Intake-only identities and submissions are excluded.</p>
+            </div>
+        </div>
+        <form method="get" class="ru-period">
+            <label for="ru-period" class="ru-visually-hidden">Reporting period</label>
+            <select id="ru-period" asp-for="Period">
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="custom">Custom range</option>
+            </select>
+            <div class="ru-custom" hidden="@(Model.Period != "custom")">
+                <label>From <input type="date" name="From" value="@d.From.ToString("yyyy-MM-dd")" /></label>
+                <label>Through <input type="date" name="Through" value="@d.Through.ToString("yyyy-MM-dd")" /></label>
+            </div>
+            <button type="submit">Apply</button>
+        </form>
+    </header>
+    <section class="ru-kpis" aria-label="Registered user summary">
+        <div class="ru-kpi ru-blue"><span class="ru-kpi-icon" aria-hidden="true">♙</span><div><strong>@d.Total</strong><span>Registered Users</span><small>Accounts registered in period</small></div></div>
+        <div class="ru-kpi ru-green"><span class="ru-kpi-icon" aria-hidden="true">✓</span><div><strong>@d.RecentlyActive</strong><span>Recently Active</span><small>Signed in during last 30 days</small></div></div>
+        <div class="ru-kpi ru-purple"><span class="ru-kpi-icon" aria-hidden="true">♧</span><div><strong>@d.Individuals</strong><span>Individual Accounts</span><small>Without approved organization membership</small></div></div>
+        <div class="ru-kpi ru-amber"><span class="ru-kpi-icon" aria-hidden="true">◷</span><div><strong>@d.PendingMemberships</strong><span>Pending Memberships</span><small>Approval requests from registered users</small></div></div>
+        <div class="ru-kpi ru-sky"><span class="ru-kpi-icon" aria-hidden="true">▦</span><div><strong>@d.Organizations</strong><span>Organizations</span><small>With approved registered members</small></div></div>
+    </section>
+    <div class="ru-first-row">
+        <section class="ru-panel ru-geography">
+            <h2>Registered Users by Parish</h2>
+            <p class="ru-subtitle">Registered account profiles by parish</p>
+            <div id="registered-users-parish-map" class="ru-map" aria-label="Registered users by Jamaican parish">Loading Jamaica map…</div>
+            <p class="ru-map-error" role="status"></p>
+            <small>Parish not provided or invalid: @d.UnknownParish</small>
+        </section>
+        <section class="ru-panel">
+            <h2>User Type</h2>
+            <p class="ru-subtitle">Each registered user counted once</p>
+            <div class="ru-donut-row">
+                <div class="ru-donut"><canvas id="ru-types" role="img" aria-label="Individual and organization representative accounts"></canvas>
+                    <span class="ru-donut-center"><strong>@d.Total</strong>Total</span>
+                </div>
+                <ul class="ru-donut-legend">
+                    <li><i class="ru-swatch ru-swatch-blue"></i><span>Individual accounts</span><strong>@d.Individuals</strong></li>
+                    <li><i class="ru-swatch ru-swatch-purple"></i><span>Organization representatives</span><strong>@d.Representatives</strong></li>
+                </ul>
+            </div>
+        </section>
+    </div>
+    <div class="ru-second-row">
+        <section class="ru-panel">
+            <h2>Registration Trend</h2>
+            <p class="ru-subtitle">New registered accounts over the selected period</p>
+            <div class="ru-chart"><canvas id="ru-trend" role="img" aria-label="Account registrations over time"></canvas></div>
+        </section>
+        <section class="ru-panel">
+            <h2>Account Status</h2>
+            <p class="ru-subtitle">Email verification and temporary lockouts</p>
+            <div class="ru-donut-row">
+                <div class="ru-donut"><canvas id="ru-status" role="img" aria-label="Registered account status"></canvas>
+                    <span class="ru-donut-center"><strong>@d.Total</strong>Total</span>
+                </div>
+                <ul class="ru-donut-legend">
+                @for (var i = 0; i < d.AccountStates.Count; i++)
+                {
+                    <li><i class="ru-swatch ru-status-@i"></i><span>@d.AccountStates[i].Name</span><strong>@d.AccountStates[i].Count</strong></li>
+                }
+                </ul>
+            </div>
+        </section>
+        <section class="ru-panel ru-activity">
+            <h2>Activity</h2>
+            <div><span aria-hidden="true">◉</span><strong>@d.RecentlyActive</strong><span>Signed in (last 30 days)</span></div>
+            <div><span aria-hidden="true">▤</span><strong>@d.RegularSubmissions</strong><span>Regular submissions in period</span></div>
+            <div><span aria-hidden="true">♙</span><strong>@d.Representatives</strong><span>Approved organization representatives</span></div>
+            <div><span aria-hidden="true">▦</span><strong>@d.Organizations</strong><span>Organizations with members in cohort</span></div>
+        </section>
+    </div>
+    <p class="ru-footnote">Reporting cohort: accounts created @d.From.ToString("dd MMM yyyy")–@d.Through.ToString("dd MMM yyyy") (UTC). Quick Intake-only placeholder identities and Quick Intake submissions are excluded. Signed-in users who also submitted a Quick Intake remain counted as registered users. Organizational representatives are users with an approved membership in a non-individual organization. Recent activity is based on recorded sign-ins, which may be incomplete for older accounts.</p>
+    <details class="ru-accessible-data">
+        <summary>View chart values and definitions</summary>
+        <h3>Registered users by parish</h3>
+        <table><thead><tr><th>Parish</th><th>Accounts</th></tr></thead><tbody>
+        @foreach (var item in d.Parishes) { <tr><td>@item.Name</td><td>@item.Count</td></tr> }
+        <tr><td>Unknown</td><td>@d.UnknownParish</td></tr>
+        </tbody></table>
+        <h3>Registration trend</h3><table><thead><tr><th>Period starting</th><th>Registrations</th></tr></thead><tbody>
+        @foreach (var item in d.Trend) { <tr><td>@item.Label</td><td>@item.Count</td></tr> }
+        </tbody></table>
+    </details>
+</div>
+<script id="ru-dashboard-data" type="application/json">@Html.Raw(json)</script>
+@section Scripts {
+    <script src="~/lib/leaflet/1.9.4/leaflet.js"></script>
+    <script src="~/lib/chart.js/4.6.1/chart.umd.min.js"></script>
+    <script src="~/js/registered-users-dashboard.js" asp-append-version="true"></script>
+}
