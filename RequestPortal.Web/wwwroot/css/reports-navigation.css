@@ -47,3 +47,33 @@
     background: #dce4ee;
     flex: 0 0 auto;
 }
+
+/* Admin uses the same compact dropdown language as Reports. */
+.authenticated-app .app-main-nav .admin-menu-panel {
+    min-width: 248px;
+}
+.authenticated-app .app-main-nav .admin-menu-panel .rp-admin-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: #edf4fc;
+    color: #2f70ab;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+}
+.authenticated-app .app-main-nav .admin-menu-panel a:hover .rp-admin-icon,
+.authenticated-app .app-main-nav .admin-menu-panel a:focus-visible .rp-admin-icon,
+.authenticated-app .app-main-nav .admin-menu-panel a[aria-current="page"] .rp-admin-icon {
+    background: #d3e8ff;
+    color: #084ca9;
+}
+.authenticated-app .app-main-nav .admin-menu-panel .rp-admin-divider {
+    height: 1px;
+    margin: 5px 8px;
+    background: #dce4ee;
+    flex: 0 0 auto;
+}
