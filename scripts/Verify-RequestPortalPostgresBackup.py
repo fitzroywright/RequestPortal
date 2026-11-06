@@ -88,7 +88,7 @@ def verify(export, report_sha):
             result = {'status': 'isolated-restore-verified', 'synthetic': report.get('synthetic') is True, 'archiveSha256': backup['archiveSha256'],
                       'reportSha256': report_sha, 'verifiedTables': len(counts), 'migrationsVerified': True,
                       'productionBusinessWrites': False, 'networkListener': False,
-                      'restoreOwnershipAndGrantsReplayed': False}
+                      'restoreOwnershipAndGrantsReplayed': False, 'restoreEngineMajor': 18, 'sourceEngineMajor': backup['source']['major']}
             (export / 'restore-verification.json').write_text(json.dumps(result, indent=2) + '\n')
             os.chmod(export / 'restore-verification.json', 0o600)
             success = True

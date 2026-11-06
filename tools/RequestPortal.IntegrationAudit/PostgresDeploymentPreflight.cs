@@ -82,6 +82,12 @@ internal static class PostgresDeploymentPreflight
         if(!string.IsNullOrEmpty(settings.Password))start.Environment["PGPASSWORD"]=settings.Password;
         start.Environment["PGSSLMODE"]=settings.SslMode switch {SslMode.VerifyCA=>"verify-ca",SslMode.VerifyFull=>"verify-full",_=>settings.SslMode.ToString().ToLowerInvariant()};
         if(!string.IsNullOrWhiteSpace(settings.RootCertificate))start.Environment["PGSSLROOTCERT"]=settings.RootCertificate;
+        else if(settings.SslMode is SslMode.VerifyCA or SslMode.VerifyFull)
+        {
+            const string systemCa="/etc/ssl/certs/ca-certificates.crt";
+            if(!File.Exists(systemCa))throw new InvalidOperationException("The existing TLS trust bundle is unavailable.");
+            start.Environment["PGSSLROOTCERT"]=systemCa;
+        }
         start.Environment["PGOPTIONS"]="-c default_transaction_read_only=on";
         using var process=Process.Start(start) ?? throw new InvalidOperationException("Unable to start PostgreSQL backup.");
         Task<string> stdout=process.StandardOutput.ReadToEndAsync(ct),stderr=process.StandardError.ReadToEndAsync(ct);
