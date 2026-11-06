@@ -11,8 +11,9 @@ using Microsoft.Extensions.Hosting;
 using Npgsql;
 
 // Fixed SELECTs only. No website startup, EF migrations, queue dispatch, SQL repair or recovery writes.
-if (args.Length != 1 || args[0] is not ("portal" or "bridge" or "input-validation")) return 2;
-using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+if (args.Length<1 || args[0] is not ("portal" or "bridge" or "input-validation" or "database-preflight" or "database-backup" or "dashboard-verification")) return 2;
+if(args.Length!=(args[0]=="database-backup"?2:1))return 2;
+using var timeout = new CancellationTokenSource(args[0]=="database-backup"?TimeSpan.FromMinutes(10):TimeSpan.FromSeconds(90));
 var token = timeout.Token;
 try
 {
@@ -22,6 +23,16 @@ try
         overrides[$"CommonSecrets:Providers:{provider.Key}:Settings:DeleteSecretIdFileAfterRead"] = "false";
     builder.Configuration.AddInMemoryCollection(overrides);
     await using var secrets = CommonSecretsBootstrapRuntime.Create(builder.Configuration);
+    if(args[0]=="dashboard-verification")
+    {
+        var report=await PostgresDeploymentPreflight.VerifyDashboardAsync(secrets.Provider,token);
+        Console.WriteLine(JsonSerializer.Serialize(report,new JsonSerializerOptions(JsonSerializerDefaults.Web)));return 0;
+    }
+    if(args[0] is "database-preflight" or "database-backup")
+    {
+        var report=await PostgresDeploymentPreflight.RunAsync(builder.Configuration,secrets.Provider,args[0]=="database-backup"?args[1]:null,token);
+        Console.WriteLine(JsonSerializer.Serialize(report,new JsonSerializerOptions(JsonSerializerDefaults.Web)));return 0;
+    }
     if(args[0]=="input-validation")
     {
         string readConnection=await secrets.Provider.GetRequiredAsync("ConnectionStrings:RequestPortal",token);

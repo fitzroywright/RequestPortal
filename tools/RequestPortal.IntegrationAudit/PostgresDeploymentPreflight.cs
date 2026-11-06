@@ -1,0 +1,138 @@
+using Microsoft.EntityFrameworkCore;
+using System.Data;
+using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
+using Common.Secrets;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
+
+internal static class PostgresDeploymentPreflight
+{
+    internal sealed record Source(string Host,string Address,string Database,string Identity,int Major,bool Recovery);
+    internal sealed record TableCount(string Schema,string Name,long Count);
+
+    private static void Guard(NpgsqlConnectionStringBuilder settings)
+    {
+        if(!string.Equals(settings.Host,"axios.fftpj.local",StringComparison.OrdinalIgnoreCase) || settings.Database!="requestportal")
+            throw new InvalidOperationException("Request Portal production target does not match.");
+    }
+
+    internal static async Task<object> RunAsync(IConfiguration configuration,ISecretProvider secrets,string? archive,CancellationToken ct)
+    {
+        if(!OperatingSystem.IsLinux())throw new PlatformNotSupportedException("The production preflight runs on Kratos.");
+        // Managed secret only: never serialize the connection string or service environment.
+        string value=await secrets.GetRequiredAsync("ConnectionStrings:RequestPortal",ct);
+        var settings=new NpgsqlConnectionStringBuilder(value);Guard(settings);
+        await using var connection=new NpgsqlConnection(value);await connection.OpenAsync(ct);
+        await using var transaction=await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
+        await using(var command=new NpgsqlCommand("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='60s'; SET LOCAL idle_in_transaction_session_timeout='10min'",connection,transaction))
+            await command.ExecuteNonQueryAsync(ct);
+        Source source;
+        await using(var command=new NpgsqlCommand("SELECT inet_server_addr()::text,current_database(),current_user,current_setting('server_version_num')::int / 10000,pg_is_in_recovery()",connection,transaction))
+        await using(var reader=await command.ExecuteReaderAsync(ct))
+        {
+            await reader.ReadAsync(ct);source=new(settings.Host!,reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.GetInt32(3),reader.GetBoolean(4));
+        }
+        if(source.Address!="10.10.0.226" || source.Database!="requestportal" || source.Recovery || source.Major is <14 or >18)
+            throw new InvalidOperationException("Unsupported or unexpected production target.");
+        var migrations=new List<string>();
+        await using(var command=new NpgsqlCommand("SELECT \"MigrationId\" FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\"",connection,transaction))
+        await using(var reader=await command.ExecuteReaderAsync(ct))
+            while(await reader.ReadAsync(ct))migrations.Add(reader.GetString(0));
+        if(!migrations.Contains("20261105070000_IntegrationExceptionDetails"))throw new InvalidOperationException("Unexpected production migration baseline.");
+        var privileges=new Dictionary<string,bool>();
+        await using(var command=new NpgsqlCommand("SELECT has_schema_privilege(current_schema(),'CREATE'),has_table_privilege('outbox_messages','INSERT')",connection,transaction))
+        await using(var reader=await command.ExecuteReaderAsync(ct))
+        {await reader.ReadAsync(ct);privileges["schemaCreate"]=reader.GetBoolean(0);privileges["outboxInsert"]=reader.GetBoolean(1);}
+        await using(var command=new NpgsqlCommand("""
+            SELECT c.relname,has_table_privilege(c.oid,'TRIGGER')
+            FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname=current_schema() AND c.relname IN
+            ('assistance_requests','request_status_history','quick_intakes','documents','deliveries',
+             'delivery_returns','organizations','request_categories','program_classifications','integration_links')
+            """,connection,transaction))
+        await using(var reader=await command.ExecuteReaderAsync(ct))
+            while(await reader.ReadAsync(ct))privileges["trigger:"+reader.GetString(0)]=reader.GetBoolean(1);
+        if(privileges.Count!=12 || privileges.Values.Any(allowed=>!allowed))throw new InvalidOperationException("Production migration privileges are incomplete.");
+        if(archive is null)
+        {
+            await transaction.RollbackAsync(ct);
+            return new {readOnly=true,status="preflight-passed",source,migrations,privileges};
+        }
+        if(!Path.IsPathFullyQualified(archive) || Path.GetFileName(archive)!="requestportal.dump" || File.Exists(archive))
+            throw new InvalidOperationException("Unsafe or existing backup output.");
+        string snapshot;
+        await using(var command=new NpgsqlCommand("SELECT pg_export_snapshot()",connection,transaction))snapshot=(string)(await command.ExecuteScalarAsync(ct))!;
+        var names=new List<(string Schema,string Name)>();
+        await using(var command=new NpgsqlCommand("SELECT schemaname,tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') AND schemaname NOT LIKE 'pg_toast%' ORDER BY schemaname,tablename",connection,transaction))
+        await using(var reader=await command.ExecuteReaderAsync(ct))
+            while(await reader.ReadAsync(ct))names.Add((reader.GetString(0),reader.GetString(1)));
+        var counts=new List<TableCount>();var quote=new NpgsqlCommandBuilder();
+        foreach(var name in names)
+        {
+            await using var command=new NpgsqlCommand("SELECT COUNT(*) FROM "+quote.QuoteIdentifier(name.Schema)+"."+quote.QuoteIdentifier(name.Name),connection,transaction);
+            counts.Add(new(name.Schema,name.Name,(long)(await command.ExecuteScalarAsync(ct))!));
+        }
+        var start=new ProcessStartInfo($"/usr/lib/postgresql/{source.Major}/bin/pg_dump") {UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
+        foreach(var argument in new[]{"--format=custom","--no-password","--lock-wait-timeout=5s","--snapshot="+snapshot,"--file="+archive})start.ArgumentList.Add(argument);
+        foreach(string key in start.Environment.Keys.Where(key=>key.StartsWith("PG",StringComparison.Ordinal)).ToArray())start.Environment.Remove(key);
+        start.Environment["PGHOST"]=settings.Host;start.Environment["PGPORT"]=settings.Port.ToString(CultureInfo.InvariantCulture);
+        start.Environment["PGDATABASE"]=settings.Database;start.Environment["PGUSER"]=settings.Username;
+        if(!string.IsNullOrEmpty(settings.Password))start.Environment["PGPASSWORD"]=settings.Password;
+        start.Environment["PGSSLMODE"]=settings.SslMode switch {SslMode.VerifyCA=>"verify-ca",SslMode.VerifyFull=>"verify-full",_=>settings.SslMode.ToString().ToLowerInvariant()};
+        if(!string.IsNullOrWhiteSpace(settings.RootCertificate))start.Environment["PGSSLROOTCERT"]=settings.RootCertificate;
+        start.Environment["PGOPTIONS"]="-c default_transaction_read_only=on";
+        using var process=Process.Start(start) ?? throw new InvalidOperationException("Unable to start PostgreSQL backup.");
+        Task<string> stdout=process.StandardOutput.ReadToEndAsync(ct),stderr=process.StandardError.ReadToEndAsync(ct);
+        try {await process.WaitForExitAsync(ct);await Task.WhenAll(stdout,stderr);}
+        catch {if(!process.HasExited)process.Kill(entireProcessTree:true);throw;}
+        if(process.ExitCode!=0)throw new InvalidOperationException("PostgreSQL backup did not complete; no migration was requested.");
+        File.SetUnixFileMode(archive,UnixFileMode.UserRead|UnixFileMode.UserWrite);
+        await using var backupStream=File.OpenRead(archive);
+        string sha=Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(backupStream,ct));
+        await transaction.RollbackAsync(ct);
+        return new {readOnly=true,status="backup-created-awaiting-isolated-restore",source,migrations,privileges,tables=counts,archiveSha256=sha,archiveBytes=new FileInfo(archive).Length,observedUtc=DateTimeOffset.UtcNow};
+    }
+    internal static async Task<object> VerifyDashboardAsync(ISecretProvider secrets,CancellationToken ct)
+    {
+        string value=await secrets.GetRequiredAsync("ConnectionStrings:RequestPortal",ct);
+        var settings=new NpgsqlConnectionStringBuilder(value);Guard(settings);
+        var options=new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>()
+            .UseNpgsql(value).Options;
+        await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(options);
+        await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
+        await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
+        bool target=await db.Database.SqlQueryRaw<bool>("SELECT current_database()='requestportal' AND inet_server_addr()=inet '10.10.0.226' AND NOT pg_is_in_recovery() AS \"Value\"").SingleAsync(ct);
+        if(!target)throw new InvalidOperationException("Actual production PostgreSQL target verification failed.");
+        var noStorage=new NoStorage();
+        var calculator=new RequestPortal.Infrastructure.Management.ManagementDashboardService(db,noStorage,
+            Microsoft.Extensions.Options.Options.Create(new RequestPortal.Infrastructure.Management.ManagementDashboardOptions()));
+        var reader=new RequestPortal.Infrastructure.Management.PersistentManagementDashboardService(db,calculator);
+        var watch=Stopwatch.StartNew();var first=await reader.GetDashboardAsync(ct);double cold=watch.Elapsed.TotalMilliseconds;
+        watch.Restart();var second=await reader.GetDashboardAsync(ct);double warm=watch.Elapsed.TotalMilliseconds;
+        if(first.SnapshotVersion<1 || first.SnapshotVersion!=second.SnapshotVersion || first.Parishes.Sum(x=>x.Requests)!=first.Statuses.Sum(x=>x.Count) ||
+           first.Executive.Outstanding!=first.Parishes.Sum(x=>x.Outstanding) || first.Executive.Completed!=first.Parishes.Sum(x=>x.Completed))
+            throw new InvalidOperationException("Published aggregate verification failed.");
+        if(first.RefreshStatus!="Current" || first.LastUpdatedUtc is null || first.LastUpdatedUtc<DateTimeOffset.UtcNow.AddMinutes(-2))
+            throw new InvalidOperationException("The published aggregate is not current.");
+        int pending=await db.OutboxMessages.CountAsync(x=>x.MessageType==RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType && x.ProcessedUtc==null,ct);
+        await tx.RollbackAsync(ct);
+        return new {readOnly=true,status="dashboard-verified",database=settings.Database,host=settings.Host,
+            first.SnapshotVersion,first.GeneratedUtc,first.LastUpdatedUtc,first.LastReconciledUtc,first.RefreshStatus,
+            totals=new {requests=first.Statuses.Sum(x=>x.Count),outstanding=first.Executive.Outstanding,completed=first.Executive.Completed},
+            pendingRefreshes=pending,coldServiceMs=cold,warmServiceMs=warm,storageReads=0,
+            measuredBrowserLoading=false,observedUtc=DateTimeOffset.UtcNow};
+    }
+    private sealed class NoStorage : Common.Storage.IFileStorage
+    {
+        private static InvalidOperationException Forbidden()=>new("Published snapshot reads must not access storage.");
+        public Task<Common.Storage.StoredFile> StoreAsync(Common.Storage.StorageWriteRequest r,CancellationToken ct=default)=>throw Forbidden();
+        public Task<Stream> OpenReadAsync(string key,CancellationToken ct=default)=>throw Forbidden();
+        public Task<Common.Storage.StoredFile?> GetMetadataAsync(string key,CancellationToken ct=default)=>throw Forbidden();
+        public Task<IReadOnlyList<Common.Storage.StoredFile>> GetVersionsAsync(string key,CancellationToken ct=default)=>throw Forbidden();
+        public Task DeleteAsync(string key,CancellationToken ct=default)=>throw Forbidden();
+        public Task<Common.Storage.StorageHealth> CheckHealthAsync(CancellationToken ct=default)=>throw Forbidden();
+    }
+
+}
