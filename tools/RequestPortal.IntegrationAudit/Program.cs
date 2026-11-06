@@ -125,7 +125,10 @@ try
 }
 catch (Exception exception)
 {
-    Console.Error.WriteLine(JsonSerializer.Serialize(new { status = "failed", errorType = exception.GetType().Name }));
+    Console.Error.WriteLine(JsonSerializer.Serialize(new { status = "failed", errorType = exception.GetType().Name,
+        stage=PostgresDeploymentPreflight.Stage,
+        code=exception.Data["PreflightCode"] as string ?? (exception is PostgresException postgres ? "SQL_"+postgres.SqlState : "PREFLIGHT_UNAVAILABLE"),
+        details=exception.Data["PreflightDetails"] }));
     return 1;
 }
 

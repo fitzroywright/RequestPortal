@@ -42,7 +42,7 @@ def verify(export, report_sha):
         raise RuntimeError('The transferred report does not match the administrator evidence.')
     report = json.loads(report_file.read_text())
     backup = report['backup']
-    if backup['source']['database'] != 'requestportal' or backup['source']['address'] != '10.10.0.226':
+    if backup['source']['database'] != 'requestportal' or backup['source'].get('endpointAddress', backup['source'].get('address')) != '10.10.0.226' or backup['source'].get('host', 'axios.fftpj.local').casefold() != 'axios.fftpj.local':
         raise RuntimeError('The backup target is not the approved production database.')
     if digest(archive) != backup['archiveSha256']:
         raise RuntimeError('The transferred archive checksum does not match.')
@@ -82,7 +82,11 @@ def verify(export, report_sha):
             counts = command([PG / 'psql', '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1'], sql.encode()).decode().splitlines()
             if [int(value) for value in counts] != [row['count'] for row in backup['tables']]:
                 raise RuntimeError('Restored table counts do not match the exported source snapshot.')
-            migrations = command([PG / 'psql', '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1'], b'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";').decode().splitlines()
+            history = [row for row in backup['tables'] if row['name'] == '__EFMigrationsHistory']
+            if len(history) != 1:
+                raise RuntimeError('The migration-history schema is ambiguous.')
+            history_sql = 'SELECT "MigrationId" FROM ' + quote(history[0]['schema']) + '.' + quote(history[0]['name']) + ' ORDER BY "MigrationId";'
+            migrations = command([PG / 'psql', '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1'], history_sql.encode()).decode().splitlines()
             if migrations != backup['migrations']:
                 raise RuntimeError('Restored migration history does not match.')
             result = {'status': 'isolated-restore-verified', 'synthetic': report.get('synthetic') is True, 'archiveSha256': backup['archiveSha256'],

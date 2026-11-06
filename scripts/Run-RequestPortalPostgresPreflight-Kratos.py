@@ -91,7 +91,19 @@ def run_reader(arguments, env):
                             capture_output=True, text=True, timeout=660)
     # Never forward provider/driver output or raw exception messages.
     if result.returncode:
-        raise RuntimeError(arguments[0] + ' failed; no production migration was requested.')
+        failure = {'errorType': 'Unavailable', 'stage': 'reader-process', 'code': 'READER_FAILED', 'exitCode': result.returncode}
+        for line in reversed(result.stderr.splitlines()):
+            try: candidate = json.loads(line)
+            except ValueError: continue
+            if not isinstance(candidate, dict) or candidate.get('status') != 'failed': continue
+            for key, pattern in [('errorType', r'[A-Za-z][A-Za-z0-9_.+]{0,99}'), ('stage', r'[a-z][a-z0-9-]{0,63}'), ('code', r'[A-Z][A-Z0-9_]{0,63}')]:
+                value = candidate.get(key)
+                if isinstance(value, str) and re.fullmatch(pattern, value): failure[key] = value
+            # Only our explicit typed guard exceptions carry approved structural observations.
+            if failure['code'] in {'PG_ENDPOINT_GUARD','PG_ENDPOINT_DNS','PG_ACTUAL_TARGET_GUARD','PG_BASELINE_MISSING','PG_PRIVILEGES_MISSING'}:
+                failure['details'] = candidate.get('details')
+            break
+        raise RuntimeError(arguments[0] + ' failed: ' + json.dumps(failure, separators=(',', ':')) + '; no production migration was requested.')
     lines = [line for line in result.stdout.splitlines() if line.startswith('{')]
     report = json.loads(lines[-1])
     if report.get('readOnly') is not True:

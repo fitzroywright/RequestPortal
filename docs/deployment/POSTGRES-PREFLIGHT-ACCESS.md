@@ -72,3 +72,15 @@ five Python guard tests pass, and a synthetic full backup/isolated restore verif
 table counts and migration history without production access. No production
 backup, grant, migration or deployment is claimed until the administrator command
 has actually run and its output has been verified.
+
+## Failure diagnostics and endpoint identity
+
+Failures report a safe stage and error code, PostgreSQL SQLSTATE when available,
+and explicit structural observations for target, migration or privilege guards.
+Raw provider/driver messages, connection strings and credentials remain suppressed.
+The client-facing endpoint is checked through the configured hostname and DNS;
+`inet_server_addr()` is retained as backend metadata and may differ behind a proxy.
+The isolated verifier checks the approved endpoint and records backend metadata
+without incorrectly requiring both addresses to be equal. PostgreSQL documents
+that function as the address on which the backend accepted its connection:
+https://www.postgresql.org/docs/16/functions-info.html.
