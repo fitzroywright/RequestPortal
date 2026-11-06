@@ -57,6 +57,7 @@
     }
     <link rel="stylesheet" href="~/css/operational-workspace.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/application-shell.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/reports-navigation.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="@(useApplicationShell ? "authenticated-app" : "public-site") @ViewData["BodyClass"]">
@@ -106,11 +107,11 @@
                                 <div class="staff-admin-menu-panel">
                                     @if (canViewManagement)
                                     {
-                                        <a asp-page="/Management/QuickIntakeDashboard">Quick Intakes</a>
-                                        <a asp-page="/Management/RegisteredUsers">Registered Users</a>
-                                        <a asp-page="/Management/Index">Management</a>
+                                        <a asp-page="/Management/QuickIntakeDashboard" aria-current="@(currentPage == "/Management/QuickIntakeDashboard" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">▤</span>Quick Intakes</a>
+                                        <a asp-page="/Management/RegisteredUsers" aria-current="@(currentPage == "/Management/RegisteredUsers" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">♧</span>Registered Users</a>
+                                        <a asp-page="/Management/Index" aria-current="@(currentPage == "/Management/Index" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">▥</span>Management</a>
                                     }
-                                    <a asp-page="/Staff/Reports">Requests</a>
+                                    <a asp-page="/Staff/Reports" aria-current="@(currentPage == "/Staff/Reports" ? "page" : null)"><span class="rp-report-icon" aria-hidden="true">▣</span>Requests</a>
                                 </div>
                             </details>
                             <a asp-page="/Staff/Reviewers">Reviewers</a>
