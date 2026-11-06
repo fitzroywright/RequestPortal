@@ -11,7 +11,13 @@ public sealed record ManagementDashboardSnapshot(
     ManagementDeliveryAnalytics DeliveryAnalytics,
     ManagementPerformanceMetrics Performance,
     IReadOnlyList<ManagementTrendPoint> Trend,
-    IReadOnlyList<ParishReachSummary> Parishes);
+    IReadOnlyList<ParishReachSummary> Parishes)
+{
+    public long SnapshotVersion { get; init; }
+    public DateTimeOffset? LastUpdatedUtc { get; init; }
+    public DateTimeOffset? LastReconciledUtc { get; init; }
+    public string RefreshStatus { get; init; } = "Current";
+}
 
 public sealed record ManagementExecutiveSummary(
     int Today,

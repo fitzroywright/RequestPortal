@@ -135,14 +135,14 @@ public sealed class QuickIntakeService : IQuickIntakeService
                 throw new ArgumentException("Enter a valid secondary phone number including country code.");
             }
         }
-        string? email = Normalize(submission.Email);
+        string? email = RequestPortal.Common.Contacts.ContactEmail.Normalize(submission.Email);
         string streetAddress = Require(submission.StreetAddress, "Street address");
         string communityDistrict = Require(submission.CommunityDistrict, "Community/District");
         string parish = Require(submission.Parish, "Parish");
         string employmentStatus = RequireAllowed(submission.EmploymentStatus, "Employment status", AllowedEmploymentStatuses);
 
-        if (submission.MonthlyIncome < 0)
-            throw new ArgumentException("Monthly income cannot be negative.");
+        if (submission.MonthlyIncome < 0 || submission.MonthlyIncome > RequestPortal.Common.Validation.WeeklyIncome.MaximumMonthly || decimal.Round(submission.MonthlyIncome,2) != submission.MonthlyIncome)
+            throw new ArgumentException("Monthly income must be non-negative, within the supported range and have at most two decimal places.");
 
         string? victimCircumstances = submission.VictimCircumstances is null
             ? null
@@ -514,7 +514,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
     {
         string raw = Require(value, "Telephone");
         if (value.Length > 40) throw new ArgumentException("Telephone cannot exceed 40 characters.");
-        return RequestPortal.Common.Contacts.ApplicantTelephone.Normalize(raw)
+        return RequestPortal.Common.Contacts.ApplicantTelephone.NormalizeNew(raw)
             ?? throw new ArgumentException("Telephone is required.");
     }
 }

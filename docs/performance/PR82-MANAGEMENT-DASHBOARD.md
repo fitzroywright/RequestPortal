@@ -1,5 +1,8 @@
 # PR #82: staff landing page and dashboard performance
 
+Historical cache measurements. The persistent replacement is documented in
+[the durable dashboard rollout](../deployment/DURABLE-DASHBOARD-ROLLOUT.md).
+
 Staff OIDC completion defaults to `/Staff/Index` (canonical URL `/Staff`). An
 explicit local return URL is retained; the destination's existing authorization
 still applies. External return URLs are rejected. Authenticated staff visiting

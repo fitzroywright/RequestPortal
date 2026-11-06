@@ -83,9 +83,11 @@ public sealed class RequestLocationService : IRequestLocationService
     ];
 
     private readonly IFileStorage storage;
+    private readonly RequestPortal.Infrastructure.Persistence.RequestPortalDbContext? db;
 
-    public RequestLocationService(IFileStorage storage)
+    public RequestLocationService(IFileStorage storage, RequestPortal.Infrastructure.Persistence.RequestPortalDbContext? db=null)
     {
+        this.db=db;
         this.storage = storage;
     }
 
@@ -149,6 +151,13 @@ public sealed class RequestLocationService : IRequestLocationService
                 MaximumBytes: 32 * 1024),
             cancellationToken);
 
+        if(db is not null)
+        {
+            db.OutboxMessages.Add(new RequestPortal.Infrastructure.Persistence.OutboxMessage {
+                Id=Guid.NewGuid(),MessageType=ManagementDashboardAggregateRefresher.MessageType,
+                Payload="{}",OccurredUtc=DateTimeOffset.UtcNow,RequestId=requestId });
+            await db.SaveChangesAsync(cancellationToken);
+        }
         return snapshot;
     }
 

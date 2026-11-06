@@ -5,6 +5,29 @@ namespace RequestPortal.Common.Contacts;
 /// <summary>Shared intake and SQL-boundary validation. Never guesses missing digits or truncates input.</summary>
 public static class ApplicantTelephone
 {
+    // New user input uses numbering-plan validation. Normalize remains the legacy integration boundary.
+    public static string? NormalizeNew(string? value)
+    {
+        if(value?.Length>100)throw new ArgumentException("Telephone input cannot exceed 100 characters.");
+        if(!string.IsNullOrWhiteSpace(value))
+        {
+            string digits=new(value.Where(char.IsAsciiDigit).ToArray());
+            bool explicitCountry=value.TrimStart().StartsWith('+') || digits.StartsWith("00") || digits.StartsWith("011") || (digits.Length==11 && digits.StartsWith('1'));
+            if(!explicitCountry && (digits.Length!=10 || !(digits.StartsWith("876") || digits.StartsWith("658"))))
+                throw new ArgumentException("Use a Jamaican 876/658 number, or include the international country code.");
+        }
+        string? canonical=Normalize(value);if(canonical is null)return null;
+        var util=PhoneNumberUtil.GetInstance();
+        if(!util.IsValidNumber(util.Parse(canonical,"JM")))
+            throw new ArgumentException("Enter a valid telephone number; Jamaica uses area code 876 or 658.");
+        return canonical;
+    }
+    public static string? Display(string? value)
+    {
+        if(string.IsNullOrWhiteSpace(value))return value;
+        try {var util=PhoneNumberUtil.GetInstance();var parsed=util.Parse(value,"JM");return util.IsValidNumber(parsed)?util.Format(parsed,PhoneNumberFormat.INTERNATIONAL):value;}
+        catch(NumberParseException) {return value;}
+    }
     public static string? Normalize(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;

@@ -24,6 +24,50 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
 
             modelBuilder.HasSequence<long>("request_code_sequence").StartsAt(10000L);
 
+            modelBuilder.Entity("RequestPortal.Infrastructure.Management.ManagementDashboardAggregate", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AggregateData")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("LastReconciledUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastUpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("NextRefreshUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RefreshStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<long>("SnapshotVersion")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("management_dashboard_aggregate", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_management_dashboard_singleton", "\"Id\" = 1");
+                        });
+                });
+
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")

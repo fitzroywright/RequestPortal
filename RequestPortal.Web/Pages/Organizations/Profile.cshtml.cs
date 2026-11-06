@@ -1,3 +1,4 @@
+using RequestPortal.Common.Contacts;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
@@ -60,8 +61,8 @@ public sealed class ProfileModel : PageModel
             Parish = Organization.Parish,
             DistrictArea = Organization.DistrictArea,
             MailingAddress = Organization.MailingAddress,
-            Phone = Organization.Phone,
-            AlternativePhone = Organization.AlternativePhone,
+            Phone = ApplicantTelephone.Display(Organization.Phone),
+            AlternativePhone = ApplicantTelephone.Display(Organization.AlternativePhone),
             Email = Organization.Email,
             Website = Organization.Website,
             PrimaryContactName = Organization.PrimaryContactName,
@@ -70,7 +71,7 @@ public sealed class ProfileModel : PageModel
             AuthorizedSignatoryTitle = Organization.AuthorizedSignatoryTitle,
             SecondaryContactName = Organization.SecondaryContactName,
             SecondaryContactEmail = Organization.SecondaryContactEmail,
-            SecondaryContactPhone = Organization.SecondaryContactPhone,
+            SecondaryContactPhone = ApplicantTelephone.Display(Organization.SecondaryContactPhone),
             EmployeeCount = Organization.EmployeeCount,
             VolunteerCount = Organization.VolunteerCount,
             ApproximateBeneficiariesServed = Organization.ApproximateBeneficiariesServed,
@@ -90,6 +91,7 @@ public sealed class ProfileModel : PageModel
 
     public async Task<IActionResult> OnPostSaveAsync(Guid id)
     {
+        InputContactNormalization.Apply(Input,ModelState,nameof(Input));
         ApplicationUser user = await GetUserAsync();
 
         if (!ModelState.IsValid)
@@ -209,12 +211,14 @@ public sealed class ProfileModel : PageModel
         public string? MailingAddress { get; set; }
 
         [Required, StringLength(100)]
+        [ContactTelephone]
         public string? Phone { get; set; }
 
         [StringLength(100)]
+        [ContactTelephone]
         public string? AlternativePhone { get; set; }
 
-        [Required, EmailAddress, StringLength(320)]
+        [Required, ContactEmail, StringLength(320)]
         public string? Email { get; set; }
 
         [Url, StringLength(500)]
@@ -235,10 +239,11 @@ public sealed class ProfileModel : PageModel
         [StringLength(250)]
         public string? SecondaryContactName { get; set; }
 
-        [EmailAddress, StringLength(320)]
+        [ContactEmail, StringLength(320)]
         public string? SecondaryContactEmail { get; set; }
 
         [StringLength(100)]
+        [ContactTelephone]
         public string? SecondaryContactPhone { get; set; }
 
         [Range(0, 1000000)]

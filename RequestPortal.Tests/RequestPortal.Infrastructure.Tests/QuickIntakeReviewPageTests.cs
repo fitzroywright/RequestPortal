@@ -129,7 +129,7 @@ public sealed class QuickIntakeReviewPageTests
     private static string Field(string html, string label)
     {
         var match = Regex.Match(html, "<dt>" + Regex.Escape(label) + "</dt><dd>(.*?)</dd>", RegexOptions.Singleline);
-        Assert.True(match.Success, "Missing field: " + label); return WebUtility.HtmlDecode(match.Groups[1].Value);
+        Assert.True(match.Success, "Missing field: " + label); return WebUtility.HtmlDecode(Regex.Replace(match.Groups[1].Value,"<[^>]+>","").Trim());
     }
     private static void Snapshot(string name, string html)
     {
@@ -151,10 +151,10 @@ public sealed class QuickIntakeReviewPageTests
         {
             ["First name"] = intake.FirstName, ["Last name"] = intake.LastName,
             ["Date of birth"] = "1986-07-12", ["Gender"] = intake.Gender, ["Marital status"] = intake.MaritalStatus,
-            ["Primary telephone / WhatsApp"] = intake.Telephone, ["Secondary telephone"] = intake.SecondaryTelephone!,
+            ["Primary telephone / WhatsApp"] = RequestPortal.Common.Contacts.ApplicantTelephone.Display(intake.Telephone)!, ["Secondary telephone"] = RequestPortal.Common.Contacts.ApplicantTelephone.Display(intake.SecondaryTelephone)!,
             ["Email"] = intake.Email!, ["Street address"] = intake.StreetAddress,
             ["Community / district"] = intake.CommunityDistrict, ["Parish"] = intake.Parish,
-            ["Employment status"] = intake.EmploymentStatus, ["Monthly household income"] = intake.MonthlyIncome.ToString("N2"),
+            ["Employment status"] = intake.EmploymentStatus, ["Monthly household income"] = RequestPortal.Common.Validation.WeeklyIncome.Display(intake.MonthlyIncome),
             ["Children under 18 living full-time"] = "Yes", ["Disability or serious medical condition"] = "Yes",
             ["Assistance programmes"] = "PATH; CARE", ["Assistance category"] = intake.HelpCategory,
             ["Victim / abuse circumstances"] = intake.VictimCircumstances!,
@@ -181,7 +181,7 @@ public sealed class QuickIntakeReviewPageTests
         string html = await fixture.Page();
         foreach (string field in new[] { "Email", "Secondary telephone", "Victim / abuse circumstances", "Assistance programmes" })
             Assert.Equal("Not provided", Field(html, field));
-        Assert.Equal("0.00", Field(html, "Monthly household income"));
+        Assert.Equal("JMD 0.00", Field(html, "Monthly household income"));
         Assert.Equal("No", Field(html, "Children under 18 living full-time"));
         Assert.Equal("No", Field(html, "Disability or serious medical condition"));
         Snapshot("missing", html);
@@ -272,7 +272,7 @@ public sealed class QuickIntakeReviewPageTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains("Enter the email address of the Individual portal account.", html);
-        Assert.Equal(Intake.Telephone, Field(html, "Primary telephone / WhatsApp"));
+        Assert.Equal(RequestPortal.Common.Contacts.ApplicantTelephone.Display(Intake.Telephone), Field(html, "Primary telephone / WhatsApp"));
         Assert.Equal(Intake.VictimCircumstances, Field(html, "Victim / abuse circumstances"));
         Assert.Equal(2, fixture.IntakeReads);
     }

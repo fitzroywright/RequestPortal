@@ -28,9 +28,9 @@
     <section class="quick-intake-review-section" aria-labelledby="quick-intake-contact">
         <h3 id="quick-intake-contact">Contact and address</h3>
         <dl class="quick-intake-review-fields">
-            <div><dt>Primary telephone / WhatsApp</dt><dd>@Provided(intake.Telephone)</dd></div>
-            <div><dt>Secondary telephone</dt><dd>@Provided(intake.SecondaryTelephone)</dd></div>
-            <div><dt>Email</dt><dd>@Provided(intake.Email)</dd></div>
+            <div><dt>Primary telephone / WhatsApp</dt><dd>@Provided(RequestPortal.Common.Contacts.ApplicantTelephone.Display(intake.Telephone))</dd></div>
+            <div><dt>Secondary telephone</dt><dd>@Provided(RequestPortal.Common.Contacts.ApplicantTelephone.Display(intake.SecondaryTelephone))</dd></div>
+            <div><dt>Email</dt><dd>@if (RequestPortal.Common.Contacts.ContactEmail.Mailto(intake.Email) is { } emailLink) { <a href="@emailLink">@intake.Email</a> } else { @Provided(intake.Email) }</dd></div>
             <div><dt>Street address</dt><dd>@Provided(intake.StreetAddress)</dd></div>
             <div><dt>Community / district</dt><dd>@Provided(intake.CommunityDistrict)</dd></div>
             <div><dt>Parish</dt><dd>@Provided(intake.Parish)</dd></div>
@@ -41,7 +41,7 @@
         <h3 id="quick-intake-household">Household and assistance</h3>
         <dl class="quick-intake-review-fields">
             <div><dt>Employment status</dt><dd>@Provided(intake.EmploymentStatus)</dd></div>
-            <div><dt>Monthly household income</dt><dd>@intake.MonthlyIncome.ToString("N2")</dd></div>
+            <div><dt>Monthly household income</dt><dd>@RequestPortal.Common.Validation.WeeklyIncome.Display(intake.MonthlyIncome)</dd></div>
             <div><dt>Children under 18 living full-time</dt><dd>@(intake.HasChildrenUnder18LivingFullTime ? "Yes" : "No")</dd></div>
             <div><dt>Disability or serious medical condition</dt><dd>@(intake.HasDisabilityOrSeriousMedicalCondition ? "Yes" : "No")</dd></div>
             <div><dt>Assistance programmes</dt><dd>@Provided(string.Join("; ", intake.AssistancePrograms))</dd></div>

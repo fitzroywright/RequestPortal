@@ -52,7 +52,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
         Assert.Equal(QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType, email.MessageType);
         Assert.Null(email.ProcessedUtc);
         Assert.Equal(0, email.AttemptCount);
-        Assert.Equal(2, await database.Db.OutboxMessages.CountAsync(token));
+        Assert.Equal(2, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
         Assert.Equal(1, await database.Db.OutboxMessages.CountAsync(m => m.MessageType == typeof(RequestSubmittedMessage).FullName, token));
     }
 
@@ -105,7 +105,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => new QuickIntakeService(database.Db).CreateAsync(Submission, token));
         database.Db.ChangeTracker.Clear();
         Assert.Equal(0, await database.Db.AssistanceRequests.CountAsync(token));
-        Assert.Equal(0, await database.Db.OutboxMessages.CountAsync(token));
+        Assert.Equal(0, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
         Assert.Contains("review this request in Request Portal", sent.Body);
         Assert.Equal(QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(result.RequestId), sent.DeliveryId);
         Assert.Equal(NotificationTransport.Email, sent.Transport);
-        Assert.Equal(3, await database.Db.OutboxMessages.CountAsync(token));
+        Assert.Equal(3, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
         Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token));
         Assert.Single(sender.Sent);
         Assert.NotNull((await Email(database, result.RequestId, token)).ProcessedUtc);
-        Assert.Equal(3, await database.Db.OutboxMessages.CountAsync(token));
+        Assert.Equal(3, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
         Assert.Equal(1, await database.Db.AssistanceRequests.CountAsync(token));
     }
 

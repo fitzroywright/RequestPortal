@@ -25,7 +25,10 @@
     <header class="mg-heading">
         <div><div class="eyebrow">FFP JAMAICA MANAGEMENT</div><h1>Management Dashboard</h1>
             <p>Operational overview of assistance requests, processing, delivery, and geographic reach.</p></div>
-        <div class="mg-refresh"><span>Last successful refresh</span><time datetime="@dashboard.GeneratedUtc.ToString("O")">@dashboard.GeneratedUtc.ToLocalTime().ToString("g")</time></div>
+        <div class="mg-refresh"><span>Last successful refresh</span><time datetime="@dashboard.GeneratedUtc.ToString("O")">@dashboard.GeneratedUtc.ToLocalTime().ToString("g")</time>
+            @if (dashboard.RefreshStatus == "Failed" || dashboard.GeneratedUtc < DateTimeOffset.UtcNow.AddMinutes(-2))
+            { <small role="status">Refresh delayed. Showing the last successful snapshot.</small> }
+        </div>
     </header>
 
     <section class="mg-kpis" aria-label="Primary request metrics">

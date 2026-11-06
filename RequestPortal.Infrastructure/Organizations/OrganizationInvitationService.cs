@@ -59,7 +59,7 @@ public sealed class OrganizationInvitationService : IOrganizationInvitationServi
         OrganizationInvitation? existing = await dbContext.Set<OrganizationInvitation>()
             .Where(item =>
                 item.OrganizationId == organizationId &&
-                item.Email == normalizedEmail &&
+                item.Email.ToUpper() == normalizedEmail.ToUpper() &&
                 item.Status == InvitationStatus.Pending)
             .OrderByDescending(item => item.CreatedUtc)
             .FirstOrDefaultAsync(cancellationToken);
@@ -147,7 +147,7 @@ public sealed class OrganizationInvitationService : IOrganizationInvitationServi
             from invitation in dbContext.Set<OrganizationInvitation>().AsNoTracking()
             join organization in dbContext.Organizations.AsNoTracking()
                 on invitation.OrganizationId equals organization.Id
-            where invitation.Email == normalizedEmail &&
+            where invitation.Email.ToUpper() == normalizedEmail.ToUpper() &&
                   invitation.Status == InvitationStatus.Pending &&
                   invitation.ExpiresUtc > now
             orderby invitation.CreatedUtc descending
@@ -339,7 +339,8 @@ public sealed class OrganizationInvitationService : IOrganizationInvitationServi
             throw new ArgumentException("A valid email address is required.", nameof(email));
         }
 
-        return email.Trim().ToLowerInvariant();
+        return RequestPortal.Common.Contacts.ContactEmail.Normalize(email)
+            ?? throw new ArgumentException("A valid email address is required.",nameof(email));
     }
 
     private static bool TokenMatches(string expectedHash, string token)

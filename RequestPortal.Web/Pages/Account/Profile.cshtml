@@ -207,7 +207,7 @@
                                 <span asp-validation-for="ProfileInput.EmployerInstitution" class="validation"></span>
                             </div>
                             <div class="field">
-                                <label asp-for="ProfileInput.MonthlyHouseholdIncome">Monthly household income</label>
+                                <label asp-for="ProfileInput.MonthlyHouseholdIncome">Monthly household income (JMD)</label>
                                 <input asp-for="ProfileInput.MonthlyHouseholdIncome" type="number" min="0" step="0.01" />
                                 <span asp-validation-for="ProfileInput.MonthlyHouseholdIncome" class="validation"></span>
                             </div>
@@ -379,10 +379,11 @@
                     <div>
                         <strong>Email</strong>
                         <input name="Preference.Destination"
-                               value="@(email?.Destination ?? Model.ProfileInput.Email)"
+                               value="@(Model.Preference.Channel == NotificationChannel.Email && ViewData.ModelState.TryGetValue("Preference.Destination", out var postedEmail) ? postedEmail.AttemptedValue : email?.Destination ?? Model.ProfileInput.Email)"
                                type="email"
                                maxlength="500"
                                aria-label="Notification email" />
+                        @if(Model.Preference.Channel == NotificationChannel.Email) { <span asp-validation-for="Preference.Destination" class="validation"></span> }
                     </div>
                     <label class="profile-toggle">
                         <input type="checkbox"
@@ -402,10 +403,11 @@
                     <div>
                         <strong>WhatsApp</strong>
                         <input name="Preference.Destination"
-                               value="@(whatsapp?.Destination ?? Model.ProfileInput.PhoneNumber)"
+                               value="@(Model.Preference.Channel == NotificationChannel.WhatsApp && ViewData.ModelState.TryGetValue("Preference.Destination", out var postedPhone) ? postedPhone.AttemptedValue : whatsapp?.Destination ?? Model.ProfileInput.PhoneNumber)"
                                type="tel"
                                maxlength="500"
-                               aria-label="WhatsApp number" />
+                               aria-label="WhatsApp number" inputmode="tel" />
+                        @if(Model.Preference.Channel == NotificationChannel.WhatsApp) { <span asp-validation-for="Preference.Destination" class="validation"></span> }
                     </div>
                     <label class="profile-toggle">
                         <input type="checkbox"

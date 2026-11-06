@@ -33,6 +33,7 @@ internal static class StartupTasks
         WebApplication app)
     {
         await PrepareDemoAsync(app);
+        await RequestPortal.Web.Services.ManagementDashboardAggregateWorker.InitializeAsync(app.Services,app.Logger,CancellationToken.None);
         await ReportStartupDiagnosticsAsync(app);
     }
 

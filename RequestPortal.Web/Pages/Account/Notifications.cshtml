@@ -27,7 +27,7 @@
                     <form method="post" asp-page-handler="Save">
                         <input type="hidden" name="Input.Channel" value="Email" />
                         <label for="emailDestination">Email address</label>
-                        <input id="emailDestination" name="Input.Destination" value="@(email?.Destination ?? Model.DefaultEmail)" maxlength="500" required />
+                        <input type="email" id="emailDestination" name="Input.Destination" value="@(email?.Destination ?? Model.DefaultEmail)" maxlength="500" required />
                         <label class="check-row">
                             <input type="checkbox" name="Input.Enabled" value="true" @(email?.Enabled != false ? "checked" : null) />
                             <span>Send email notifications</span>
@@ -49,7 +49,7 @@
                     <form method="post" asp-page-handler="Save">
                         <input type="hidden" name="Input.Channel" value="WhatsApp" />
                         <label for="whatsappDestination">WhatsApp number</label>
-                        <input id="whatsappDestination" name="Input.Destination" value="@(whatsapp?.Destination ?? string.Empty)" maxlength="500" required />
+                        <input type="tel" inputmode="tel" id="whatsappDestination" name="Input.Destination" value="@(whatsapp?.Destination ?? string.Empty)" maxlength="500" required />
                         <label class="check-row"><input type="checkbox" name="Input.Enabled" value="true" @(whatsapp?.Enabled == true ? "checked" : null) /><span>Send WhatsApp notifications</span></label>
                         <button class="button button-small" type="submit">Save WhatsApp preference</button>
                     </form>

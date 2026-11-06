@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Data;
 using System.Text.Json;
 using System.Security.Cryptography;
@@ -10,7 +11,7 @@ using Microsoft.Extensions.Hosting;
 using Npgsql;
 
 // Fixed SELECTs only. No website startup, EF migrations, queue dispatch, SQL repair or recovery writes.
-if (args.Length != 1 || args[0] is not ("portal" or "bridge")) return 2;
+if (args.Length != 1 || args[0] is not ("portal" or "bridge" or "input-validation")) return 2;
 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
 var token = timeout.Token;
 try
@@ -21,6 +22,17 @@ try
         overrides[$"CommonSecrets:Providers:{provider.Key}:Settings:DeleteSecretIdFileAfterRead"] = "false";
     builder.Configuration.AddInMemoryCollection(overrides);
     await using var secrets = CommonSecretsBootstrapRuntime.Create(builder.Configuration);
+    if(args[0]=="input-validation")
+    {
+        string readConnection=await secrets.Provider.GetRequiredAsync("ConnectionStrings:RequestPortal",token);
+        var settings=new NpgsqlConnectionStringBuilder(readConnection);
+        if(settings.Database!="requestportal" || settings.Host!="axios.fftpj.local")throw new InvalidOperationException("Production PostgreSQL target does not match.");
+        await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(
+            new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>()
+                .UseNpgsql(readConnection).Options);
+        var report=await new RequestPortal.Infrastructure.Management.InputDataQualityAudit(db).RunAsync(token);
+        Console.WriteLine(JsonSerializer.Serialize(report,new JsonSerializerOptions(JsonSerializerDefaults.Web)));return 0;
+    }
     var rows = new List<object>();
     if (args[0] == "portal")
     {

@@ -10,7 +10,7 @@ public sealed class OrganizationInvitation
     public OrganizationInvitation(Guid id, Guid organizationId, string email, string tokenHash, Guid invitedByUserId, DateTimeOffset createdUtc, DateTimeOffset expiresUtc)
     {
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(tokenHash)) throw new ArgumentException("Invitation email and token are required.");
-        Id = id; OrganizationId = organizationId; Email = email.Trim().ToLowerInvariant(); TokenHash = tokenHash; InvitedByUserId = invitedByUserId; CreatedUtc = createdUtc; ExpiresUtc = expiresUtc; Status = InvitationStatus.Pending;
+        Id = id; OrganizationId = organizationId; Email = email.Trim(); TokenHash = tokenHash; InvitedByUserId = invitedByUserId; CreatedUtc = createdUtc; ExpiresUtc = expiresUtc; Status = InvitationStatus.Pending;
     }
     public Guid Id { get; private set; }
     public Guid OrganizationId { get; private set; }

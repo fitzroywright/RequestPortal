@@ -51,6 +51,9 @@ public sealed class NotificationsModel : PageModel
 
     public async Task<IActionResult> OnPostSaveAsync()
     {
+        try {Input.Destination=RequestPortal.Infrastructure.Notifications.NotificationPreferenceService.NormalizeDestination(Input.Channel,Input.Destination);}
+        catch(ArgumentException error) {ModelState.AddModelError("Input.Destination",error.Message);}
+
         ApplicationUser user = await GetUserAsync();
         LoadAvailability();
 

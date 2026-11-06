@@ -22,6 +22,7 @@ namespace RequestPortal.Infrastructure.Persistence;
 public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     public RequestPortalDbContext(DbContextOptions<RequestPortalDbContext> options) : base(options) { }
+    public DbSet<RequestPortal.Infrastructure.Management.ManagementDashboardAggregate> ManagementDashboardAggregates => Set<RequestPortal.Infrastructure.Management.ManagementDashboardAggregate>();
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
     public DbSet<OrganizationInvitation> OrganizationInvitations => Set<OrganizationInvitation>();
