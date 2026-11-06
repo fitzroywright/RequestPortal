@@ -40,3 +40,10 @@
         max-width:calc(100vw - 24px);
     }
 }
+
+.authenticated-app .app-main-nav .staff-admin-menu-panel .rp-report-divider {
+    height: 1px;
+    margin: 5px 8px;
+    background: #dce4ee;
+    flex: 0 0 auto;
+}
