@@ -34,6 +34,7 @@
                                     <th class="staff-organization-header"><div class="staff-request-header-filter"><label for="requests-organization-filter">Organization</label><input id="requests-organization-filter" name="Organization" form="requests-grid-filters" value="@Model.Organization" maxlength="200" type="search" placeholder="Search organization…" autocomplete="off" aria-label="Filter requests by organization" /></div></th>
                                     <th>Summary</th>
                                     <th class="staff-work-status-header"><select id="requests-status-filter" name="WorkStatus" form="requests-grid-filters" aria-label="Filter requests by work status"><option value="">All statuses</option>@foreach (var status in Enum.GetValues<RequestPortal.Domain.Requests.RequestStatus>()) { <option value="@status" selected="@(Model.WorkStatus == status)">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(status.ToString())</option> }</select></th>
+                                    <th class="staff-submitted-column">Date Submitted</th>
                                     <th class="staff-age-column">Age</th>
                                 </tr>
                             </thead>
