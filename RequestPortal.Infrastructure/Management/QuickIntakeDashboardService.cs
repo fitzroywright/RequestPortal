@@ -37,6 +37,11 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
         // contact details or individual demographic records are materialized.
         var parishRows = await query.GroupBy(q => q.Parish).Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
         var types = await query.GroupBy(q => q.DateOfBirth == new DateOnly(1900, 1, 1) && q.StreetAddress == "Not captured" ? Missing : q.HelpCategory).Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
+        // Older records were backfilled with false without an actual answer.
+        // The paired DOB/address sentinel distinguishes those unknown responses.
+        var childRows = await query.GroupBy(q => q.DateOfBirth == new DateOnly(1900, 1, 1) && q.StreetAddress == "Not captured"
+            ? Missing : q.HasChildrenUnder18LivingFullTime ? "Yes" : "No")
+            .Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
         var jobs = await query.GroupBy(q => q.DateOfBirth == new DateOnly(1900, 1, 1) && q.StreetAddress == "Not captured" ? Missing : q.EmploymentStatus).Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
         var genders = await query.GroupBy(q => q.DateOfBirth == new DateOnly(1900, 1, 1) && q.StreetAddress == "Not captured" ? Missing : q.Gender).Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
         var income = await query.GroupBy(q => (q.DateOfBirth == new DateOnly(1900, 1, 1) && q.StreetAddress == "Not captured") || q.MonthlyIncome < 0 ? Missing : q.MonthlyIncome == 0 ? IncomeLabels[0] :
@@ -49,6 +54,7 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
             .Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
         var parishes = Counts(parishRows, JamaicaParishes.Names.Append(JamaicaParishes.Unknown).ToArray(), JamaicaParishes.Normalize, total);
         var requestTypes = Counts(types, Types.Append(Missing).ToArray(), name => Canonical(name, Types), total);
+        var children = Protect(Counts(childRows, ["Yes", "No", Missing], name => name, total));
         var employment = Protect(Counts(jobs, Jobs.Append(Missing).ToArray(), name => Canonical(name, Jobs), total));
         var gender = Protect(Counts(genders, Genders.Append(Missing).ToArray(), name => Canonical(name, Genders), total));
         var incomes = Protect(Counts(income, IncomeLabels, name => name, total));
@@ -72,7 +78,7 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
         }
         await transaction.CommitAsync(ct);
         return new(range, total, sent, parishes, requestTypes,
-            new([], false, "Household size was not captured on Quick Intake. Current profiles cannot reconstruct household size at submission."),
+            children,
             employment, incomes, gender, ageGroups, insights);
     }
     public async Task<IReadOnlyList<QuickIntakeRecordLink>> GetRecordsAsync(QuickIntakeRange range, string? parish, int page, CancellationToken ct = default)
