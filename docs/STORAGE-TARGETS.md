@@ -42,6 +42,12 @@ RequestPortal continues to own authorization, malware scanning, retention, docum
 
 Changing providers does not copy existing files. Migrate the stored keys first, verify the destination, then change `Storage:Provider` and restart. RequestPortal does not silently fall back to the old target because that would create two competing authoritative stores.
 
+For Kratos, follow the [TrueNAS cutover procedure](deployment/TRUENAS-STORAGE-CUTOVER.md).
+The existing FFP Manager share is authoritative only after verified migration and
+explicit administrator cutover authorization. Request locations and dashboard
+aggregates are PostgreSQL data; dashboard requests and rebuilds do not read the
+file provider for location information.
+
 
 ## Request Portal logical storage layout
 

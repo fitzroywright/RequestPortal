@@ -12,6 +12,7 @@ using RequestPortal.Infrastructure.Documents;
 using RequestPortal.Infrastructure.Persistence;
 using RequestPortal.Infrastructure.Security;
 using RequestPortal.Web.Configuration;
+using RequestPortal.Infrastructure.Storage;
 
 namespace RequestPortal.Web.Startup;
 
@@ -169,6 +170,17 @@ internal static class PlatformServiceRegistration
                         builder.Environment.ContentRootPath
                         , target.RootPath!))
             };
+        }
+
+        if (target.Kind == StorageTargetKind.NetworkFolder && builder.Environment.IsProduction() &&
+            !string.IsNullOrWhiteSpace(builder.Configuration["StorageCutover:AuthorizedPlanSha256"]))
+        {
+            string expectedSource = builder.Configuration["Storage:NetworkFolder:ExpectedCifsSource"]
+                ?? throw new InvalidOperationException("RP-STORAGE-MOUNT-004: The authorized CIFS source must be configured.");
+            string expectedRoot = builder.Configuration["Storage:NetworkFolder:ExpectedMountRoot"]
+                ?? throw new InvalidOperationException("RP-STORAGE-MOUNT-005: The authorized CIFS subdirectory must be configured.");
+            if (!OperatingSystem.IsLinux())throw new InvalidOperationException("The production CIFS mount guard requires Linux.");
+            NetworkFolderMountGuard.Verify(target.RootPath!, expectedSource, expectedRoot, File.ReadAllText("/proc/self/mountinfo"));
         }
 
         global::Common.Storage.StorageServiceCollectionExtensions

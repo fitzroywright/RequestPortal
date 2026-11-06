@@ -134,10 +134,10 @@ internal static class PostgresDeploymentPreflight
             new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>().UseNpgsql(value).Options);
         await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
-        bool target=await db.Database.SqlQueryRaw<bool>("SELECT current_database()='requestportal' AND NOT pg_is_in_recovery() AND current_setting('server_version_num')::int/10000 BETWEEN 13 AND 18 AS \"Value\"").SingleAsync(ct);
+        bool target=await db.Database.SqlQueryRaw<bool>("SELECT host(inet_server_addr())='10.10.0.226' AND current_database()='requestportal' AND NOT pg_is_in_recovery() AND current_setting('server_version_num')::int/10000 BETWEEN 13 AND 18 AS \"Value\"").SingleAsync(ct);
         if(!target)throw Stop("PG_ACTUAL_TARGET_GUARD",new {databaseMatches=false});
         var evidence=await RequestPortal.Infrastructure.Management.ManagementDashboardSourceVerification.ReadAsync(db,null,ct);
-        if(!evidence.MigrationPrivileges || evidence.DashboardTriggers!=10 || !evidence.TriggerFunctionPresent)
+        if(!evidence.MigrationPrivileges || evidence.DashboardTriggers!=evidence.ExpectedDashboardTriggers || !evidence.TriggerSetValid || !evidence.TriggerFunctionPresent)
             throw Stop("PG_SCHEMA_VERIFICATION",new {evidence.MigrationPrivileges,evidence.DashboardTriggers,evidence.TriggerFunctionPresent});
         var applied=await db.Database.GetAppliedMigrationsAsync(ct);
         if(!applied.Contains("20261106170310_ManagementDashboardAggregate"))throw Stop("PG_BASELINE_MISSING",new {required="20261106170310_ManagementDashboardAggregate"});
@@ -155,10 +155,9 @@ internal static class PostgresDeploymentPreflight
         await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(options);
         await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
-        bool target=await db.Database.SqlQueryRaw<bool>("SELECT current_database()='requestportal' AND NOT pg_is_in_recovery() AS \"Value\"").SingleAsync(ct);
+        bool target=await db.Database.SqlQueryRaw<bool>("SELECT host(inet_server_addr())='10.10.0.226' AND current_database()='requestportal' AND NOT pg_is_in_recovery() AS \"Value\"").SingleAsync(ct);
         if(!target)throw new InvalidOperationException("Actual production PostgreSQL target verification failed.");
-        var noStorage=new NoStorage();
-        var calculator=new RequestPortal.Infrastructure.Management.ManagementDashboardService(db,noStorage,
+        var calculator=new RequestPortal.Infrastructure.Management.ManagementDashboardService(db,
             Microsoft.Extensions.Options.Options.Create(new RequestPortal.Infrastructure.Management.ManagementDashboardOptions()));
         var reader=new RequestPortal.Infrastructure.Management.PersistentManagementDashboardService(db,calculator);
         var watch=Stopwatch.StartNew();var first=await reader.GetDashboardAsync(ct);double cold=watch.Elapsed.TotalMilliseconds;
@@ -170,7 +169,7 @@ internal static class PostgresDeploymentPreflight
             throw Stop("PG_AGGREGATE_STALE",new {first.SnapshotVersion,first.RefreshStatus,first.LastUpdatedUtc});
         var sourceEvidence=await RequestPortal.Infrastructure.Management.ManagementDashboardSourceVerification.ReadAsync(db,first,ct);
         if(!sourceEvidence.Reconciled)throw Stop("PG_SOURCE_TOTALS",new {first.SnapshotVersion});
-        if(!sourceEvidence.MigrationPrivileges || sourceEvidence.DashboardTriggers!=10 || !sourceEvidence.TriggerFunctionPresent)
+        if(!sourceEvidence.MigrationPrivileges || sourceEvidence.DashboardTriggers!=sourceEvidence.ExpectedDashboardTriggers || !sourceEvidence.TriggerSetValid || !sourceEvidence.TriggerFunctionPresent)
             throw Stop("PG_SCHEMA_VERIFICATION",new {sourceEvidence.MigrationPrivileges,sourceEvidence.DashboardTriggers,sourceEvidence.TriggerFunctionPresent});
         var applied=await db.Database.GetAppliedMigrationsAsync(ct);
         if(!applied.Contains("20261106170310_ManagementDashboardAggregate"))throw Stop("PG_BASELINE_MISSING",new {required="20261106170310_ManagementDashboardAggregate"});
@@ -182,15 +181,4 @@ internal static class PostgresDeploymentPreflight
             sourceEvidence,migration="20261106170310_ManagementDashboardAggregate",pendingRefreshes=pending,coldServiceMs=cold,warmServiceMs=warm,storageReads=0,
             measuredBrowserLoading=false,observedUtc=DateTimeOffset.UtcNow};
     }
-    private sealed class NoStorage : Common.Storage.IFileStorage
-    {
-        private static InvalidOperationException Forbidden()=>new("Published snapshot reads must not access storage.");
-        public Task<Common.Storage.StoredFile> StoreAsync(Common.Storage.StorageWriteRequest r,CancellationToken ct=default)=>throw Forbidden();
-        public Task<Stream> OpenReadAsync(string key,CancellationToken ct=default)=>throw Forbidden();
-        public Task<Common.Storage.StoredFile?> GetMetadataAsync(string key,CancellationToken ct=default)=>throw Forbidden();
-        public Task<IReadOnlyList<Common.Storage.StoredFile>> GetVersionsAsync(string key,CancellationToken ct=default)=>throw Forbidden();
-        public Task DeleteAsync(string key,CancellationToken ct=default)=>throw Forbidden();
-        public Task<Common.Storage.StorageHealth> CheckHealthAsync(CancellationToken ct=default)=>throw Forbidden();
-    }
-
 }

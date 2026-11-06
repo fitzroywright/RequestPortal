@@ -34,7 +34,8 @@ internal static class ProductionCommissioning
             await provider.GetAsync("Authentication:Apple:ClientSecret"),
             await provider.GetAsync("Authentication:StaffOidc:ClientSecret"),
             await provider.GetAsync(integrationSharedSecretName),
-            await provider.GetAsync(storageSecretName),
+            string.Equals(configuration["Storage:Provider"], "SharePoint", StringComparison.OrdinalIgnoreCase)
+                ? await provider.GetAsync(storageSecretName) : null,
             await provider.GetAsync(whatsAppSecretName),
             await provider.GetAsync(messagingGraphSecretName),
             configuration.GetValue("Notifications:WhatsAppWebhookEnabled", false)

@@ -1,4 +1,3 @@
-using Common.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RequestPortal.Application.Management;
@@ -9,7 +8,12 @@ using RequestPortal.Infrastructure.Persistence;
 
 namespace RequestPortal.Infrastructure.Management;
 
-public sealed class ManagementDashboardService : IManagementDashboardService
+public interface IManagementDashboardSnapshotBuilder
+{
+    Task<ManagementDashboardSnapshot> BuildAggregateAsync(CancellationToken cancellationToken = default);
+}
+
+public sealed class ManagementDashboardService : IManagementDashboardService, IManagementDashboardSnapshotBuilder
 {
     private static readonly RequestStatus[] OutstandingStatuses =
     [
@@ -33,14 +37,13 @@ public sealed class ManagementDashboardService : IManagementDashboardService
     ];
 
     private readonly RequestPortalDbContext dbContext;
-    private readonly IFileStorage storage;
     private readonly ManagementDashboardOptions options;
     private readonly TimeProvider clock;
-    public ManagementDashboardService(RequestPortalDbContext dbContext, IFileStorage storage,
+    public ManagementDashboardService(RequestPortalDbContext dbContext,
         IOptions<ManagementDashboardOptions> options, TimeProvider? clock=null)
     {
         this.clock=clock ?? TimeProvider.System;
-        this.dbContext = dbContext; this.storage = storage; this.options = options.Value;
+        this.dbContext = dbContext; this.options = options.Value;
     }
 
     // Used by the aggregate worker and explicitly scoped drilldowns, never by the default HTTP page.
@@ -48,17 +51,17 @@ public sealed class ManagementDashboardService : IManagementDashboardService
         GetDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
 
     public Task<ManagementDashboardSnapshot> GetDashboardAsync(ManagementDashboardFilter filter,
-        CancellationToken cancellationToken = default) => BuildDashboardAsync(filter, false, cancellationToken);
+        CancellationToken cancellationToken = default) => BuildDashboardAsync(filter, cancellationToken);
 
     public Task<ManagementDashboardSnapshot> BuildAggregateAsync(CancellationToken cancellationToken = default) =>
-        BuildDashboardAsync(new ManagementDashboardFilter(), true, cancellationToken);
+        BuildDashboardAsync(new ManagementDashboardFilter(), cancellationToken);
 
     private async Task<ManagementDashboardSnapshot> BuildDashboardAsync(
-        ManagementDashboardFilter filter, bool strictStorage,
+        ManagementDashboardFilter filter,
         CancellationToken cancellationToken)
     {
         DateTimeOffset now = clock.GetUtcNow();
-        List<ManagementRequestRow> rows = await LoadRowsAsync(now, filter, cancellationToken, strictStorage);
+        List<ManagementRequestRow> rows = await LoadRowsAsync(now, filter, cancellationToken);
         Guid[] scopedRequestIds = rows.Select(row => row.Id).ToArray();
         List<LifecycleTiming> timings = await LoadLifecycleTimingsAsync(scopedRequestIds, cancellationToken);
 
@@ -290,7 +293,7 @@ public sealed class ManagementDashboardService : IManagementDashboardService
     private async Task<List<ManagementRequestRow>> LoadRowsAsync(
         DateTimeOffset now,
         ManagementDashboardFilter filter,
-        CancellationToken cancellationToken, bool strictStorage=false)
+        CancellationToken cancellationToken)
     {
         var query =
             from request in dbContext.AssistanceRequests.AsNoTracking()
@@ -340,15 +343,14 @@ public sealed class ManagementDashboardService : IManagementDashboardService
             .ToListAsync(cancellationToken))
             .ToHashSet();
 
-        // Bound storage I/O instead of allocating an unbounded task per historical request.
-        var geo = new System.Collections.Concurrent.ConcurrentDictionary<Guid, RequestLocationSnapshot>();
-        await Parallel.ForEachAsync(baseRows, new ParallelOptions { MaxDegreeOfParallelism = Math.Clamp(options.LocationReadConcurrency, 1, 32), CancellationToken = cancellationToken },
-            async (row, token) =>
-            {
-                RequestLocationSnapshot? location = await ReadLocationSafeAsync(row.Id, token, strictStorage)
-                    ?? RequestLocationService.ResolveExisting(row.Id, row.Location);
-                if (location is not null) geo[row.Id] = location;
-            });
+        var geo = await dbContext.RequestLocations.AsNoTracking()
+            .Where(location => requestIds.Contains(location.RequestId))
+            .Select(location => new RequestLocationSnapshot(location.RequestId, location.SourceText, location.Parish,
+                location.Community, location.Latitude, location.Longitude, location.Precision, location.ResolvedUtc))
+            .ToDictionaryAsync(location => location.RequestId, cancellationToken);
+        foreach (var row in baseRows)
+            if (!geo.ContainsKey(row.Id) && RequestLocationService.ResolveExisting(row.Id, row.Location) is { } legacy)
+                geo[row.Id] = legacy;
 
         DateTimeOffset overdueCutoff = now.AddDays(-Math.Max(1, options.OverdueDays));
         DateTimeOffset stalledCutoff = now.AddDays(-Math.Max(1, options.StalledDays));
@@ -383,22 +385,6 @@ public sealed class ManagementDashboardService : IManagementDashboardService
                 stalled,
                 missingDocuments);
         }).ToList();
-    }
-
-    private async Task<RequestLocationSnapshot?> ReadLocationSafeAsync(Guid requestId, CancellationToken cancellationToken, bool strictStorage)
-    {
-        try
-        {
-            return await RequestLocationStorage.ReadAsync(storage, requestId, cancellationToken);
-        }
-        catch (StorageException) when (!strictStorage)
-        {
-            return null;
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return null;
-        }
     }
 
     private async Task<List<LifecycleTiming>> LoadLifecycleTimingsAsync(
