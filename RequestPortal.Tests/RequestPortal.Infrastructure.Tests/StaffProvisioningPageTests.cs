@@ -114,6 +114,7 @@ public sealed class StaffProvisioningPageTests
                 services.AddScoped<StaffAdministrationService>(); services.AddScoped<StaffPreProvisioningService>();
                 services.AddAuthentication(StaffOidcOptions.StaffCookieScheme)
                     .AddScheme<AuthenticationSchemeOptions, Authentication>(StaffOidcOptions.StaffCookieScheme, _ => { });
+                services.AddPageAuthorizationFixture();
                 services.AddAuthorization(options => options.AddPolicy("StaffAdministration", policy =>
                 {
                     policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);

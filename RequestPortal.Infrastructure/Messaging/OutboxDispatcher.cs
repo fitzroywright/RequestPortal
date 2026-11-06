@@ -1,3 +1,4 @@
+using RequestPortal.Infrastructure.Messages;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -34,6 +35,7 @@ public sealed class OutboxDispatcher
     private readonly ILogger<OutboxDispatcher> logger;
     private readonly IRequestPortalOperationsFlowPublisher operationsFlowPublisher;
     private readonly IPortalMessageService portalMessageService;
+    private readonly StaffNotificationRouting routing;
 
     public OutboxDispatcher(
         RequestPortalDbContext dbContext,
@@ -43,7 +45,8 @@ public sealed class OutboxDispatcher
         IOptions<NotificationOptions> notificationOptions,
         ILogger<OutboxDispatcher> logger,
         IRequestPortalOperationsFlowPublisher operationsFlowPublisher,
-        IPortalMessageService portalMessageService)
+        IPortalMessageService portalMessageService,
+        StaffNotificationRouting? routing = null)
     {
         this.dbContext = dbContext;
         this.notificationSender = notificationSender;
@@ -53,6 +56,7 @@ public sealed class OutboxDispatcher
         this.logger = logger;
         this.operationsFlowPublisher = operationsFlowPublisher;
         this.portalMessageService = portalMessageService;
+        this.routing = routing ?? new StaffNotificationRouting(dbContext);
     }
 
     public async Task<int> DispatchBatchAsync(int batchSize = 20, CancellationToken cancellationToken = default)
@@ -498,9 +502,10 @@ public sealed class OutboxDispatcher
         string body = applicationNumber is null
             ? $"Request # {request.PublicReference} has been submitted to FFP for review. Please quote this request code whenever you contact FFP about your application."
             : $"Your request has been received by Food For The Poor Jamaica. FFP Manager reference number: {applicationNumber}. Please quote this reference whenever you contact Client Relations. Request Portal code: {request.PublicReference}.";
+        Guid[] portalRecipients = recipients.Concat(await routing.RecipientsAsync(message.RequestId, false, cancellationToken)).Distinct().ToArray();
         await portalMessageService.SendSystemMessageAsync(
             request.OrganizationId, message.RequestId, null,
-            $"Request submitted: {confirmationReference}", body, recipients,
+            $"Request submitted: {confirmationReference}", body, portalRecipients,
             cancellationToken, CreateDeterministicGuid(message.MessageId, "SubmissionConfirmation"),
             notifyExternally: false);
         await DeliverToRecipientsAsync(
@@ -544,9 +549,10 @@ public sealed class OutboxDispatcher
             request.OrganizationId,
             recipientUserId,
             cancellationToken);
+        Guid[] portalRecipients = recipients.Concat(await routing.RecipientsAsync(request.Id, false, cancellationToken)).Distinct().ToArray();
         await portalMessageService.SendSystemMessageAsync(
             request.OrganizationId, request.Id, null, $"Request status: {request.PublicReference}",
-            body, recipients, cancellationToken,
+            body, portalRecipients, cancellationToken,
             CreateDeterministicGuid(message.MessageId, "StatusNotification"), notifyExternally: false);
         await DeliverToRecipientsAsync(
             recipients,

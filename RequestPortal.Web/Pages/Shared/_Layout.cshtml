@@ -114,6 +114,7 @@
                                     {
                                         <a asp-page="/Administration/Staff">Staff &amp; Roles</a>
                                         <a asp-page="/Administration/ApplicantAccounts">Accounts and Identity</a>
+                                        <a asp-page="/Administration/NotificationRouting">Notification Routing</a>
                                         @if ((await NavigationAuthorization.AuthorizeAsync(User, null, RequestPortal.Web.Security.WhatsAppSettingsAdministratorRequirement.Policy)).Succeeded)
                                         {
                                             <a asp-page="/Administration/WhatsAppSettings">WhatsApp Settings</a>

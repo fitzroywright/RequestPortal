@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using RequestPortal.Application.Messages;
 using RequestPortal.Application.Integration;
 using RequestPortal.Application.Auditing;
@@ -20,18 +22,25 @@ public sealed class PortalMessageService : IPortalMessageService
     private readonly FfpManagerBridgeOptions bridgeOptions;
     private readonly IBusinessAuditWriter? auditWriter;
 
+    private readonly StaffNotificationRouting routing;
+    private readonly ILogger<PortalMessageService> logger;
+
     public PortalMessageService(
         RequestPortalDbContext dbContext,
         IPortalMessageRealtimeNotifier realtimeNotifier,
         IExternalApplicationBridgeClient bridgeClient,
         IOptions<FfpManagerBridgeOptions> bridgeOptions,
-        IBusinessAuditWriter? auditWriter = null)
+        IBusinessAuditWriter? auditWriter = null,
+        StaffNotificationRouting? routing = null,
+        ILogger<PortalMessageService>? logger = null)
     {
         this.dbContext = dbContext;
         this.realtimeNotifier = realtimeNotifier;
         this.bridgeClient = bridgeClient;
         this.bridgeOptions = bridgeOptions.Value;
         this.auditWriter = auditWriter;
+        this.routing = routing ?? new StaffNotificationRouting(dbContext);
+        this.logger = logger ?? NullLogger<PortalMessageService>.Instance;
     }
 
     public async Task<int> GetUnreadCountAsync(
@@ -39,12 +48,7 @@ public sealed class PortalMessageService : IPortalMessageService
         bool isStaff,
         CancellationToken cancellationToken = default)
     {
-        if (isStaff)
-        {
-            await EnsureSharedStaffMailboxRecipientsAsync(
-                userId,
-                cancellationToken);
-        }
+        var visible = await VisibleThreadIdsAsync(userId, isStaff, false, cancellationToken);
 
         return await (
             from recipient in dbContext.MessageRecipients.AsNoTracking()
@@ -52,7 +56,7 @@ public sealed class PortalMessageService : IPortalMessageService
                 on recipient.MessageId equals message.Id
             join thread in dbContext.MessageThreads.AsNoTracking()
                 on message.ThreadId equals thread.Id
-            where recipient.UserId == userId &&
+            where visible.Contains(thread.Id) && recipient.UserId == userId &&
                   recipient.ReadUtc == null &&
                   recipient.ArchivedUtc == null &&
                   thread.ClosedUtc == null
@@ -66,12 +70,7 @@ public sealed class PortalMessageService : IPortalMessageService
         int take = 100,
         CancellationToken cancellationToken = default)
     {
-        if (isStaff)
-        {
-            await EnsureSharedStaffMailboxRecipientsAsync(
-                userId,
-                cancellationToken);
-        }
+        var visible = await VisibleThreadIdsAsync(userId, isStaff, false, cancellationToken);
 
         int boundedTake = Math.Clamp(take, 1, 250);
 
@@ -90,7 +89,7 @@ public sealed class PortalMessageService : IPortalMessageService
             join request in dbContext.AssistanceRequests.AsNoTracking()
                 on thread.RequestId equals request.Id into requests
             from request in requests.DefaultIfEmpty()
-            where recipient.UserId == userId &&
+            where visible.Contains(thread.Id) && recipient.UserId == userId &&
                   recipient.ArchivedUtc == null &&
                   thread.ClosedUtc == null
             orderby message.SentUtc descending
@@ -171,6 +170,7 @@ public sealed class PortalMessageService : IPortalMessageService
         int take = 100,
         CancellationToken cancellationToken = default)
     {
+        var visible = await VisibleThreadIdsAsync(userId, isStaff, true, cancellationToken);
         int boundedTake = Math.Clamp(take, 1, 250);
 
         var rows = await (
@@ -188,10 +188,7 @@ public sealed class PortalMessageService : IPortalMessageService
             join request in dbContext.AssistanceRequests.AsNoTracking()
                 on thread.RequestId equals request.Id into requests
             from request in requests.DefaultIfEmpty()
-            where thread.ClosedUtc != null &&
-                  (isStaff
-                      ? thread.StaffVisible
-                      : message.SenderUserId == userId || recipients.Any(item => item.UserId == userId))
+            where thread.ClosedUtc != null && visible.Contains(thread.Id)
             orderby message.SentUtc descending
             select new
             {
@@ -237,6 +234,7 @@ public sealed class PortalMessageService : IPortalMessageService
         int take = 100,
         CancellationToken cancellationToken = default)
     {
+        var visible = await VisibleThreadIdsAsync(userId, isStaff, true, cancellationToken);
         int boundedTake = Math.Clamp(take, 1, 250);
 
         var rows = await (
@@ -252,10 +250,7 @@ public sealed class PortalMessageService : IPortalMessageService
             join request in dbContext.AssistanceRequests.AsNoTracking()
                 on thread.RequestId equals request.Id into requests
             from request in requests.DefaultIfEmpty()
-            where thread.ClosedUtc == null &&
-                  (isStaff
-                    ? message.SenderKind == PortalMessageSenderKind.FfpStaff
-                    : message.SenderUserId == userId)
+            where thread.ClosedUtc == null && visible.Contains(thread.Id) && message.SenderUserId == userId
             orderby message.SentUtc descending
             select new
             {
@@ -294,14 +289,6 @@ public sealed class PortalMessageService : IPortalMessageService
         if (thread is null || !await CanViewThreadAsync(userId, isStaff, thread, cancellationToken))
         {
             return null;
-        }
-
-        if (isStaff && thread.StaffVisible)
-        {
-            await EnsureSharedStaffThreadRecipientsAsync(
-                userId,
-                threadId,
-                cancellationToken);
         }
 
         await MarkThreadReadAsync(userId, threadId, cancellationToken);
@@ -563,16 +550,8 @@ public sealed class PortalMessageService : IPortalMessageService
                 throw new InvalidOperationException("This conversation is closed. Contact FFP to reopen it.");
         }
 
-        Guid[] staffUserIds = await dbContext.Users
-            .AsNoTracking()
-            .Where(user => user.IsInternalStaff)
-            .Select(user => user.Id)
-            .ToArrayAsync(cancellationToken);
-
-        if (staffUserIds.Length == 0)
-        {
-            throw new InvalidOperationException("No FFP staff mailbox identities are available.");
-        }
+        Guid[] staffUserIds = await routing.RecipientsAsync(requestId, false, cancellationToken, threadId);
+        if (staffUserIds.Length == 0) WarnMissingResponsibility(false);
 
         return await SendInternalAsync(
             senderUserId,
@@ -670,10 +649,10 @@ public sealed class PortalMessageService : IPortalMessageService
         }
         else if (audience == MessageAudience.FfpInternal)
         {
-            effectiveRecipients = await dbContext.Users.AsNoTracking()
-                .Where(user => user.IsInternalStaff && user.Id != senderUserId)
-                .Select(user => user.Id)
-                .ToArrayAsync(cancellationToken);
+            effectiveRecipients = (recipientUserIds.Count > 0
+                ? await routing.EligibleAsync(recipientUserIds, cancellationToken)
+                : await routing.RecipientsAsync(requestId, true, cancellationToken))
+                .Where(id => id != senderUserId).ToArray();
         }
 
         if (effectiveRecipients.Length == 0)
@@ -753,12 +732,8 @@ public sealed class PortalMessageService : IPortalMessageService
                     item.Status == MembershipStatus.Approved && item.Role == OrganizationRole.Administrator &&
                     item.ReceiveRequestNotifications)
                 .Select(item => item.UserId).ToArrayAsync(cancellationToken);
-            Guid[] authors = await dbContext.PortalMessages.AsNoTracking()
-                .Where(item => item.ThreadId == threadId && item.SenderUserId != null)
-                .Select(item => item.SenderUserId!.Value).Distinct().ToArrayAsync(cancellationToken);
-            Guid[] staff = await dbContext.Users.AsNoTracking().Where(item => item.IsInternalStaff)
-                .Select(item => item.Id).ToArrayAsync(cancellationToken);
-            recipients = managers.Concat(authors).Concat(staff)
+            Guid[] staff = await routing.RecipientsAsync(thread.RequestId, false, cancellationToken, thread.Id);
+            recipients = managers.Concat(staff)
                 .Append(request.CreatedByUserId).Append(request.SubmittedByUserId ?? request.CreatedByUserId)
                 .Where(id => id != senderUserId).Distinct().ToArray();
         }
@@ -769,11 +744,12 @@ public sealed class PortalMessageService : IPortalMessageService
                 throw new UnauthorizedAccessException("Only FFP staff can reply to internal conversations.");
             }
 
-            recipients = await dbContext.Users
-                .AsNoTracking()
-                .Where(user => user.IsInternalStaff && user.Id != senderUserId)
-                .Select(user => user.Id)
-                .ToArrayAsync(cancellationToken);
+            bool systemAlert = await dbContext.PortalMessages.AsNoTracking()
+                .AnyAsync(m => m.ThreadId == thread.Id && m.SenderKind == PortalMessageSenderKind.System, cancellationToken);
+            recipients = (systemAlert
+                ? await routing.RecipientsAsync(thread.RequestId, true, cancellationToken)
+                : await routing.EligibleAsync(participantUserIds, cancellationToken))
+                .Where(id => id != senderUserId).ToArray();
         }
         else if (senderIsStaff)
         {
@@ -788,11 +764,7 @@ public sealed class PortalMessageService : IPortalMessageService
         }
         else if (thread.StaffVisible)
         {
-            recipients = await dbContext.Users
-                .AsNoTracking()
-                .Where(user => user.IsInternalStaff)
-                .Select(user => user.Id)
-                .ToArrayAsync(cancellationToken);
+            recipients = await routing.RecipientsAsync(thread.RequestId, false, cancellationToken, thread.Id);
         }
         else
         {
@@ -802,6 +774,14 @@ public sealed class PortalMessageService : IPortalMessageService
                 .ToArray();
         }
 
+        if (thread.Audience == MessageAudience.Request)
+        {
+            Guid[] staff = await routing.EligibleAsync(recipients, cancellationToken);
+            Guid[] publicIds = await dbContext.Users.AsNoTracking().Where(u => recipients.Contains(u.Id) && !u.IsInternalStaff &&
+                dbContext.OrganizationMemberships.Any(m => m.UserId == u.Id && m.OrganizationId == thread.OrganizationId && m.Status == MembershipStatus.Approved))
+                .Select(u => u.Id).ToArrayAsync(cancellationToken);
+            recipients = staff.Concat(publicIds).Distinct().ToArray();
+        }
         if (thread.Audience != MessageAudience.PersonalNote &&
             recipients.Length == 0)
         {
@@ -844,16 +824,8 @@ public sealed class PortalMessageService : IPortalMessageService
             cancellationToken,
             MessageAudience.FfpInternal);
 
-        Guid[] staffUserIds = await dbContext.Users
-            .AsNoTracking()
-            .Where(user => user.IsInternalStaff)
-            .Select(user => user.Id)
-            .ToArrayAsync(cancellationToken);
-
-        if (staffUserIds.Length == 0)
-        {
-            throw new InvalidOperationException("No FFP staff mailbox identities are available.");
-        }
+        Guid[] staffUserIds = await routing.RecipientsAsync(requestId, true, cancellationToken);
+        if (staffUserIds.Length == 0) WarnMissingResponsibility(true);
 
         PortalMessage message = new(
             Guid.NewGuid(),
@@ -923,15 +895,19 @@ public sealed class PortalMessageService : IPortalMessageService
             body,
             DateTimeOffset.UtcNow);
 
-        Guid[] staffUserIds = await dbContext.Users
-            .AsNoTracking()
-            .Where(user => user.IsInternalStaff)
-            .Select(user => user.Id)
-            .ToArrayAsync(cancellationToken);
-        Guid[] allRecipients = recipientUserIds
-            .Concat(staffUserIds)
-            .Distinct()
-            .ToArray();
+        Guid[] allRecipients = recipientUserIds.Distinct().ToArray();
+        Guid[] explicitStaff = await dbContext.Users.AsNoTracking()
+            .Where(u => allRecipients.Contains(u.Id) && u.IsInternalStaff).Select(u => u.Id).ToArrayAsync(cancellationToken);
+        Guid[] eligibleStaff = await routing.EligibleAsync(explicitStaff, cancellationToken);
+        Guid[] authorizedPublic = await dbContext.Users.AsNoTracking()
+            .Where(u => allRecipients.Contains(u.Id) && !u.IsInternalStaff &&
+                (!organizationId.HasValue || dbContext.OrganizationMemberships.Any(m => m.OrganizationId == organizationId &&
+                    m.UserId == u.Id && m.Status == MembershipStatus.Approved)))
+            .Select(u => u.Id).ToArrayAsync(cancellationToken);
+        allRecipients = authorizedPublic.Concat(eligibleStaff).ToArray();
+        if (requestId.HasValue && eligibleStaff.Length == 0 &&
+            (await routing.RecipientsAsync(requestId, false, cancellationToken)).Length == 0)
+            WarnMissingResponsibility(false);
 
         dbContext.PortalMessages.Add(message);
         AddRecipients(message.Id, allRecipients, senderUserId: null);
@@ -1032,12 +1008,24 @@ public sealed class PortalMessageService : IPortalMessageService
         Guid threadId,
         CancellationToken cancellationToken = default)
     {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({'A' + threadId.ToString()}))", cancellationToken);
         MessageThread thread = await LoadStaffThreadForMutationAsync(
             staffUserId,
             threadId,
             cancellationToken);
 
+        if (thread.AssignedToStaffUserId == staffUserId) return;
         thread.Assign(staffUserId, DateTimeOffset.UtcNow);
+        // Keep assignment-only notifications out of the public conversation.
+        var noticeThread = new MessageThread(Guid.NewGuid(), thread.OrganizationId, thread.RequestId,
+            "Conversation assigned", true, DateTimeOffset.UtcNow, MessageAudience.FfpInternal);
+        noticeThread.Assign(staffUserId, DateTimeOffset.UtcNow);
+        var notice = new PortalMessage(Guid.NewGuid(), noticeThread.Id, null, PortalMessageSenderKind.System,
+            "FFP Request Processing", $"A conversation has been assigned to you. Open /Messages/Thread/{thread.Id:D} to review it.", DateTimeOffset.UtcNow);
+        dbContext.MessageThreads.Add(noticeThread);
+        dbContext.PortalMessages.Add(notice);
+        AddRecipients(notice.Id, [staffUserId], null);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (auditWriter is not null)
@@ -1051,6 +1039,8 @@ public sealed class PortalMessageService : IPortalMessageService
                 $"assignedTo={staffUserId:D}",
                 cancellationToken);
         }
+        await transaction.CommitAsync(cancellationToken);
+        await NotifyAsync(notice, noticeThread, [staffUserId], cancellationToken);
     }
 
     public async Task UnassignThreadAsync(
@@ -1117,6 +1107,8 @@ public sealed class PortalMessageService : IPortalMessageService
                 item => item.Id == threadId && item.StaffVisible,
                 cancellationToken) ?? throw new MessageThreadNotFoundException();
 
+        if (!await CanViewThreadAsync(staffUserId, true, thread, cancellationToken))
+            throw new UnauthorizedAccessException("The current user cannot manage this conversation.");
         thread.Reopen();
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -1428,117 +1420,50 @@ public sealed class PortalMessageService : IPortalMessageService
             cancellationToken);
     }
 
-    private async Task<bool> CanViewThreadAsync(
-        Guid userId,
-        bool isStaff,
-        MessageThread thread,
-        CancellationToken cancellationToken)
+    private async Task<bool> CanViewThreadAsync(Guid userId, bool isStaff, MessageThread thread, CancellationToken ct) =>
+        await (await VisibleThreadIdsAsync(userId, isStaff, true, ct)).ContainsAsync(thread.Id, ct);
+
+    private async Task<IQueryable<Guid>> VisibleThreadIdsAsync(Guid userId, bool isStaff, bool administrativeAccess, CancellationToken ct)
     {
-        if (isStaff && thread.StaffVisible)
+        var threads = dbContext.MessageThreads.AsNoTracking();
+        if (!isStaff)
         {
-            return true;
+            // Membership revocation removes access even if an old recipient row remains.
+            return threads.Where(t =>
+                (!t.OrganizationId.HasValue || dbContext.OrganizationMemberships.Any(m =>
+                    m.OrganizationId == t.OrganizationId && m.UserId == userId && m.Status == MembershipStatus.Approved)) &&
+                (t.Audience == MessageAudience.Request ||
+                 dbContext.PortalMessages.Any(m => m.ThreadId == t.Id && m.SenderUserId == userId) ||
+                 dbContext.PortalMessages.Any(m => m.ThreadId == t.Id && dbContext.MessageRecipients.Any(r => r.MessageId == m.Id && r.UserId == userId))))
+                .Select(t => t.Id);
         }
-
-        bool sent = await dbContext.PortalMessages
-            .AsNoTracking()
-            .AnyAsync(
-                message => message.ThreadId == thread.Id && message.SenderUserId == userId,
-                cancellationToken);
-        if (sent)
-        {
-            return true;
-        }
-
-        return await (
-            from recipient in dbContext.MessageRecipients.AsNoTracking()
-            join message in dbContext.PortalMessages.AsNoTracking()
-                on recipient.MessageId equals message.Id
-            where message.ThreadId == thread.Id && recipient.UserId == userId
-            select recipient)
-            .AnyAsync(cancellationToken);
+        bool eligible = (await routing.EligibleAsync([userId], ct)).Length > 0;
+        bool intake = eligible && await dbContext.UserClaims.AnyAsync(c => c.UserId == userId && c.ClaimType == StaffNotificationRouting.ClaimType && c.ClaimValue == StaffNotificationRouting.Intake, ct);
+        bool operations = eligible && await dbContext.UserClaims.AnyAsync(c => c.UserId == userId && c.ClaimType == StaffNotificationRouting.ClaimType && c.ClaimValue == StaffNotificationRouting.Operations, ct);
+        bool administrator = administrativeAccess && await routing.IsAdministratorAsync(userId, ct);
+        return threads.Where(t => t.StaffVisible && eligible && (
+            administrator && t.RequestId.HasValue ||
+            t.AssignedToStaffUserId == userId ||
+            t.Audience == MessageAudience.FfpInternal && operations ||
+            t.Audience != MessageAudience.FfpInternal && t.AssignedToStaffUserId == null && intake &&
+                (t.Audience == MessageAudience.Request || dbContext.PortalMessages.Any(m => m.ThreadId == t.Id &&
+                    dbContext.MessageRecipients.Any(r => r.MessageId == m.Id && r.UserId == userId))) ||
+            // Explicit personal/direct conversations retain their participants;
+            // legacy system/shared broadcasts confer no authorization.
+            t.Audience != MessageAudience.Request &&
+            !dbContext.PortalMessages.Any(m => m.ThreadId == t.Id && m.SenderKind == PortalMessageSenderKind.System) &&
+            (dbContext.PortalMessages.Any(m => m.ThreadId == t.Id && m.SenderUserId == userId) ||
+             dbContext.PortalMessages.Any(m => m.ThreadId == t.Id && dbContext.MessageRecipients.Any(r => r.MessageId == m.Id && r.UserId == userId)))
+        )).Select(t => t.Id);
     }
 
-    private async Task EnsureSharedStaffMailboxRecipientsAsync(
-        Guid staffUserId,
-        CancellationToken cancellationToken)
+    private void WarnMissingResponsibility(bool operational)
     {
-        await EnsureInternalStaffAsync(staffUserId, cancellationToken);
-
-        Guid[] messageIds = await (
-            from message in dbContext.PortalMessages.AsNoTracking()
-            join thread in dbContext.MessageThreads.AsNoTracking()
-                on message.ThreadId equals thread.Id
-            where thread.StaffVisible &&
-                  thread.ClosedUtc == null &&
-                  message.SenderUserId != staffUserId &&
-                  (message.SenderKind != PortalMessageSenderKind.FfpStaff ||
-                   thread.Audience == MessageAudience.FfpInternal)
-            select message.Id)
-            .ToArrayAsync(cancellationToken);
-
-        if (messageIds.Length == 0)
-        {
-            return;
-        }
-
-        Guid[] existing = await dbContext.MessageRecipients
-            .AsNoTracking()
-            .Where(recipient =>
-                recipient.UserId == staffUserId &&
-                messageIds.Contains(recipient.MessageId))
-            .Select(recipient => recipient.MessageId)
-            .ToArrayAsync(cancellationToken);
-
-        HashSet<Guid> existingSet = existing.ToHashSet();
-        foreach (Guid messageId in messageIds.Where(id => !existingSet.Contains(id)))
-        {
-            dbContext.MessageRecipients.Add(
-                new MessageRecipient(messageId, staffUserId));
-        }
-
-        if (dbContext.ChangeTracker.HasChanges())
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-    }
-
-    private async Task EnsureSharedStaffThreadRecipientsAsync(
-        Guid staffUserId,
-        Guid threadId,
-        CancellationToken cancellationToken)
-    {
-        await EnsureInternalStaffAsync(staffUserId, cancellationToken);
-
-        Guid[] messageIds = await (
-            from message in dbContext.PortalMessages.AsNoTracking()
-            join thread in dbContext.MessageThreads.AsNoTracking()
-                on message.ThreadId equals thread.Id
-            where message.ThreadId == threadId &&
-                  message.SenderUserId != staffUserId &&
-                  (message.SenderKind != PortalMessageSenderKind.FfpStaff ||
-                   thread.Audience == MessageAudience.FfpInternal)
-            select message.Id)
-            .ToArrayAsync(cancellationToken);
-
-        Guid[] existing = await dbContext.MessageRecipients
-            .AsNoTracking()
-            .Where(recipient =>
-                recipient.UserId == staffUserId &&
-                messageIds.Contains(recipient.MessageId))
-            .Select(recipient => recipient.MessageId)
-            .ToArrayAsync(cancellationToken);
-
-        HashSet<Guid> existingSet = existing.ToHashSet();
-        foreach (Guid messageId in messageIds.Where(id => !existingSet.Contains(id)))
-        {
-            dbContext.MessageRecipients.Add(
-                new MessageRecipient(messageId, staffUserId));
-        }
-
-        if (dbContext.ChangeTracker.HasChanges())
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
+        string responsibility = operational ? StaffNotificationRouting.Operations : StaffNotificationRouting.Intake;
+        logger.LogWarning("NotificationRoutingMissing: no eligible {Responsibility} recipients. Configure Admin > Notification Routing. Alert/correspondence is retained; no all-staff fallback.", responsibility);
+        dbContext.AuditEntries.Add(new RequestPortal.Domain.Auditing.AuditEntry(Guid.NewGuid(), Guid.Empty,
+            "NotificationRoutingMissing", "NotificationRouting", Guid.Empty, null, DateTimeOffset.UtcNow,
+            $"Configure Admin > Notification Routing: {responsibility}. No eligible recipients; no broadcast.", outcome: "Warning"));
     }
 
     private async Task<IReadOnlyList<MailboxMessageView>> GetStaffQueueAsync(
@@ -1576,13 +1501,12 @@ public sealed class PortalMessageService : IPortalMessageService
     {
         await EnsureInternalStaffAsync(staffUserId, cancellationToken);
 
-        return await dbContext.MessageThreads
-            .SingleOrDefaultAsync(
-                item =>
-                    item.Id == threadId &&
-                    item.StaffVisible &&
-                    item.ClosedUtc == null,
-                cancellationToken) ?? throw new MessageThreadNotFoundException();
+        MessageThread thread = await dbContext.MessageThreads.SingleOrDefaultAsync(
+            item => item.Id == threadId && item.StaffVisible && item.ClosedUtc == null, cancellationToken)
+            ?? throw new MessageThreadNotFoundException();
+        if (!await CanViewThreadAsync(staffUserId, true, thread, cancellationToken))
+            throw new UnauthorizedAccessException("The current user cannot manage this conversation.");
+        return thread;
     }
 
     private async Task EnsureInternalStaffAsync(

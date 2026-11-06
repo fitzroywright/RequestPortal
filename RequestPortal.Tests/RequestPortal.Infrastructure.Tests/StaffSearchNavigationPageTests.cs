@@ -106,10 +106,11 @@ public sealed class StaffSearchNavigationPageTests
         {
             data.Reads++;
             if (method == "GetApplicantsAsync") return Task.FromResult<IReadOnlyDictionary<Guid, StaffRequestSearchRow>>(new Dictionary<Guid, StaffRequestSearchRow> { [RequestId] = data.Row });
-            if (method == "GetSubmittedQueueAsync")
+            if (method is "GetSubmittedQueueAsync" or "GetFilteredQueueAsync")
             {
-                int pageSize=(int)args[1]!;pageSize=pageSize is 25 or 50 or 100?pageSize:25;
-                int page=Math.Clamp((int)args[0]!,1,(int)Math.Ceiling(46d/pageSize));
+                int offset = method == "GetFilteredQueueAsync" ? 3 : 0;
+                int pageSize=(int)args[offset+1]!;pageSize=pageSize is 25 or 50 or 100?pageSize:25;
+                int page=Math.Clamp((int)args[offset]!,1,(int)Math.Ceiling(46d/pageSize));
                 return Task.FromResult(new StaffRequestSearchResult(data.QueueRows.Skip((page-1)*pageSize).Take(pageSize).ToArray(),46,page,pageSize,null));
             }
             string search = (string)args[0]!;
@@ -175,6 +176,7 @@ public sealed class StaffSearchNavigationPageTests
             .AddScheme<AuthenticationSchemeOptions, Authentication>(IdentityConstants.ApplicationScheme, _ => { });
         var assembly = typeof(ReviewModel).Assembly;
         assembly.GetType("RequestPortal.Web.Startup.AuthorizationServiceRegistration")!.GetMethod("Add")!.Invoke(null, [builder]);
+        builder.Services.AddPageAuthorizationFixture();
         var app = builder.Build(); assembly.GetType("RequestPortal.Web.Startup.ApplicationPipeline")!.GetMethod("Configure")!.Invoke(null, [app]); app.MapRazorPages();
         await app.StartAsync(TestContext.Current.CancellationToken);
         var client = app.GetTestServer().CreateClient(); client.BaseAddress = new("https://localhost"); client.DefaultRequestHeaders.Add("X-Test-Actor", actor);
@@ -195,11 +197,11 @@ public sealed class StaffSearchNavigationPageTests
         using var queue = await f.Get("/Staff"); Assert.Equal(HttpStatusCode.OK, queue.StatusCode);
         string html = await queue.Content.ReadAsStringAsync(TestContext.Current.CancellationToken); Snapshot("queue", html);
         Assert.Contains("Showing 1", html); Assert.Contains("25 of 46 requests", html); Assert.Contains("Page 1 of 2", html); Assert.DoesNotContain("View queue", html); Assert.DoesNotContain("View all submitted requests", html);
-        Assert.Contains("John Brown", html); Assert.DoesNotContain("Registered requester", html); Assert.Contains("Search by applicant name or request reference...", html);
-        var orgLink = Regex.Match(html, "data-row-href=\"([^\"]*Staff/Organization[^\"]*)\""); Assert.Contains("?id=" + Organization, Href(orgLink, "data-row-href"));
+        Assert.Contains("John Brown", html); Assert.DoesNotContain("Registered requester", html); Assert.Contains("Filter requests by applicant", html);
+        var requestLink = Regex.Match(html, "data-row-href=\"([^\"]*Staff/Review[^\"]*)\""); Assert.Contains("/Staff/Review/" + RequestId, Href(requestLink, "data-row-href"));
         using var result = await f.Get("/Staff?Search=John&PageNumber=1"); Assert.Equal(HttpStatusCode.OK, result.StatusCode);
         html = await result.Content.ReadAsStringAsync(TestContext.Current.CancellationToken); Snapshot("search", html);
-        Assert.Contains("John Brown", html); Assert.Contains("Clear Search", html); Assert.Contains("PageNumber=2", html); Assert.Contains("Search=John", html); Assert.Contains("/Staff/Review/" + RequestId, html);
+        Assert.Contains("John Brown", html); Assert.Contains("Search results", html); Assert.Contains("PageNumber=2", html); Assert.Contains("Search=John", html); Assert.Contains("/Staff/Review/" + RequestId, html);
         Assert.DoesNotContain("Requests Awaiting Review", html);
         Assert.Contains("Showing 1", html); Assert.Contains("of 101 requests", html);
         using var sized = await f.Get("/Staff?Search=John&PageSize=50&PageNumber=2");
@@ -208,6 +210,9 @@ public sealed class StaffSearchNavigationPageTests
         Assert.Contains("PageSize=50", sizedHtml); Assert.Contains("Search=John", sizedHtml);
         using var search50=await f.Get("/Staff?Search=John&PageSize=50");Snapshot("search-50",await search50.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
 
+        using var cleared = await f.Get("/Staff");
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        Assert.DoesNotContain("id=\"search-results-title\"", await cleared.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         using var none = await f.Get("/Staff?Search=none"); Assert.Contains("No requests match", await none.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         foreach (string query in new[] { "Search=req-fixture", "requestCode=REQ-FIXTURE" })
         { using var exact = await f.Get("/Staff?" + query); Assert.Equal(HttpStatusCode.Redirect, exact.StatusCode); Assert.Equal("/Staff/Review/" + RequestId, exact.Headers.Location!.OriginalString); }
@@ -303,7 +308,7 @@ public sealed class StaffSearchNavigationPageTests
         Snapshot(actor=="Administrator"?"integrations":"integrations-reviewer",html);
         using var original=await fixture.Get("/Staff/Review/"+RequestId);
         Assert.Contains("FFP Manager transfer: Failed",await original.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-        using var queue=await fixture.Get("/Staff");Assert.Contains("Integration failures / reconciliation",await queue.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var queue=await fixture.Get("/Staff");Assert.Contains("/Staff/Integrations",await queue.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Contains("value=\"John\"",html);
         Assert.Matches("<option(?=[^>]*value=\"Failed\")(?=[^>]*selected)[^>]*>",html);
         using var invalid=await fixture.Get("/Staff/Integrations?From=2026-12-31&Through=2026-01-01");Assert.Equal(HttpStatusCode.BadRequest,invalid.StatusCode);

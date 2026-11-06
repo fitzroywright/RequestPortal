@@ -91,6 +91,7 @@ public sealed class ManagementDashboardPageTests
                 services.AddSingleton(DispatchProxy.Create<IUserStore<ApplicationUser>, Users>());
                 services.AddSingleton<IManagementDashboardService>(service);
                 services.AddAuthentication(StaffOidcOptions.StaffCookieScheme).AddScheme<AuthenticationSchemeOptions, Authentication>(StaffOidcOptions.StaffCookieScheme, _ => { });
+                services.AddPageAuthorizationFixture();
                 services.AddAuthorization(options => options.AddPolicy(PortalPolicies.ManagementDashboard, policy =>
                 {
                     policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme); policy.RequireAuthenticatedUser();

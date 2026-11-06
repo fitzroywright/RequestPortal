@@ -152,6 +152,7 @@ public sealed class MessageNavigationPageTests
         // Exercise the actual production conventions, policies, exception handler and 404 middleware.
         var assembly = typeof(ThreadModel).Assembly;
         assembly.GetType("RequestPortal.Web.Startup.AuthorizationServiceRegistration")!.GetMethod("Add")!.Invoke(null, [builder]);
+        builder.Services.AddPageAuthorizationFixture();
         var app = builder.Build();
         assembly.GetType("RequestPortal.Web.Startup.ApplicationPipeline")!.GetMethod("Configure")!.Invoke(null, [app]);
         app.MapRazorPages();

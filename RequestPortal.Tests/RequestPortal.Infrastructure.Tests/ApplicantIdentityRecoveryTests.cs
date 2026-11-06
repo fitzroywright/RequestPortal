@@ -213,6 +213,7 @@ public sealed class ApplicantIdentityRecoveryTests
             });
         var assembly=typeof(RequestPortal.Web.Pages.Account.IdentityRecoveryModel).Assembly;
         assembly.GetType("RequestPortal.Web.Startup.AuthorizationServiceRegistration")!.GetMethod("Add")!.Invoke(null,[builder]);
+        builder.Services.AddPageAuthorizationFixture();
         var app=builder.Build();assembly.GetType("RequestPortal.Web.Startup.ApplicationPipeline")!.GetMethod("Configure")!.Invoke(null,[app]);app.MapRazorPages();await app.StartAsync(Ct);
         var client=app.GetTestServer().CreateClient();client.BaseAddress=new("https://localhost");return new(){App=app,Client=client};
     }

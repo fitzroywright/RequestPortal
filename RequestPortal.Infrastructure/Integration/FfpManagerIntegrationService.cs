@@ -1,3 +1,4 @@
+using RequestPortal.Infrastructure.Messages;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
     private readonly FfpManagerBridgeOptions options;
     private readonly IClock clock;
     private readonly IPortalMessageService portalMessageService;
+    private readonly StaffNotificationRouting routing;
     private readonly ILogger<FfpManagerIntegrationService>? logger;
 
     public FfpManagerIntegrationService(
@@ -35,7 +37,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         IOptions<FfpManagerBridgeOptions> options,
         IClock clock,
         IPortalMessageService portalMessageService,
-        ILogger<FfpManagerIntegrationService>? logger = null)
+        ILogger<FfpManagerIntegrationService>? logger = null,
+        StaffNotificationRouting? routing = null)
     {
         this.dbContext = dbContext;
         this.documentService = documentService;
@@ -43,6 +46,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         this.options = options.Value;
         this.clock = clock;
         this.portalMessageService = portalMessageService;
+        this.routing = routing ?? new StaffNotificationRouting(dbContext);
         this.logger = logger;
     }
 
@@ -349,6 +353,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             .ToArrayAsync(cancellationToken);
 
         Guid[] recipients = subscribedManagerIds
+            .Concat(await routing.RecipientsAsync(request.Id, false, cancellationToken))
             .Append(primaryRecipientUserId)
             .Distinct()
             .ToArray();

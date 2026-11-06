@@ -28,6 +28,7 @@ public sealed class PortalMessagingTests
         database.Db.Organizations.Add(organization);
         RequestPortal.Domain.Requests.AssistanceRequest request = new(Guid.NewGuid(), "RP-26-18427", organization.Id, applicant.Id, Now);
         database.Db.AssistanceRequests.Add(request);
+        database.Db.UserClaims.Add(new Microsoft.AspNetCore.Identity.IdentityUserClaim<Guid> { UserId = staff.Id, ClaimType = StaffNotificationRouting.ClaimType, ClaimValue = StaffNotificationRouting.Intake });
         await database.Db.SaveChangesAsync(cancellationToken);
         PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
 
@@ -76,6 +77,7 @@ public sealed class PortalMessagingTests
 
         Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
         database.Db.Organizations.Add(organization);
+        database.Db.UserClaims.Add(new Microsoft.AspNetCore.Identity.IdentityUserClaim<Guid> { UserId = staff.Id, ClaimType = StaffNotificationRouting.ClaimType, ClaimValue = StaffNotificationRouting.Intake });
         await database.Db.SaveChangesAsync(cancellationToken);
 
         CapturingRealtimeNotifier realtime = new();
@@ -191,7 +193,7 @@ public sealed class PortalMessagingTests
     }
 
     [Fact]
-    public async Task SystemMessage_AppearsForRepresentativeAndSharedStaffInbox()
+    public async Task SystemMessage_UsesOnlyExplicitRecipientsEvenWhenIntakeIsConfigured()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         await using PostgreSqlTestDatabase database = await PostgreSqlTestDatabase.CreateAsync(cancellationToken);
@@ -202,6 +204,7 @@ public sealed class PortalMessagingTests
 
         Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
         database.Db.Organizations.Add(organization);
+        database.Db.UserClaims.Add(new Microsoft.AspNetCore.Identity.IdentityUserClaim<Guid> { UserId = staff.Id, ClaimType = StaffNotificationRouting.ClaimType, ClaimValue = StaffNotificationRouting.Intake });
         await database.Db.SaveChangesAsync(cancellationToken);
 
         CapturingRealtimeNotifier realtime = new();
@@ -218,16 +221,14 @@ public sealed class PortalMessagingTests
 
         MailboxMessageView representativeInbox = Assert.Single(
             await service.GetInboxAsync(representative.Id, false, cancellationToken: cancellationToken));
-        MailboxMessageView staffInbox = Assert.Single(
-            await service.GetInboxAsync(staff.Id, true, cancellationToken: cancellationToken));
+        Assert.Empty(await service.GetInboxAsync(staff.Id, true, cancellationToken: cancellationToken));
 
         Assert.Equal("FFP Request Processing", representativeInbox.SenderName);
         Assert.Equal("FFP", representativeInbox.SenderKind);
-        Assert.Equal(threadId, staffInbox.ThreadId);
         Assert.Contains(realtime.Messages, item =>
             item.ThreadId == threadId &&
             item.RecipientUserIds.Contains(representative.Id) &&
-            item.RecipientUserIds.Contains(staff.Id));
+            !item.RecipientUserIds.Contains(staff.Id));
     }
 
     [Fact]
@@ -301,6 +302,7 @@ public sealed class PortalMessagingTests
 
         Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
         database.Db.Organizations.Add(organization);
+        database.Db.UserClaims.Add(new Microsoft.AspNetCore.Identity.IdentityUserClaim<Guid> { UserId = staff.Id, ClaimType = StaffNotificationRouting.ClaimType, ClaimValue = StaffNotificationRouting.Intake });
         await database.Db.SaveChangesAsync(cancellationToken);
 
         PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
@@ -366,6 +368,7 @@ public sealed class PortalMessagingTests
 
         Organization organization = CreateApprovedOrganization(representative.Id, "Community Group");
         database.Db.Organizations.Add(organization);
+        database.Db.UserClaims.Add(new Microsoft.AspNetCore.Identity.IdentityUserClaim<Guid> { UserId = staff.Id, ClaimType = StaffNotificationRouting.ClaimType, ClaimValue = StaffNotificationRouting.Intake });
         await database.Db.SaveChangesAsync(cancellationToken);
 
         PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());
@@ -423,6 +426,7 @@ public sealed class PortalMessagingTests
                 representative.Id,
                 Now));
 
+        database.Db.UserClaims.Add(new Microsoft.AspNetCore.Identity.IdentityUserClaim<Guid> { UserId = staff.Id, ClaimType = StaffNotificationRouting.ClaimType, ClaimValue = StaffNotificationRouting.Intake });
         await database.Db.SaveChangesAsync(cancellationToken);
 
         PortalMessageService service = CreateService(database.Db, new CapturingRealtimeNotifier());

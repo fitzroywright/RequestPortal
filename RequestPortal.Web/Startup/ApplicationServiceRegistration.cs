@@ -71,6 +71,9 @@ internal static class ApplicationServiceRegistration
             , PortalMessageService>();
 
         builder.Services.AddScoped<MessageArchiveService>();
+        builder.Services.AddScoped<IStaffNotificationAccess, StaffNotificationAccess>();
+        builder.Services.AddScoped<StaffNotificationRouting>();
+        builder.Services.AddScoped<NotificationRoutingAdministration>();
 
         builder.Services.AddScoped<
             INotificationPreferenceService

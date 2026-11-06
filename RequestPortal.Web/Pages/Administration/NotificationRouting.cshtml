@@ -1,0 +1,27 @@
+@page
+@model RequestPortal.Web.Pages.Administration.NotificationRoutingModel
+@{ ViewData["Title"] = "Notification Routing"; }
+@section Styles { <link rel="stylesheet" href="~/css/staff-administration.css" asp-append-version="true" /> }
+<section class="section staff-administration"><div class="shell">
+<div class="eyebrow">Administration</div><div class="staff-page-heading"><h1>Notification Routing</h1></div>
+<p>Designate the staff responsible for intake and operational escalation. Roles alone do not subscribe staff to messages. Assignments route request notifications to the assigned staff member.</p>
+<div asp-validation-summary="All" class="flash error" role="alert"></div>
+@if (!Model.Entries.Any(e => e.Eligible && e.Intake)) {
+    <div class="flash error" role="alert">No eligible intake recipients are configured. New requests continue processing, but intake alerts have no staff recipient. Select the responsible Client Relations staff below. There is no all-staff fallback.</div>
+}
+@if (!Model.Entries.Any(e => e.Eligible && e.Operations)) {
+    <div class="flash error" role="alert">No eligible operational escalation recipients are configured. Failure alerts are retained and an operational warning is recorded.</div>
+}
+<div class="staff-table-scroll"><table><thead><tr><th>Staff member</th><th>Access</th><th>Responsibilities</th></tr></thead><tbody>
+@foreach (var entry in Model.Entries) {
+    <tr><td>@entry.Name</td><td><span class="status @(entry.Eligible ? "status-approved" : "status-rejected")">@(entry.Eligible ? "Eligible" : "Inactive or unauthorized")</span></td><td>
+    <form method="post" class="action-row">
+        <input type="hidden" name="StaffUserId" value="@entry.Id" /><input type="hidden" name="Version" value="@entry.Version" />
+        <label><input type="checkbox" name="Intake" value="true" checked="@entry.Intake" /> Client Relations / intake</label>
+        <label><input type="checkbox" name="Operations" value="true" checked="@entry.Operations" /> Operational escalation</label>
+        <button type="submit" class="button button-small">Save</button>
+    </form></td></tr>
+}
+</tbody></table></div>
+<p class="muted">Changes affect future delivery and current message access. Historical messages, recipients, and audit trails are preserved. Recipients must have active staff access and request-review permission.</p>
+</div></section>
