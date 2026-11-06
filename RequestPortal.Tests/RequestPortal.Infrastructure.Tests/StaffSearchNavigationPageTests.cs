@@ -50,7 +50,7 @@ public sealed class StaffSearchNavigationPageTests
 
         public bool Archived;
         public StaffRequestSearchRow Row => new() { RequestId = RequestId, PublicReference = "REQ-FIXTURE", ApplicantName = "John Brown", OrganizationName = "Fixture organization", Category = "Food", ReceivedUtc = DateTimeOffset.UtcNow, Status = RequestStatus.Submitted };
-        public IReadOnlyList<StaffRequestSearchRow> QueueRows => Enumerable.Range(0,46).Select(i=>new StaffRequestSearchRow { RequestId=i==0?RequestId:Guid.Parse($"33333333-3333-4333-8333-{i:D12}"),PublicReference=i==0?"REQ-FIXTURE":$"REQ-QUEUE-{i:D3}",ApplicantName="John Brown",OrganizationName="Fixture organization",Summary="Queue summary",ReceivedUtc=DateTimeOffset.UtcNow.AddDays(-i),CreatedUtc=DateTimeOffset.UtcNow.AddDays(-i),Status=RequestStatus.Submitted }).ToArray();
+        public IReadOnlyList<StaffRequestSearchRow> QueueRows => Enumerable.Range(0,46).Select(i=>new StaffRequestSearchRow { RequestId=i==0?RequestId:Guid.Parse($"33333333-3333-4333-8333-{i:D12}"),PublicReference=i==0?"REQ-FIXTURE":$"REQ-QUEUE-{i:D3}",ApplicantName="John Brown",OrganizationName="Fixture organization",Summary="Queue summary",ReceivedUtc=DateTimeOffset.UtcNow.AddDays(-i),CreatedUtc=new DateTimeOffset(2020,1,1,0,0,0,TimeSpan.Zero),SubmittedUtc=i==0?null:new DateTimeOffset(2026,11,5,12,0,0,TimeSpan.Zero),Status=RequestStatus.Submitted }).ToArray();
         public DocumentSummary Document(Guid id) => new(id, DocumentType.RequestSupport, "evidence.pdf", "application/pdf", 12, DateTimeOffset.UtcNow, DocumentVerificationStatus.Pending, DocumentRetentionClass.RequestEvidence, null, false, null);
         public StaffOperationsSnapshot Snapshot => new([], [new(Organization, "Fixture organization", "JM", DateOnly.FromDateTime(DateTime.UtcNow), "Approved", 0)], [], [],
             [new(OrgDocument, Organization, "Fixture organization", DocumentType.OrganizationRegistrationCertificate, "registration.pdf", DateTimeOffset.UtcNow, 1),
@@ -228,6 +228,16 @@ public sealed class StaffSearchNavigationPageTests
             string html=await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
             var panel=Regex.Match(html,"<main class=\"workspace-panel request-panel\">(.*?)</main>",RegexOptions.Singleline).Value;
             Assert.Equal(sample.Rows,Regex.Matches(panel,"<tr class=\"staff-select-row\"").Count);
+            var headers = Regex.Matches(panel, "<th(?:\\s[^>]*)?>.*?</th>", RegexOptions.Singleline);
+            Assert.Equal(6, headers.Count);
+            Assert.Contains("Date Submitted", headers[5].Value);
+            Assert.DoesNotContain("staff-age-column", panel);
+            Assert.DoesNotContain("ageDays", panel);
+            Assert.Contains("05 Nov 2026", panel);
+            Assert.DoesNotContain("01 Jan 2020", panel);
+            if (!sample.Query.Contains("PageNumber=2"))
+                Assert.Matches("staff-submitted-column[\"]>(?:—|&#x2014;)</td>", panel);
+
             Assert.Contains(sample.Range,panel);Assert.Contains(sample.Page,panel);Assert.Contains("Requests per page",panel);
             Snapshot(sample.Query.Contains("PageNumber=2")?"queue-page-2":sample.Query.Contains("50")?"queue-size-50":sample.Query.Contains("100")?"queue-size-100":"queue",html);
             foreach(Match row in Regex.Matches(panel,"<tr class=\"staff-select-row\".*?</tr>",RegexOptions.Singleline))

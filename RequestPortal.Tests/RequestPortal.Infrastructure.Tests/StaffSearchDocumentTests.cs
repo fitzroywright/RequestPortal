@@ -81,7 +81,10 @@ public sealed class StaffSearchDocumentTests
             Assert.Equal(result.Items.Select(x => x.RequestId), (await service.SearchAsync(value, 1, ct)).Items.Select(x => x.RequestId));
             Assert.Contains(exact.Id, result.Items.Concat(second.Items).Select(x => x.RequestId)); // Declined is searchable too.
         }
-        Assert.Equal(representativeRequest.Id, Assert.Single((await service.SearchAsync("Marcia Williams", cancellationToken: ct)).Items).RequestId);
+        var submittedRow = Assert.Single((await service.SearchAsync("Marcia Williams", cancellationToken: ct)).Items);
+        Assert.Equal(representativeRequest.Id, submittedRow.RequestId);
+        Assert.Equal(now, submittedRow.SubmittedUtc);
+        Assert.Null(Assert.Single((await service.SearchAsync("Alicia Campbell", cancellationToken: ct)).Items).SubmittedUtc);
         Assert.DoesNotContain(representativeRequest.Id, (await service.SearchAsync("Record Creator", cancellationToken: ct)).Items.Select(x => x.RequestId));
         var campbells = await service.SearchAsync("Campbell", cancellationToken: ct);
         Assert.Equal(2, campbells.TotalCount);
