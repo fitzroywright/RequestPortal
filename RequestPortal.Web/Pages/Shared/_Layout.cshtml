@@ -63,7 +63,7 @@
 <body class="@(useApplicationShell ? "authenticated-app" : "public-site") @ViewData["BodyClass"]">
     <header class="site-header @(useApplicationShell ? "app-header" : null)">
         <div class="shell nav-shell @(useApplicationShell ? "app-nav-shell" : null)">
-            <a class="brand @(useApplicationShell ? "app-brand" : null)" asp-page="/Index">
+            <a class="brand @(useApplicationShell ? "app-brand" : null)" asp-page="@(isFfpStaff ? "/Staff/Index" : "/Index")">
                 @if (useApplicationShell)
                 {
                     @if (string.Equals(currentPage, "/Staff/Integrations", StringComparison.OrdinalIgnoreCase))
