@@ -1,0 +1,109 @@
+@page
+@model RequestPortal.Web.Pages.Administration.WhatsAppSettingsModel
+@using RequestPortal.Web.Pages.Administration
+@{ ViewData["Title"] = "WhatsApp Settings"; }
+@section Styles { <link rel="stylesheet" href="~/css/staff-administration.css" asp-append-version="true" /> }
+<section class="section staff-administration"><div class="shell">
+<div class="eyebrow">Administration</div>
+<div class="staff-page-heading"><h1>WhatsApp Settings</h1></div>
+<p>Manage the configured WhatsApp connection and authorized test messaging. Automatic notifications to applicants remain disabled.</p>
+@if (Model.Alert is not null) { <div class="flash error" role="alert">@Model.Alert</div> }
+
+<section class="staff-disclosure" aria-labelledby="connection-heading">
+<h2 id="connection-heading">Connection</h2>
+<dl class="staff-facts">
+    <div><dt>Connection health</dt><dd><span class="@WhatsAppSettingsModel.CheckClass(Model.Readiness?.Ready)" role="status">@(Model.Readiness is null ? "Not checked" : Model.Readiness.Ready ? "Connected" : "Needs attention")</span></dd></div>
+    <div><dt>Configured sender</dt><dd><span class="@WhatsAppSettingsModel.CheckClass(Model.SenderConfigured)">@(Model.SenderConfigured ? "Configured" : "Needs attention")</span> Meta test sender · Phone Number ID @Model.SenderId</dd></div>
+    <div><dt>Meta messaging permission</dt><dd><span class="@WhatsAppSettingsModel.CheckClass(Model.PermissionVerified)">@WhatsAppSettingsModel.CheckLabel(Model.PermissionVerified)</span></dd></div>
+    <div><dt>Template availability</dt><dd><span class="@WhatsAppSettingsModel.CheckClass(Model.TemplateAvailable)">@(Model.TemplateAvailable is null ? "Not checked" : Model.TemplateAvailable == true ? "hello_world / en_US available" : "Approval not confirmed")</span></dd></div>
+</dl>
+<form method="post" asp-page-handler="Check" class="action-row"><button class="button button-small" type="submit">Check connection</button></form>
+@if (Model.Readiness is { } readiness) { <p class="muted">@WhatsAppSettingsModel.StageLabel(readiness.Stage)</p> }
+</section>
+
+<section class="staff-disclosure" aria-labelledby="configuration-heading">
+<h2 id="configuration-heading">Configuration</h2>
+<dl class="staff-facts">
+    <div><dt>Graph API version</dt><dd>@Model.ApiVersion</dd></div>
+    <div><dt>Credentials</dt><dd>Managed exclusively in OpenBao</dd></div>
+    <div><dt>Automatic outbound notifications</dt><dd><span class="@(Model.AutomaticDeliveryEnabled ? "status status-rejected" : "status")">@(Model.AutomaticDeliveryEnabled ? "Unexpectedly enabled — test messaging blocked" : "Disabled")</span></dd></div>
+    <div><dt>Authorized test template</dt><dd>hello_world · English (US)</dd></div>
+</dl>
+<p class="muted">Connection settings and credentials are managed by the existing protected production configuration. Tokens and secrets are never displayed here.</p>
+</section>
+
+<section class="staff-disclosure" aria-labelledby="test-messaging-heading">
+<h2 id="test-messaging-heading">Test Messaging</h2>
+@if (Model.Test is not { } test)
+{
+    @if (Model.OperationId is not null)
+    {
+        <p role="status">Operation status is unavailable. Refresh this operation before authorizing a replacement; an earlier send may already have been accepted.</p>
+        <a class="button button-outline button-small" asp-page="/Administration/WhatsAppSettings" asp-route-OperationId="@Model.OperationId">Refresh operation status</a>
+    }
+    else
+    {
+        <p>Verify the recipient in Meta's API Setup test-recipient list. Enter the same E.164 number twice, including + and country code. Authorization expires after ten minutes and does not send a message.</p>
+        <form method="post" asp-page-handler="Authorize" class="form-grid" autocomplete="off">
+            <div class="staff-fields">
+                <div class="field"><label asp-for="Recipient">Verified test recipient</label><input asp-for="Recipient" type="password" autocomplete="new-password" maxlength="16" required /></div>
+                <div class="field"><label asp-for="RepeatRecipient">Repeat recipient</label><input asp-for="RepeatRecipient" type="password" autocomplete="new-password" maxlength="16" required /></div>
+            </div>
+            <label><input asp-for="VerifiedInMeta" /> I confirm this recipient is verified in Meta's test-recipient list.</label>
+            <label><input asp-for="AuthorizeRecipient" /> I explicitly authorize this recipient for one hello_world test.</label>
+            <div class="action-row"><button class="button" type="submit">Authorize recipient only</button></div>
+        </form>
+    }
+}
+else
+{
+    <dl class="staff-facts">
+        <div><dt>Operation</dt><dd>@test.Id</dd></div>
+        <div><dt>Send status</dt><dd><span class="@WhatsAppSettingsModel.StateClass(test.State)">@WhatsAppSettingsModel.StateLabel(test.State)</span></dd></div>
+        <div><dt>Authorized (UTC)</dt><dd>@test.AuthorizedUtc.ToString("u")</dd></div>
+        <div><dt>Authorization expires (UTC)</dt><dd>@test.ExpiresUtc.ToString("u")</dd></div>
+    </dl>
+    @if (test.State == "Authorized")
+    {
+        <form method="post" asp-page-handler="Send" class="form-grid">
+            <input type="hidden" asp-for="OperationId" />
+            <div class="field"><label asp-for="Confirmation">To explicitly authorize one send, type SEND HELLO_WORLD</label><input asp-for="Confirmation" autocomplete="off" required /></div>
+            <div class="action-row"><button class="button" type="submit">Send hello_world once</button></div>
+        </form>
+    }
+    else
+    {
+        <p>This authorization cannot be reused. Meta acceptance is not proof of delivery. Pending or unknown outcomes must not be retried blindly.</p>
+    }
+}
+</section>
+
+<section class="staff-disclosure" aria-labelledby="delivery-heading">
+<h2 id="delivery-heading">Delivery &amp; Diagnostics</h2>
+@if (Model.Readiness is { Ready: false } check)
+{
+    <p role="status">Connection check needs attention: @WhatsAppSettingsModel.StageLabel(check.Stage).</p>
+    @if (check.HttpStatus is not null || check.ErrorCode is not null) { <p>HTTP status: @(check.HttpStatus?.ToString() ?? "Not returned") · Meta error: @(check.ErrorCode?.ToString() ?? "Not returned") · Subcode: @(check.ErrorSubcode?.ToString() ?? "Not returned")</p> }
+}
+@if (Model.Test is { } result)
+{
+    <dl class="staff-facts">
+        <div><dt>Attempted (UTC)</dt><dd>@(result.AttemptedUtc?.ToString("u") ?? "Not attempted")</dd></div>
+        <div><dt>Result recorded (UTC)</dt><dd>@(result.CompletedUtc?.ToString("u") ?? "Pending")</dd></div>
+        <div><dt>HTTP status</dt><dd>@(result.HttpStatus?.ToString() ?? "Not returned")</dd></div>
+        <div><dt>Meta error / subcode</dt><dd>@(result.ErrorCode?.ToString() ?? "None recorded") / @(result.ErrorSubcode?.ToString() ?? "None recorded")</dd></div>
+        <div><dt>Message ID fingerprint</dt><dd>@(result.MessageIdFingerprint ?? "Not available")</dd></div>
+    </dl>
+    @if (result.Delivery.Count == 0) { <p role="status">No processed delivery-status receipt has been correlated yet.</p> }
+    else
+    {
+        <div class="staff-table-scroll"><table><thead><tr><th scope="col">Delivery status</th><th scope="col">Recorded (UTC)</th><th scope="col">Error codes</th></tr></thead><tbody>
+        @foreach (var delivery in result.Delivery) { <tr><td><span class="@WhatsAppSettingsModel.StateClass(delivery.State)">@WhatsAppSettingsModel.StateLabel(delivery.State)</span></td><td>@delivery.RecordedUtc?.ToString("u")</td><td>@(delivery.ErrorCodes.Count == 0 ? "None" : string.Join(", ", delivery.ErrorCodes))</td></tr> }
+        </tbody></table></div>
+    }
+    <div class="staff-controls"><a class="button button-outline button-small" asp-page="/Administration/WhatsAppSettings" asp-route-OperationId="@result.Id">Refresh delivery status</a></div>
+}
+else { <p>Authorized test results and delivery receipts appear here after a test operation. Refreshing status never sends a message.</p> }
+<p class="muted">Delivery is confirmed by a delivered or read webhook receipt. Diagnostics show only safe status information and numeric error codes.</p>
+</section>
+</div></section>

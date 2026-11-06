@@ -11,8 +11,15 @@ internal static class AuthorizationServiceRegistration
 {
     public static void Add(WebApplicationBuilder builder)
     {
+        builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, WhatsAppSettingsAdministratorHandler>();
+        builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler, WhatsAppSettingsAuthorizationResultHandler>();
         builder.Services.AddAuthorization(options =>
         {
+            options.AddPolicy(WhatsAppSettingsAdministratorRequirement.Policy, policy => {
+                policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new WhatsAppSettingsAdministratorRequirement());
+            });
             options.AddPolicy("StaffAdministration", policy => {
                 policy.AuthenticationSchemes.Add(StaffOidcOptions.StaffCookieScheme);
                 policy.RequireAuthenticatedUser();

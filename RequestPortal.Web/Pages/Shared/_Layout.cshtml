@@ -1,4 +1,5 @@
 @inject IConfiguration Configuration
+@inject Microsoft.AspNetCore.Authorization.IAuthorizationService NavigationAuthorization
 @inject Microsoft.AspNetCore.Identity.UserManager<RequestPortal.Infrastructure.Identity.ApplicationUser> LayoutUserManager
 @using System.Security.Claims
 @{
@@ -113,7 +114,10 @@
                                     {
                                         <a asp-page="/Administration/Staff">Staff &amp; Roles</a>
                                         <a asp-page="/Administration/ApplicantAccounts">Accounts and Identity</a>
-                                        <a asp-page="/Administration/WhatsAppCommissioning">WhatsApp test</a>
+                                        @if ((await NavigationAuthorization.AuthorizeAsync(User, null, RequestPortal.Web.Security.WhatsAppSettingsAdministratorRequirement.Policy)).Succeeded)
+                                        {
+                                            <a asp-page="/Administration/WhatsAppSettings">WhatsApp Settings</a>
+                                        }
                                     }
                                     <a asp-page="/Staff/Integrations">Integrations</a>
                                 </div>

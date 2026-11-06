@@ -1,6 +1,6 @@
-# Administrator-controlled WhatsApp test
+# WhatsApp Settings administration
 
-The administrator page `/Administration/WhatsAppCommissioning` uses the existing
+The administrator page `/Administration/WhatsAppSettings` uses the existing
 Common.Messaging `WhatsAppMessageChannel`, template serializer and Common.Secrets
 resolver. It does not register a WhatsApp channel in the shared notification queue.
 `Notifications:WhatsAppEnabled` must remain false; the inbound webhook must remain
@@ -12,9 +12,19 @@ are part of this feature.
 
 ## Readiness and explicit authorization
 
-An active staff administrator with `security.manage` opens **Admin → WhatsApp test**.
-Every action uses the existing StaffAdministration policy and rechecks the active
-account/current administrator grants. Razor Pages antiforgery protection applies.
+An active staff administrator with `security.manage` opens **Admin → WhatsApp Settings**.
+The page, menu entry and every handler require the current existing Administrator
+role through Common.Security, in addition to the existing staff access/security
+permissions. Every action still rechecks the active account and administrator grants.
+Role claims alone do not establish membership. Unauthenticated requests are challenged;
+authenticated non-administrators receive HTTP 403, including on the legacy URL.
+Razor Pages antiforgery protection applies. Other pages retain their existing
+challenge/access-denied behavior.
+
+The permanent page uses the shared administration layout and status indicators, in
+Connection, Configuration, Test Messaging, and Delivery & Diagnostics sections.
+Credentials remain in OpenBao. The old URL redirects bookmarks and preserves submitted
+form methods/consent when forwarding to Settings, under the same role policy.
 
 1. Check readiness. The protected token is resolved in memory. Read-only Graph GETs
    verify the configured phone is a verified Cloud API sender, the token reports
