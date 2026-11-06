@@ -32,6 +32,7 @@ public sealed class StaffRequestSearchService(RequestPortalDbContext db) : IStaf
             Summary = request.Summary ?? "",
             CreatedUtc = request.CreatedUtc,
             ReceivedUtc = request.SubmittedUtc ?? request.CreatedUtc,
+            SubmittedUtc = request.SubmittedUtc,
             Status = request.Status
         };
 

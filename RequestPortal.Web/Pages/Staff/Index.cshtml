@@ -34,13 +34,12 @@
                                     <th class="staff-organization-header"><div class="staff-request-header-filter"><label for="requests-organization-filter">Organization</label><input id="requests-organization-filter" name="Organization" form="requests-grid-filters" value="@Model.Organization" maxlength="200" type="search" placeholder="Search organization…" autocomplete="off" aria-label="Filter requests by organization" /></div></th>
                                     <th>Summary</th>
                                     <th class="staff-work-status-header"><select id="requests-status-filter" name="WorkStatus" form="requests-grid-filters" aria-label="Filter requests by work status"><option value="">All statuses</option>@foreach (var status in Enum.GetValues<RequestPortal.Domain.Requests.RequestStatus>()) { <option value="@status" selected="@(Model.WorkStatus == status)">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(status.ToString())</option> }</select></th>
-                                    <th class="staff-age-column">Age</th>
+                                    <th class="staff-submitted-column">Date Submitted</th>
                                 </tr>
                             </thead>
                             <tbody>
                             @foreach (StaffRequestSearchRow request in Model.SubmittedRequests)
                             {
-                                var ageDays = Math.Max(0, (DateTimeOffset.UtcNow - request.CreatedUtc).Days);
                                 <tr class="staff-select-row" data-row-href="@Url.Page("/Staff/Review", new { id = request.RequestId })" role="link" tabindex="0">
                                     <td>
                                         <a asp-page="/Staff/Review" asp-route-id="@request.RequestId">
@@ -57,7 +56,7 @@
                                     <td>@request.OrganizationName</td>
                                     <td>@request.Summary</td>
                                     <td><span class="status">@RequestPortal.Domain.Requests.RequestStatusPresentation.Label(request.Status.ToString())</span></td>
-                                    <td class="staff-age-column">@ageDays d</td>
+                                    <td class="staff-submitted-column">@(request.SubmittedUtc.HasValue ? request.SubmittedUtc.Value.ToString("dd MMM yyyy") : "—")</td>
                                 </tr>
                             }
                             @if (Model.SubmittedRequests.Count == 0)
@@ -191,5 +190,5 @@
 .staff-waiting-row strong,.staff-waiting-row span{overflow-wrap:anywhere}
 .staff-waiting-row small{color:var(--muted,#64748b)}
 .staff-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px}.staff-pagination form{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.staff-pagination nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.staff-pagination select{padding:6px}.staff-pagination [aria-disabled="true"]{color:#637083}
-.staff-age-column{width:96px;min-width:96px;white-space:nowrap}
+.staff-submitted-column{width:122px;min-width:122px;white-space:nowrap;font-variant-numeric:tabular-nums}
 </style>
