@@ -16,7 +16,7 @@ internal static class PostgresDeploymentPreflight
         var error=new InvalidOperationException("Production preflight validation failed.");
         error.Data["PreflightCode"]=code;error.Data["PreflightDetails"]=details;return error;
     }
-    internal sealed record Source(string Host,string EndpointAddress,string Address,string Database,string Identity,int Major,bool Recovery);
+    internal sealed record Source(string Host,string EndpointAddress,string? Address,string Database,string Identity,int Major,bool Recovery);
     internal sealed record TableCount(string Schema,string Name,long Count);
 
     private static void Guard(NpgsqlConnectionStringBuilder settings)
@@ -53,7 +53,7 @@ internal static class PostgresDeploymentPreflight
         await using(var command=new NpgsqlCommand("SELECT inet_server_addr()::text,current_database(),current_user,current_setting('server_version_num')::int / 10000,pg_is_in_recovery()",connection,transaction))
         await using(var reader=await command.ExecuteReaderAsync(ct))
         {
-            await reader.ReadAsync(ct);source=new(settings.Host!,endpoint,reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.GetInt32(3),reader.GetBoolean(4));
+            await reader.ReadAsync(ct);source=new(settings.Host!,endpoint,reader.IsDBNull(0)?null:reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.GetInt32(3),reader.GetBoolean(4));
         }
         // inet_server_addr describes the backend side of this connection, not necessarily the client-facing endpoint.
         if(source.Database!="requestportal" || source.Recovery || source.Major is <14 or >18)
