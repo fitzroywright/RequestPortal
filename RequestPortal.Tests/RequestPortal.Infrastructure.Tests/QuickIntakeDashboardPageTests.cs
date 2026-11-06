@@ -77,9 +77,11 @@ public sealed class QuickIntakeDashboardPageTests
         using var response=await f.Client.GetAsync("/Management/QuickIntakeDashboard",ct);Assert.True(response.StatusCode == HttpStatusCode.OK,await response.Content.ReadAsStringAsync(ct));
         string html=await response.Content.ReadAsStringAsync(ct);
         string menu=Regex.Match(html,"<details class=\"staff-admin-menu reports-menu\">(.*?)</details>",RegexOptions.Singleline).Value;
-        var links=Regex.Matches(menu,"<a href=\"([^\"]+)\">([^<]+)</a>").Cast<Match>().ToArray();
-        Assert.Equal(new[]{"Quick Intake Dashboard","Management Dashboard","Request Reports"},links.Select(l=>l.Groups[2].Value));
-        Assert.Equal(new[]{"/Management/QuickIntakeDashboard","/Management","/Staff/Reports"},links.Select(l=>l.Groups[1].Value));
+        var links=Regex.Matches(menu,"<a\\b[^>]*href=\\\"([^\\\"]+)\\\"[^>]*>(.*?)</a>",RegexOptions.Singleline).Cast<Match>().ToArray();
+        Assert.Equal(new[]{"Quick Intakes","Registered Users","Management","Requests"},
+            links.Select(l=>Regex.Replace(l.Groups[2].Value,"<[^>]+>","").Trim()));
+        Assert.Equal(new[]{"/Management/QuickIntakeDashboard","/Management/RegisteredUsers","/Management","/Staff/Reports"},
+            links.Select(l=>l.Groups[1].Value));
         Assert.Single(Regex.Matches(html,"href=\"/Management\""));Assert.Single(Regex.Matches(html,"href=\"/Staff/Reports\""));
         foreach(var title in new[]{"Quick Intake Dashboard","Requests by Location","Quick Intakes by Request Type","Household Size","Employment Status","Monthly Income (JMD)","Gender","Age Group","Key Insights"})Assert.Contains(title,html);
         Assert.Contains("site-header",html);Assert.Contains("authenticated-app",html);Assert.Contains("main-nav",html);Assert.DoesNotContain("<aside",html);
