@@ -1,6 +1,6 @@
 .authenticated-app:has(.ru-dashboard) .app-main{background:#fff}
 .ru-dashboard.shell{width:min(1600px,calc(100% - 36px));max-width:none;margin:0 auto;padding:18px 0 28px;color:#0b1730;font-size:13px;display:grid;gap:14px}
-.ru-dashboard *{box-sizing:border-box}.ru-dashboard h1,.ru-dashboard h2,.ru-dashboard p{margin:0}
+.ru-dashboard *{box-sizing:border-box}.ru-dashboard [hidden]{display:none!important}.ru-dashboard h1,.ru-dashboard h2,.ru-dashboard p{margin:0}
 .ru-dashboard h1{font-size:27px;line-height:1.2;font-weight:800;letter-spacing:-.5px}
 .ru-dashboard h2{font-size:18px;line-height:1.25;font-weight:800;margin:0 0 6px}
 .ru-dashboard .ru-subtitle{color:#4b5d77;font-size:12px}
