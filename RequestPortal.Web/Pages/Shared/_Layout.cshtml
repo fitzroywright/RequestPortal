@@ -101,11 +101,17 @@
                         {
                             <a asp-page="/Staff/Index">Requests</a>
                             <a asp-page="/Staff/Organizations">Organizations</a>
-                            <a asp-page="/Staff/Reports">Reports</a>
-                            @if (canViewManagement)
-                            {
-                                <a asp-page="/Management/Index">Management</a>
-                            }
+                            <details class="staff-admin-menu reports-menu">
+                                <summary aria-label="Reports menu">Reports <span aria-hidden="true">▾</span></summary>
+                                <div class="staff-admin-menu-panel">
+                                    @if (canViewManagement)
+                                    {
+                                        <a asp-page="/Management/QuickIntakeDashboard">Quick Intake Dashboard</a>
+                                        <a asp-page="/Management/Index">Management Dashboard</a>
+                                    }
+                                    <a asp-page="/Staff/Reports">Request Reports</a>
+                                </div>
+                            </details>
                             <a asp-page="/Staff/Reviewers">Reviewers</a>
                             <details class="staff-admin-menu">
                                 <summary aria-label="Administration menu">Admin <span aria-hidden="true">▾</span></summary>

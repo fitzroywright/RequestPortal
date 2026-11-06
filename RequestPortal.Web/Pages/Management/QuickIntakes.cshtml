@@ -1,0 +1,10 @@
+@page
+@model RequestPortal.Web.Pages.Management.QuickIntakesModel
+@{ ViewData["Title"] = "Quick Intakes"; }
+<section class="section"><div class="shell"><h1>Quick Intakes</h1><p>@Model.From.ToString("dd MMM yyyy")–@Model.Through.ToString("dd MMM yyyy") UTC · @(Model.Parish ?? "All parishes") · Page @Model.PageNumber</p>
+<p><a asp-page="/Management/QuickIntakeDashboard" asp-route-Period="custom" asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")">Back to Quick Intake Dashboard</a></p>
+<table><thead><tr><th>Request reference</th><th>Parish</th><th>Received (UTC)</th></tr></thead><tbody>@foreach(var row in Model.Records) { <tr><td><a asp-page="/Staff/Review" asp-route-id="@row.RequestId">@row.Reference</a></td><td>@row.Parish</td><td>@row.ReceivedUtc.UtcDateTime.ToString("dd MMM yyyy HH:mm")</td></tr> }</tbody></table>
+@if(Model.Records.Count == 0) { <p>No Quick Intakes match this filter.</p> }
+@if(Model.PageNumber > 1) { <a asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")" asp-route-Parish="@Model.Parish" asp-route-PageNumber="@(Model.PageNumber-1)">Previous</a> }
+@if(Model.Records.Count == 50) { <a asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")" asp-route-Parish="@Model.Parish" asp-route-PageNumber="@(Model.PageNumber+1)">Next</a> }
+</div></section>

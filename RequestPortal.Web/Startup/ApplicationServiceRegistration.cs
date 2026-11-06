@@ -70,6 +70,7 @@ internal static class ApplicationServiceRegistration
             IPortalMessageService
             , PortalMessageService>();
 
+        builder.Services.AddScoped<RequestPortal.Application.Management.IQuickIntakeDashboardService, RequestPortal.Infrastructure.Management.QuickIntakeDashboardService>();
         builder.Services.AddScoped<MessageArchiveService>();
         builder.Services.AddScoped<IStaffNotificationAccess, StaffNotificationAccess>();
         builder.Services.AddScoped<StaffNotificationRouting>();

@@ -1,0 +1,52 @@
+@page
+@model RequestPortal.Web.Pages.Management.QuickIntakeDashboardModel
+@using RequestPortal.Application.Management
+@using RequestPortal.Web.Pages.Management
+@using System.Text.Json
+@{ ViewData["Title"] = "Quick Intake Dashboard"; var d = Model.Dashboard; }
+@section Styles {
+<link rel="stylesheet" href="~/lib/leaflet/1.9.4/leaflet.css" />
+<link rel="stylesheet" href="~/css/quick-intake-dashboard.css" asp-append-version="true" />
+}
+<div class="qi-dashboard shell" data-quick-intake-dashboard data-geography-url="@Url.Content("~/data/jamaica-parishes.528b7394d3b3.geojson")" data-records-url="@Url.Page("/Management/QuickIntakes")">
+<header class="qi-heading"><div class="qi-title"><span class="qi-heading-icon">@Html.Raw(QuickIntakeDashboardModel.Icon("clipboard"))</span><div><h1>Quick Intake Dashboard</h1><p>Analysis of Quick Intake requests and applicant needs.</p></div></div>
+<form method="get" class="qi-date-filter"><label class="qi-sr-only" for="qi-period">Date range</label><span class="qi-range-choice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 4h14v17H5zM8 2v5m8-5v5M5 9h14" /></svg><select asp-for="Period" id="qi-period"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="custom">Custom range</option></select></span><button class="qi-date-apply" type="submit">Apply</button>
+<div class="qi-custom-dates" hidden="@(Model.Period != "custom")"><label>From <input type="date" name="From" value="@Model.Range.From.ToString("yyyy-MM-dd")" /></label><label>Through <input type="date" name="Through" value="@Model.Range.Through.ToString("yyyy-MM-dd")" /></label></div>
+</form></header>
+<section class="qi-metrics" aria-label="Quick Intake summary metrics">
+@foreach (var m in new[] {
+    (Name:"Quick Intakes",Value:(int?)d.Total,Note:"Total received",Icon:"inbox",Tone:"blue"),
+    (Name:"Awaiting Screening",Value:d.AwaitingScreening,Note:"Screening not recorded",Icon:"clock",Tone:"amber"),
+    (Name:"Follow-up Required",Value:d.FollowUpRequired,Note:"Screening not recorded",Icon:"people",Tone:"blue"),
+    (Name:"Screening Complete",Value:d.ScreeningComplete,Note:"Screening not recorded",Icon:"check",Tone:"green"),
+    (Name:"New Applicants",Value:d.NewApplicants,Note:"Account origin unavailable",Icon:"person",Tone:"purple"),
+    (Name:"Sent to FFP Manager",Value:(int?)d.SentToFfpManager,Note:"Verified synchronization",Icon:"sync",Tone:"pink") }) {
+<div class="qi-metric qi-tone-@m.Tone"><span class="qi-metric-icon">@Html.Raw(QuickIntakeDashboardModel.Icon(m.Icon))</span><div><strong aria-label="@(m.Value.HasValue ? m.Value.Value.ToString() : "Unavailable")">@(m.Value.HasValue ? m.Value.Value.ToString("N0") : "—")</strong><span>@m.Name</span><small>@m.Note</small></div></div>
+}
+</section>
+<div class="qi-geographic-row">
+<section class="qi-panel qi-geography"><h2>Requests by Location</h2><p class="qi-panel-subtitle">Quick Intakes by parish (map view)</p><div id="quick-intake-parish-map" class="qi-map" aria-label="Quick Intake counts across all 14 Jamaican parishes"><p>Loading Jamaica map…</p></div><p class="qi-map-status" role="status"></p><small>Unknown / invalid parish: @d.Parishes.Last().Count · <a asp-page="/Management/QuickIntakes" asp-route-From="@Model.Range.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Range.Through.ToString("yyyy-MM-dd")">View Quick Intakes</a></small></section>
+<section class="qi-panel qi-type"><h2>Quick Intakes by Request Type</h2><div class="qi-doughnut-layout"><div class="qi-doughnut"><canvas id="qi-types" aria-label="Quick Intakes by request type" role="img"></canvas><span class="qi-doughnut-total"><strong>@d.Total</strong>Total</span></div><ul class="qi-legend" data-legend="types"></ul></div></section>
+</div>
+<div class="qi-three-column">
+<section class="qi-panel"><h2>Household Size</h2><div class="qi-unavailable"><span aria-hidden="true">▥</span><strong>Not available</strong><p>Household size is not captured on Quick Intake.</p></div></section>
+<section class="qi-panel"><h2>Employment Status</h2><div class="qi-chart" data-dimension="employment"><canvas id="qi-employment" aria-label="Employment status" role="img"></canvas></div></section>
+<section class="qi-panel"><h2>Monthly Income (JMD)</h2><div class="qi-chart" data-dimension="income"><canvas id="qi-income" aria-label="Monthly income equivalent in Jamaican dollars" role="img"></canvas></div><small>Stored monthly income. Current weekly reports are converted × 52 ÷ 12.</small></section>
+</div>
+<div class="qi-three-column qi-bottom-row">
+<section class="qi-panel"><h2>Gender</h2><div class="qi-doughnut-layout" data-dimension="gender"><div class="qi-doughnut"><canvas id="qi-gender" aria-label="Gender" role="img"></canvas><span class="qi-doughnut-total"><strong>@d.Total</strong>Total</span></div><ul class="qi-legend" data-legend="gender"></ul></div></section>
+<section class="qi-panel"><h2>Age Group</h2><div class="qi-chart" data-dimension="ages"><canvas id="qi-ages" aria-label="Age at Quick Intake submission" role="img"></canvas></div><small>Age at submission, calculated from date of birth.</small></section>
+<section class="qi-panel qi-insights"><h2><span aria-hidden="true">@Html.Raw(QuickIntakeDashboardModel.Icon("bulb"))</span> Key Insights</h2><ul>@foreach(var insight in d.Insights) { <li>@insight</li> }</ul></section>
+</div>
+<p class="qi-methodology">@Model.Range.From.ToString("dd MMM yyyy")–@Model.Range.Through.ToString("dd MMM yyyy") (UTC, inclusive). Percentages use all @d.Total Quick Intakes; missing responses have their own category. Sensitive charts are withheld when any nonzero group has fewer than 5 records. Screening stages and new-account attribution are not recorded.</p>
+<details class="qi-data-table"><summary>View accessible chart data and definitions</summary><p>“Sent” requires a verified FFP Manager destination, application reference and synchronized outcome. It is not the queued count. New Applicants cannot be inferred from anonymous tracking identities or account conversions.</p>
+@foreach(var dimension in new[] { (Name:"Parish",Rows:d.Parishes), (Name:"Request type",Rows:d.RequestTypes), (Name:"Employment",Rows:d.Employment.Items), (Name:"Monthly income",Rows:d.Income.Items), (Name:"Gender",Rows:d.Gender.Items), (Name:"Age group",Rows:d.Ages.Items) }) {
+<h3>@dimension.Name</h3><table><thead><tr><th>Group</th><th>Count</th><th>Percent of all intakes</th></tr></thead><tbody>@foreach(var row in dimension.Rows) { <tr><td>@row.Name</td><td>@(row.Count?.ToString() ?? "Withheld")</td><td>@(row.Percent.HasValue ? row.Percent.Value.ToString("0.#") + "%" : "Withheld")</td></tr> }</tbody></table>
+}</details>
+<noscript><p>Interactive charts and the map require JavaScript. Aggregated values are available in the chart data table above.</p></noscript>
+</div>
+<script id="quick-intake-dashboard-data" type="application/json">@Html.Raw(JsonSerializer.Serialize(d,new JsonSerializerOptions(JsonSerializerDefaults.Web)))</script>
+@section Scripts {
+<script src="~/lib/leaflet/1.9.4/leaflet.js"></script><script src="~/lib/chart.js/4.6.1/chart.umd.min.js"></script>
+<script src="~/js/quick-intake-dashboard.js" asp-append-version="true"></script>
+}
