@@ -45,7 +45,6 @@
         const canvas = document.getElementById(id);
         const container = root.querySelector(`[data-dimension="${dimension}"]`) || canvas.closest('.qi-doughnut-layout');
         const group = dimension === 'types' ? { items: data.requestTypes } : data[dimension];
-        if (group.suppressed) { empty(container, 'Withheld to protect groups smaller than 5.'); return; }
         if (!data.total) { empty(container, 'No Quick Intakes in this date range.'); return; }
         if (!window.Chart) { empty(container, 'Chart unavailable. Use the accessible data table below.'); return; }
         const items = group.items.filter(item => item.count > 0 || item.name !== "Not provided / unknown");
@@ -64,6 +63,7 @@
         if (legendKey) legend(legendKey, items, colors);
     }
     chart('qi-types', 'types', 'doughnut', false, 'types');
+    chart('qi-children-under-18', 'childrenUnder18', 'bar', true);
     chart('qi-employment', 'employment', 'bar', true);
     chart('qi-income', 'income', 'bar', true);
     chart('qi-gender', 'gender', 'doughnut', false, 'gender', ['#2e82ff', '#9951ff', '#c6bbff', '#cbd1db']);

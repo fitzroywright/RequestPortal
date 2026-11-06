@@ -14,7 +14,7 @@ public sealed record QuickIntakeCount(string Name, int? Count, decimal? Percent)
 public sealed record QuickIntakeDistribution(IReadOnlyList<QuickIntakeCount> Items, bool Suppressed, string? Unavailable = null);
 public sealed record QuickIntakeDashboardSnapshot(QuickIntakeRange Range, int Total, int SentToFfpManager,
     IReadOnlyList<QuickIntakeCount> Parishes, IReadOnlyList<QuickIntakeCount> RequestTypes,
-    QuickIntakeDistribution Household, QuickIntakeDistribution Employment, QuickIntakeDistribution Income,
+    QuickIntakeDistribution ChildrenUnder18, QuickIntakeDistribution Employment, QuickIntakeDistribution Income,
     QuickIntakeDistribution Gender, QuickIntakeDistribution Ages, IReadOnlyList<string> Insights)
 {
     public int? AwaitingScreening => null;

@@ -29,7 +29,7 @@ public sealed class QuickIntakeDashboardPageTests
         QuickIntakeCount[] Rows(string[] names,int[] counts)=>names.Select((n,i)=>new QuickIntakeCount(n,counts[i],Math.Round(counts[i]*100m/42,1))).ToArray();
         var types=Rows(["Food","Housing","Earn an Income","Education","Health","Water & Hygiene","Not provided / unknown"],[14,9,8,6,5,0,0]);
         return new(range,42,40,Rows(JamaicaParishes.Names.Append(JamaicaParishes.Unknown).ToArray(),[2,3,4,1,2,1,3,6,0,4,1,1,2,12,0]),types,
-            new([],false,"Not captured"),new(Rows(["Employed","Self Employed","Unemployed","Student","Not provided / unknown"],[18,8,8,8,0]),false),
+            new(Rows(["Yes","No","Not provided / unknown"],[21,21,0]),false),new(Rows(["Employed","Self Employed","Unemployed","Student","Not provided / unknown"],[18,8,8,8,0]),false),
             new(Rows(["No income","≤ 50,000","50,000.01–100,000","100,000.01–200,000","> 200,000","Not provided / unknown"],[10,12,9,6,5,0]),false),
             new(Rows(["Male","Female","Prefer not to Say","Not provided / unknown"],[28,14,0,0]),false),new(Rows(["< 25","25–34","35–44","45–54","55–64","65+","Not provided / unknown"],[0,6,11,12,7,6,0]),false),
             ["33.3% of Quick Intakes request food assistance.","Gender: Male is the largest recorded group (66.7% of all Quick Intakes).","Age at intake: 45–54 is the largest recorded group (28.6% of all Quick Intakes).","23.8% report no income."]);
@@ -85,10 +85,10 @@ public sealed class QuickIntakeDashboardPageTests
         Assert.Equal(new[]{"/Management/QuickIntakeDashboard","/Management/RegisteredUsers","/Management","/Staff/Reports","/Staff/Reviewers"},
             links.Select(l=>l.Groups[1].Value));
         Assert.Single(Regex.Matches(html,"href=\"/Management\""));Assert.Single(Regex.Matches(html,"href=\"/Staff/Reports\""));
-        foreach(var title in new[]{"Quick Intake Dashboard","Requests by Location","Quick Intakes by Request Type","Household Size","Employment Status","Monthly Income (JMD)","Gender","Age Group","Key Insights"})Assert.Contains(title,html);
+        foreach(var title in new[]{"Quick Intake Dashboard","Requests by Location","Quick Intakes by Request Type","Children Under 18 Living at Home","Employment Status","Monthly Income (JMD)","Gender","Age Group","Key Insights"})Assert.Contains(title,html);
         Assert.Contains("site-header",html);Assert.Contains("authenticated-app",html);Assert.Contains("main-nav",html);Assert.DoesNotContain("<aside",html);
         Assert.Contains("jamaica-parishes.528b7394d3b3.geojson",html);Assert.Contains("chart.js/4.6.1",html);
-        Assert.Contains("Screening not recorded",html);Assert.Contains("Account origin unavailable",html);Assert.Contains("Household size is not captured",html);
+        Assert.Contains("Screening not recorded",html);Assert.Contains("Account origin unavailable",html);Assert.Contains("qi-children-under-18",html);
         Assert.Equal(new QuickIntakeRange(new(2026,10,7),new(2026,11,5)),f.Service.LastRange);
         Assert.Contains("no-store",response.Headers.CacheControl!.ToString());
         string? output=Environment.GetEnvironmentVariable("REQUESTPORTAL_QI_RENDER_OUTPUT");if(output is not null){Directory.CreateDirectory(output);await File.WriteAllTextAsync(Path.Combine(output,"index.html"),html,ct);}
