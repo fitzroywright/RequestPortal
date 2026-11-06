@@ -124,6 +124,8 @@ jobs:
 
       - name: Test Release
         env:
+          REQUESTPORTAL_QI_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-quick-intake
+          REQUESTPORTAL_RU_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-registered-users
           REQUESTPORTAL_DASHBOARD_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-dashboard
           REQUESTPORTAL_IDENTITY_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-identities
           REQUESTPORTAL_STAFF_NAV_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-staff-navigation
@@ -132,6 +134,8 @@ jobs:
 
       - name: Verify flat layouts and interactive map in Chromium
         env:
+          REQUESTPORTAL_QI_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-quick-intake
+          REQUESTPORTAL_RU_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-registered-users
           REQUESTPORTAL_DASHBOARD_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-dashboard
           REQUESTPORTAL_IDENTITY_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-identities
           REQUESTPORTAL_STAFF_NAV_RENDER_OUTPUT: ${{ runner.temp }}/requestportal-staff-navigation
@@ -140,6 +144,7 @@ jobs:
           node "$RUNNER_TEMP/portal-browser/node_modules/playwright/cli.js" install --with-deps chromium
           export PLAYWRIGHT_MODULE="$RUNNER_TEMP/portal-browser/node_modules/playwright"
           node scripts/tests/test_management_dashboard.cjs
+          node scripts/tests/test_reports_dashboards.cjs
           node scripts/tests/test_flat_pages.cjs
           node scripts/tests/test_staff_search_navigation.cjs
           node scripts/tests/test_integrations_viewport.cjs

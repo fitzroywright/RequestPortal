@@ -30,16 +30,19 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
    await page.locator('.staff-pagination').getByRole('link',{name:'Next',exact:true}).click();await page.waitForURL('**PageNumber=2');
    assert.equal(new URL(page.url()).searchParams.get('PageSize'),'25');
    assert.equal(await page.locator('.request-panel tbody tr').count(),21);
-   await page.selectOption('#request-page-size','50');await page.getByRole('button',{name:'Apply page size',exact:true}).click();await page.waitForURL('**PageSize=50');
+   await page.selectOption('#request-page-size','50');await page.waitForURL('**PageSize=50');
    assert(!new URL(page.url()).searchParams.has('PageNumber'));
    assert.equal(await page.locator('.request-panel tbody tr').count(),46);
-   await page.getByRole('textbox',{name:'Search by applicant name or request reference',exact:true}).fill('John');
-   await page.getByRole('button',{name:'Search',exact:true}).click();await page.waitForURL(url=>url.pathname==='/Staff'&&url.searchParams.get('Search')==='John');
+   await page.getByRole('searchbox',{name:'Filter requests by applicant',exact:true}).fill('John');
+   await page.waitForURL(url=>url.pathname==='/Staff'&&url.searchParams.get('Applicant')==='John');
+   assert.equal(new URL(page.url()).searchParams.get('PageSize'),'50');
+   // Historical Search URLs remain supported; exercise their result pagination separately.
+   await page.goto('http://127.0.0.1:5499/Staff?Search=John&PageSize=50');
    assert(await page.getByRole('cell',{name:'John Brown'}).count()>0);
    await page.getByRole('link',{name:'Next',exact:true}).click();await page.waitForURL('**PageNumber=2');
    assert.equal(new URL(page.url()).searchParams.get('PageSize'),'50');
    assert.equal(new URL(page.url()).searchParams.get('Search'),'John');
-   await page.getByRole('link',{name:'Clear Search',exact:true}).click();await page.waitForURL('**/Staff');
+   await page.goto('http://127.0.0.1:5499/Staff');
    for(const index of [0,1,2,3])for(const mode of ['row','link','keyboard']){
     await page.goto('http://127.0.0.1:5499/Staff/Organizations');
     const row=page.locator('tr[data-row-href]').nth(index),dest=await row.getAttribute('data-row-href');
@@ -81,6 +84,6 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
     cases++;
    }
   }
-  console.log(`${cases} browser navigation cases passed at desktop/tablet/mobile: row, explicit link, and Enter activation; organization and request document anchors/highlights, search, pagination, integration diagnostics, CSV export absence and Administrator/Reviewer controls, and clear; no console errors or page-wide overflow.`);
+  console.log(`${cases} browser navigation cases passed at desktop/tablet/mobile: row, explicit link, and Enter activation; organization and request document anchors/highlights, applicant filter, legacy search, pagination, integration diagnostics, CSV export absence and Administrator/Reviewer controls; no console errors or page-wide overflow.`);
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
