@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
+using RequestPortal.Web.Security;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace RequestPortal.Web.Pages;
@@ -7,11 +9,16 @@ public sealed class IndexModel : PageModel
 {
     public string FirstName { get; private set; } = "there";
 
-    public void OnGet()
+    public IActionResult OnGet()
     {
+        if (User.Identity?.IsAuthenticated == true &&
+            User.HasClaim(StaffOidcOptions.StaffSurfaceClaim, StaffOidcOptions.StaffSurfaceValue))
+        {
+            return RedirectToPage("/Staff/Index");
+        }
         if (User.Identity?.IsAuthenticated != true)
         {
-            return;
+            return Page();
         }
 
         string? value =
@@ -24,5 +31,6 @@ public sealed class IndexModel : PageModel
                 .Trim()
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
         }
+        return Page();
     }
 }
