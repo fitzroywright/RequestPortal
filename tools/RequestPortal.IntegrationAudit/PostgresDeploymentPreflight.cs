@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
 using System.Diagnostics;
@@ -9,52 +10,73 @@ using Npgsql;
 
 internal static class PostgresDeploymentPreflight
 {
-    internal sealed record Source(string Host,string Address,string Database,string Identity,int Major,bool Recovery);
+    internal static string Stage { get; private set; }="startup";
+    private static InvalidOperationException Stop(string code,object details)
+    {
+        var error=new InvalidOperationException("Production preflight validation failed.");
+        error.Data["PreflightCode"]=code;error.Data["PreflightDetails"]=details;return error;
+    }
+    internal sealed record Source(string Host,string EndpointAddress,string? Address,string Database,string Identity,int Major,bool Recovery);
     internal sealed record TableCount(string Schema,string Name,long Count);
 
     private static void Guard(NpgsqlConnectionStringBuilder settings)
     {
         if(!string.Equals(settings.Host,"axios.fftpj.local",StringComparison.OrdinalIgnoreCase) || settings.Database!="requestportal")
-            throw new InvalidOperationException("Request Portal production target does not match.");
+            throw Stop("PG_ENDPOINT_GUARD",new {hostMatches=string.Equals(settings.Host,"axios.fftpj.local",StringComparison.OrdinalIgnoreCase),databaseMatches=settings.Database=="requestportal"});
+    }
+
+    private static async Task<string> VerifyEndpointAsync(NpgsqlConnectionStringBuilder settings,CancellationToken ct)
+    {
+        Guard(settings);
+        var addresses=await Dns.GetHostAddressesAsync(settings.Host!,ct);
+        if(!addresses.Any(address=>address.Equals(IPAddress.Parse("10.10.0.226"))))
+            throw Stop("PG_ENDPOINT_DNS",new {resolved=addresses.Select(address=>address.ToString()).ToArray()});
+        return "10.10.0.226";
     }
 
     internal static async Task<object> RunAsync(IConfiguration configuration,ISecretProvider secrets,string? archive,CancellationToken ct)
     {
         if(!OperatingSystem.IsLinux())throw new PlatformNotSupportedException("The production preflight runs on Kratos.");
         // Managed secret only: never serialize the connection string or service environment.
+        Stage="resolve-managed-secret";
         string value=await secrets.GetRequiredAsync("ConnectionStrings:RequestPortal",ct);
-        var settings=new NpgsqlConnectionStringBuilder(value);Guard(settings);
+        Stage="configured-target";
+        var settings=new NpgsqlConnectionStringBuilder(value);
+        string endpoint=await VerifyEndpointAsync(settings,ct);
+        Stage="open-postgresql";
         await using var connection=new NpgsqlConnection(value);await connection.OpenAsync(ct);
         await using var transaction=await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
         await using(var command=new NpgsqlCommand("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='60s'; SET LOCAL idle_in_transaction_session_timeout='10min'",connection,transaction))
             await command.ExecuteNonQueryAsync(ct);
+        Stage="actual-target-metadata";
         Source source;
         await using(var command=new NpgsqlCommand("SELECT inet_server_addr()::text,current_database(),current_user,current_setting('server_version_num')::int / 10000,pg_is_in_recovery()",connection,transaction))
         await using(var reader=await command.ExecuteReaderAsync(ct))
         {
-            await reader.ReadAsync(ct);source=new(settings.Host!,reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.GetInt32(3),reader.GetBoolean(4));
+            await reader.ReadAsync(ct);source=new(settings.Host!,endpoint,reader.IsDBNull(0)?null:reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.GetInt32(3),reader.GetBoolean(4));
         }
-        if(source.Address!="10.10.0.226" || source.Database!="requestportal" || source.Recovery || source.Major is <14 or >18)
-            throw new InvalidOperationException("Unsupported or unexpected production target.");
+        // inet_server_addr describes the backend side of this connection, not necessarily the client-facing endpoint.
+        if(source.Database!="requestportal" || source.Recovery || source.Major is <14 or >18)
+            throw Stop("PG_ACTUAL_TARGET_GUARD",new {source.Address,source.Database,source.Major,source.Recovery});
+        Stage="migration-history";
         var migrations=new List<string>();
         await using(var command=new NpgsqlCommand("SELECT \"MigrationId\" FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\"",connection,transaction))
         await using(var reader=await command.ExecuteReaderAsync(ct))
             while(await reader.ReadAsync(ct))migrations.Add(reader.GetString(0));
-        if(!migrations.Contains("20261105070000_IntegrationExceptionDetails"))throw new InvalidOperationException("Unexpected production migration baseline.");
+        if(!migrations.Contains("20261105070000_IntegrationExceptionDetails"))throw Stop("PG_BASELINE_MISSING",new {required="20261105070000_IntegrationExceptionDetails",applied=migrations});
+        Stage="migration-privileges";
         var privileges=new Dictionary<string,bool>();
         await using(var command=new NpgsqlCommand("SELECT has_schema_privilege(current_schema(),'CREATE'),has_table_privilege('outbox_messages','INSERT')",connection,transaction))
         await using(var reader=await command.ExecuteReaderAsync(ct))
         {await reader.ReadAsync(ct);privileges["schemaCreate"]=reader.GetBoolean(0);privileges["outboxInsert"]=reader.GetBoolean(1);}
         await using(var command=new NpgsqlCommand("""
-            SELECT c.relname,has_table_privilege(c.oid,'TRIGGER')
-            FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-            WHERE n.nspname=current_schema() AND c.relname IN
-            ('assistance_requests','request_status_history','quick_intakes','documents','deliveries',
-             'delivery_returns','organizations','request_categories','program_classifications','integration_links')
+            SELECT required.name,COALESCE(has_table_privilege(to_regclass(required.name),'TRIGGER'),false)
+            FROM (VALUES ('assistance_requests'),('request_status_history'),('quick_intakes'),('documents'),('deliveries'),
+                         ('delivery_returns'),('organizations'),('request_categories'),('program_classifications'),('integration_links')) AS required(name)
             """,connection,transaction))
         await using(var reader=await command.ExecuteReaderAsync(ct))
             while(await reader.ReadAsync(ct))privileges["trigger:"+reader.GetString(0)]=reader.GetBoolean(1);
-        if(privileges.Count!=12 || privileges.Values.Any(allowed=>!allowed))throw new InvalidOperationException("Production migration privileges are incomplete.");
+        if(privileges.Count!=12 || privileges.Values.Any(allowed=>!allowed))throw Stop("PG_PRIVILEGES_MISSING",new {source,privileges});
         if(archive is null)
         {
             await transaction.RollbackAsync(ct);
@@ -65,7 +87,7 @@ internal static class PostgresDeploymentPreflight
         string snapshot;
         await using(var command=new NpgsqlCommand("SELECT pg_export_snapshot()",connection,transaction))snapshot=(string)(await command.ExecuteScalarAsync(ct))!;
         var names=new List<(string Schema,string Name)>();
-        await using(var command=new NpgsqlCommand("SELECT schemaname,tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') AND schemaname NOT LIKE 'pg_toast%' ORDER BY schemaname,tablename",connection,transaction))
+        await using(var command=new NpgsqlCommand("SELECT schemaname,tablename FROM pg_tables WHERE schemaname<>'information_schema' AND schemaname !~ '^pg_' ORDER BY schemaname,tablename",connection,transaction))
         await using(var reader=await command.ExecuteReaderAsync(ct))
             while(await reader.ReadAsync(ct))names.Add((reader.GetString(0),reader.GetString(1)));
         var counts=new List<TableCount>();var quote=new NpgsqlCommandBuilder();
@@ -102,14 +124,15 @@ internal static class PostgresDeploymentPreflight
     }
     internal static async Task<object> VerifyDashboardAsync(ISecretProvider secrets,CancellationToken ct)
     {
+        Stage="verify-aggregate";
         string value=await secrets.GetRequiredAsync("ConnectionStrings:RequestPortal",ct);
-        var settings=new NpgsqlConnectionStringBuilder(value);Guard(settings);
+        var settings=new NpgsqlConnectionStringBuilder(value);await VerifyEndpointAsync(settings,ct);
         var options=new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>()
             .UseNpgsql(value).Options;
         await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(options);
         await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
-        bool target=await db.Database.SqlQueryRaw<bool>("SELECT current_database()='requestportal' AND inet_server_addr()=inet '10.10.0.226' AND NOT pg_is_in_recovery() AS \"Value\"").SingleAsync(ct);
+        bool target=await db.Database.SqlQueryRaw<bool>("SELECT current_database()='requestportal' AND NOT pg_is_in_recovery() AS \"Value\"").SingleAsync(ct);
         if(!target)throw new InvalidOperationException("Actual production PostgreSQL target verification failed.");
         var noStorage=new NoStorage();
         var calculator=new RequestPortal.Infrastructure.Management.ManagementDashboardService(db,noStorage,
@@ -119,9 +142,9 @@ internal static class PostgresDeploymentPreflight
         watch.Restart();var second=await reader.GetDashboardAsync(ct);double warm=watch.Elapsed.TotalMilliseconds;
         if(first.SnapshotVersion<1 || first.SnapshotVersion!=second.SnapshotVersion || first.Parishes.Sum(x=>x.Requests)!=first.Statuses.Sum(x=>x.Count) ||
            first.Executive.Outstanding!=first.Parishes.Sum(x=>x.Outstanding) || first.Executive.Completed!=first.Parishes.Sum(x=>x.Completed))
-            throw new InvalidOperationException("Published aggregate verification failed.");
+            throw Stop("PG_AGGREGATE_TOTALS",new {first.SnapshotVersion});
         if(first.RefreshStatus!="Current" || first.LastUpdatedUtc is null || first.LastUpdatedUtc<DateTimeOffset.UtcNow.AddMinutes(-2))
-            throw new InvalidOperationException("The published aggregate is not current.");
+            throw Stop("PG_AGGREGATE_STALE",new {first.SnapshotVersion,first.RefreshStatus,first.LastUpdatedUtc});
         int pending=await db.OutboxMessages.CountAsync(x=>x.MessageType==RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType && x.ProcessedUtc==null,ct);
         await tx.RollbackAsync(ct);
         return new {readOnly=true,status="dashboard-verified",database=settings.Database,host=settings.Host,

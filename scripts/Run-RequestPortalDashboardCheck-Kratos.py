@@ -55,7 +55,16 @@ def main():
     result = subprocess.run(['/usr/bin/dotnet',str(ROOT/'RequestPortal.IntegrationAudit.dll'),'dashboard-verification'],
                             cwd='/opt/aegis/requestportal',env=env,preexec_fn=drop,capture_output=True,text=True,timeout=100)
     if result.returncode:
-        raise RuntimeError('Read-only dashboard verification failed; no production write was requested.')
+        safe = {'stage':'reader-process','code':'READER_FAILED','exitCode':result.returncode}
+        for line in reversed(result.stderr.splitlines()):
+            try: candidate=json.loads(line)
+            except ValueError: continue
+            if not isinstance(candidate,dict) or candidate.get('status')!='failed': continue
+            for key,pattern in [('stage',r'[a-z][a-z0-9-]{0,63}'),('code',r'[A-Z][A-Z0-9_]{0,63}')]:
+                value=candidate.get(key)
+                if isinstance(value,str) and re.fullmatch(pattern,value): safe[key]=value
+            break
+        raise RuntimeError('Read-only dashboard verification failed: '+json.dumps(safe)+'; no production write was requested.')
     lines = [line for line in result.stdout.splitlines() if line.startswith('{')]
     report = json.loads(lines[-1])
     if report.get('readOnly') is not True or report.get('status') != 'dashboard-verified':

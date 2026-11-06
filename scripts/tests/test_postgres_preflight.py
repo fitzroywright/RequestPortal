@@ -35,6 +35,18 @@ class PreflightTests(unittest.TestCase):
         with patch.object(runner.pwd,'getpwnam',return_value=user),patch.object(runner.subprocess,'run',return_value=result):
             with self.assertRaises(RuntimeError) as error:runner.run_reader(['database-preflight'],{})
         self.assertNotIn('PRIVATE',str(error.exception))
+    def test_reader_exposes_safe_stage_and_code_without_raw_driver_messages(self):
+        user=type('User',(),{'pw_dir':'/unused','pw_gid':1,'pw_uid':1})()
+        result=subprocess.CompletedProcess([],1,stdout='PRIVATE',stderr='PRIVATE\n'+json.dumps({'status':'failed','errorType':'PostgresException','stage':'migration-privileges','code':'SQL_42501','message':'PRIVATE'}))
+        with patch.object(runner.pwd,'getpwnam',return_value=user),patch.object(runner.subprocess,'run',return_value=result):
+            with self.assertRaises(RuntimeError) as error:runner.run_reader(['database-preflight'],{})
+        self.assertIn('SQL_42501',str(error.exception));self.assertIn('migration-privileges',str(error.exception));self.assertNotIn('PRIVATE',str(error.exception))
+    def test_privilege_guard_exposes_only_explicit_structural_observations(self):
+        user=type('User',(),{'pw_dir':'/unused','pw_gid':1,'pw_uid':1})()
+        result=subprocess.CompletedProcess([],1,stdout='',stderr=json.dumps({'status':'failed','errorType':'InvalidOperationException','stage':'migration-privileges','code':'PG_PRIVILEGES_MISSING','details':{'schemaCreate':False}}))
+        with patch.object(runner.pwd,'getpwnam',return_value=user),patch.object(runner.subprocess,'run',return_value=result):
+            with self.assertRaises(RuntimeError) as error:runner.run_reader(['database-preflight'],{})
+        self.assertIn('schemaCreate',str(error.exception))
     def test_identifier_quoting_cannot_turn_metadata_into_sql(self):
         self.assertEqual('"x""; DROP DATABASE production;--"',verify.quote('x"; DROP DATABASE production;--'))
     def test_verifier_rejects_report_mismatch_before_starting_postgres(self):
