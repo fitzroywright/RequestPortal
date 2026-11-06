@@ -106,10 +106,11 @@
                                 <div class="staff-admin-menu-panel">
                                     @if (canViewManagement)
                                     {
-                                        <a asp-page="/Management/QuickIntakeDashboard">Quick Intake Dashboard</a>
-                                        <a asp-page="/Management/Index">Management Dashboard</a>
+                                        <a asp-page="/Management/QuickIntakeDashboard">Quick Intakes</a>
+                                        <a asp-page="/Management/RegisteredUsers">Registered Users</a>
+                                        <a asp-page="/Management/Index">Management</a>
                                     }
-                                    <a asp-page="/Staff/Reports">Request Reports</a>
+                                    <a asp-page="/Staff/Reports">Requests</a>
                                 </div>
                             </details>
                             <a asp-page="/Staff/Reviewers">Reviewers</a>
@@ -255,6 +256,26 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
         <script src="~/js/messages.js" asp-append-version="true"></script>
     }
+    <script>
+    (() => {
+        const menus = [...document.querySelectorAll(".staff-admin-menu")];
+        const closeAll = except => {
+            for (const menu of menus) if (menu !== except) menu.open = false;
+        };
+        menus.forEach(menu => {
+            menu.addEventListener("toggle", () => { if (menu.open) closeAll(menu); });
+        });
+        document.addEventListener("pointerdown", event => {
+            if (!event.target.closest(".staff-admin-menu")) closeAll();
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key !== "Escape") return;
+            const open = menus.find(menu => menu.open);
+            closeAll();
+            if (open) { event.preventDefault(); open.querySelector("summary")?.focus(); }
+        });
+    })();
+    </script>
     <script>
     (() => {
         const trigger = document.querySelector("[data-profile-menu-trigger]");
