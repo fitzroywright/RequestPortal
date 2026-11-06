@@ -69,8 +69,23 @@
     chart('qi-gender', 'gender', 'doughnut', false, 'gender', ['#2e82ff', '#9951ff', '#c6bbff', '#cbd1db']);
     chart('qi-ages', 'ages', 'bar');
     const metrics = new Map(data.parishes.map(p => [p.name, p.count]));
+    // Relative color scale: a parish with the most requests always has the
+    // darkest blue. Rank distinct positive counts so that large reporting
+    // periods do not collapse every parish above a fixed threshold into one shade.
     const fills = ['#f2f8ff', '#dfedff', '#c5dfff', '#95c5f2', '#559ad8'];
-    const color = count => fills[count >= 10 ? 4 : count >= 6 ? 3 : count >= 3 ? 2 : count >= 1 ? 1 : 0];
+    const distinctPositive = [...new Set([...metrics.values()].filter(n => n > 0))].sort((a, b) => a - b);
+    const shadeIndex = count => {
+        if (!count) return 0;
+        const rank = distinctPositive.indexOf(count);
+        return distinctPositive.length === 1 ? 4 : 1 + Math.floor(3 * rank / (distinctPositive.length - 1));
+    };
+    const color = count => fills[shadeIndex(count)];
+    const legendBands = [4, 3, 2, 1, 0].map(index => {
+        const counts = [...metrics.values()].filter(n => shadeIndex(n) === index);
+        if (!counts.length) return null;
+        const low = Math.min(...counts), high = Math.max(...counts);
+        return { index, label: low === high ? String(low) : `${low}–${high}` };
+    }).filter(Boolean);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
     fetch(root.dataset.geographyUrl, { credentials: 'same-origin', signal: controller.signal }).then(response => {
@@ -106,7 +121,19 @@
             });
         };
         const legendControl = L.control({ position: 'bottomleft' });
-        legendControl.onAdd = () => { const box = L.DomUtil.create('div', 'qi-map-legend'); ['10+', '6–9', '3–5', '1–2', '0'].forEach((label, i) => { const row = document.createElement('span'), swatch = document.createElement('i'); swatch.style.backgroundColor = fills[4 - i]; row.append(swatch, document.createTextNode(label)); box.append(row); }); return box; };
+        legendControl.onAdd = () => {
+            const box = L.DomUtil.create('div', 'qi-map-legend');
+            const title = document.createElement('strong');
+            title.textContent = 'Quick Intakes by parish';
+            box.append(title);
+            legendBands.forEach(({ index, label }) => {
+                const row = document.createElement('span'), swatch = document.createElement('i');
+                swatch.style.backgroundColor = fills[index];
+                row.append(swatch, document.createTextNode(label));
+                box.append(row);
+            });
+            return box;
+        };
         legendControl.addTo(map); fit(); observer = new ResizeObserver(fit); observer.observe(container);
     }).catch(() => { root.querySelector('.qi-map-status').textContent = 'Map unavailable. All parish counts and filtered records remain accessible below.'; }).finally(() => clearTimeout(timer));
     window.addEventListener('pagehide', () => { controller.abort(); clearTimeout(timer); observer?.disconnect(); charts.forEach(c => c.destroy()); map?.remove(); }, { once: true });
