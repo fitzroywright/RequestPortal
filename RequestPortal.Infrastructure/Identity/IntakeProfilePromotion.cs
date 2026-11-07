@@ -21,7 +21,8 @@ public static class IntakeProfilePromotion
         if (string.IsNullOrWhiteSpace(user.Parish)) user.Parish = intake.Parish;
         if (string.IsNullOrWhiteSpace(user.Town)) user.Town = intake.CommunityDistrict;
         if (string.IsNullOrWhiteSpace(user.EmploymentStatus)) user.EmploymentStatus = intake.EmploymentStatus;
-        user.MonthlyHouseholdIncome ??= intake.MonthlyIncome;
+        // Quick Intake retains weekly JMD under its legacy storage name; the profile field is monthly.
+        user.MonthlyHouseholdIncome ??= RequestPortal.Common.Validation.WeeklyIncome.ToMonthly(intake.MonthlyIncome);
         if (string.IsNullOrWhiteSpace(user.FirstName)) user.FirstName = intake.FirstName;
         if (string.IsNullOrWhiteSpace(user.LastName)) user.LastName = intake.LastName;
         if (string.IsNullOrWhiteSpace(user.AlternativePhoneNumber)) user.AlternativePhoneNumber = intake.SecondaryTelephone;

@@ -59,12 +59,12 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         var generatedReference = await FfpManagerReferenceNumberGenerator.GenerateAsync(
             connection, transaction, submission.Parish, submission.SubmittedUtc, cancellationToken);
         long statusId = await referenceData.ResolveApplicationStatusIdAsync(options.InitialApplicationStatus, cancellationToken);
-        const string insert = """
+        string insert = $$"""
             INSERT INTO dbo.ApplicationLetters
-            (Code,ReferenceNo,Name,ContactPerson,FirstName,LastName,Street,Town,DateOfBirth,Gender,Occupation,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource)
+            (Code,ReferenceNo,Name,ContactPerson,FirstName,LastName,Street,Town,DateOfBirth,Gender,Occupation,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource{{BridgeQuickIntakeFields.Columns(submission)}})
             OUTPUT INSERTED.ID
             VALUES
-            (@Code,@ReferenceNo,@Name,@ContactPerson,@FirstName,@LastName,@Street,@Town,@DateOfBirth,@Gender,@Occupation,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource);
+            (@Code,@ReferenceNo,@Name,@ContactPerson,@FirstName,@LastName,@Street,@Town,@DateOfBirth,@Gender,@Occupation,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource{{BridgeQuickIntakeFields.Values(submission)}});
             """;
         await using SqlCommand command = new(insert, connection, transaction);
         AddNullable(command, "@Code", submission.PublicReference, SqlDbType.NVarChar, 500);
@@ -80,7 +80,7 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         BridgeApplicationReceipt.AddParameters(command, submission);
         AddNullable(command, "@MainContactNo", BridgeApplicantProfile.MainContact(submission), SqlDbType.NVarChar, 255);
         AddNullable(command, "@Comments", CombineComments(submission), SqlDbType.NVarChar, 2500);
-        AddNullable(command, "@Programme", submission.ProgramCategory, SqlDbType.NVarChar, 255);
+        BridgeQuickIntakeFields.AddParameters(command, submission);
         AddNullable(command, "@Requirements", CombineRequirements(submission), SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationStatus", SqlDbType.BigInt).Value = statusId;
         AddNullable(command, "@UserName", options.UserName, SqlDbType.NVarChar, 50);

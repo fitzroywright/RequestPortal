@@ -16,6 +16,7 @@ public static class ExternalApplicantValidation
         DateOfBirth(submission.DateOfBirth);
         Email(submission.ApplicantEmail);
         Employment(submission.ApplicantEmploymentStatus);
+        QuickIntakeApplicationFields.Validate(submission);
     }
 
     public static string? Telephone(string? value, string field)
