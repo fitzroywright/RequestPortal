@@ -68,19 +68,19 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
             ? null
             : await ResolveLookupIdAsync(connection, transaction, "ApplicationStatusTypes", options.InitialApplicationStatus, cancellationToken);
 
-        const string insertApplication = """
+        string insertApplication = $$"""
             INSERT INTO dbo.ApplicationLetters
             (
                 Code, ReferenceNo, Name, ContactPerson, FirstName, LastName, Street, Town, DateOfBirth, Gender, Occupation, MainContactNo, ApplicationDate, DateReceived,
                 Comments, Programme, Requirements, ApplicationStatus, UserName, DateCreated, DateUpdated,
-                AuditID, CreatedBy, ExternalRequestId, Parish, DocumentSource
+                AuditID, CreatedBy, ExternalRequestId, Parish, DocumentSource{{BridgeQuickIntakeFields.Columns(submission)}}
             )
             OUTPUT INSERTED.ID
             VALUES
             (
                 @Code, @ReferenceNo, @Name, @ContactPerson, @FirstName, @LastName, @Street, @Town, @DateOfBirth, @Gender, @Occupation, @MainContactNo, @ApplicationDate, @DateReceived,
                 @Comments, @Programme, @Requirements, @ApplicationStatus, @UserName, @DateCreated, @DateUpdated,
-                @AuditID, @CreatedBy, @ExternalRequestId, @Parish, @DocumentSource
+                @AuditID, @CreatedBy, @ExternalRequestId, @Parish, @DocumentSource{{BridgeQuickIntakeFields.Values(submission)}}
             );
             """;
 
@@ -98,7 +98,7 @@ public sealed class SqlFfpManagerGateway : IFfpManagerGateway
         BridgeApplicationReceipt.AddParameters(command, submission);
         AddNullable(command, "@MainContactNo", BridgeApplicantProfile.MainContact(submission), SqlDbType.NVarChar, 255);
         AddNullable(command, "@Comments", CombineComments(submission), SqlDbType.NVarChar, 2500);
-        AddNullable(command, "@Programme", submission.ProgramCategory, SqlDbType.NVarChar, 255);
+        BridgeQuickIntakeFields.AddParameters(command, submission);
         AddNullable(command, "@Requirements", CombineRequirements(submission), SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationStatus", SqlDbType.BigInt).Value = statusId.HasValue ? statusId.Value : DBNull.Value;
         AddNullable(command, "@UserName", options.UserName, SqlDbType.NVarChar, 50);

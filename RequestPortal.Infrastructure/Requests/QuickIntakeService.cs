@@ -35,11 +35,6 @@ public sealed class QuickIntakeService : IQuickIntakeService
         "Employed", "Self Employed", "Unemployed", "Student"
     };
 
-    private static readonly HashSet<string> AllowedPrograms = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "None", "None of the Above", "PATH", "Poor Relief Dole", "Rehabilitation Programme", "Solidarity Program", "CARE"
-    };
-
     private static readonly HashSet<string> AllowedHelpCategories = new(StringComparer.OrdinalIgnoreCase)
     {
         "Food", "Housing", "Earn an Income", "Education", "Health", "Water & Hygiene"
@@ -143,7 +138,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
         string employmentStatus = RequireAllowed(submission.EmploymentStatus, "Employment status", AllowedEmploymentStatuses);
 
         if (submission.MonthlyIncome < 0 || submission.MonthlyIncome > RequestPortal.Common.Validation.WeeklyIncome.MaximumMonthly || decimal.Round(submission.MonthlyIncome,2) != submission.MonthlyIncome)
-            throw new ArgumentException("Monthly income must be non-negative, within the supported range and have at most two decimal places.");
+            throw new ArgumentException("Weekly income must be non-negative, within the supported range and have at most two decimal places.");
 
         string? victimCircumstances = submission.VictimCircumstances is null
             ? null
@@ -184,7 +179,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
             Parish = parish,
             Town = communityDistrict,
             EmploymentStatus = employmentStatus,
-            MonthlyHouseholdIncome = submission.MonthlyIncome,
+            MonthlyHouseholdIncome = RequestPortal.Common.Validation.WeeklyIncome.ToMonthly(submission.MonthlyIncome),
             FirstName = firstName,
             LastName = lastName,
             AlternativePhoneNumber = secondaryTelephone,
@@ -427,7 +422,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
         targetUser.Parish ??= intake.Parish;
         targetUser.Town ??= intake.CommunityDistrict;
         targetUser.EmploymentStatus ??= intake.EmploymentStatus;
-        targetUser.MonthlyHouseholdIncome ??= intake.MonthlyIncome;
+        targetUser.MonthlyHouseholdIncome ??= RequestPortal.Common.Validation.WeeklyIncome.ToMonthly(intake.MonthlyIncome);
         IntakeProfilePromotion.FillMissing(targetUser, intake);
 
         targetUser.IndividualProfileUpdateRequired = true;
@@ -476,29 +471,10 @@ public sealed class QuickIntakeService : IQuickIntakeService
     private static string BuildLocation(string streetAddress, string communityDistrict, string parish) =>
         $"{streetAddress}, {communityDistrict}, {parish}";
 
-    private static string NormalizePrograms(IReadOnlyList<string> values)
-    {
-        if (values is null || values.Count == 0)
-            throw new ArgumentException("Select at least one programme or None.");
+    private static string NormalizePrograms(IReadOnlyList<string> values) =>
+        ProfileIntakeChoices.NormalizePrograms(values ?? throw new ArgumentException("Select at least one programme or None."));
 
-        List<string> normalized = values
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => AllowedPrograms.FirstOrDefault(item => string.Equals(item, value.Trim(), StringComparison.OrdinalIgnoreCase))
-                ?? throw new ArgumentException("Current assistance programmes contain an invalid selection."))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (normalized.Count == 0)
-            throw new ArgumentException("Select at least one programme or None.");
-
-        if (normalized.Any(value => value is "None" or "None of the Above") && normalized.Count > 1)
-            throw new ArgumentException("None cannot be selected with another programme.");
-
-        return string.Join("|", normalized.Select(value => string.Equals(value, "None", StringComparison.OrdinalIgnoreCase) ? "None of the Above" : value));
-    }
-
-    private static IReadOnlyList<string> ParsePrograms(string value) =>
-        value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(item => string.Equals(item, "None", StringComparison.OrdinalIgnoreCase) ? "None of the Above" : item).ToArray();
+    private static IReadOnlyList<string> ParsePrograms(string value) => ProfileIntakeChoices.Parse(value, '|');
 
     private static string HelpCategoryDescription(string category) => category switch
     {

@@ -177,6 +177,7 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 intake?.SecondaryTelephone,
                 intake?.DateOfBirth);
 
+            submission = QuickIntakeSubmissionMapping.Apply(submission, intake);
             ExternalApplicantValidation.Validate(submission);
             // Only the outgoing DTO changes; persisted and displayed numbers remain E.164.
             submission = submission with

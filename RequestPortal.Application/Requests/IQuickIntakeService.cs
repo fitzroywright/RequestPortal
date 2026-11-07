@@ -17,6 +17,7 @@ public sealed record QuickIntakeSubmission(
     string CommunityDistrict,
     string Parish,
     string EmploymentStatus,
+    // Legacy storage/contract name: this value is weekly JMD.
     decimal MonthlyIncome,
     bool HasChildrenUnder18LivingFullTime,
     bool HasDisabilityOrSeriousMedicalCondition,

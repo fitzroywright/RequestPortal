@@ -136,7 +136,7 @@ public sealed class QuickIntakeModel : PageModel
                     Input.CommunityDistrict,
                     Input.Parish,
                     Input.EmploymentStatus,
-                    WeeklyIncome.ToMonthly(Input.MonthlyIncome),
+                    Input.MonthlyIncome, // Legacy input/property name; the entered amount is weekly JMD.
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms,
@@ -204,7 +204,7 @@ public sealed class QuickIntakeModel : PageModel
                 new QuickIntakeSubmission(Input.FirstName, Input.LastName, Input.DateOfBirth!.Value,
                     Input.Gender, Input.MaritalStatus, Input.Telephone, Input.Email,
                     Input.StreetAddress, Input.CommunityDistrict, Input.Parish,
-                    Input.EmploymentStatus, WeeklyIncome.ToMonthly(Input.MonthlyIncome),
+                    Input.EmploymentStatus, Input.MonthlyIncome,
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
