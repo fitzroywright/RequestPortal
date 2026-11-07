@@ -12,8 +12,10 @@ public sealed record LegacyRequestLocation(string StorageKey, string ExpectedSha
 /// <summary>Operator-only import of verified location JSON. Never registered in HTTP or worker services.</summary>
 public static class RequestLocationRecovery
 {
-    public static async Task<int> ImportAsync(RequestPortalDbContext db, IReadOnlyList<LegacyRequestLocation> source, CancellationToken ct)
+    public static async Task<int> ImportAsync(RequestPortalDbContext db, IReadOnlyList<LegacyRequestLocation> source, CancellationToken ct, string? sourceEvidenceSha256 = null)
     {
+        if (sourceEvidenceSha256 is not null && (sourceEvidenceSha256.Length != 64 || !sourceEvidenceSha256.All(Uri.IsHexDigit)))
+            throw new InvalidOperationException("RP-LOCATION-IMPORT-EVIDENCE: Invalid geography evidence fingerprint.");
         var validated = source.Select(item =>
         {
             if (item.Payload.Length > 32 * 1024 || item.ExpectedSha256.Length != 64 || !item.ExpectedSha256.All(Uri.IsHexDigit) ||
@@ -56,7 +58,7 @@ public static class RequestLocationRecovery
         }
         var marker = await db.RequestLocationImportStates.SingleOrDefaultAsync(x => x.Id == 1, ct);
         if (marker is null) { marker = new(); db.RequestLocationImportStates.Add(marker); }
-        marker.SourceFingerprint = fingerprint; marker.VerifiedUtc = DateTimeOffset.UtcNow; marker.ImportedLocations = validated.Length;
+        marker.SourceFingerprint = sourceEvidenceSha256 ?? fingerprint; marker.VerifiedUtc = DateTimeOffset.UtcNow; marker.ImportedLocations = validated.Length;
         var aggregate = await db.ManagementDashboardAggregates.SingleOrDefaultAsync(x => x.Id == 1, ct);
         if (aggregate is not null)
         {

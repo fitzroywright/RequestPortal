@@ -145,4 +145,23 @@ public sealed class RequestLocationRecoveryTests
         }
         Assert.Equal(1, await RequestLocationRecovery.ImportAsync(fixture.Db, [source], ct));
     }
+    [Fact]
+    public async Task ThrottledLoopPauseKeepsTheFailedSnapshotAndRestoresOnlyItsOwnSchedule()
+    {
+        var ct = TestContext.Current.CancellationToken; await using var fixture = await PostgreSqlTestDatabase.CreateAsync(ct);
+        await fixture.Db.ManagementDashboardAggregates.ExecuteUpdateAsync(set => set.SetProperty(x => x.RefreshStatus, "Failed")
+            .SetProperty(x => x.LastError, "Original provider failure").SetProperty(x => x.AttemptCount, 10), ct);
+        var before = await fixture.Db.ManagementDashboardAggregates.AsNoTracking().SingleAsync(ct);
+        var pause = await DashboardRecoveryPause.PauseAsync(fixture.Db, ct);
+        var held = await fixture.Db.ManagementDashboardAggregates.AsNoTracking().SingleAsync(ct);
+        Assert.Equal(before.AggregateData, held.AggregateData); Assert.Equal(before.SnapshotVersion, held.SnapshotVersion);
+        Assert.Equal("Failed", held.RefreshStatus); Assert.Equal(before.LastError, held.LastError);
+        Assert.True(held.NextRefreshUtc > DateTimeOffset.UtcNow.AddHours(1));
+        Assert.True(await DashboardRecoveryPause.ResumeAsync(fixture.Db, pause, ct));
+        Assert.Equal(before.NextRefreshUtc, (await fixture.Db.ManagementDashboardAggregates.AsNoTracking().SingleAsync(ct)).NextRefreshUtc);
+        var again = await DashboardRecoveryPause.PauseAsync(fixture.Db, ct);
+        await RequestLocationRecovery.ImportAsync(fixture.Db, [], ct);
+        Assert.False(await DashboardRecoveryPause.ResumeAsync(fixture.Db, again, ct));
+        Assert.True((await fixture.Db.ManagementDashboardAggregates.AsNoTracking().SingleAsync(ct)).NextRefreshUtc <= DateTimeOffset.UtcNow);
+    }
 }

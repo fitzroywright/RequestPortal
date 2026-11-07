@@ -19,6 +19,10 @@ public sealed class RequestLocationExportTests
         public string State { get; } = Directory.CreateTempSubdirectory("rp-geography-source-").FullName;
         public bool ThrottleOnce;
         public bool ConcurrentUpdate;
+        public bool WrongMetadataLength;
+        public bool UseNamedDrive;
+        public bool MetadataMissing;
+        public int MetadataReads;
         public string ContentETag = "stable";
         public byte[] Payload => JsonSerializer.SerializeToUtf8Bytes(new RequestLocationSnapshot(Id, "Half Way Tree, St. Andrew", "St. Andrew", "Half Way Tree",
             18.0179123456789m, -76.7936123456789m, LocationPrecision.Exact, DateTimeOffset.Parse("2026-09-01T00:00:00Z")), new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -39,6 +43,8 @@ public sealed class RequestLocationExportTests
                 return Task.FromResult(response);
             }
             string path = Uri.UnescapeDataString(request.RequestUri.AbsolutePath);
+            if (path.EndsWith("/sites/site/drives", StringComparison.Ordinal))
+                return Task.FromResult(Json(new { value = new[] { new { id = "drive", name = "Documents" } } }));
             if (path.EndsWith("root:/Portal", StringComparison.Ordinal))
                 return Task.FromResult(MissingApplicationRoot ? new(HttpStatusCode.NotFound) : Json(new { id = "app", folder = new { } }));
             if (path.EndsWith("root:/Portal/requestportal/locations:/children", StringComparison.Ordinal))
@@ -47,9 +53,15 @@ public sealed class RequestLocationExportTests
                 return Task.FromResult(Json(new { value = new[] { new { id = "payload", name = "resolved-location.json", eTag = ContentETag, size = Payload.Length, file = new { } } } }));
             string key = $"requestportal/locations/{Id:N}/resolved-location.json";
             string digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)));
-            if (path.EndsWith("/.common-storage/metadata/" + digest + ".json:/content", StringComparison.Ordinal))
-                return Task.FromResult(Json(new StoredFile(key, Payload.Length, "application/json", "resolved-location.json", Convert.ToHexStringLower(SHA256.HashData(Payload)),
+            if (path.Contains("/.common-storage/metadata/", StringComparison.Ordinal))
+            {
+                MetadataReads++;
+                if (MetadataMissing || !path.EndsWith("/" + digest + ".json:/content", StringComparison.Ordinal)) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+                return Task.FromResult(Json(new StoredFile(key, Payload.Length + (WrongMetadataLength ? 1 : 0), "application/json", "resolved-location.json", Convert.ToHexStringLower(SHA256.HashData(Payload)),
                     DateTimeOffset.UtcNow, "legacy", 1, StorageStatus.Stored, new Dictionary<string, string> { { "RequestId", (WrongMetadataOwner ? Guid.NewGuid() : Id).ToString("D") } })));
+            }
+            if (path.EndsWith("/" + key, StringComparison.Ordinal))
+                return Task.FromResult(MissingGeographyRoot ? new(HttpStatusCode.NotFound) : Json(new { id = "payload", eTag = ContentETag, size = Payload.Length, file = new { } }));
             if (path.EndsWith("/items/payload/content", StringComparison.Ordinal))
             {
                 if (ConcurrentUpdate) ContentETag = "changed";
@@ -66,7 +78,7 @@ public sealed class RequestLocationExportTests
     }
     private static SharePointLocationExport Reader(Source source, string state, out HttpClient http)
     {
-        var options = new SharePointStorageOptions("tenant", "client", "fixture", "site", null, "", DriveId: "drive", RootFolder: "Portal");
+        var options = new SharePointStorageOptions("tenant", "client", "fixture", "site", null, "", DriveId: source.UseNamedDrive ? null : "drive", DriveName: source.UseNamedDrive ? "documents" : null, RootFolder: "Portal");
         http = new HttpClient(source, false);
         return new(new GraphReadClient(http, options, source.State, (_, _) => Task.CompletedTask, TimeSpan.Zero), options);
     }
@@ -80,6 +92,14 @@ public sealed class RequestLocationExportTests
         var final = await reader.ReadAsync(new HashSet<Guid> { source.Id }, true, first, ct);
         Assert.True(final.WritersStopped); Assert.Equal(1, source.PayloadReads);
         Assert.Equal(source.Payload, Assert.Single(final.Records).Location.Payload);
+    }
+    [Fact]
+    public async Task NamedDriveResolutionMatchesTheInstalledProvidersCaseInsensitiveConvention()
+    {
+        using var source = new Source { UseNamedDrive = true };
+        var reader = Reader(source, source.State, out var http); using var client = http;
+        var result = await reader.ReadAsync(new HashSet<Guid> { source.Id }, false, null, TestContext.Current.CancellationToken);
+        Assert.Equal("drive", result.DriveId); Assert.Single(result.Records);
     }
     [Fact]
     public async Task CorruptGeographyIsStoppedAtTheExactShaVerificationOperation()
@@ -99,6 +119,15 @@ public sealed class RequestLocationExportTests
         Assert.Equal("LOCATION_CHANGED_DURING_EXPORT", error.Code); Assert.Equal(1, source.PayloadReads);
     }
     [Fact]
+    public async Task MetadataLengthMismatchIsNotMisreportedAsAShaMismatch()
+    {
+        using var source = new Source { WrongMetadataLength = true };
+        var reader = Reader(source, source.State, out var http); using var client = http;
+        var error = await Assert.ThrowsAsync<LocationSourceException>(() => reader.ReadAsync(new HashSet<Guid> { source.Id }, false, null, TestContext.Current.CancellationToken));
+        Assert.Equal("LOCATION_METADATA_LENGTH_MISMATCH", error.Code);
+        Assert.Equal(reader.ExpectedSha256, reader.ActualSha256); Assert.NotEqual(reader.ExpectedLength, reader.ActualLength);
+    }
+    [Fact]
     public async Task MissingApplicationRootCannotMasqueradeAsEmptyGeographyHistory()
     {
         using var source = new Source { MissingApplicationRoot = true };
@@ -109,10 +138,49 @@ public sealed class RequestLocationExportTests
     [Fact]
     public async Task VerifiedApplicationWithNoGeographyFolderProducesAnExplicitEmptyExport()
     {
-        using var source = new Source { MissingGeographyRoot = true };
+        using var source = new Source { MissingGeographyRoot = true, MetadataMissing = true };
         var reader = Reader(source, Path.GetTempPath(), out var http); using var client = http;
         var result = await reader.ReadAsync(new HashSet<Guid> { source.Id }, true, null, TestContext.Current.CancellationToken);
         Assert.True(result.Complete); Assert.Empty(result.Records); Assert.Equal(0, source.PayloadReads);
+        Assert.Equal(source.Id, Assert.Single(result.VerifiedMissingRequestIds!)); LocationExportValidation.ValidateCoverage(result);
+    }
+    [Fact]
+    public async Task MissingContentFolderWithSurvivingMetadataCannotEraseHistoricalGeography()
+    {
+        using var source = new Source { MissingGeographyRoot = true };
+        var reader = Reader(source, source.State, out var http); using var client = http;
+        var error = await Assert.ThrowsAsync<LocationSourceException>(() => reader.ReadAsync(new HashSet<Guid> { source.Id }, false, null, TestContext.Current.CancellationToken));
+        Assert.Equal("LOCATION_CONTENT_MISSING", error.Code); Assert.Equal(1, source.MetadataReads);
+    }
+    [Fact]
+    public async Task FinalStoppedWriterPassReusesAbsenceProofButCapturesNewlyCreatedGeography()
+    {
+        using var source = new Source { MissingGeographyRoot = true, MetadataMissing = true };
+        var reader = Reader(source, source.State, out var http); using var client = http; var ct = TestContext.Current.CancellationToken;
+        var first = await reader.ReadAsync(new HashSet<Guid> { source.Id }, false, null, ct);
+        var stopped = await reader.ReadAsync(new HashSet<Guid> { source.Id }, true, first, ct);
+        Assert.Equal(1, source.MetadataReads); Assert.Empty(stopped.Records);
+        source.MissingGeographyRoot = false; source.MetadataMissing = false;
+        var changed = await reader.ReadAsync(new HashSet<Guid> { source.Id }, true, first, ct);
+        Assert.Single(changed.Records); Assert.Empty(changed.VerifiedMissingRequestIds!);
+    }
+    [Fact]
+    public async Task MetadataCoverageIncludesRequestsWithoutPhysicalDirectories()
+    {
+        using var source = new Source(); var other = Guid.NewGuid();
+        var reader = Reader(source, source.State, out var http); using var client = http;
+        var result = await reader.ReadAsync(new HashSet<Guid> { source.Id, other }, false, null, TestContext.Current.CancellationToken);
+        Assert.Single(result.Records); Assert.Equal(other, Assert.Single(result.VerifiedMissingRequestIds!)); Assert.Equal(2, result.KnownRequestCount);
+        Assert.Throws<LocationSourceException>(() => LocationExportValidation.ValidateCoverage(result with { VerifiedMissingRequestIds = [] }));
+    }
+    [Fact]
+    public async Task RequestCreatedAfterInitialDatabaseReadIsVerifiedBeforeIncludingItsGeography()
+    {
+        using var source = new Source(); var reader = Reader(source, source.State, out var http); using var client = http;
+        int checks = 0;
+        var result = await reader.ReadAsync(new HashSet<Guid>(), false, null, TestContext.Current.CancellationToken,
+            (id, _) => { checks++; return Task.FromResult(id == source.Id); });
+        Assert.Equal(1, checks); Assert.Single(result.Records); Assert.Equal(1, result.KnownRequestCount);
     }
     [Theory]
     [InlineData(false)]

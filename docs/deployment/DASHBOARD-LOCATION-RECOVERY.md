@@ -12,13 +12,25 @@ The existing worker, advisory lock, atomic snapshot publication, reconciliation 
 last valid snapshot remain in place. Application and dashboard health semantics are
 unchanged.
 
-## Read-only evidence and geography preparation
+## Confirmed cause and geography preparation
 
-The manifest-pinned `Read-RequestPortalDashboardStorage-Kratos.py` reuses the installed
-approved managed-environment helper and runs tools under the existing application
-identity. It classifies the first failing metadata/content operation in a bounded
-64-request sample. It then exports only `requestportal/locations` and the matching
-Common.Storage metadata. No supporting-document inventory is performed.
+The completed production diagnostic found `STORAGE-SHAREPOINT-METADATA-001` in
+`GetMetadataAsync`, HTTP 429 with Graph `activityLimitReached`, after 1,459 missing
+location metadata responses in 12.2 seconds at concurrency 16. Application health
+was 200; dashboard readiness was 503. The diagnostic must not be repeated.
+
+The manifest-pinned `Recover-RequestPortalDashboard-Kratos.py` reuses that evidence,
+the installed approved environment helper and existing application identity. Before
+geography preparation it takes the worker advisory lock and leases its retry
+schedule for at most two hours, preserving its failed status and last snapshot.
+Requests and other functionality stay online. The lease is restored on failure;
+successful import releases it immediately without marking the aggregate healthy.
+
+The exporter reads only `requestportal/locations` and exact location metadata keys
+for known request IDs at four requests per second, with persistent provider backoff.
+A missing content folder is insufficient evidence of empty history: surviving
+metadata without content blocks import. Complete exports record every location or
+its verified metadata absence. No supporting-document inventory is performed.
 
 The geography exporter verifies the configured application root, request identity,
 metadata identity, payload size and SHA-256. On a mismatch it checks content ETag and
@@ -42,7 +54,10 @@ Use the established administrator and Aegis.Operations procedure for these steps
    Obtain a complete verified geography export before entering maintenance.
 2. Stop Request Portal writers. Run `location-export` again into the same protected
    `locations.json`; unchanged payloads can be reused only after source metadata,
-   content ETag and the cached payload hash match. Export records whether the service
+   content ETag and the cached payload hash match. The original service PID must
+   remain unchanged until it is stopped. In this fenced pass, prior absence proofs
+   can be reused because Common.Storage writes content before metadata; all new
+   physical location content and new request IDs are checked again. Export records whether the service
    was inactive/dead with zero main/control PIDs before and after the read.
 3. After backup/restore and target checks pass, run `location-schema` against that
    export. It refuses active writers, an unfenced/stale export or unexpected pending

@@ -12,12 +12,20 @@ public sealed class DashboardStorageDiagnosticTests
     {
         public bool Missing;
         public int Reads;
+        public int MetadataReads, FailAtMetadata;
         protected override object? Invoke(MethodInfo? method,object?[]? args) => method!.Name switch
         {
-            "GetMetadataAsync" => Task.FromResult<StoredFile?>(Missing ? null : new("fixture",1,"application/json","fixture","",DateTimeOffset.UtcNow,"fixture",1,StorageStatus.Stored,new Dictionary<string,string>())),
+            "GetMetadataAsync" => Metadata(),
             "OpenReadAsync" => Fail(),
             _ => throw new InvalidOperationException("The probe attempted a non-read operation.")
         };
+        private Task<StoredFile?> Metadata()
+        {
+            MetadataReads++;
+            if(FailAtMetadata>0 && MetadataReads>=FailAtMetadata)
+                throw new StorageException("STORAGE-SHAREPOINT-METADATA-001","PRIVATE {\"code\":\"activityLimitReached\"}");
+            return Task.FromResult<StoredFile?>(Missing ? null : new("fixture",1,"application/json","fixture","",DateTimeOffset.UtcNow,"fixture",1,StorageStatus.Stored,new Dictionary<string,string>()));
+        }
         private Task<Stream> Fail() {Reads++;throw new StorageException("STORAGE-SHAREPOINT-READ-001","PRIVATE key, PRIVATE token {\"error\":{\"code\":\"activityLimitReached\",\"message\":\"PRIVATE\"}}");}
     }
     private sealed class ResponseHandler : HttpMessageHandler
@@ -53,6 +61,14 @@ public sealed class DashboardStorageDiagnosticTests
         var storage=(Storage)DispatchProxy.Create<IFileStorage,Storage>();storage.Missing=true;
         var result=await DashboardStorageDiagnostics.ProbeAsync((IFileStorage)storage,[Guid.NewGuid(),Guid.NewGuid()],1,TestContext.Current.CancellationToken);
         Assert.Equal(2,result.Missing);Assert.Equal(0,storage.Reads);Assert.Empty(result.Failures);
+    }
+    [Fact]
+    public async Task LaterLocationMetadataFailureIsIdentifiedAndStopsTheRemainingProbe()
+    {
+        var storage=(Storage)DispatchProxy.Create<IFileStorage,Storage>();storage.Missing=true;storage.FailAtMetadata=70;
+        var result=await DashboardStorageDiagnostics.ProbeAsync((IFileStorage)storage,Enumerable.Range(0,100).Select(_=>Guid.NewGuid()).ToArray(),1,TestContext.Current.CancellationToken);
+        Assert.True(result.StoppedAfterFailure);Assert.Equal(70,result.Examined);Assert.Equal(69,result.Missing);
+        Assert.Equal("metadata",Assert.Single(result.Failures).Operation);Assert.Equal(0,storage.Reads);
     }
     [Theory]
     [InlineData("POST")]

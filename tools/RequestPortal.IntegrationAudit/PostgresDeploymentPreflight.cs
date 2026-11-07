@@ -51,17 +51,35 @@ internal static class PostgresDeploymentPreflight
             ids=await db.AssistanceRequests.AsNoTracking().Select(x=>x.Id).ToArrayAsync(ct);
             await tx.RollbackAsync(ct);
         }
-        if(!string.Equals(configuration["Storage:Provider"],"SharePoint",StringComparison.OrdinalIgnoreCase))
+        if(!string.Equals(configuration["Storage:Provider"]?.Trim(),"SharePoint",StringComparison.OrdinalIgnoreCase))
             throw Stop("LOCATION_SOURCE_PROVIDER_GUARD",new { });
         var json=new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        if(mode=="location-pause")
+        {
+            Stage="pause-throttled-dashboard-refresh";
+            var pause=await RequestPortal.Infrastructure.Management.DashboardRecoveryPause.PauseAsync(db,ct);
+            await File.WriteAllTextAsync(path+".pause.json",JsonSerializer.Serialize(pause,json),ct);
+            File.SetUnixFileMode(path+".pause.json",UnixFileMode.UserRead|UnixFileMode.UserWrite);
+            return new {status="dashboard-refresh-paused",pause.SnapshotVersion,pause.PausedUntilUtc,snapshotChanged=false};
+        }
+        if(mode=="location-resume")
+        {
+            Stage="restore-dashboard-refresh-schedule";
+            var pause=JsonSerializer.Deserialize<RequestPortal.Infrastructure.Management.DashboardPauseState>(await File.ReadAllTextAsync(path+".pause.json",ct),json)
+                ?? throw Stop("LOCATION_PAUSE_STATE_INVALID",new { });
+            bool restored=await RequestPortal.Infrastructure.Management.DashboardRecoveryPause.ResumeAsync(db,pause,ct);
+            return new {status="dashboard-refresh-schedule-reconciled",restored,snapshotChanged=false};
+        }
         if(mode is "location-schema" or "location-import")
         {
             Stage="import-verified-geography";
             if(!await PortalStoppedAsync(ct))throw Stop("LOCATION_WRITERS_NOT_STOPPED",new { });
-            var data=JsonSerializer.Deserialize<RequestPortal.LocationRecovery.LocationExport>(await File.ReadAllBytesAsync(path,ct),json)
+            byte[] evidence=await File.ReadAllBytesAsync(path,ct);
+            var data=JsonSerializer.Deserialize<RequestPortal.LocationRecovery.LocationExport>(evidence,json)
                 ?? throw Stop("LOCATION_EXPORT_INVALID",new { });
+            RequestPortal.LocationRecovery.LocationExportValidation.ValidateCoverage(data);
             if(!data.Complete || !data.WritersStopped || data.RootFolder!=(configuration["Storage:SharePoint:RootFolder"]?.Trim()??"") ||
-               (!string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:DriveId"]) && data.DriveId!=configuration["Storage:SharePoint:DriveId"]) ||
+               (!string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:DriveId"]) && data.DriveId!=configuration["Storage:SharePoint:DriveId"]?.Trim()) ||
                data.ObservedUtc<DateTimeOffset.UtcNow.AddMinutes(-30) || data.ObservedUtc>DateTimeOffset.UtcNow.AddMinutes(1))
                 throw Stop("LOCATION_FINAL_FENCE_REQUIRED",new { });
             if(mode=="location-schema")
@@ -79,29 +97,31 @@ internal static class PostgresDeploymentPreflight
             }
             if(!(await db.Database.GetAppliedMigrationsAsync(ct)).Contains("20261107000005_PostgresRequestLocations"))
                 throw Stop("LOCATION_REVIEWED_SCHEMA_REQUIRED",new { });
-            int imported=await RequestPortal.Infrastructure.Management.RequestLocationRecovery.ImportAsync(db,data.Records.Select(x=>x.Location).ToArray(),ct);
-            return new {status="location-import-verified",imported,sourceWrites=false,providerChanged=false,database="requestportal"};
+            string sha=Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(evidence));
+            int imported=await RequestPortal.Infrastructure.Management.RequestLocationRecovery.ImportAsync(db,data.Records.Select(x=>x.Location).ToArray(),ct,sha);
+            return new {status="location-import-verified",imported,sourceEvidenceSha256=sha,verifiedMissingLocations=data.VerifiedMissingRequestIds!.Count,sourceWrites=false,providerChanged=false,database="requestportal"};
         }
         Stage="export-legacy-geography";
         string secretName=configuration["Storage:SharePoint:ClientSecretName"]?.Trim() ?? "storage/sharepoint/client-secret";
         var options=Common.Storage.StorageTargetOptions.FromConfiguration(configuration,await secrets.GetRequiredAsync(secretName,ct)).SharePoint!;
         using var http=new HttpClient {Timeout=TimeSpan.FromMinutes(2)};
-        var client=new RequestPortal.LocationRecovery.GraphReadClient(http,options,Path.GetDirectoryName(path)!);
-        var reader=new RequestPortal.LocationRecovery.SharePointLocationExport(client,options);
+        var client=new RequestPortal.LocationRecovery.GraphReadClient(http,options,Path.GetDirectoryName(path)!,minimumInterval:TimeSpan.FromMilliseconds(250));
+        var reader=new RequestPortal.LocationRecovery.SharePointLocationExport(client,options) {
+            Progress=checks=>Console.WriteLine(JsonSerializer.Serialize(new {status="location-export-progress",metadataRequests=checks,initialRequestCount=ids.Length},json)) };
         RequestPortal.LocationRecovery.LocationExport? cached=File.Exists(path)?JsonSerializer.Deserialize<RequestPortal.LocationRecovery.LocationExport>(await File.ReadAllBytesAsync(path,ct),json):null;
         try
         {
             bool stopped=await PortalStoppedAsync(ct);
-            var data=await reader.ReadAsync(ids.ToHashSet(),stopped,cached,ct);
+            var data=await reader.ReadAsync(ids.ToHashSet(),stopped,cached,ct,(id,token)=>db.AssistanceRequests.AsNoTracking().AnyAsync(x=>x.Id==id,token));
             data=data with {WritersStopped=stopped && await PortalStoppedAsync(ct)};
             string candidate=path+".writing";await File.WriteAllBytesAsync(candidate,JsonSerializer.SerializeToUtf8Bytes(data,json),ct);
             File.SetUnixFileMode(candidate,UnixFileMode.UserRead|UnixFileMode.UserWrite);File.Move(candidate,path,true);
-            return new {status="location-export-verified",locations=data.Records.Count,data.WritersStopped,client.Requests,client.ThrottledResponses,
+            return new {status="location-export-verified",locations=data.Records.Count,verifiedMissingLocations=data.VerifiedMissingRequestIds!.Count,data.KnownRequestCount,data.WritersStopped,client.Requests,client.ThrottledResponses,
                 sourceWrites=false,supportingDocumentsScanned=0,providerChanged=false};
         }
         catch(Exception error)
         {
-            var failure=new {operation=reader.Operation,storageKey=reader.CurrentKey,reader.ExpectedSha256,reader.ActualSha256,errorType=error.GetType().Name,
+            var failure=new {operation=reader.Operation,storageKey=reader.CurrentKey,reader.ExpectedSha256,reader.ActualSha256,reader.ExpectedLength,reader.ActualLength,errorType=error.GetType().Name,
                 code=error is RequestPortal.LocationRecovery.LocationSourceException source?source.Code:"LOCATION_EXPORT_FAILED"};
             await File.WriteAllTextAsync(path+".failure.json",JsonSerializer.Serialize(failure,json),CancellationToken.None);
             File.SetUnixFileMode(path+".failure.json",UnixFileMode.UserRead|UnixFileMode.UserWrite);
@@ -236,7 +256,7 @@ internal static class PostgresDeploymentPreflight
         var ids=await (from request in db.AssistanceRequests.AsNoTracking()
                        join organization in db.Organizations on request.OrganizationId equals organization.Id
                        where request.Status!=RequestPortal.Domain.Requests.RequestStatus.Draft && request.Status!=RequestPortal.Domain.Requests.RequestStatus.Cancelled && request.Status!=RequestPortal.Domain.Requests.RequestStatus.Duplicate
-                       orderby request.Id select request.Id).Take(64).ToListAsync(ct);
+                       orderby request.Id select request.Id).ToListAsync(ct);
         await tx.RollbackAsync(ct); // Never hold a DB snapshot open during external storage reads.
         string secretName=configuration["Storage:SharePoint:ClientSecretName"]?.Trim() ?? "storage/sharepoint/client-secret";
         var targetOptions=Common.Storage.StorageTargetOptions.FromConfiguration(configuration,await secrets.GetAsync(secretName,ct));
