@@ -19,12 +19,12 @@ public sealed class QuickIntakeDashboardTests
         new(Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),"PRIVATE_FIRST","PRIVATE_LAST",dob ?? new(1990,11,5),gender,"Single","PRIVATE_PHONE",null,address,"PRIVATE_COMMUNITY",parish,employment,income,false,false,"None",category,received ?? Received);
 
     [Fact]
-    public async Task WeeklyIncomeGroupsIndividualConvertedAmountsAndPreservesUnknowns()
+    public async Task SavedWeeklyIncomeAndDerivedMonthlyIncomeUseExistingBandsAndPreserveUnknowns()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var db = await PostgreSqlTestDatabase.CreateAsync(ct);
-        decimal[] monthly = [0, 21666.66m, 21666.67m, 43333.33m, 43333.34m, 86666.66m, 86666.67m];
-        db.Db.QuickIntakes.AddRange(monthly.Select((amount, i) => Intake(i, income: amount)));
+        decimal[] weekly = [0, 5000, 5000.01m, 10000, 10000.01m, 20000, 20000.01m];
+        db.Db.QuickIntakes.AddRange(weekly.Select((amount, i) => Intake(i, income: amount)));
         db.Db.QuickIntakes.Add(Intake(8, dob: new(1900, 1, 1), address: "Not captured", income: 0));
         await db.Db.SaveChangesAsync(ct);
         var result = await Service(db).GetAsync(Range, ct);
@@ -32,10 +32,26 @@ public sealed class QuickIntakeDashboardTests
         Assert.Equal(new int?[] { 1, 1, 2, 2, 1, 1 }, result.WeeklyIncome.Items.Select(c => c.Count));
         Assert.Equal(8, result.WeeklyIncome.Items.Sum(c => c.Count));
         Assert.Equal(100, result.WeeklyIncome.Items.Sum(c => c.Percent));
-        // The same monthly bucket splits into distinct weekly buckets.
-        Assert.Equal(4, result.Income.Items.Single(c => c.Name == "≤ 50,000").Count);
+        Assert.False(result.Income.Suppressed);
+        Assert.Equal(new int?[] { 1, 4, 2, 0, 0, 1 }, result.Income.Items.Select(c => c.Count));
+        Assert.Equal(8, result.Income.Items.Sum(c => c.Count));
+        Assert.Equal(100, result.Income.Items.Sum(c => c.Percent));
         Assert.Equal(1, result.WeeklyIncome.Items.Last().Count);
-        Assert.Equal(monthly, await db.Db.QuickIntakes.Where(q => q.StreetAddress != "Not captured").OrderBy(q => q.MonthlyIncome).Select(q => q.MonthlyIncome).ToArrayAsync(ct));
+        Assert.Equal(weekly, await db.Db.QuickIntakes.Where(q => q.StreetAddress != "Not captured").OrderBy(q => q.MonthlyIncome).Select(q => q.MonthlyIncome).ToArrayAsync(ct));
+    }
+
+    [Fact]
+    public async Task MonthlyIncomeClassifiesConvertedWeeklyAmountsOnBothSidesOfBandBoundaries()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = await PostgreSqlTestDatabase.CreateAsync(ct);
+        decimal[] weekly = [11538.46m, 11538.47m, 23076.92m, 23076.93m, 46153.84m, 46153.85m];
+        db.Db.QuickIntakes.AddRange(weekly.Select((amount, i) => Intake(i, income: amount)));
+        await db.Db.SaveChangesAsync(ct);
+        var result = await Service(db).GetAsync(Range, ct);
+        // Each pair converts to just below/above 50,000, 100,000 and 200,000 JMD.
+        Assert.Equal(new int?[] { 0, 1, 2, 2, 1, 0 }, result.Income.Items.Select(c => c.Count));
+        Assert.Equal(new int?[] { 0, 0, 0, 2, 4, 0 }, result.WeeklyIncome.Items.Select(c => c.Count));
     }
 
     [Fact]
@@ -59,7 +75,7 @@ public sealed class QuickIntakeDashboardTests
         Assert.Equal(5,result.RequestTypes.Single(c=>c.Name=="Housing").Count);Assert.Equal(50,result.RequestTypes.Single(c=>c.Name=="Education").Percent);
         foreach(var rows in new[]{result.Parishes,result.RequestTypes,result.Employment.Items,result.Income.Items,result.Gender.Items,result.Ages.Items}) {Assert.Equal(10,rows.Sum(c=>c.Count));Assert.Equal(100,rows.Sum(c=>c.Percent));}
         Assert.False(result.Employment.Suppressed);Assert.Equal(5,result.Employment.Items.Single(c=>c.Name=="Self Employed").Count);
-        Assert.Equal(5,result.Income.Items.Single(c=>c.Name=="No income").Count);Assert.Equal(5,result.Income.Items.Single(c=>c.Name=="50,000.01–100,000").Count);
+        Assert.Equal(5,result.Income.Items.Single(c=>c.Name=="No income").Count);Assert.Equal(5,result.Income.Items.Single(c=>c.Name=="> 200,000").Count);
         Assert.Null(result.AwaitingScreening);Assert.Null(result.FollowUpRequired);Assert.Null(result.ScreeningComplete);Assert.Null(result.NewApplicants);Assert.False(result.ChildrenUnder18.Suppressed);Assert.Equal(10,result.ChildrenUnder18.Items.Single(c=>c.Name=="No").Count);
         string json=JsonSerializer.Serialize(result);foreach(var privateValue in new[]{"PRIVATE_FIRST","PRIVATE_LAST","PRIVATE_PHONE","PRIVATE_COMMUNITY","external","FFP-123"}) Assert.DoesNotContain(privateValue,json);
         Assert.Contains(result.Insights,s=>s.Contains("50%")&&s.Contains("housing"));Assert.Contains(result.Insights,s=>s.Contains("50%")&&s.Contains("no income"));
