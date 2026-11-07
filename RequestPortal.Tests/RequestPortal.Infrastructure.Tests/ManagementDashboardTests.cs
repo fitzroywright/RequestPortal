@@ -97,7 +97,7 @@ public sealed class ManagementDashboardTests
             }
         }
         await fixture.Db.SaveChangesAsync(token);
-        var service = new ManagementDashboardService(fixture.Db, DispatchProxy.Create<IFileStorage, Storage>(), Options.Create(new ManagementDashboardOptions()));
+        var service = new ManagementDashboardService(fixture.Db, Options.Create(new ManagementDashboardOptions()));
         var dashboard = await service.GetDashboardAsync(token);
         Assert.Equal(6, dashboard.Statuses.Sum(item => item.Count));
         Assert.Equal(15, dashboard.Parishes.Count);
