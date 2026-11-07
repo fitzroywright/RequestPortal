@@ -47,7 +47,8 @@ public static class BridgeApplicantProfile
             string digits = number[1..];
             if (result.Any(p => p.Number == digits)) return;
             var util = PhoneNumberUtil.GetInstance();
-            result.Add(new(digits, numberType, util.GetNumberType(util.Parse(number, "JM"))));
+            result.Add(new(digits, numberType, QuickIntakeApplicationFields.AppliesTo(submission)
+                ? PhoneNumberType.MOBILE : util.GetNumberType(util.Parse(number, "JM"))));
         }
     }
 
