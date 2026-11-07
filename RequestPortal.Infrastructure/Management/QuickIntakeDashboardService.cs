@@ -23,7 +23,7 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
     private IQueryable<QuickIntakeRecord> Cohort(QuickIntakeRange range)
     {
         range.Validate();
-        return db.QuickIntakes.AsNoTracking().Where(q => q.CreatedUtc >= range.StartUtc && q.CreatedUtc < range.EndUtc);
+        return QuickIntakeReporting.Population(db, range.StartUtc, range.EndUtc);
     }
     public async Task<QuickIntakeDashboardSnapshot> GetAsync(QuickIntakeRange range, CancellationToken ct = default)
     {
@@ -31,10 +31,8 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", ct);
         var query = Cohort(range);
         int total = await query.CountAsync(ct);
-        int sent = await query.CountAsync(q => db.IntegrationLinks.Any(l => l.RequestId == q.RequestId &&
-            l.SystemName == integration.Value.SystemName && l.Status == SynchronizationStatus.Synchronized &&
-            l.VerifiedUtc != null && l.SynchronizedUtc != null && l.ExternalReference != null && l.ExternalReference != "" &&
-            l.ApplicationNumber != null && l.ApplicationNumber != ""), ct);
+        var verifiedIds = QuickIntakeReporting.VerifiedRequestIds(db, integration.Value.SystemName);
+        int sent = await query.CountAsync(q => verifiedIds.Contains(q.RequestId), ct);
         // Only grouped projections leave PostgreSQL. No applicant identities, DOBs,
         // contact details or individual demographic records are materialized.
         var parishRows = await query.GroupBy(q => q.Parish).Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);

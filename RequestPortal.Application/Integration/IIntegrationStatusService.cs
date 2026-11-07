@@ -42,7 +42,7 @@ public interface IIntegrationStatusService
 }
 
 public sealed record IntegrationMonitorQuery(string? Search = null, string? Status = null,
-    DateTimeOffset? FromUtc = null, DateTimeOffset? ThroughUtc = null, string Sort = "received", int Page = 1, int PageSize = 25);
+    DateTimeOffset? FromUtc = null, DateTimeOffset? ThroughUtc = null, string Sort = "received", int Page = 1, int PageSize = 25, string? Source = null, bool NotVerified = false);
 public sealed record IntegrationTransferRow(Guid RequestId, Guid? LinkId, string PublicReference, string ApplicantName,
     string Source, string SystemName, string Target, SynchronizationStatus Status, string? FailureStage,
     string? FailureClassification, string? ErrorCode, string? Explanation, DateTimeOffset SubmittedUtc,
@@ -50,6 +50,7 @@ public sealed record IntegrationTransferRow(Guid RequestId, Guid? LinkId, string
     DateTimeOffset? VerifiedUtc, string? ApplicationId, string? ApplicationNumber, bool HasQueuedSubmission)
 {
     // Only classified, sanitized failures may be exposed; legacy provider payloads stay protected.
+    public bool VerifiedInFfpManager { get; init; }
     public string? RecordedError { get; init; }
     public string? RecoveryAction { get; init; }
 }
@@ -57,7 +58,10 @@ public sealed record IntegrationMonitorCounts(int Failed, int Pending, int Retry
 { public int NeedsAttention => Failed + ReconciliationRequired; }
 public sealed record IntegrationMonitorPage(IReadOnlyList<IntegrationTransferRow> Items, int TotalCount, int Page, int PageSize,
     IntegrationMonitorCounts Counts)
-{ public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize)); }
+{
+  public IReadOnlyDictionary<string, int> NotVerifiedBreakdown { get; init; } = new Dictionary<string, int>();
+  public int? VerifiedCount { get; init; }
+  public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize)); }
 public sealed record IntegrationAttemptView(Guid Id, int Number, string Operation, DateTimeOffset StartedUtc,
     DateTimeOffset? CompletedUtc, bool Succeeded, string Stage, string? Classification, string? ErrorCode, string? Explanation);
 public sealed record IntegrationOperatorEvent(DateTimeOffset OccurredUtc, string Action, string? Detail, Guid ActorUserId = default);
