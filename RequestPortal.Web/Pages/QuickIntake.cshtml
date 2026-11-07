@@ -36,6 +36,8 @@
 
                 <form method="post" enctype="multipart/form-data" class="quick-intake-form" id="quickIntakeForm">
                     @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Input.PayFrequency" />
+                    <input type="hidden" asp-for="Input.PhoneLineType" />
                     <div asp-validation-summary="ModelOnly" class="quick-intake-errors"></div>
                     <input asp-for="Input.Website" class="quick-intake-trap" tabindex="-1" autocomplete="off" aria-hidden="true" />
 

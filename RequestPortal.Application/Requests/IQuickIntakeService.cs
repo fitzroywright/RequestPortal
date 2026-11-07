@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using RequestPortal.Domain.Requests;
 
 namespace RequestPortal.Application.Requests;
 
@@ -24,7 +25,9 @@ public sealed record QuickIntakeSubmission(
     IReadOnlyList<string> AssistancePrograms,
     string HelpCategory,
     string? SecondaryTelephone = null,
-    IReadOnlyList<string>? VictimCircumstances = null);
+    IReadOnlyList<string>? VictimCircumstances = null,
+    int PayFrequency = QuickIntakeTransferDefaults.PayFrequency,
+    int PhoneLineType = QuickIntakeTransferDefaults.PhoneLineType);
 
 public sealed record QuickIntakeResult(
     Guid RequestId,

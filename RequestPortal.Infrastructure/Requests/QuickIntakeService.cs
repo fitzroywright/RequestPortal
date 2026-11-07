@@ -137,6 +137,10 @@ public sealed class QuickIntakeService : IQuickIntakeService
         string parish = Require(submission.Parish, "Parish");
         string employmentStatus = RequireAllowed(submission.EmploymentStatus, "Employment status", AllowedEmploymentStatuses);
 
+        if (submission.PayFrequency != QuickIntakeTransferDefaults.PayFrequency ||
+            submission.PhoneLineType != QuickIntakeTransferDefaults.PhoneLineType)
+            throw new ArgumentException("Quick Intake requires the agreed weekly pay frequency and mobile phone line type.");
+
         if (submission.MonthlyIncome < 0 || submission.MonthlyIncome > RequestPortal.Common.Validation.WeeklyIncome.MaximumMonthly || decimal.Round(submission.MonthlyIncome,2) != submission.MonthlyIncome)
             throw new ArgumentException("Weekly income must be non-negative, within the supported range and have at most two decimal places.");
 
@@ -284,7 +288,9 @@ public sealed class QuickIntakeService : IQuickIntakeService
             secondaryTelephone,
             victimCircumstances,
             submission.Telephone,
-            submission.SecondaryTelephone);
+            submission.SecondaryTelephone,
+            submission.PayFrequency,
+            submission.PhoneLineType);
         if (signedInApplicant is not null)
             IntakeProfilePromotion.FillMissing(signedInApplicant, intake);
         if (signedInApplicant is not null)

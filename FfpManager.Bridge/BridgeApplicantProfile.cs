@@ -2,6 +2,7 @@ using System.Data;
 using Microsoft.Data.SqlClient;
 using PhoneNumbers;
 using RequestPortal.Application.Integration;
+using RequestPortal.Domain.Requests;
 
 namespace FfpManager.Bridge;
 
@@ -47,8 +48,7 @@ public static class BridgeApplicantProfile
             string digits = number[1..];
             if (result.Any(p => p.Number == digits)) return;
             var util = PhoneNumberUtil.GetInstance();
-            result.Add(new(digits, numberType, QuickIntakeApplicationFields.AppliesTo(submission)
-                ? PhoneNumberType.MOBILE : util.GetNumberType(util.Parse(number, "JM"))));
+            result.Add(new(digits, numberType, util.GetNumberType(util.Parse(number, "JM"))));
         }
     }
 
@@ -87,6 +87,17 @@ public static class BridgeApplicantProfile
         return matches[0];
     }
 
+    public static long ResolveLineType(ExternalApplicationSubmission submission, ApplicantPhone phone,
+        IReadOnlyList<(long Id, string? Name, string? Description)> rows)
+    {
+        if (!QuickIntakeApplicationFields.AppliesTo(submission)) return ResolveLineType(phone.LineType, rows);
+        QuickIntakeApplicationFields.Validate(submission);
+        long lineType = submission.PhoneLineType ?? QuickIntakeTransferDefaults.PhoneLineType;
+        if (!rows.Any(row => row.Id == lineType))
+            throw new InvalidOperationException("Submitted Quick Intake phone LineType is missing; no applicant records were committed.");
+        return lineType;
+    }
+
     public static async Task<ApplicantProfilePlan> PrepareAsync(SqlConnection connection, SqlTransaction transaction,
         ExternalApplicationSubmission submission, CancellationToken token)
     {
@@ -113,7 +124,7 @@ public static class BridgeApplicantProfile
             await using var reader = await lookup.ExecuteReaderAsync(token);
             while (await reader.ReadAsync(token)) lines.Add((reader.GetInt64(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
         }
-        return new(phones.Select(phone => new ResolvedApplicantPhone(phone.Number,phone.NumberType,ResolveLineType(phone.LineType,lines))).ToArray(),email);
+        return new(phones.Select(phone => new ResolvedApplicantPhone(phone.Number,phone.NumberType,ResolveLineType(submission,phone,lines))).ToArray(),email);
     }
 
     public static async Task InsertChildrenAsync(SqlConnection connection, SqlTransaction transaction,

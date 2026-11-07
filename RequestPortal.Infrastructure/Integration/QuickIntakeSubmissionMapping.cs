@@ -14,6 +14,8 @@ public static class QuickIntakeSubmissionMapping
         {
             // The owner confirms historical amounts were weekly but mislabeled MonthlyIncome.
             // Preserve storage and amounts; never convert or rewrite historical records.
+            PayFrequency = intake.PayFrequency ?? QuickIntakeTransferDefaults.PayFrequency,
+            PhoneLineType = intake.PhoneLineType ?? QuickIntakeTransferDefaults.PhoneLineType,
             WeeklyIncome = captured && intake.MonthlyIncome >= 0 ? intake.MonthlyIncome : null,
             ApplicantMaritalStatus = captured ? intake.MaritalStatus : null,
             HasChildrenUnder18LivingFullTime = captured ? intake.HasChildrenUnder18LivingFullTime : null,
