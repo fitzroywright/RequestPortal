@@ -83,6 +83,15 @@ def assert_same_release(binary, expected_sha, expected_pid):
     require(running(current) and current.get('MainPID') == expected_pid and sha(binary) == expected_sha,
             'The production release or service PID changed during geography preparation; deployment was not attempted.')
 
+def kestrel_health(base, url):
+    # Match the installed Aegis deployer's Request Portal host-filtering semantics.
+    raw = base.command(['/usr/bin/curl', '--fail', '--silent', '--show-error', '--max-time', '15',
+                        '-H', 'Host: requestportal.ffpja.org', url])
+    result = json.loads(raw)
+    require(result.get('status') == 'Healthy' and result.get('application') == 'RequestPortal',
+            'Kestrel did not report healthy Request Portal dependencies.')
+    return result
+
 
 def interrupt(signum, frame):
     raise RuntimeError('Recovery was interrupted; restoring the previous application state where required.')
@@ -189,8 +198,8 @@ def recover(source):
 
     try:
         report['applicationHealthBefore'] = base.http('/health')
-        require(json.loads(base.command(['/usr/bin/curl', '--fail', '--silent', '--show-error', '--max-time', '15', loopback])).get('status') == 'Healthy',
-                'Previous Kestrel health did not pass.')
+        report['stage'] = 'previous-kestrel-health'
+        report['kestrelHealthBefore'] = kestrel_health(base, loopback)
         report['catalogueBefore'] = audit('deployment-catalogue-verification')
         if installed == plan['applicationSha256']:
             report['status'] = 'already-installed-no-redeployment'
@@ -228,8 +237,8 @@ def recover(source):
         current = service_properties()
         require(running(current) and current['MainPID'] != initial['MainPID'], 'The new Request Portal process is not active/running.')
         report['applicationHealth'] = base.http('/health')
-        direct = base.command(['/usr/bin/curl', '--fail', '--silent', '--show-error', '--max-time', '15', loopback])
-        require(json.loads(direct).get('status') == 'Healthy', 'Kestrel health verification failed.')
+        report['stage'] = 'deployed-kestrel-health'
+        kestrel_health(base, loopback)
         report['kestrelHealth'] = 'Healthy'
         versions = []
         for attempt in range(100):

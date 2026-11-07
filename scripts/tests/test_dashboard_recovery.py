@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 SOURCE = Path(__file__).resolve().parents[1] / 'Recover-RequestPortalDashboard-Kratos.py'
 spec = importlib.util.spec_from_file_location('dashboard_recovery', SOURCE)
@@ -11,6 +12,23 @@ spec.loader.exec_module(recovery)
 
 
 class DashboardRecoveryTests(unittest.TestCase):
+    def test_kestrel_probe_passes_the_production_host_filter_and_preserves_fail_on_http_errors(self):
+        observed = []
+        def command(args):
+            observed.append(args)
+            if '-H' not in args or args[args.index('-H') + 1] != 'Host: requestportal.ffpja.org':
+                raise RuntimeError('HTTP 400: invalid host')
+            self.assertIn('--fail', args)
+            return b'{"status":"Healthy","application":"RequestPortal"}'
+        result = recovery.kestrel_health(SimpleNamespace(command=command), 'http://127.0.0.1:5401/health')
+        self.assertEqual('Healthy', result['status'])
+        self.assertEqual(1, len(observed))
+
+    def test_kestrel_probe_still_rejects_unhealthy_dependencies_or_another_application(self):
+        for body in [b'{"status":"Unhealthy","application":"RequestPortal"}', b'{"status":"Healthy","application":"Other"}']:
+            with self.assertRaises(RuntimeError):
+                recovery.kestrel_health(SimpleNamespace(command=lambda args: body), 'http://127.0.0.1:5401/health')
+
     def test_account_host_and_arguments_are_checked_before_any_lock_or_write(self):
         for uid, host, args in [(1, 'kratos', ['recover']), (0, 'elsewhere', ['recover']), (0, 'kratos', ['recover', 'extra'])]:
             with patch.object(recovery.os, 'geteuid', return_value=uid), \
