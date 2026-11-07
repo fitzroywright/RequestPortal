@@ -12,6 +12,7 @@ using Xunit;
 
 namespace RequestPortal.Infrastructure.Tests;
 
+[Collection("Dashboard advisory lock")]
 public sealed class ManagementDashboardAggregateTests(ITestOutputHelper output)
 {
     public sealed class Control

@@ -13,6 +13,10 @@ using Xunit;
 
 namespace RequestPortal.Infrastructure.Tests;
 
+[CollectionDefinition("Dashboard advisory lock", DisableParallelization = true)]
+public sealed class DashboardAdvisoryLockCollection { }
+
+[Collection("Dashboard advisory lock")]
 public sealed class RequestLocationRecoveryTests
 {
     private static async Task<Guid> Seed(PostgreSqlTestDatabase fixture, CancellationToken ct)
@@ -104,5 +108,41 @@ public sealed class RequestLocationRecoveryTests
         Assert.Contains("RP-LOCATION-RECOVERY-002", (await Assert.ThrowsAsync<InvalidOperationException>(() => StartupTasks.ApplyDatabaseMigrationsAsync(prepared))).Message);
         await RequestLocationRecovery.ImportAsync(current.Db, [], ct);
         await StartupTasks.ApplyDatabaseMigrationsAsync(prepared);
+    }
+    [Fact]
+    public async Task VerifiedImportReleasesOldRetryDelayWithoutFalselyReportingDashboardReadiness()
+    {
+        var ct = TestContext.Current.CancellationToken; await using var fixture = await PostgreSqlTestDatabase.CreateAsync(ct);
+        var id = await Seed(fixture, ct);
+        await using var workerDb = fixture.CreateSiblingContext();
+        var refresher = new ManagementDashboardAggregateRefresher(workerDb, new ManagementDashboardService(workerDb, Options.Create(new ManagementDashboardOptions())));
+        Assert.True(await refresher.RefreshAsync(ct));
+        var row = await fixture.Db.ManagementDashboardAggregates.SingleAsync(ct);
+        string? previous = row.AggregateData; long version = row.SnapshotVersion;
+        row.RefreshStatus = "Failed"; row.LastError = "Previous provider failure"; row.AttemptCount = 10; row.NextRefreshUtc = DateTimeOffset.UtcNow.AddMinutes(5);
+        await fixture.Db.SaveChangesAsync(ct);
+        await RequestLocationRecovery.ImportAsync(fixture.Db, [Legacy(Snapshot(id))], ct);
+        Assert.Equal(0, row.AttemptCount); Assert.True(row.NextRefreshUtc <= DateTimeOffset.UtcNow);
+        Assert.Equal(previous, row.AggregateData); Assert.Equal(version, row.SnapshotVersion); Assert.Equal("Failed", row.RefreshStatus);
+        var state = new RequestPortal.Web.Services.ManagementDashboardWorkerState(); state.Set("Waiting", DateTimeOffset.UtcNow);
+        Assert.False((await RequestPortal.Web.Services.ManagementDashboardReadiness.ReadAsync(fixture.Db, state, ct)).Ready);
+        workerDb.ChangeTracker.Clear(); Assert.True(await refresher.RefreshAsync(ct));
+        var ready = await RequestPortal.Web.Services.ManagementDashboardReadiness.ReadAsync(fixture.Db, state, ct);
+        Assert.True(ready.Ready); Assert.Equal(version + 1, ready.SnapshotVersion);
+    }
+    [Fact]
+    public async Task ImportCannotRaceAnActiveDashboardCalculationAndRetriesAfterItsLockIsReleased()
+    {
+        var ct = TestContext.Current.CancellationToken; await using var fixture = await PostgreSqlTestDatabase.CreateAsync(ct);
+        var source = Legacy(Snapshot(await Seed(fixture, ct)));
+        await using (var worker = fixture.CreateSiblingContext())
+        await using (var transaction = await worker.Database.BeginTransactionAsync(ct))
+        {
+            await worker.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(7294321651::bigint)", ct);
+            Assert.Contains("IMPORT-BUSY", (await Assert.ThrowsAsync<InvalidOperationException>(() => RequestLocationRecovery.ImportAsync(fixture.Db, [source], ct))).Message);
+            Assert.False(await fixture.Db.RequestLocations.AnyAsync(ct)); Assert.False(await fixture.Db.RequestLocationImportStates.AnyAsync(ct));
+            await transaction.RollbackAsync(ct);
+        }
+        Assert.Equal(1, await RequestLocationRecovery.ImportAsync(fixture.Db, [source], ct));
     }
 }

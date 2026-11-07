@@ -36,6 +36,8 @@ public static class RequestLocationRecovery
         await db.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s'", ct);
         bool locked = await db.Database.SqlQueryRaw<bool>("SELECT pg_try_advisory_xact_lock(7294321652::bigint) AS \"Value\"").SingleAsync(ct);
         if (!locked) throw new InvalidOperationException("RP-LOCATION-IMPORT-BUSY: Another geography import is running.");
+        bool workerIdle = await db.Database.SqlQueryRaw<bool>("SELECT pg_try_advisory_xact_lock(7294321651::bigint) AS \"Value\"").SingleAsync(ct);
+        if (!workerIdle) throw new InvalidOperationException("RP-LOCATION-IMPORT-BUSY: A dashboard calculation is still running.");
         var ids = validated.Select(x => x.RequestId).ToArray();
         var known = await db.AssistanceRequests.Where(x => ids.Contains(x.Id)).Select(x => x.Id).ToHashSetAsync(ct);
         if (known.Count != validated.Length)
@@ -55,6 +57,14 @@ public static class RequestLocationRecovery
         var marker = await db.RequestLocationImportStates.SingleOrDefaultAsync(x => x.Id == 1, ct);
         if (marker is null) { marker = new(); db.RequestLocationImportStates.Add(marker); }
         marker.SourceFingerprint = fingerprint; marker.VerifiedUtc = DateTimeOffset.UtcNow; marker.ImportedLocations = validated.Length;
+        var aggregate = await db.ManagementDashboardAggregates.SingleOrDefaultAsync(x => x.Id == 1, ct);
+        if (aggregate is not null)
+        {
+            // The verified data source changed. Release the old SharePoint failure cooldown once,
+            // retaining the failed status, error, version and snapshot until a real rebuild succeeds.
+            aggregate.AttemptCount = 0;
+            aggregate.NextRefreshUtc = DateTimeOffset.UtcNow;
+        }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return validated.Length;
