@@ -4,6 +4,7 @@
 @using RequestPortal.Domain.Requests
 @{
     ViewData["Title"] = "Request Reports";
+    ViewData["BodyClass"] = "staff-reports-page";
     string? fromDateRoute = Model.FromDate?.ToString("yyyy-MM-dd");
     string? toDateRoute = Model.ToDate?.ToString("yyyy-MM-dd");
 }
@@ -168,7 +169,7 @@
 
                 @if (Model.Report.TotalPages > 1)
                 {
-                    <div class="action-row" style="justify-content:space-between;margin-top:14px">
+                    <div class="action-row reports-pagination" aria-label="Report pages">
                         @if (Model.Report.Page > 1)
                         {
                             <a class="button button-outline"
