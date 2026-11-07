@@ -9,6 +9,7 @@ using RequestPortal.Application.Documents;
 using RequestPortal.Domain.Documents;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using RequestPortal.Application.Requests;
+using RequestPortal.Domain.Requests;
 
 namespace RequestPortal.Web.Pages;
 
@@ -140,7 +141,7 @@ public sealed class QuickIntakeModel : PageModel
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
                     Input.AssistancePrograms,
-                    Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
+                    Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances, Input.PayFrequency, Input.PhoneLineType),
                 HttpContext.RequestAborted, applicantUserId: await GetApplicantIdAsync());
 
             RequestReference = result.PublicReference;
@@ -207,7 +208,7 @@ public sealed class QuickIntakeModel : PageModel
                     Input.EmploymentStatus, Input.MonthlyIncome,
                     string.Equals(Input.HasChildrenUnder18LivingFullTime, "Yes", StringComparison.OrdinalIgnoreCase),
                     string.Equals(Input.HasDisabilityOrSeriousMedicalCondition, "Yes", StringComparison.OrdinalIgnoreCase),
-                    Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances),
+                    Input.AssistancePrograms, Input.HelpCategory, Input.SecondaryTelephone, Input.VictimCircumstances, Input.PayFrequency, Input.PhoneLineType),
                 HttpContext.RequestAborted, SubmissionId, await GetApplicantIdAsync());
             return new JsonResult(new { requestId = result.RequestId, reference = result.PublicReference });
         }
@@ -241,6 +242,12 @@ public sealed class QuickIntakeModel : PageModel
 
     public sealed class InputModel
     {
+        [Range(QuickIntakeTransferDefaults.PayFrequency, QuickIntakeTransferDefaults.PayFrequency)]
+        public int PayFrequency { get; set; } = QuickIntakeTransferDefaults.PayFrequency;
+
+        [Range(QuickIntakeTransferDefaults.PhoneLineType, QuickIntakeTransferDefaults.PhoneLineType)]
+        public int PhoneLineType { get; set; } = QuickIntakeTransferDefaults.PhoneLineType;
+
         [Required, StringLength(150)]
         public string FirstName { get; set; } = string.Empty;
 

@@ -31,7 +31,9 @@ public sealed class QuickIntakeRecord
         string? secondaryTelephone = null,
         string? victimCircumstances = null,
         string? originalTelephone = null,
-        string? originalSecondaryTelephone = null)
+        string? originalSecondaryTelephone = null,
+        int? payFrequency = QuickIntakeTransferDefaults.PayFrequency,
+        int? phoneLineType = QuickIntakeTransferDefaults.PhoneLineType)
     {
         if (id == Guid.Empty) throw new ArgumentException("Quick intake id is required.", nameof(id));
         if (requestId == Guid.Empty) throw new ArgumentException("Request id is required.", nameof(requestId));
@@ -75,6 +77,8 @@ public sealed class QuickIntakeRecord
         AssistancePrograms = assistancePrograms.Trim();
         HelpCategory = helpCategory.Trim();
         CreatedUtc = createdUtc;
+        PayFrequency = payFrequency;
+        PhoneLineType = phoneLineType;
     }
 
     public Guid Id { get; private set; }
@@ -98,6 +102,8 @@ public sealed class QuickIntakeRecord
     public string Parish { get; private set; } = string.Empty;
     public string EmploymentStatus { get; private set; } = string.Empty;
     public decimal MonthlyIncome { get; private set; }
+    public int? PayFrequency { get; private set; }
+    public int? PhoneLineType { get; private set; }
     public bool HasChildrenUnder18LivingFullTime { get; private set; }
     public bool HasDisabilityOrSeriousMedicalCondition { get; private set; }
     public string AssistancePrograms { get; private set; } = string.Empty;

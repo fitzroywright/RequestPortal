@@ -49,7 +49,9 @@ public sealed record ExternalApplicationSubmission(
     bool? HasChildrenUnder18LivingFullTime = null,
     bool? HasDisabilityOrSeriousMedicalCondition = null,
     IReadOnlyList<string>? CurrentAssistancePrograms = null,
-    IReadOnlyList<string>? VictimCircumstances = null);
+    IReadOnlyList<string>? VictimCircumstances = null,
+    int? PayFrequency = null,
+    int? PhoneLineType = null);
 
 public sealed record ExternalApplicationReference(string ApplicationId, string? ApplicationNumber, DateTimeOffset AcceptedUtc, bool AlreadyExisted = false);
 public sealed record ExternalApplicationReceipt(Guid PortalRequestId, string ApplicationId, string ApplicationNumber,

@@ -60,17 +60,17 @@ public sealed class FfpManagerApplicantProfileTests
         string primary = util.Format(util.GetExampleNumberForType("JM", PhoneNumberType.FIXED_LINE), PhoneNumberFormat.E164);
         string secondary = util.Format(util.GetExampleNumberForType("GB", PhoneNumberType.FIXED_LINE), PhoneNumberFormat.E164);
         Assert.Equal(PhoneNumberType.FIXED_LINE_OR_MOBILE, util.GetNumberType(util.Parse(primary, "JM")));
-        var phones = BridgeApplicantProfile.Phones(Submission() with
+        var submission = Submission() with
         {
-            DocumentSource = source, PrimaryTelephone = primary, SecondaryTelephone = secondary
-        });
+            DocumentSource = source, PrimaryTelephone = primary, SecondaryTelephone = secondary, PhoneLineType = 2
+        };
+        var phones = BridgeApplicantProfile.Phones(submission);
         Assert.Equal(new long[] { 93, 83 }, phones.Select(phone => phone.NumberType));
         Assert.Equal(new[] { primary[1..], secondary[1..] }, phones.Select(phone => phone.Number));
         (long, string?, string?)[] lines = [(1, "4", "Land Line"), (2, "Mobile", "Cellular Mobile"), (3, "Skype", "Internet Telephony")];
         foreach (var phone in phones)
         {
-            Assert.Equal(PhoneNumberType.MOBILE, phone.LineType);
-            long lineType = BridgeApplicantProfile.ResolveLineType(phone.LineType, lines);
+            long lineType = BridgeApplicantProfile.ResolveLineType(submission, phone, lines);
             Assert.Equal(2, lineType);
             using var command = new Microsoft.Data.SqlClient.SqlCommand();
             BridgeApplicantProfile.AddPhoneParameters(command, new(phone.Number, phone.NumberType, lineType));

@@ -420,6 +420,12 @@ namespace RequestPortal.Infrastructure.Persistence.Migrations
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
 
+                    b.Property<int?>("PayFrequency")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PhoneLineType")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Parish")
                         .IsRequired()
                         .HasMaxLength(100)

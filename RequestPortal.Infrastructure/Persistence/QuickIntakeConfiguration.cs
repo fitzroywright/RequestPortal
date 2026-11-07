@@ -25,6 +25,8 @@ internal sealed class QuickIntakeRecordConfiguration : IEntityTypeConfiguration<
         builder.Property(item => item.Parish).HasMaxLength(100).IsRequired();
         builder.Property(item => item.EmploymentStatus).HasMaxLength(50).IsRequired();
         builder.Property(item => item.MonthlyIncome).HasPrecision(14, 2).IsRequired();
+        builder.Property(item => item.PayFrequency);
+        builder.Property(item => item.PhoneLineType);
         builder.Property(item => item.AssistancePrograms).HasMaxLength(500).IsRequired();
         builder.Property(item => item.HelpCategory).HasMaxLength(100).IsRequired();
         builder.HasIndex(item => item.RequestId).IsUnique();

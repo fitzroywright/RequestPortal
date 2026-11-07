@@ -1,4 +1,5 @@
 using RequestPortal.Application.Requests;
+using RequestPortal.Domain.Requests;
 
 namespace RequestPortal.Application.Integration;
 
@@ -9,7 +10,7 @@ public static class QuickIntakeApplicationFields
     {
         if (!AppliesTo(submission)) throw new InvalidOperationException("Field updates are available only for Quick Intake.");
         Validate(submission);
-        return new(submission.WeeklyIncome, 2, MaritalStatus(submission.ApplicantMaritalStatus),
+        return new(submission.WeeklyIncome, submission.PayFrequency ?? QuickIntakeTransferDefaults.PayFrequency, MaritalStatus(submission.ApplicantMaritalStatus),
             Dependents(submission.HasChildrenUnder18LivingFullTime), submission.HasDisabilityOrSeriousMedicalCondition,
             Programme(submission), Circumstance(submission));
     }
@@ -58,6 +59,10 @@ public static class QuickIntakeApplicationFields
     public static void Validate(ExternalApplicationSubmission submission)
     {
         if (!AppliesTo(submission)) return;
+        if (submission.PayFrequency is { } payFrequency && payFrequency != QuickIntakeTransferDefaults.PayFrequency)
+            throw new ExternalApplicationValidationException("PayFrequency", "Quick Intake requires the agreed weekly pay frequency.");
+        if (submission.PhoneLineType is { } phoneLineType && phoneLineType != QuickIntakeTransferDefaults.PhoneLineType)
+            throw new ExternalApplicationValidationException("PhoneLineType", "Quick Intake requires the agreed mobile phone line type.");
         // FFPJM Income is decimal(18,10): eight integer digits. The source is JMD to two decimals.
         if (submission.WeeklyIncome is { } income &&
             (income < 0 || income > 99999999.99m || decimal.Round(income, 2) != income))
