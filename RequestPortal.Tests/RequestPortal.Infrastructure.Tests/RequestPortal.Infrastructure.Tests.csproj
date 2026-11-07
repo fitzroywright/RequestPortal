@@ -12,6 +12,9 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="../../tools/RequestPortal.IntegrationAudit/DashboardStorageDiagnostics.cs" Link="DashboardStorageDiagnostics.cs" />
+    <Compile Include="../../tools/RequestPortal.IntegrationAudit/LocationGraphReader.cs" Link="LocationGraphReader.cs" />
+    <Compile Include="../../tools/RequestPortal.IntegrationAudit/SharePointLocationExport.cs" Link="SharePointLocationExport.cs" />
     <ProjectReference Include="../../RequestPortal.Web/RequestPortal.Web.csproj" />
     <ProjectReference Include="../../RequestPortal.Infrastructure/RequestPortal.Infrastructure.csproj" />
     <ProjectReference Include="../../FfpManager.Bridge/FfpManager.Bridge.csproj" />

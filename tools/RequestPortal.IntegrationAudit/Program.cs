@@ -10,10 +10,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 
-// Fixed SELECTs only. No website startup, EF migrations, queue dispatch, SQL repair or recovery writes.
-if (args.Length<1 || args[0] is not ("portal" or "bridge" or "input-validation" or "database-preflight" or "database-backup" or "dashboard-verification" or "deployment-catalogue-verification")) return 2;
-if(args.Length!=(args[0]=="database-backup"?2:1))return 2;
-using var timeout = new CancellationTokenSource(args[0]=="database-backup"?TimeSpan.FromMinutes(10):TimeSpan.FromSeconds(90));
+// Existing audit modes are read-only. location-import is an explicit, fenced geography-only write.
+if (args.Length<1 || args[0] is not ("portal" or "bridge" or "input-validation" or "database-preflight" or "database-backup" or "dashboard-verification" or "deployment-catalogue-verification" or "dashboard-storage-diagnostics" or "location-pause" or "location-resume" or "location-export" or "location-schema" or "location-import")) return 2;
+if(args.Length!=(args[0] is "database-backup" or "location-pause" or "location-resume" or "location-export" or "location-schema" or "location-import"?2:1))return 2;
+using var timeout = new CancellationTokenSource(args[0]=="location-export"?TimeSpan.FromHours(2):args[0] is "database-backup" or "dashboard-storage-diagnostics"?TimeSpan.FromMinutes(10):TimeSpan.FromSeconds(90));
 var token = timeout.Token;
 try
 {
@@ -23,6 +23,16 @@ try
         overrides[$"CommonSecrets:Providers:{provider.Key}:Settings:DeleteSecretIdFileAfterRead"] = "false";
     builder.Configuration.AddInMemoryCollection(overrides);
     await using var secrets = CommonSecretsBootstrapRuntime.Create(builder.Configuration);
+    if(args[0] is "location-pause" or "location-resume" or "location-export" or "location-schema" or "location-import")
+    {
+        var report=await PostgresDeploymentPreflight.RecoverLocationsAsync(args[0],args[1],builder.Configuration,secrets.Provider,token);
+        Console.WriteLine(JsonSerializer.Serialize(report,new JsonSerializerOptions(JsonSerializerDefaults.Web)));return 0;
+    }
+    if(args[0]=="dashboard-storage-diagnostics")
+    {
+        var report=await PostgresDeploymentPreflight.DiagnoseStorageAsync(builder.Configuration,secrets.Provider,token);
+        Console.WriteLine(JsonSerializer.Serialize(report,new JsonSerializerOptions(JsonSerializerDefaults.Web)));return 0;
+    }
     if(args[0]=="deployment-catalogue-verification")
     {
         var report=await PostgresDeploymentPreflight.VerifyCatalogueAsync(secrets.Provider,token);
