@@ -177,6 +177,8 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 intake?.SecondaryTelephone,
                 intake?.DateOfBirth);
 
+            ExternalApplicantValidation.Validate(submission);
+
             attempt.SetStage("DestinationLookup");
             await dbContext.SaveChangesAsync(cancellationToken);
             var receipt = await bridgeClient.FindApplicationAsync(request.Id, cancellationToken);

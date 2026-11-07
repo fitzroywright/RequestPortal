@@ -41,11 +41,12 @@ public sealed class StaffSearchNavigationPageTests
     private sealed class State
     {
         public int Reads, Writes, Downloads;
+        public string? ValidationCode;
         public string TransferApplicant = "John Brown";
         public IReadOnlyList<IntegrationTransferRow>? TransferRows;
         public Exception? RecoveryFailure;
         public IntegrationTransferRow Transfer => new(RequestId,Organization,"REQ-FIXTURE",TransferApplicant,"Quick Intake","FFPManager",
-            "JMDB01 / FFPJM",SynchronizationStatus.Failed,"SqlSubmission","PermanentSql","SQL_CONSTRAINT","SQL Server rejected a field value.",
+            "JMDB01 / FFPJM",SynchronizationStatus.Failed,"SqlSubmission",ValidationCode is null ? "PermanentSql" : "PermanentValidation",ValidationCode ?? "SQL_CONSTRAINT","SQL Server rejected a field value.",
             DateTimeOffset.UtcNow,DateTimeOffset.UtcNow,1,null,null,null,null,null,true) { RecordedError = "SQL Server rejected a field value. Review the mapping before retrying.", RecoveryAction = "Review the mapping before retrying." };
 
         public bool Archived;
@@ -356,6 +357,25 @@ public sealed class StaffSearchNavigationPageTests
         if (actor == "Administrator") { Assert.Contains("Search=John", html); Assert.Contains("PageNumber=2", html); Snapshot("integration-detail", html); }
         using var missing = await fixture.Get("/Staff/Integrations?handler=Diagnostics&RequestId=" + Guid.NewGuid());
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("VALIDATION_PRIMARY_TELEPHONE", "PrimaryTelephone")]
+    [InlineData("VALIDATION_SECONDARY_TELEPHONE", "SecondaryTelephone")]
+    [InlineData("VALIDATION_DATE_OF_BIRTH", "DateOfBirth")]
+    [InlineData("VALIDATION_APPLICANT_EMAIL", "ApplicantEmail")]
+    [InlineData("VALIDATION_EMPLOYMENT_STATUS", "ApplicantEmploymentStatus")]
+    [InlineData("VALIDATION", "The precise field was not captured")]
+    public async Task ValidationDiagnosticsExplainCorrectionBeforeTechnicalDetails(string code, string field)
+    {
+        await using var f = await Setup(); f.Data.ValidationCode = code;
+        using var response = await f.Get("/Staff/Integrations?handler=Diagnostics&RequestId=" + RequestId);
+        string html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(code, html); Assert.Contains(field, html); Assert.Contains("PermanentValidation", html);
+        Assert.Contains("Validation rule:", html); Assert.Contains("Required action:", html); Assert.Contains("No automatic retry", html);
+        Assert.True(html.IndexOf("Actionable validation failure", StringComparison.Ordinal) < html.IndexOf("Technical Details", StringComparison.Ordinal));
+        if (code == "VALIDATION") Assert.DoesNotContain("Rejected field:</dt><dd>DateOfBirth", html);
     }
 
     [Theory][InlineData("Retry")][InlineData("Reconcile")]

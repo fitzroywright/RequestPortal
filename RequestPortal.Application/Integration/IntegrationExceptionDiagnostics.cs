@@ -30,7 +30,8 @@ public static class IntegrationExceptionDiagnostics
             text.Append("Classified reason: ").AppendLine(transfer.Failure.Code);
         if (exception is ExternalApplicationValidationException validation)
         {
-            text.Append("Rejected field: ").AppendLine(Symbol(validation.Field));
+            text.Append("Rejected field: ").AppendLine(TransferFailures.For(stage, validation.Code).Field ?? "Not captured");
+            text.Append("Validation code: ").AppendLine(validation.Code);
             if (validation.Message == "The applicant telephone requires correction before transfer.")
                 text.AppendLine("Exception message: The applicant telephone requires correction before transfer.");
         }

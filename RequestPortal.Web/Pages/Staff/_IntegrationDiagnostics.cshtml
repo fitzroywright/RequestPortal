@@ -1,16 +1,32 @@
 @model RequestPortal.Web.Pages.Staff.IntegrationsModel
 @using RequestPortal.Domain.Integration
+@using RequestPortal.Application.Integration
 @using Monitor = RequestPortal.Web.Pages.Staff.IntegrationsModel
 @if(Model.Selected is { } detail) {
     var transfer = detail.Transfer;
     var last = detail.Attempts.FirstOrDefault();
+    var validation = transfer.ErrorCode is { } code && code.StartsWith("VALIDATION", StringComparison.Ordinal) ? TransferFailures.For(transfer.FailureStage ?? "Unknown", code) : null;
     string statusClass = Monitor.StatusClass(transfer.Status);
     bool legacyUnknown = string.Equals(transfer.ErrorCode, "LEGACY_FAILURE", StringComparison.OrdinalIgnoreCase);
     string recoveryGuidance = legacyUnknown
         ? "The original exception was not preserved. First verify whether this request already exists in FFP Manager; then inspect retained portal, bridge, and SQL logs for this request and time. Do not resubmit until the destination outcome is known."
         : (transfer.RecoveryAction ?? "No specific recovery action was recorded. Verify destination status and review recorded attempt details before retrying.");
     <section class="integration-diagnostics @statusClass" aria-label="Diagnostics for @transfer.PublicReference">
-        <header class="integration-error-heading"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@statusClass"/></svg><div><strong>@(legacyUnknown ? "Original error unavailable" : transfer.Status is SynchronizationStatus.Failed or SynchronizationStatus.ReconciliationRequired or SynchronizationStatus.Retrying ? "Recorded failure" : "Transfer diagnostics")</strong><h2>@(legacyUnknown ? "Cause cannot be determined from this historical record" : Monitor.DiagnosticTitle(transfer))</h2><p>@(legacyUnknown ? "This failure was logged before detailed attempt diagnostics were available. LEGACY_FAILURE is a historical marker, not the exception that caused the transfer to fail." : transfer.RecordedError ?? transfer.Explanation ?? "No error was recorded.")</p></div></header>
+        <header class="integration-error-heading"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@statusClass"/></svg><div><strong>@(legacyUnknown ? "Original error unavailable" : transfer.Status is SynchronizationStatus.Failed or SynchronizationStatus.ReconciliationRequired or SynchronizationStatus.Retrying ? "Recorded failure" : "Transfer diagnostics")</strong><h2>@(legacyUnknown ? "Cause cannot be determined from this historical record" : Monitor.DiagnosticTitle(transfer))</h2><p>@(legacyUnknown ? "This failure was logged before detailed attempt diagnostics were available. LEGACY_FAILURE is a historical marker, not the exception that caused the transfer to fail." : validation?.Explanation ?? transfer.RecordedError ?? transfer.Explanation ?? "No error was recorded.")</p></div></header>
+        @if (validation is not null) {
+            <section class="integration-recovery" aria-label="Actionable validation failure">
+                <h3>Source information requires correction</h3>
+                <dl class="integration-operation">
+                    <dt>Request / stage:</dt><dd>@transfer.PublicReference / @(transfer.FailureStage ?? "Not recorded")</dd>
+                    <dt>Category / code:</dt><dd>@(transfer.FailureClassification ?? "Not recorded") / @transfer.ErrorCode</dd>
+                    <dt>Rejected field:</dt><dd>@(validation.Field ?? "The precise field was not captured in this historical error.")</dd>
+                    <dt>Reason:</dt><dd>@validation.Explanation</dd>
+                    <dt>Validation rule:</dt><dd>@(validation.ValidationRule ?? "The specific rule was not captured. Review the source and restricted attempt evidence; do not infer the rejected field.")</dd>
+                    <dt>Required action:</dt><dd>@(validation.CorrectiveAction ?? "Verify and correct source information using recorded evidence, then request an authorized destination-verified retry.")</dd>
+                    <dt>Retry eligibility:</dt><dd>No automatic retry. An authorized retry is eligible only after source correction and destination verification.</dd>
+                </dl>
+            </section>
+        }
         <div class="integration-diagnostic-columns">
             <section><h3>Technical Details</h3><pre>Code: @(transfer.ErrorCode ?? "Not recorded")
 Stage: @(transfer.FailureStage ?? "Not recorded")

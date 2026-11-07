@@ -118,7 +118,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
 
         string firstName = Require(submission.FirstName, "First name");
         string lastName = Require(submission.LastName, "Last name");
-        if (submission.DateOfBirth == default || submission.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
+        if (submission.DateOfBirth < new DateOnly(1753, 1, 1) || submission.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
             throw new ArgumentException("Enter a valid date of birth.");
 
         string gender = RequireAllowed(submission.Gender, "Gender", AllowedGenders);
@@ -136,6 +136,7 @@ public sealed class QuickIntakeService : IQuickIntakeService
             }
         }
         string? email = RequestPortal.Common.Contacts.ContactEmail.Normalize(submission.Email);
+        if (email?.Length > 100) throw new ArgumentException("Email cannot exceed 100 characters.");
         string streetAddress = Require(submission.StreetAddress, "Street address");
         string communityDistrict = Require(submission.CommunityDistrict, "Community/District");
         string parish = Require(submission.Parish, "Parish");
