@@ -23,9 +23,14 @@ public static class BridgeApplicantProfile
 
     public static string? Normalize(string? value)
     {
-        try { return RequestPortal.Common.Contacts.ApplicantTelephone.Normalize(value); }
-        catch (ArgumentException exception) { throw new InvalidOperationException(exception.Message); }
+        return ExternalApplicantValidation.Telephone(TransferInput(value), "PrimaryTelephone")?[1..];
     }
+
+    // Digits-only wire values include the country code. Restore the E.164 marker
+    // for validation/classification, never for destination persistence. Retain the
+    // existing normalizer for formatted input and international access prefixes.
+    private static string? TransferInput(string? value) =>
+        !string.IsNullOrEmpty(value) && value.All(char.IsAsciiDigit) && value[0] != '0' ? "+" + value : value;
 
     public static IReadOnlyList<ApplicantPhone> Phones(ExternalApplicationSubmission submission)
     {
@@ -36,17 +41,13 @@ public static class BridgeApplicantProfile
 
         void Add(string? value, long numberType)
         {
-            string? number;
-            try { number = Normalize(value); }
-            catch (InvalidOperationException)
-            {
-                throw new ExternalApplicationValidationException(
-                    numberType == ApplicantNumberType ? "PrimaryTelephone" : "SecondaryTelephone",
-                    "The applicant telephone requires correction before transfer.");
-            }
-            if (number is null || result.Any(p => p.Number == number)) return;
+            string? number = ExternalApplicantValidation.Telephone(TransferInput(value),
+                numberType == ApplicantNumberType ? "PrimaryTelephone" : "SecondaryTelephone");
+            if (number is null) return;
+            string digits = number[1..];
+            if (result.Any(p => p.Number == digits)) return;
             var util = PhoneNumberUtil.GetInstance();
-            result.Add(new(number, numberType, util.GetNumberType(util.Parse(number, "JM"))));
+            result.Add(new(digits, numberType, util.GetNumberType(util.Parse(number, "JM"))));
         }
     }
 
@@ -60,12 +61,11 @@ public static class BridgeApplicantProfile
 
     public static void Validate(ExternalApplicationSubmission submission)
     {
-        BridgeApplicationReceipt.Validate(submission.ApplicantEmploymentStatus);
-        _ = Phones(submission);
-        if (submission.DateOfBirth is { } date && date.Year < 1753)
-            throw new InvalidOperationException("Date of birth is outside the SQL datetime range.");
-        if (submission.ApplicantEmail?.Trim().Length > 100)
-            throw new InvalidOperationException("FFP Manager EmailAddresses.MailboxName permits at most 100 characters.");
+        ExternalApplicantValidation.Validate(submission with
+        {
+            PrimaryTelephone = TransferInput(submission.PrimaryTelephone),
+            SecondaryTelephone = TransferInput(submission.SecondaryTelephone)
+        });
     }
 
     public static long ResolveLineType(PhoneNumberType kind, IReadOnlyList<(long Id, string? Name, string? Description)> rows)
@@ -122,9 +122,7 @@ public static class BridgeApplicantProfile
         foreach (var phone in plan.Phones)
         {
             await using var command = new SqlCommand("INSERT INTO dbo.PhoneNumbers (Number,NumberType,Network,LineType,ApplicationLetter,CreatedBy,DateCreated,UserName,DateUpdated) VALUES (@Number,@NumberType,5,@LineType,@ApplicationLetter,@CreatedBy,@DateCreated,@UserName,@DateUpdated);", connection, transaction);
-            command.Parameters.Add("@Number", SqlDbType.NVarChar, 15).Value = phone.Number;
-            command.Parameters.Add("@NumberType", SqlDbType.BigInt).Value = phone.NumberType;
-            command.Parameters.Add("@LineType", SqlDbType.BigInt).Value = phone.LineType;
+            AddPhoneParameters(command, phone);
             Audit(command, applicationId, submission, options);
             await command.ExecuteNonQueryAsync(token);
         }
@@ -135,6 +133,15 @@ public static class BridgeApplicantProfile
             Audit(command, applicationId, submission, options);
             await command.ExecuteNonQueryAsync(token);
         }
+    }
+
+    public static void AddPhoneParameters(SqlCommand command, ResolvedApplicantPhone phone)
+    {
+        string field = phone.NumberType == SecondaryNumberType ? "SecondaryTelephone" : "PrimaryTelephone";
+        string? number = ExternalApplicantValidation.Telephone(TransferInput(phone.Number), field);
+        command.Parameters.Add("@Number", SqlDbType.NVarChar, 15).Value = number is null ? DBNull.Value : number[1..];
+        command.Parameters.Add("@NumberType", SqlDbType.BigInt).Value = phone.NumberType;
+        command.Parameters.Add("@LineType", SqlDbType.BigInt).Value = phone.LineType;
     }
 
     private static void Audit(SqlCommand command, long applicationId, ExternalApplicationSubmission submission, BridgeOptions options)

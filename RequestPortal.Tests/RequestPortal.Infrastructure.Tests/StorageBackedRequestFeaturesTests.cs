@@ -81,48 +81,21 @@ public sealed class StorageBackedRequestFeaturesTests
     }
 
     [Fact]
-    public async Task RequestLocation_RoundTripsThroughCommonStorage()
+    public async Task RequestLocation_RoundTripsThroughPostgresAndQueuesDurableRefresh()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        string root = CreateTemporaryDirectory();
-        try
-        {
-            LocalFileStorage storage = new(root);
-            RequestLocationService service = new(storage);
-            Guid requestId = Guid.NewGuid();
-            const string sourceText = "Half Way Tree, St. Andrew, Jamaica";
-
-            RequestLocationSnapshot saved = await service.ResolveAndSaveAsync(
-                requestId,
-                sourceText,
-                latitude: null,
-                longitude: null,
-                cancellationToken)
-                ?? throw new InvalidOperationException("Location was not resolved.");
-
-            Assert.Equal(requestId, saved.RequestId);
-            Assert.Equal(sourceText, saved.SourceText);
-            Assert.Equal("St. Andrew", saved.Parish);
-            Assert.Equal("Half Way Tree", saved.Community);
-
-            string key = $"requestportal/locations/{requestId:N}/resolved-location.json";
-            StoredFile? metadata = await storage.GetMetadataAsync(key, cancellationToken);
-            Assert.NotNull(metadata);
-            Assert.Equal(StorageStatus.Stored, metadata!.Status);
-            Assert.Equal("application/json", metadata.ContentType);
-
-            await using Stream stream = await storage.OpenReadAsync(key, cancellationToken);
-            using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            JsonElement rootElement = document.RootElement;
-            Assert.Equal(requestId, rootElement.GetProperty("requestId").GetGuid());
-            Assert.Equal(sourceText, rootElement.GetProperty("sourceText").GetString());
-            Assert.Equal("St. Andrew", rootElement.GetProperty("parish").GetString());
-            Assert.Equal("Half Way Tree", rootElement.GetProperty("community").GetString());
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        var ct=TestContext.Current.CancellationToken;
+        await using var fixture=await PostgreSqlTestDatabase.CreateAsync(ct);
+        var actor=Guid.NewGuid();var now=DateTimeOffset.UtcNow;
+        var org=new RequestPortal.Domain.Organizations.Organization(Guid.NewGuid(),"Location fixture","JM",actor,now);
+        var request=new AssistanceRequest(Guid.NewGuid(),"LOC-1",org.Id,actor,now);
+        fixture.Db.Organizations.Add(org);fixture.Db.AssistanceRequests.Add(request);await fixture.Db.SaveChangesAsync(ct);
+        await fixture.Db.OutboxMessages.ExecuteDeleteAsync(ct);
+        var service=new RequestLocationService(fixture.Db);
+        var saved=await service.ResolveAndSaveAsync(request.Id,"Half Way Tree, St. Andrew, Jamaica",null,null,ct);
+        Assert.NotNull(saved);Assert.Equal("St. Andrew",saved.Parish);Assert.Equal("Half Way Tree",saved.Community);
+        await using var read=fixture.CreateSiblingContext();
+        var row=await read.RequestLocations.SingleAsync(ct);Assert.Equal(saved,row.Snapshot());
+        Assert.True(await read.OutboxMessages.AnyAsync(x=>x.MessageType==ManagementDashboardAggregateRefresher.MessageType && x.ProcessedUtc==null,ct));
     }
 
     private static string CreateTemporaryDirectory()

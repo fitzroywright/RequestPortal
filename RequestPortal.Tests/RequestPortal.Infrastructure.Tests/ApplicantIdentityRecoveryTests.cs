@@ -257,7 +257,18 @@ public sealed class ApplicantIdentityRecoveryTests
         using var anonymous=await web.Send("/Administration/ApplicantAccounts","anonymous");Assert.Contains(anonymous.StatusCode,new[]{System.Net.HttpStatusCode.Unauthorized,System.Net.HttpStatusCode.Redirect});
         using var callback=await web.Send("/Account/IdentityRecovery?handler=Callback","anonymous");Assert.Equal(System.Net.HttpStatusCode.BadRequest,callback.StatusCode);
         Assert.Empty(f.Accounts.Public.GetIdentities(f.Applicant.Id.ToString()));
-        using var directory=await web.Send("/Administration/ApplicantAccounts");Assert.Equal(System.Net.HttpStatusCode.OK,directory.StatusCode);Snapshot("identity-search",await directory.Content.ReadAsStringAsync(Ct));
+        using var directory=await web.Send("/Administration/ApplicantAccounts");Assert.Equal(System.Net.HttpStatusCode.OK,directory.StatusCode);
+        string html = await directory.Content.ReadAsStringAsync(Ct); Snapshot("identity-search", html);
+        Assert.DoesNotContain("identity-search", html); Assert.DoesNotContain("<th>Open</th>", html);
+        Assert.Matches("(?s)<th>.*?name=\"Search\".*?</th>", html);
+        Assert.Matches("(?s)<th>.*?<select.*?name=\"Status\".*?</th>", html);
+        Assert.Contains("name=\"PageNumber\" value=\"1\"", html);
+        Assert.Contains("data-account-url=\"/Administration/ApplicantAccounts?Id=" + f.Applicant.Id, html);
+        Assert.Contains("tabindex=\"0\" role=\"link\"", html);
+        Assert.Contains("setTimeout(submit, 350)", html);
+        using var empty = await web.Send("/Administration/ApplicantAccounts?Search=absent&Status=Disabled");
+        string emptyHtml = await empty.Content.ReadAsStringAsync(Ct);
+        Assert.Contains("No applicant accounts match", emptyHtml); Assert.Contains("name=\"Search\"", emptyHtml); Assert.Contains("id=\"identity-filters\"", emptyHtml);
     }
     [Fact]
     public async Task FlatReportsKeepAllFiltersPaginationOpeningAndActualExportFormats()
@@ -284,7 +295,9 @@ public sealed class ApplicantIdentityRecoveryTests
             else if(handler=="Pdf")Assert.StartsWith("%PDF",System.Text.Encoding.ASCII.GetString(bytes,0,4));
             else { string content=System.Text.Encoding.UTF8.GetString(bytes);Assert.Contains("REQ-FILTER-MATCH",content);Assert.DoesNotContain("REQ-PAGED-",content); }
         }
-        using var paged=await web.Send("/Staff/Reports?Search=Pagination&PageNumber=2");html=await paged.Content.ReadAsStringAsync(Ct);Snapshot("reports-paged",html);Assert.Contains("Page 2 of 2",html);Assert.Equal(2,System.Text.RegularExpressions.Regex.Matches(html,"<td><strong>REQ-PAGED-").Count);Assert.Contains("Search=Pagination",html);
+        using var paged=await web.Send("/Staff/Reports?Search=Pagination&PageNumber=2");html=await paged.Content.ReadAsStringAsync(Ct);Snapshot("reports-paged",html);Assert.Contains("Page 2 of 6",html);Assert.Equal(20,System.Text.RegularExpressions.Regex.Matches(html,"<td><strong>REQ-PAGED-").Count);Assert.Contains("Search=Pagination",html);
+        using var last = await web.Send("/Staff/Reports?Search=Pagination&PageNumber=6");
+        string lastHtml = await last.Content.ReadAsStringAsync(Ct); Assert.Contains("Page 6 of 6", lastHtml); Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(lastHtml, "<td><strong>REQ-PAGED-").Count);
         using var clear=await web.Send("/Staff/Reports");string cleared=await clear.Content.ReadAsStringAsync(Ct);Assert.Contains("103 matching requests",cleared);Snapshot("reports-clear",cleared);
         using var empty=await web.Send("/Staff/Reports?CountryCode=US");html=await empty.Content.ReadAsStringAsync(Ct);Assert.Contains("No requests match",html);Snapshot("reports-empty",html);
         using var denied=await web.Send("/Staff/Reports","anonymous");Assert.NotEqual(System.Net.HttpStatusCode.OK,denied.StatusCode);

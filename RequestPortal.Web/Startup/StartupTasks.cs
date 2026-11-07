@@ -26,6 +26,16 @@ internal static class StartupTasks
                 "RP-MIGRATION-001: No EF Core migrations exist. Startup is blocked until a baseline migration is generated and reviewed.");
         }
 
+        if (app.Environment.IsProduction() && !app.Configuration.GetValue("Demo:Enabled", false))
+        {
+            var pending = (await db.Database.GetPendingMigrationsAsync()).ToArray();
+            if (pending.Any(x => x.EndsWith("_PostgresRequestLocations", StringComparison.Ordinal)))
+                throw new InvalidOperationException("RP-LOCATION-RECOVERY-001: Verified backup and one-time geography import are required before this production release can start.");
+            var recovered = await db.RequestLocationImportStates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == 1);
+            if (recovered is null || recovered.VerifiedUtc == default || recovered.SourceFingerprint.Length != 64 ||
+                !recovered.SourceFingerprint.All(Uri.IsHexDigit))
+                throw new InvalidOperationException("RP-LOCATION-RECOVERY-002: Verified legacy geography import evidence is required before production startup.");
+        }
         await db.Database.MigrateAsync();
     }
 
@@ -33,7 +43,6 @@ internal static class StartupTasks
         WebApplication app)
     {
         await PrepareDemoAsync(app);
-        await RequestPortal.Web.Services.ManagementDashboardAggregateWorker.InitializeAsync(app.Services,app.Logger,CancellationToken.None);
         await ReportStartupDiagnosticsAsync(app);
     }
 

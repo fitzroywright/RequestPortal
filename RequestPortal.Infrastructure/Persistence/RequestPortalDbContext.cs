@@ -23,6 +23,8 @@ public sealed class RequestPortalDbContext : IdentityDbContext<ApplicationUser, 
 {
     public RequestPortalDbContext(DbContextOptions<RequestPortalDbContext> options) : base(options) { }
     public DbSet<RequestPortal.Infrastructure.Management.ManagementDashboardAggregate> ManagementDashboardAggregates => Set<RequestPortal.Infrastructure.Management.ManagementDashboardAggregate>();
+    public DbSet<RequestPortal.Infrastructure.Management.PersistedRequestLocation> RequestLocations => Set<RequestPortal.Infrastructure.Management.PersistedRequestLocation>();
+    public DbSet<RequestPortal.Infrastructure.Management.RequestLocationImportState> RequestLocationImportStates => Set<RequestPortal.Infrastructure.Management.RequestLocationImportState>();
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
     public DbSet<OrganizationInvitation> OrganizationInvitations => Set<OrganizationInvitation>();

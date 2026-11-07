@@ -182,3 +182,6 @@ public interface IRequestLocationService
         double? longitude,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>No usable published aggregate exists; this never signals a database connectivity failure.</summary>
+public sealed class ManagementDashboardInitializingException() : InvalidOperationException("The dashboard is initializing. Please check again shortly.");

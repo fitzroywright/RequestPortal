@@ -45,27 +45,44 @@
         const canvas = document.getElementById(id);
         const container = root.querySelector(`[data-dimension="${dimension}"]`) || canvas.closest('.qi-doughnut-layout');
         const group = dimension === 'types' ? { items: data.requestTypes } : data[dimension];
+        if (group.suppressed || group.unavailable) { empty(container, group.unavailable || 'Distribution suppressed for privacy.'); return; }
         if (!data.total) { empty(container, 'No Quick Intakes in this date range.'); return; }
         if (!window.Chart) { empty(container, 'Chart unavailable. Use the accessible data table below.'); return; }
         const items = group.items.filter(item => item.count > 0 || item.name !== "Not provided / unknown");
-        charts.push(new Chart(canvas, {
+        const instance = new Chart(canvas, {
             type,
             data: { labels: items.map(v => v.name), datasets: [{ data: items.map(v => v.count), backgroundColor: type === 'doughnut' ? colors : '#3788ff', borderColor: type === 'doughnut' ? '#fff' : '#3788ff', borderWidth: type === 'doughnut' ? 1 : 0, borderRadius: type === 'bar' ? 3 : 0, maxBarThickness: horizontal ? 15 : 48 }] },
             plugins: [valuesPlugin],
             options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: type === 'doughnut' ? '67%' : undefined,
                 indexAxis: horizontal ? 'y' : 'x', layout: { padding: type === 'bar' ? { top: 15, right: 25 } : 3 },
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${items[ctx.dataIndex].count} (${items[ctx.dataIndex].percent}% of all Quick Intakes)` } } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${dimension === 'income' ? 'Monthly income (JMD): ' : dimension === 'weeklyIncome' ? 'Weekly income (JMD): ' : ''}${items[ctx.dataIndex].count} (${items[ctx.dataIndex].percent}% of all Quick Intakes)` } } },
                 scales: type === 'bar' ? {
                     x: { beginAtZero: true, display: !horizontal, grid: { display: false }, border: { display: false }, ticks: { color: '#09132f', font: { size: 12 }, maxRotation: 0 }, grace: horizontal ? '18%' : undefined },
                     y: { beginAtZero: true, grid: { display: !horizontal, color: '#e6eaf1' }, border: { display: false }, ticks: { color: '#09132f', precision: 0, font: { size: 12 }, autoSkip: false }, grace: horizontal ? undefined : '18%' }
                 } : undefined }
-        }));
+        });
+        charts.push(instance);
         if (legendKey) legend(legendKey, items, colors);
+        return instance;
     }
     chart('qi-types', 'types', 'doughnut', false, 'types');
     chart('qi-children-under-18', 'childrenUnder18', 'bar', true);
     chart('qi-employment', 'employment', 'bar', true);
-    chart('qi-income', 'income', 'bar', true);
+    let incomeChart = chart('qi-income', 'weeklyIncome', 'bar', true);
+    document.getElementById('qi-income-period').addEventListener('change', event => {
+        const weekly = event.target.value === 'weekly';
+        const title = `${weekly ? 'Weekly' : 'Monthly'} Income (JMD)`;
+        document.getElementById('qi-income-title').textContent = title;
+        root.querySelectorAll('[data-income-table]').forEach(table => { table.hidden = table.dataset.incomeTable !== event.target.value; });
+        incomeChart?.destroy();
+        if (incomeChart) charts.splice(charts.indexOf(incomeChart), 1);
+        const container = root.querySelector('[data-dimension="weeklyIncome"], [data-dimension="income"]');
+        container.dataset.dimension = weekly ? 'weeklyIncome' : 'income';
+        const canvas = document.createElement('canvas'); canvas.id = 'qi-income';
+        canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', title);
+        container.replaceChildren(canvas);
+        incomeChart = chart('qi-income', container.dataset.dimension, 'bar', true);
+    });
     chart('qi-gender', 'gender', 'doughnut', false, 'gender', ['#2e82ff', '#9951ff', '#c6bbff', '#cbd1db']);
     chart('qi-ages', 'ages', 'bar');
     const metrics = new Map(data.parishes.map(p => [p.name, p.count]));

@@ -32,10 +32,11 @@ public sealed class ManagementDashboardPageTests
     }
     private sealed class Dashboard(bool deliveryData, bool longNames) : IManagementDashboardService
     {
+        public bool Initializing;
         public int Calls;
         public ManagementRequestFilter? LastFilter;
-        public ManagementDashboardSnapshot Snapshot { get; } = Build(deliveryData, longNames);
-        public Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken token = default) { Calls++; return Task.FromResult(Snapshot); }
+        public ManagementDashboardSnapshot Snapshot { get; set; } = Build(deliveryData, longNames);
+        public Task<ManagementDashboardSnapshot> GetDashboardAsync(CancellationToken token = default) { Calls++; if (Initializing) throw new ManagementDashboardInitializingException(); return Task.FromResult(Snapshot); }
         public Task<ManagementDashboardSnapshot> GetDashboardAsync(ManagementDashboardFilter filter, CancellationToken token = default) => GetDashboardAsync(token);
         public Task<IReadOnlyList<ManagementRequestRow>> GetRequestsAsync(ManagementRequestFilter filter, CancellationToken token = default) { Calls++; LastFilter = filter; return Task.FromResult<IReadOnlyList<ManagementRequestRow>>([]); }
         public Task<ParishDrillDown> GetParishAsync(string parish, CancellationToken token = default) { Calls++; return Task.FromResult(new ParishDrillDown(parish, [], [])); }
@@ -105,6 +106,34 @@ public sealed class ManagementDashboardPageTests
         var client = host.GetTestServer().CreateClient(); client.BaseAddress = new("https://localhost"); client.DefaultRequestHeaders.Add("X-Test-Actor", actor);
         return new() { Host = host, Client = client, Service = service };
     }
+    [Fact]
+    public async Task StaleSnapshotKeepsMetricsAndClearlyShowsLastSuccessfulRefresh()
+    {
+        await using var fixture = await Setup();
+        fixture.Service.Snapshot = fixture.Service.Snapshot with {LastUpdatedUtc = DateTimeOffset.UtcNow.AddMinutes(-10)};
+        using var response = await fixture.Client.GetAsync("/Management", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        string html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("Refresh delayed. Showing the last successful snapshot.", html);
+        Assert.Contains("Last successful refresh", html);
+        Assert.Contains("Request Status", html);
+        Assert.Equal(1, fixture.Service.Calls);
+    }
+
+    [Fact]
+    public async Task MissingSnapshotRendersInitializationWithoutChartsOrHistoricalReads()
+    {
+        await using var fixture = await Setup();
+        fixture.Service.Initializing = true;
+        using var response = await fixture.Client.GetAsync("/Management", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        string html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("The dashboard is initializing", html);
+        Assert.DoesNotContain("management-dashboard-data", html);
+        Assert.Equal(1, fixture.Service.Calls);
+        Assert.Null(fixture.Service.LastFilter);
+    }
+
     [Theory]
     [InlineData("Administrator", true, false)]
     [InlineData("Reviewer", false, false)]

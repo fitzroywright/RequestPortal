@@ -289,6 +289,55 @@ public sealed class IntegrationMonitoringTests
         }
     }
 
+    [Fact]
+    public async Task OutgoingApplicantPhonesAreDigitsOnlyAndStoredNumbersRemainUnchanged()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
+        Guid request = await Intake(database);
+        var intake = await database.Db.QuickIntakes.SingleAsync(ct);
+        database.Db.Entry(intake).Property(q => q.SecondaryTelephone).CurrentValue = "+442079460018";
+        await database.Db.SaveChangesAsync(ct);
+        string storedPrimary = intake.MobileNumber;
+        var bridge = new Bridge();
+        await Submit(database, bridge).SubmitRequestAsync(request, ct);
+        var submission = Assert.IsType<ExternalApplicationSubmission>(bridge.LastSubmission);
+        Assert.Equal(storedPrimary[1..], submission.PrimaryTelephone);
+        Assert.Equal("442079460018", submission.SecondaryTelephone);
+        Assert.All(submission.PrimaryTelephone!, digit => Assert.True(char.IsAsciiDigit(digit)));
+        Assert.All(submission.SecondaryTelephone!, digit => Assert.True(char.IsAsciiDigit(digit)));
+        database.Db.ChangeTracker.Clear();
+        var saved = await database.Db.QuickIntakes.SingleAsync(ct);
+        Assert.Equal(storedPrimary, saved.MobileNumber); Assert.Equal("+442079460018", saved.SecondaryTelephone);
+    }
+
+    [Theory]
+    [InlineData("MobileNumber", "VALIDATION_PRIMARY_TELEPHONE")]
+    [InlineData("SecondaryTelephone", "VALIDATION_SECONDARY_TELEPHONE")]
+    [InlineData("DateOfBirth", "VALIDATION_DATE_OF_BIRTH")]
+    [InlineData("Email", "VALIDATION_APPLICANT_EMAIL")]
+    [InlineData("EmploymentStatus", "VALIDATION_EMPLOYMENT_STATUS")]
+    public async Task HistoricalApplicantValidationStopsBeforeDestinationAndRetainsDurableFailure(string property, string code)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
+        Guid request = await Intake(database);
+        var intake = await database.Db.QuickIntakes.SingleAsync(ct);
+        object value = property == "DateOfBirth" ? new DateOnly(1752, 12, 31) : property == "EmploymentStatus" ? "PRIVATE_INVALID\n" : "PRIVATE_INVALID";
+        database.Db.Entry(intake).Property(property).CurrentValue = value;
+        await database.Db.SaveChangesAsync(ct);
+        var bridge = new Bridge();
+        var error = await Assert.ThrowsAsync<IntegrationTransferException>(() => Submit(database, bridge).SubmitRequestAsync(request, ct));
+        Assert.Equal(code, error.Failure.Code); Assert.False(error.Failure.Transient);
+        Assert.Equal(0, bridge.Lookups); Assert.Equal(0, bridge.Inserts);
+        Assert.DoesNotContain("PRIVATE_INVALID", error.Failure.Explanation);
+        var link = await database.Db.IntegrationLinks.SingleAsync(ct);
+        Assert.Equal(SynchronizationStatus.Failed, link.Status); Assert.Null(link.NextRetryUtc);
+        var attempt = await database.Db.IntegrationAttempts.SingleAsync(ct);
+        Assert.Equal(code, attempt.ErrorCode); Assert.NotNull(attempt.CompletedUtc);
+        Assert.True(await database.Db.AssistanceRequests.AnyAsync(r => r.Id == request, ct));
+    }
+
     [Theory]
     [InlineData(null)] [InlineData("Not a parish")]
     public async Task InvalidSourceMappingFailsBeforeSqlButAfterDurableAttempt(string? parish)
@@ -499,10 +548,13 @@ public sealed class IntegrationMonitoringTests
         public bool ReturnUnavailable {get;set;}
         public Task<ExternalReturnOutboxStatus> GetReturnOutboxAsync(CancellationToken cancellationToken=default)
             => ReturnUnavailable ? throw new HttpRequestException("TOP-SECRET") : Task.FromResult(ReturnStatus);
+        public int Lookups { get; private set; }
         public Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid id,CancellationToken cancellationToken=default)
-            => Task.FromResult(HideDestination?null:Records.GetValueOrDefault(id));
+        { Lookups++; return Task.FromResult(HideDestination?null:Records.GetValueOrDefault(id)); }
+        public ExternalApplicationSubmission? LastSubmission { get; private set; }
         public async Task<ExternalApplicationReference> SubmitApplicationAsync(ExternalApplicationSubmission submission,CancellationToken cancellationToken=default)
         {
+            LastSubmission = submission;
             if(FailureCode is {} code) throw new IntegrationTransferException(TransferFailures.For("SqlServer",code),new Exception("TOP-SECRET"));
             Inserts++;
             var receipt=new ExternalApplicationReceipt(submission.PortalRequestId,"123","KGN/26/GR/0100",submission.SubmittedUtc,"JMDB01","FFPJM");

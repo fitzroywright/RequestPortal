@@ -18,6 +18,8 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
     private static readonly string[] AgeLabels = ["< 25", "25–34", "35–44", "45–54", "55–64", "65+", Missing];
     private static readonly string[] IncomeLabels = ["No income", "≤ 50,000", "50,000.01–100,000", "100,000.01–200,000", "> 200,000", Missing];
 
+    private static readonly string[] WeeklyIncomeLabels = ["No income", "≤ 5,000", "Over 5,000 to 10,000", "Over 10,000 to 20,000", "> 20,000", Missing];
+
     private IQueryable<QuickIntakeRecord> Cohort(QuickIntakeRange range)
     {
         range.Validate();
@@ -44,6 +46,11 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
         var genders = await query.GroupBy(q => q.DateOfBirth == new DateOnly(1900, 1, 1) && q.StreetAddress == "Not captured" ? Missing : q.Gender).Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
         var income = await query.GroupBy(q => (q.DateOfBirth == new DateOnly(1900, 1, 1) && q.StreetAddress == "Not captured") || q.MonthlyIncome < 0 ? Missing : q.MonthlyIncome == 0 ? IncomeLabels[0] :
             q.MonthlyIncome <= 50000 ? IncomeLabels[1] : q.MonthlyIncome <= 100000 ? IncomeLabels[2] : q.MonthlyIncome <= 200000 ? IncomeLabels[3] : IncomeLabels[4])
+            .Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
+        // Classify each saved monthly amount after conversion, before grouping.
+        var weeklyIncome = await query.Select(q => new { q.DateOfBirth, q.StreetAddress, Income = q.MonthlyIncome * 12m / 52m })
+            .GroupBy(q => (q.DateOfBirth == new DateOnly(1900, 1, 1) && q.StreetAddress == "Not captured") || q.Income < 0 ? Missing : q.Income == 0 ? WeeklyIncomeLabels[0] :
+                q.Income <= 5000 ? WeeklyIncomeLabels[1] : q.Income <= 10000 ? WeeklyIncomeLabels[2] : q.Income <= 20000 ? WeeklyIncomeLabels[3] : WeeklyIncomeLabels[4])
             .Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
         var ages = await query.Select(q => new { Age = q.CreatedUtc.Year - q.DateOfBirth.Year -
             (q.CreatedUtc.Month < q.DateOfBirth.Month || q.CreatedUtc.Month == q.DateOfBirth.Month && q.CreatedUtc.Day < q.DateOfBirth.Day ? 1 : 0), q.DateOfBirth })
@@ -75,7 +82,8 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
         await transaction.CommitAsync(ct);
         return new(range, total, sent, parishes, requestTypes,
             children,
-            employment, incomes, gender, ageGroups, insights);
+            employment, incomes, gender, ageGroups, insights)
+        { WeeklyIncome = Protect(Counts(weeklyIncome, WeeklyIncomeLabels, name => name, total)) };
     }
     public async Task<IReadOnlyList<QuickIntakeRecordLink>> GetRecordsAsync(QuickIntakeRange range, string? parish, int page, CancellationToken ct = default)
     {

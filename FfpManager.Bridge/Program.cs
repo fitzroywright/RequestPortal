@@ -235,11 +235,7 @@ api.AddEndpointFilter(async (context, next) =>
     catch (ExternalApplicationValidationException exception)
     {
         app.Logger.LogError(exception, "Bridge validation exception for field {Field}", exception.Field);
-        string code = exception.Field switch {
-            "PrimaryTelephone" => "VALIDATION_PRIMARY_TELEPHONE",
-            "SecondaryTelephone" => "VALIDATION_SECONDARY_TELEPHONE",
-            _ => "VALIDATION"
-        };
+        string code = exception.Code;
         return Results.Json(TransferFailures.For("Validation", code) with
         {
             TechnicalDetails = IntegrationExceptionDiagnostics.Capture(exception, "Validation", code)

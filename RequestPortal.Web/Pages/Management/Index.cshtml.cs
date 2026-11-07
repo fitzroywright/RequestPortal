@@ -14,8 +14,11 @@ public sealed class IndexModel : PageModel
 
     public ManagementDashboardSnapshot Dashboard { get; private set; } = null!;
 
+    public bool IsInitializing { get; private set; }
+
     public async Task OnGetAsync()
     {
-        Dashboard = await dashboardService.GetDashboardAsync(HttpContext.RequestAborted);
+        try { Dashboard = await dashboardService.GetDashboardAsync(HttpContext.RequestAborted); }
+        catch (ManagementDashboardInitializingException) { IsInitializing = true; }
     }
 }

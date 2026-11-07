@@ -19,6 +19,117 @@ internal static class PostgresDeploymentPreflight
     internal sealed record Source(string Host,string EndpointAddress,string? Address,string Database,string Identity,int Major,bool Recovery);
     internal sealed record TableCount(string Schema,string Name,long Count);
 
+    private static async Task<bool> PortalStoppedAsync(CancellationToken ct)
+    {
+        var start=new ProcessStartInfo("/usr/bin/systemctl") {UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
+        foreach(var part in new[] {"show","aegis-requestportal","-p","ActiveState","-p","SubState","-p","MainPID","-p","ControlPID"})start.ArgumentList.Add(part);
+        using var process=Process.Start(start) ?? throw new InvalidOperationException("Service state is unavailable.");
+        string output=await process.StandardOutput.ReadToEndAsync(ct);await process.WaitForExitAsync(ct);
+        if(process.ExitCode!=0)throw new InvalidOperationException("Service state is unavailable.");
+        var values=output.Split('\n',StringSplitOptions.RemoveEmptyEntries).Select(x=>x.Split('=',2)).ToDictionary(x=>x[0],x=>x[1],StringComparer.Ordinal);
+        return values.GetValueOrDefault("ActiveState")=="inactive" && values.GetValueOrDefault("SubState")=="dead" &&
+            values.GetValueOrDefault("MainPID")=="0" && values.GetValueOrDefault("ControlPID")=="0";
+    }
+
+    internal static async Task<object> RecoverLocationsAsync(string mode,string path,IConfiguration configuration,ISecretProvider secrets,CancellationToken ct)
+    {
+        if(!OperatingSystem.IsLinux() || Dns.GetHostName().Split('.')[0]!="kratos")throw Stop("LOCATION_KRATOS_GUARD",new { });
+        path=Path.GetFullPath(path);
+        if(!path.StartsWith("/var/tmp/requestportal-location-recovery-",StringComparison.Ordinal) || Path.GetFileName(path)!="locations.json" ||
+           !Directory.Exists(Path.GetDirectoryName(path)))throw Stop("LOCATION_PRIVATE_EXPORT_GUARD",new { });
+        Stage="location-database-target";
+        string connection=await secrets.GetRequiredAsync("ConnectionStrings:RequestPortal",ct);
+        await VerifyEndpointAsync(new NpgsqlConnectionStringBuilder(connection),ct);
+        await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(
+            new DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>().UseNpgsql(connection).Options);
+        Guid[] ids;
+        await using(var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct))
+        {
+            await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
+            if(!await db.Database.SqlQueryRaw<bool>("SELECT host(inet_server_addr())='10.10.0.226' AND current_database()='requestportal' AND NOT pg_is_in_recovery() AND current_setting('server_version_num')::int/10000 BETWEEN 13 AND 18 AS \"Value\"").SingleAsync(ct))
+                throw Stop("PG_ACTUAL_TARGET_GUARD",new { });
+            ids=await db.AssistanceRequests.AsNoTracking().Select(x=>x.Id).ToArrayAsync(ct);
+            await tx.RollbackAsync(ct);
+        }
+        if(!string.Equals(configuration["Storage:Provider"]?.Trim(),"SharePoint",StringComparison.OrdinalIgnoreCase))
+            throw Stop("LOCATION_SOURCE_PROVIDER_GUARD",new { });
+        var json=new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        if(mode=="location-pause")
+        {
+            Stage="pause-throttled-dashboard-refresh";
+            var pause=await RequestPortal.Infrastructure.Management.DashboardRecoveryPause.PauseAsync(db,ct);
+            await File.WriteAllTextAsync(path+".pause.json",JsonSerializer.Serialize(pause,json),ct);
+            File.SetUnixFileMode(path+".pause.json",UnixFileMode.UserRead|UnixFileMode.UserWrite);
+            return new {status="dashboard-refresh-paused",pause.SnapshotVersion,pause.PausedUntilUtc,snapshotChanged=false};
+        }
+        if(mode=="location-resume")
+        {
+            Stage="restore-dashboard-refresh-schedule";
+            var pause=JsonSerializer.Deserialize<RequestPortal.Infrastructure.Management.DashboardPauseState>(await File.ReadAllTextAsync(path+".pause.json",ct),json)
+                ?? throw Stop("LOCATION_PAUSE_STATE_INVALID",new { });
+            bool restored=await RequestPortal.Infrastructure.Management.DashboardRecoveryPause.ResumeAsync(db,pause,ct);
+            return new {status="dashboard-refresh-schedule-reconciled",restored,snapshotChanged=false};
+        }
+        if(mode is "location-schema" or "location-import")
+        {
+            Stage="import-verified-geography";
+            if(!await PortalStoppedAsync(ct))throw Stop("LOCATION_WRITERS_NOT_STOPPED",new { });
+            byte[] evidence=await File.ReadAllBytesAsync(path,ct);
+            var data=JsonSerializer.Deserialize<RequestPortal.LocationRecovery.LocationExport>(evidence,json)
+                ?? throw Stop("LOCATION_EXPORT_INVALID",new { });
+            RequestPortal.LocationRecovery.LocationExportValidation.ValidateCoverage(data);
+            if(!data.Complete || !data.WritersStopped || data.RootFolder!=(configuration["Storage:SharePoint:RootFolder"]?.Trim()??"") ||
+               (!string.IsNullOrWhiteSpace(configuration["Storage:SharePoint:DriveId"]) && data.DriveId!=configuration["Storage:SharePoint:DriveId"]?.Trim()) ||
+               data.ObservedUtc<DateTimeOffset.UtcNow.AddMinutes(-30) || data.ObservedUtc>DateTimeOffset.UtcNow.AddMinutes(1))
+                throw Stop("LOCATION_FINAL_FENCE_REQUIRED",new { });
+            if(mode=="location-schema")
+            {
+                const string migration="20261107000005_PostgresRequestLocations";
+                var pending=(await db.Database.GetPendingMigrationsAsync(ct)).ToArray();
+                if(pending.Length>0)
+                {
+                    if(pending.Length!=1 || pending[0]!=migration)throw Stop("LOCATION_UNEXPECTED_PENDING_MIGRATIONS",new { });
+                    var migrator=Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>(db);
+                    await migrator.MigrateAsync(migration,ct);
+                }
+                if(!(await db.Database.GetAppliedMigrationsAsync(ct)).Contains(migration))throw Stop("LOCATION_REVIEWED_SCHEMA_REQUIRED",new { });
+                return new {status="location-schema-verified",migration,applied=pending.Length==1,providerChanged=false};
+            }
+            if(!(await db.Database.GetAppliedMigrationsAsync(ct)).Contains("20261107000005_PostgresRequestLocations"))
+                throw Stop("LOCATION_REVIEWED_SCHEMA_REQUIRED",new { });
+            string sha=Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(evidence));
+            int imported=await RequestPortal.Infrastructure.Management.RequestLocationRecovery.ImportAsync(db,data.Records.Select(x=>x.Location).ToArray(),ct,sha);
+            return new {status="location-import-verified",imported,sourceEvidenceSha256=sha,verifiedMissingLocations=data.VerifiedMissingRequestIds!.Count,sourceWrites=false,providerChanged=false,database="requestportal"};
+        }
+        Stage="export-legacy-geography";
+        string secretName=configuration["Storage:SharePoint:ClientSecretName"]?.Trim() ?? "storage/sharepoint/client-secret";
+        var options=Common.Storage.StorageTargetOptions.FromConfiguration(configuration,await secrets.GetRequiredAsync(secretName,ct)).SharePoint!;
+        using var http=new HttpClient {Timeout=TimeSpan.FromMinutes(2)};
+        var client=new RequestPortal.LocationRecovery.GraphReadClient(http,options,Path.GetDirectoryName(path)!,minimumInterval:TimeSpan.FromMilliseconds(250));
+        var reader=new RequestPortal.LocationRecovery.SharePointLocationExport(client,options) {
+            Progress=checks=>Console.WriteLine(JsonSerializer.Serialize(new {status="location-export-progress",metadataRequests=checks,initialRequestCount=ids.Length},json)) };
+        RequestPortal.LocationRecovery.LocationExport? cached=File.Exists(path)?JsonSerializer.Deserialize<RequestPortal.LocationRecovery.LocationExport>(await File.ReadAllBytesAsync(path,ct),json):null;
+        try
+        {
+            bool stopped=await PortalStoppedAsync(ct);
+            var data=await reader.ReadAsync(ids.ToHashSet(),stopped,cached,ct,(id,token)=>db.AssistanceRequests.AsNoTracking().AnyAsync(x=>x.Id==id,token));
+            data=data with {WritersStopped=stopped && await PortalStoppedAsync(ct)};
+            string candidate=path+".writing";await File.WriteAllBytesAsync(candidate,JsonSerializer.SerializeToUtf8Bytes(data,json),ct);
+            File.SetUnixFileMode(candidate,UnixFileMode.UserRead|UnixFileMode.UserWrite);File.Move(candidate,path,true);
+            return new {status="location-export-verified",locations=data.Records.Count,verifiedMissingLocations=data.VerifiedMissingRequestIds!.Count,data.KnownRequestCount,data.WritersStopped,client.Requests,client.ThrottledResponses,
+                sourceWrites=false,supportingDocumentsScanned=0,providerChanged=false};
+        }
+        catch(Exception error)
+        {
+            var failure=new {operation=reader.Operation,storageKey=reader.CurrentKey,reader.ExpectedSha256,reader.ActualSha256,reader.ExpectedLength,reader.ActualLength,errorType=error.GetType().Name,
+                code=error is RequestPortal.LocationRecovery.LocationSourceException source?source.Code:"LOCATION_EXPORT_FAILED"};
+            await File.WriteAllTextAsync(path+".failure.json",JsonSerializer.Serialize(failure,json),CancellationToken.None);
+            File.SetUnixFileMode(path+".failure.json",UnixFileMode.UserRead|UnixFileMode.UserWrite);
+            throw Stop("LOCATION_SOURCE_READ_FAILED",new {operation=reader.Operation,errorType=error.GetType().Name,
+                code=error is RequestPortal.LocationRecovery.LocationSourceException known?known.Code:"LOCATION_EXPORT_FAILED"});
+        }
+    }
+
     private static void Guard(NpgsqlConnectionStringBuilder settings)
     {
         if(!string.Equals(settings.Host,"axios.fftpj.local",StringComparison.OrdinalIgnoreCase) || settings.Database!="requestportal")
@@ -125,6 +236,71 @@ internal static class PostgresDeploymentPreflight
         await transaction.RollbackAsync(ct);
         return new {readOnly=true,status="backup-created-awaiting-isolated-restore",source,clientMajor,migrations,privileges,tables=counts,archiveSha256=sha,archiveBytes=new FileInfo(archive).Length,observedUtc=DateTimeOffset.UtcNow};
     }
+    internal static async Task<object> DiagnoseStorageAsync(IConfiguration configuration,ISecretProvider secrets,CancellationToken ct)
+    {
+        Stage="diagnose-dashboard-storage";
+        string value=await secrets.GetRequiredAsync("ConnectionStrings:RequestPortal",ct);
+        var settings=new NpgsqlConnectionStringBuilder(value);await VerifyEndpointAsync(settings,ct);
+        await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(
+            new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>().UseNpgsql(value).Options);
+        await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
+        await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
+        bool target=await db.Database.SqlQueryRaw<bool>("SELECT current_database()='requestportal' AND NOT pg_is_in_recovery() AS \"Value\"").SingleAsync(ct);
+        if(!target)throw Stop("PG_ACTUAL_TARGET_GUARD",new {databaseMatches=false});
+        var row=await db.ManagementDashboardAggregates.AsNoTracking().SingleAsync(x=>x.Id==1,ct);
+        var snapshot=RequestPortal.Infrastructure.Management.PersistentManagementDashboardService.Read(row);
+        var evidence=await RequestPortal.Infrastructure.Management.ManagementDashboardSourceVerification.ReadAsync(db,snapshot,ct);
+        var pendingQuery=db.OutboxMessages.Where(m=>m.MessageType==RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType && m.ProcessedUtc==null);
+        int pending=await pendingQuery.CountAsync(ct);
+        var oldest=await pendingQuery.MinAsync(x=>(DateTimeOffset?)x.OccurredUtc,ct);
+        var ids=await (from request in db.AssistanceRequests.AsNoTracking()
+                       join organization in db.Organizations on request.OrganizationId equals organization.Id
+                       where request.Status!=RequestPortal.Domain.Requests.RequestStatus.Draft && request.Status!=RequestPortal.Domain.Requests.RequestStatus.Cancelled && request.Status!=RequestPortal.Domain.Requests.RequestStatus.Duplicate
+                       orderby request.Id select request.Id).ToListAsync(ct);
+        await tx.RollbackAsync(ct); // Never hold a DB snapshot open during external storage reads.
+        string secretName=configuration["Storage:SharePoint:ClientSecretName"]?.Trim() ?? "storage/sharepoint/client-secret";
+        var targetOptions=Common.Storage.StorageTargetOptions.FromConfiguration(configuration,await secrets.GetAsync(secretName,ct));
+        using var handler=new ReadOnlyStorageHttpHandler(new HttpClientHandler());
+        using var http=new HttpClient(handler);
+        Common.Storage.IFileStorage storage;
+        if(targetOptions.Kind==Common.Storage.StorageTargetKind.SharePoint)
+            storage=new Common.Storage.SharePointFileStorage(targetOptions.SharePoint!,http);
+        else if(targetOptions.Kind is Common.Storage.StorageTargetKind.LocalFolder or Common.Storage.StorageTargetKind.NetworkFolder)
+        {
+            string root=Path.GetFullPath(targetOptions.RootPath!);
+            if(!Directory.Exists(root))throw new InvalidOperationException("The existing storage root is unavailable; no directories were created.");
+            storage=targetOptions.Kind==Common.Storage.StorageTargetKind.LocalFolder ? new Common.Storage.LocalFileStorage(root) : new Common.Storage.NetworkFolderStorage(root);
+        }
+        else throw new InvalidOperationException("This read-only diagnostic does not support the configured storage provider.");
+        int concurrency=configuration.GetValue<int?>("ManagementDashboard:LocationReadConcurrency") ?? 16;
+        var probe=await DashboardStorageDiagnostics.ProbeAsync(storage,ids,concurrency,ct);
+        return new {readOnly=true,status="storage-diagnostic-collected",provider=targetOptions.Kind.ToString(),
+            snapshot=new {row.SnapshotVersion,row.LastUpdatedUtc,row.RefreshStatus,row.AttemptCount,row.NextRefreshUtc},
+            pendingRefreshes=pending,oldestPendingUtc=oldest,sourceEvidence=evidence,probe,
+            httpStatuses=handler.Statuses,retryAfterSeconds=handler.RetryAfterSeconds,
+            productionBusinessWrites=false,storageWrites=false,migrationRequested=false,deploymentAttempted=false};
+    }
+
+    internal static async Task<object> VerifyCatalogueAsync(ISecretProvider secrets,CancellationToken ct)
+    {
+        Stage="verify-catalogue";
+        string value=await secrets.GetRequiredAsync("ConnectionStrings:RequestPortal",ct);
+        var settings=new NpgsqlConnectionStringBuilder(value);await VerifyEndpointAsync(settings,ct);
+        await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(
+            new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<RequestPortal.Infrastructure.Persistence.RequestPortalDbContext>().UseNpgsql(value).Options);
+        await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
+        await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
+        bool target=await db.Database.SqlQueryRaw<bool>("SELECT host(inet_server_addr())='10.10.0.226' AND current_database()='requestportal' AND NOT pg_is_in_recovery() AND current_setting('server_version_num')::int/10000 BETWEEN 13 AND 18 AS \"Value\"").SingleAsync(ct);
+        if(!target)throw Stop("PG_ACTUAL_TARGET_GUARD",new {databaseMatches=false});
+        var evidence=await RequestPortal.Infrastructure.Management.ManagementDashboardSourceVerification.ReadAsync(db,null,ct);
+        if(!evidence.MigrationPrivileges || evidence.DashboardTriggers!=evidence.ExpectedDashboardTriggers || !evidence.TriggerSetValid || !evidence.TriggerFunctionPresent)
+            throw Stop("PG_SCHEMA_VERIFICATION",new {evidence.MigrationPrivileges,evidence.DashboardTriggers,evidence.TriggerFunctionPresent});
+        var applied=await db.Database.GetAppliedMigrationsAsync(ct);
+        if(!applied.Contains("20261106170310_ManagementDashboardAggregate"))throw Stop("PG_BASELINE_MISSING",new {required="20261106170310_ManagementDashboardAggregate"});
+        await tx.RollbackAsync(ct);
+        return new {readOnly=true,status="catalogue-verified",evidence,migration="20261106170310_ManagementDashboardAggregate"};
+    }
+
     internal static async Task<object> VerifyDashboardAsync(ISecretProvider secrets,CancellationToken ct)
     {
         Stage="verify-aggregate";
@@ -135,10 +311,9 @@ internal static class PostgresDeploymentPreflight
         await using var db=new RequestPortal.Infrastructure.Persistence.RequestPortalDbContext(options);
         await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead,ct);
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'",ct);
-        bool target=await db.Database.SqlQueryRaw<bool>("SELECT current_database()='requestportal' AND NOT pg_is_in_recovery() AS \"Value\"").SingleAsync(ct);
+        bool target=await db.Database.SqlQueryRaw<bool>("SELECT host(inet_server_addr())='10.10.0.226' AND current_database()='requestportal' AND NOT pg_is_in_recovery() AS \"Value\"").SingleAsync(ct);
         if(!target)throw new InvalidOperationException("Actual production PostgreSQL target verification failed.");
-        var noStorage=new NoStorage();
-        var calculator=new RequestPortal.Infrastructure.Management.ManagementDashboardService(db,noStorage,
+        var calculator=new RequestPortal.Infrastructure.Management.ManagementDashboardService(db,
             Microsoft.Extensions.Options.Options.Create(new RequestPortal.Infrastructure.Management.ManagementDashboardOptions()));
         var reader=new RequestPortal.Infrastructure.Management.PersistentManagementDashboardService(db,calculator);
         var watch=Stopwatch.StartNew();var first=await reader.GetDashboardAsync(ct);double cold=watch.Elapsed.TotalMilliseconds;
@@ -148,23 +323,18 @@ internal static class PostgresDeploymentPreflight
             throw Stop("PG_AGGREGATE_TOTALS",new {first.SnapshotVersion});
         if(first.RefreshStatus!="Current" || first.LastUpdatedUtc is null || first.LastUpdatedUtc<DateTimeOffset.UtcNow.AddMinutes(-2))
             throw Stop("PG_AGGREGATE_STALE",new {first.SnapshotVersion,first.RefreshStatus,first.LastUpdatedUtc});
+        var sourceEvidence=await RequestPortal.Infrastructure.Management.ManagementDashboardSourceVerification.ReadAsync(db,first,ct);
+        if(!sourceEvidence.Reconciled)throw Stop("PG_SOURCE_TOTALS",new {first.SnapshotVersion});
+        if(!sourceEvidence.MigrationPrivileges || sourceEvidence.DashboardTriggers!=sourceEvidence.ExpectedDashboardTriggers || !sourceEvidence.TriggerSetValid || !sourceEvidence.TriggerFunctionPresent)
+            throw Stop("PG_SCHEMA_VERIFICATION",new {sourceEvidence.MigrationPrivileges,sourceEvidence.DashboardTriggers,sourceEvidence.TriggerFunctionPresent});
+        var applied=await db.Database.GetAppliedMigrationsAsync(ct);
+        if(!applied.Contains("20261106170310_ManagementDashboardAggregate"))throw Stop("PG_BASELINE_MISSING",new {required="20261106170310_ManagementDashboardAggregate"});
         int pending=await db.OutboxMessages.CountAsync(x=>x.MessageType==RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType && x.ProcessedUtc==null,ct);
         await tx.RollbackAsync(ct);
         return new {readOnly=true,status="dashboard-verified",database=settings.Database,host=settings.Host,
             first.SnapshotVersion,first.GeneratedUtc,first.LastUpdatedUtc,first.LastReconciledUtc,first.RefreshStatus,
             totals=new {requests=first.Statuses.Sum(x=>x.Count),outstanding=first.Executive.Outstanding,completed=first.Executive.Completed},
-            pendingRefreshes=pending,coldServiceMs=cold,warmServiceMs=warm,storageReads=0,
+            sourceEvidence,migration="20261106170310_ManagementDashboardAggregate",pendingRefreshes=pending,coldServiceMs=cold,warmServiceMs=warm,storageReads=0,
             measuredBrowserLoading=false,observedUtc=DateTimeOffset.UtcNow};
     }
-    private sealed class NoStorage : Common.Storage.IFileStorage
-    {
-        private static InvalidOperationException Forbidden()=>new("Published snapshot reads must not access storage.");
-        public Task<Common.Storage.StoredFile> StoreAsync(Common.Storage.StorageWriteRequest r,CancellationToken ct=default)=>throw Forbidden();
-        public Task<Stream> OpenReadAsync(string key,CancellationToken ct=default)=>throw Forbidden();
-        public Task<Common.Storage.StoredFile?> GetMetadataAsync(string key,CancellationToken ct=default)=>throw Forbidden();
-        public Task<IReadOnlyList<Common.Storage.StoredFile>> GetVersionsAsync(string key,CancellationToken ct=default)=>throw Forbidden();
-        public Task DeleteAsync(string key,CancellationToken ct=default)=>throw Forbidden();
-        public Task<Common.Storage.StorageHealth> CheckHealthAsync(CancellationToken ct=default)=>throw Forbidden();
-    }
-
 }

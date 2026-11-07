@@ -11,6 +11,7 @@ internal static class EndpointRegistration
     public static void Map(WebApplication app)
     {
         app.MapRazorPages();
+        app.MapManagementDashboardReadiness();
         // Staff lifecycle writes go through the audited, confirmed Razor workflow.
         // The generic account API cannot enforce application last-administrator rules.
         app.MapGet("/api/staff/security/accounts", async (HttpContext http, StaffAdministrationService administration) =>

@@ -32,7 +32,7 @@
 <div class="qi-three-column">
 <section class="qi-panel"><h2>Children Under 18 Living at Home</h2><div class="qi-chart" data-dimension="childrenUnder18"><canvas id="qi-children-under-18" aria-label="Quick Intake applicants with children under 18 living full-time at home" role="img"></canvas></div><small>Yes, No, or not recorded on legacy intakes.</small></section>
 <section class="qi-panel"><h2>Employment Status</h2><div class="qi-chart" data-dimension="employment"><canvas id="qi-employment" aria-label="Employment status" role="img"></canvas></div></section>
-<section class="qi-panel"><h2>Monthly Income (JMD)</h2><div class="qi-chart" data-dimension="income"><canvas id="qi-income" aria-label="Monthly income equivalent in Jamaican dollars" role="img"></canvas></div><small>Stored monthly income. Current weekly reports are converted × 52 ÷ 12.</small></section>
+<section class="qi-panel"><div style="display:flex;align-items:start;justify-content:space-between;gap:8px"><h2 id="qi-income-title" aria-live="polite">Weekly Income (JMD)</h2><label class="qi-sr-only" for="qi-income-period">Income period</label><select id="qi-income-period" style="font-size:12px;padding:3px 6px"><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select></div><div class="qi-chart" data-dimension="weeklyIncome"><canvas id="qi-income" aria-label="Weekly income in Jamaican dollars" role="img"></canvas></div><small>Weekly = stored monthly income × 12 ÷ 52. Amounts are grouped individually.</small></section>
 </div>
 <div class="qi-three-column qi-bottom-row">
 <section class="qi-panel"><h2>Gender</h2><div class="qi-doughnut-layout" data-dimension="gender"><div class="qi-doughnut"><canvas id="qi-gender" aria-label="Gender" role="img"></canvas><span class="qi-doughnut-total"><strong>@d.Total</strong>Total</span></div><ul class="qi-legend" data-legend="gender"></ul></div></section>
@@ -41,8 +41,14 @@
 </div>
 <p class="qi-methodology">@Model.Range.From.ToString("dd MMM yyyy")–@Model.Range.Through.ToString("dd MMM yyyy") (UTC, inclusive). Percentages use all @d.Total Quick Intakes; missing responses have their own category. Screening stages and new-account attribution are not recorded.</p>
 <details class="qi-data-table"><summary>View accessible chart data and definitions</summary><p>“Verified” requires a verified FFP Manager destination, application reference and synchronized outcome. It is not the queued count. New Applicants cannot be inferred from anonymous tracking identities or account conversions.</p>
-@foreach(var dimension in new[] { (Name:"Parish",Rows:d.Parishes), (Name:"Request type",Rows:d.RequestTypes), (Name:"Children under 18 at home",Rows:d.ChildrenUnder18.Items), (Name:"Employment",Rows:d.Employment.Items), (Name:"Monthly income",Rows:d.Income.Items), (Name:"Gender",Rows:d.Gender.Items), (Name:"Age group",Rows:d.Ages.Items) }) {
+@foreach(var dimension in new[] { (Name:"Parish",Rows:d.Parishes), (Name:"Request type",Rows:d.RequestTypes), (Name:"Children under 18 at home",Rows:d.ChildrenUnder18.Items), (Name:"Employment",Rows:d.Employment.Items), (Name:"Gender",Rows:d.Gender.Items), (Name:"Age group",Rows:d.Ages.Items) }) {
 <h3>@dimension.Name</h3><table><thead><tr><th>Group</th><th>Count</th><th>Percent of all intakes</th></tr></thead><tbody>@foreach(var row in dimension.Rows) { <tr><td>@row.Name</td><td>@(row.Count?.ToString() ?? "—")</td><td>@(row.Percent.HasValue ? row.Percent.Value.ToString("0.#") + "%" : "—")</td></tr> }</tbody></table>
+}
+@foreach(var income in new[] { (Key:"weekly",Name:"Weekly Income (JMD)",Data:d.WeeklyIncome), (Key:"monthly",Name:"Monthly Income (JMD)",Data:d.Income) }) {
+<div data-income-table="@income.Key" hidden="@(income.Key != "weekly")"><h3>@income.Name</h3>
+@if(income.Data.Suppressed || income.Data.Unavailable is not null) { <p>@(income.Data.Unavailable ?? "Income distribution suppressed for privacy.")</p> }
+else { <table><thead><tr><th>Group</th><th>Count</th><th>Percent of all intakes</th></tr></thead><tbody>@foreach(var row in income.Data.Items) { <tr><td>@row.Name</td><td>@(row.Count?.ToString() ?? "—")</td><td>@(row.Percent.HasValue ? row.Percent.Value.ToString("0.#") + "%" : "—")</td></tr> }</tbody></table> }
+</div>
 }</details>
 <noscript><p>Interactive charts and the map require JavaScript. Aggregated values are available in the chart data table above.</p></noscript>
 </div>

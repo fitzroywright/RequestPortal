@@ -19,6 +19,26 @@ public sealed class QuickIntakeDashboardTests
         new(Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),"PRIVATE_FIRST","PRIVATE_LAST",dob ?? new(1990,11,5),gender,"Single","PRIVATE_PHONE",null,address,"PRIVATE_COMMUNITY",parish,employment,income,false,false,"None",category,received ?? Received);
 
     [Fact]
+    public async Task WeeklyIncomeGroupsIndividualConvertedAmountsAndPreservesUnknowns()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = await PostgreSqlTestDatabase.CreateAsync(ct);
+        decimal[] monthly = [0, 21666.66m, 21666.67m, 43333.33m, 43333.34m, 86666.66m, 86666.67m];
+        db.Db.QuickIntakes.AddRange(monthly.Select((amount, i) => Intake(i, income: amount)));
+        db.Db.QuickIntakes.Add(Intake(8, dob: new(1900, 1, 1), address: "Not captured", income: 0));
+        await db.Db.SaveChangesAsync(ct);
+        var result = await Service(db).GetAsync(Range, ct);
+        Assert.False(result.WeeklyIncome.Suppressed);
+        Assert.Equal(new int?[] { 1, 1, 2, 2, 1, 1 }, result.WeeklyIncome.Items.Select(c => c.Count));
+        Assert.Equal(8, result.WeeklyIncome.Items.Sum(c => c.Count));
+        Assert.Equal(100, result.WeeklyIncome.Items.Sum(c => c.Percent));
+        // The same monthly bucket splits into distinct weekly buckets.
+        Assert.Equal(4, result.Income.Items.Single(c => c.Name == "≤ 50,000").Count);
+        Assert.Equal(1, result.WeeklyIncome.Items.Last().Count);
+        Assert.Equal(monthly, await db.Db.QuickIntakes.Where(q => q.StreetAddress != "Not captured").OrderBy(q => q.MonthlyIncome).Select(q => q.MonthlyIncome).ToArrayAsync(ct));
+    }
+
+    [Fact]
     public async Task QuickOnlyInclusiveDatesAndAllDimensionsReconcileWithVerifiedIntegration()
     {
         var ct=TestContext.Current.CancellationToken;await using var db=await PostgreSqlTestDatabase.CreateAsync(ct);

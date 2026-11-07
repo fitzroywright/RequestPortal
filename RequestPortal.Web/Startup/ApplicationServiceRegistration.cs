@@ -143,7 +143,10 @@ internal static class ApplicationServiceRegistration
                     ManagementDashboardOptions.SectionName));
 
         builder.Services.AddScoped<ManagementDashboardService>();
+        builder.Services.AddScoped<IManagementDashboardSnapshotBuilder>(services => services.GetRequiredService<ManagementDashboardService>());
         builder.Services.AddScoped<ManagementDashboardAggregateRefresher>();
+        builder.Services.AddScoped<IManagementDashboardAggregateRefresher>(services => services.GetRequiredService<ManagementDashboardAggregateRefresher>());
+        builder.Services.AddSingleton<RequestPortal.Web.Services.ManagementDashboardWorkerState>();
         builder.Services.AddHostedService<RequestPortal.Web.Services.ManagementDashboardAggregateWorker>();
         builder.Services.AddScoped<
             IManagementDashboardService
