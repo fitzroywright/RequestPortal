@@ -270,6 +270,10 @@ api.MapGet("/applications/by-request/{requestId:guid}", async (Guid requestId, I
     var receipt = await gateway.FindApplicationAsync(requestId, token);
     return receipt is null ? Results.NoContent() : Results.Ok(receipt);
 });
+api.MapGet("/applications/by-request/{requestId:guid}/fields", async (Guid requestId, IFfpManagerGateway gateway, CancellationToken token) =>
+    Results.Ok(await gateway.ReadFieldsAsync(requestId, token)));
+api.MapPost("/applications/fields/update", async (ApplicationFieldUpdate update, IFfpManagerGateway gateway, CancellationToken token) =>
+    Results.Ok(await gateway.UpdateFieldsAsync(update, token)));
 api.MapGet("/integration-outbox", async (IIntegrationOutboxStore store, CancellationToken token) =>
     Results.Ok(await store.GetSnapshotAsync(token)));
 

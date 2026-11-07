@@ -111,6 +111,19 @@ public sealed partial class IntegrationStatusService : IIntegrationStatusService
             "Operator requested destination verification and a safe retry.", cancellationToken);
         // Reconciliation is read-only at the destination. An ambiguous result blocks the write.
         await ReconcileRequestAsync(staffUserId, link.RequestId, cancellationToken);
+        if (await dbContext.QuickIntakes.AsNoTracking().AnyAsync(q => q.RequestId == link.RequestId, cancellationToken))
+        {
+            // Recheck before touching the submission queue. Existing Quick Intake applications
+            // go to an explicit field preview, never an implicit historical overwrite.
+            var destination = await bridgeClient.FindApplicationAsync(link.RequestId, cancellationToken);
+            if (destination is not null)
+            {
+                FfpManagerIntegrationService.ValidateReceipt(link.RequestId, destination);
+                if (destination.ApplicationId != link.ExternalReference || destination.ApplicationNumber != link.ApplicationNumber)
+                    throw new IntegrationTransferException(TransferFailures.For("DestinationVerification", "DESTINATION_CONFLICT"));
+                throw new ExistingDestinationPreviewRequiredException(link.RequestId);
+            }
+        }
         var queueId = FfpManagerSubmissionRequestedMessage.IdForRequest(link.RequestId);
         var queue = await dbContext.OutboxMessages.SingleOrDefaultAsync(item => item.Id == queueId, cancellationToken);
         if (queue is null)

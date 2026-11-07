@@ -85,3 +85,37 @@ remain NULL and do not fall back to ProgramCategory. Regular submissions retain
 Programme=ProgramCategory and their existing insert columns/defaults. Both SQL gateways
 use the same parameter mapping only on the existing new-application insertion path;
 existing synchronized applications still return before any insertion or update.
+
+## Staff-confirmed historical field updates
+
+The Integrations page offers Update FFP Manager Fields only to existing integration
+operators, for Quick Intake links with a verified destination ID/reference and a
+Synchronized or Reconciliation Required diagnostic state. Preview reloads the
+unique, active ExternalRequestId match through the authenticated Bridge API and
+checks it against the persisted link. Failed Quick Intake retries that find an
+existing application stop before resetting the submission queue and open this
+preview instead; absent destinations retain the existing validated submission path.
+
+Preview and apply share the deployed mapping helpers. Source unknowns are excluded;
+zero and false remain meaningful values. Differing nonempty destination values are
+conflicts and cannot be approved through this action. Only explicitly selected
+missing fields can be filled. The preview is encrypted/authenticated using the
+existing Data Protection infrastructure, bound to the staff ID, and expires after
+ten minutes. Updates require an antiforgery-protected POST and explicit confirmation.
+
+The Bridge retains its existing SQL target and AD/Kerberos connection guard. It
+checks existing column-update permissions without granting privileges. A serializable
+transaction locks the ExternalRequestId range with UPDLOCK/HOLDLOCK, compares the
+complete mapped snapshot, reference, workflow status and last-update timestamp,
+then updates only allowlisted selected columns. OUTPUT INTO a table variable counts
+the affected identity without depending on trigger row counts. Readback must match
+exactly the approved changes before commit. Any changed identity, stale preview,
+conflict, unexpected readback or unavailable permission fails closed. There is no
+insert path, workflow/status write, background update, bulk mode or automatic retry.
+
+The existing Portal audit trail records preview, durable update intent, verified
+completion or unconfirmed outcome with actor, application ID and field names, not
+sensitive field values. An unconfirmed transport outcome requires a fresh preview.
+Production SQL compilation/schema checks are separate from isolated policy/UI tests;
+neither is proof of an executed production update. No production write is performed
+merely for release verification.

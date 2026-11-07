@@ -5,7 +5,7 @@ using RequestPortal.Application.Integration;
 
 namespace FfpManager.Bridge;
 
-public sealed class SqlFfpManagerGateway : IFfpManagerGateway
+public sealed partial class SqlFfpManagerGateway : IFfpManagerGateway
 {
     // This lookup never repairs references, inserts applications or changes destination data.
     public async Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default)

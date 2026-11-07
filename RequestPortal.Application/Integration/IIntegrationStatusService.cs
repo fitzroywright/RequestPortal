@@ -20,6 +20,10 @@ public sealed record IntegrationStatusSummary(
 
 public interface IIntegrationStatusService
 {
+    Task<ApplicationFieldPreview> PreviewFieldsAsync(Guid staffUserId, Guid requestId, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Field previews are unavailable.");
+    Task ApplyFieldsAsync(Guid staffUserId, ApplicationFieldPreview preview, IReadOnlyList<string> approved, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Field updates are unavailable.");
     Task<IntegrationMonitorPage> SearchAsync(IntegrationMonitorQuery query, CancellationToken cancellationToken = default);
     Task<IntegrationTransferDetail?> GetRequestAsync(Guid requestId, CancellationToken cancellationToken = default);
     // Restricted diagnostic retrieval. Web callers MUST enforce ManageSecurity.
@@ -51,6 +55,9 @@ public sealed record IntegrationTransferRow(Guid RequestId, Guid? LinkId, string
 {
     // Only classified, sanitized failures may be exposed; legacy provider payloads stay protected.
     public bool VerifiedInFfpManager { get; init; }
+    public bool CanUpdateFields => Source == "Quick Intake" && LinkId.HasValue && VerifiedUtc.HasValue &&
+        !string.IsNullOrWhiteSpace(ApplicationId) && !string.IsNullOrWhiteSpace(ApplicationNumber) &&
+        Status is SynchronizationStatus.Synchronized or SynchronizationStatus.ReconciliationRequired;
     public string? RecordedError { get; init; }
     public string? RecoveryAction { get; init; }
 }

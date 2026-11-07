@@ -1,0 +1,24 @@
+@model RequestPortal.Web.Pages.Staff.IntegrationsModel
+@if (Model.FieldPreview is { } preview) {
+<section class="integration-operations" aria-labelledby="field-preview-title">
+    <h2 id="field-preview-title">Update FFP Manager Fields</h2>
+    <p>@preview.PublicReference · FFP Manager @preview.Destination.Identity.ApplicationNumber</p>
+    <p>Only selected missing fields can be filled. Conflicting values require a separately reviewed resolution. Unknown source values are preserved. This preview expires after ten minutes.</p>
+    <form method="post" asp-page-handler="UpdateFields" asp-all-route-data="Model.Routes(Model.Transfers.Page)">
+        <input type="hidden" asp-for="ProtectedFieldPreview" />
+        <table><thead><tr><th>Field</th><th>Current FFP Manager value</th><th>Quick Intake proposal</th><th>Decision</th></tr></thead><tbody>
+        @foreach (var field in preview.Differences) {
+            <tr><td>@field.Name</td><td>@(field.Current ?? "Not recorded")</td><td>@(field.Proposed ?? "Unknown — preserve destination")</td><td>
+            @if (field.CanApply) { <label><input type="checkbox" name="ApprovedFields" value="@field.Name" /> Approve filling this field</label> }
+            else if (field.Conflict) { <strong>Conflict — review required; excluded</strong> }
+            else { <span>No change</span> }
+            </td></tr>
+        }
+        </tbody></table>
+        @if (preview.Differences.Any(d => d.CanApply)) {
+            <label><input asp-for="ConfirmFieldUpdate" required /> I confirm only the selected, nonconflicting fields should be filled.</label>
+            <button class="button" type="submit">Confirm selected field updates</button>
+        }
+    </form>
+</section>
+}

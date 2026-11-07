@@ -7,6 +7,10 @@ namespace FfpManager.Bridge;
 
 public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
 {
+    public Task<ApplicationFieldSnapshot> ReadFieldsAsync(Guid requestId, CancellationToken cancellationToken = default)
+        => legacy.ReadFieldsAsync(requestId, cancellationToken);
+    public Task<ApplicationFieldSnapshot> UpdateFieldsAsync(ApplicationFieldUpdate update, CancellationToken cancellationToken = default)
+        => legacy.UpdateFieldsAsync(update, cancellationToken);
     public Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default)
         => legacy.FindApplicationAsync(requestId, cancellationToken);
     private readonly BridgeOptions options;

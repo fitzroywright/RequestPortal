@@ -41,6 +41,9 @@ public static class TransferFailures
 
     public static TransferFailure For(string stage, string code) => code switch
     {
+        "FIELD_PREVIEW_STALE" => new(stage, "Concurrency", code, "Destination values changed after preview. No fields were updated. Generate a new preview and review the current values.", false),
+        "FIELD_READBACK" => new(stage, "Verification", code, "The approved field update could not be verified. Do not retry automatically; generate a new preview to check current values.", false),
+        "FIELD_ACCESS" => new(stage, "Authorization", code, "The existing Bridge service identity cannot safely read and update all agreed destination fields. No fields were changed.", false),
         "VALIDATION" => new(stage, "PermanentValidation", code, "Required fields or mapping values are invalid. Correct the source or mapping before an authorized retry.", false),
         "VALIDATION_PRIMARY_TELEPHONE" => new(stage, "PermanentValidation", code, "The primary applicant telephone cannot be transferred. Verify the original submission and correct the source before an authorized reconciled retry.", false),
         "VALIDATION_SECONDARY_TELEPHONE" => new(stage, "PermanentValidation", code, "The secondary applicant telephone cannot be transferred. Verify the original submission and correct the source before an authorized reconciled retry.", false),

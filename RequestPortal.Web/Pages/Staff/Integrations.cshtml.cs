@@ -11,6 +11,9 @@ using Common.Storage;
 using Common.Diagnostics;
 using RequestPortal.Infrastructure.Security;
 using RequestPortal.Web.Security;
+using Microsoft.AspNetCore.DataProtection;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace RequestPortal.Web.Pages.Staff;
 
@@ -22,6 +25,7 @@ public sealed class IntegrationsModel : PageModel
     private readonly IDiagnosticOperationsRouter diagnostics;
     private readonly IStaffOperationsService staffOperationsService;
     private readonly IExternalApplicationBridgeClient bridgeClient;
+    private readonly ITimeLimitedDataProtector? fieldPreviewProtector;
 
     public IntegrationsModel(
         IIntegrationStatusService integrationStatusService,
@@ -29,7 +33,8 @@ public sealed class IntegrationsModel : PageModel
         IFileStorage storage,
         IDiagnosticOperationsRouter diagnostics,
         IStaffOperationsService staffOperationsService,
-        IExternalApplicationBridgeClient bridgeClient)
+        IExternalApplicationBridgeClient bridgeClient,
+        IDataProtectionProvider? dataProtectionProvider = null)
     {
         this.integrationStatusService = integrationStatusService;
         this.userManager = userManager;
@@ -37,6 +42,7 @@ public sealed class IntegrationsModel : PageModel
         this.diagnostics = diagnostics;
         this.staffOperationsService = staffOperationsService;
         this.bridgeClient = bridgeClient;
+        fieldPreviewProtector = dataProtectionProvider?.CreateProtector("RequestPortal.IntegrationFields.v1").ToTimeLimitedDataProtector();
     }
 
     public IntegrationMonitorPage Transfers { get; private set; } = new([], 0, 1, 25, new(0,0,0,0,0));
@@ -56,6 +62,11 @@ public sealed class IntegrationsModel : PageModel
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
     [BindProperty(SupportsGet = true)] public Guid? RequestId { get; set; }
     public bool CanOperate => User.HasClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ManageSecurity);
+    public ApplicationFieldPreview? FieldPreview { get; private set; }
+    [BindProperty] public string? ProtectedFieldPreview { get; set; }
+    [BindProperty] public string[] ApprovedFields { get; set; } = [];
+    [BindProperty] public bool ConfirmFieldUpdate { get; set; }
+    private sealed record FieldPreviewEnvelope(Guid Actor, ApplicationFieldPreview Preview);
     public static string StatusLabel(RequestPortal.Domain.Integration.SynchronizationStatus status) => status switch {
         RequestPortal.Domain.Integration.SynchronizationStatus.ReconciliationRequired => "Reconciliation Required",
         RequestPortal.Domain.Integration.SynchronizationStatus.NotSent => "Pending", _ => status.ToString() };
@@ -182,6 +193,11 @@ public sealed class IntegrationsModel : PageModel
             await integrationStatusService.RetryAsync(staffUser.Id, linkId, HttpContext.RequestAborted);
             TempData["Success"] = "Integration submission retried.";
         }
+        catch (ExistingDestinationPreviewRequiredException exception)
+        {
+            return RedirectToPage("/Staff/Integrations", "FieldPreview", new { RequestId = exception.RequestId, Source, NotVerified, Search, Status,
+                From = From?.ToString("yyyy-MM-dd"), Through = Through?.ToString("yyyy-MM-dd"), Sort, PageNumber });
+        }
         catch (Exception exception) when (exception is InvalidOperationException or IntegrationTransferException)
         {
             TempData["Error"] = exception.Message;
@@ -192,6 +208,50 @@ public sealed class IntegrationsModel : PageModel
             TempData["Error"] = "The integration service could not be reached. The outcome is unconfirmed; recheck the destination before retrying. Reference: " + HttpContext.TraceIdentifier;
         }
 
+        return RedirectToPage(ReturnRoutes());
+    }
+
+    public async Task<IActionResult> OnGetFieldPreviewAsync(Guid requestId)
+    {
+        Response.Headers.CacheControl = "no-store";
+        if (!CanOperate) return Forbid(StaffOidcOptions.StaffCookieScheme);
+        if (requestId == Guid.Empty || fieldPreviewProtector is null) return BadRequest("Field preview is unavailable.");
+        try
+        {
+            var staff = await GetStaffUserAsync();
+            FieldPreview = await integrationStatusService.PreviewFieldsAsync(staff.Id, requestId, HttpContext.RequestAborted);
+            ProtectedFieldPreview = fieldPreviewProtector.Protect(JsonSerializer.Serialize(new FieldPreviewEnvelope(staff.Id, FieldPreview)), TimeSpan.FromMinutes(10));
+            return await OnGetAsync();
+        }
+        catch (UnauthorizedAccessException) { return Forbid(StaffOidcOptions.StaffCookieScheme); }
+        catch (Exception exception) when (exception is InvalidOperationException or IntegrationTransferException or HttpRequestException or NotSupportedException or TimeoutException or TaskCanceledException)
+        {
+            TempData["Error"] = "A safe field preview could not be verified. No destination fields were changed. " + (exception is InvalidOperationException ? exception.Message : "Recheck the destination identity and availability.");
+            return RedirectToPage(ReturnRoutes());
+        }
+    }
+
+    public async Task<IActionResult> OnPostUpdateFieldsAsync()
+    {
+        Response.Headers.CacheControl = "no-store";
+        if (!CanOperate) return Forbid(StaffOidcOptions.StaffCookieScheme);
+        if (!ModelState.IsValid || !ConfirmFieldUpdate || fieldPreviewProtector is null || string.IsNullOrWhiteSpace(ProtectedFieldPreview) || ProtectedFieldPreview.Length > 30000)
+            return BadRequest("Confirm the selected fields using a current preview.");
+        try
+        {
+            var staff = await GetStaffUserAsync();
+            var envelope = JsonSerializer.Deserialize<FieldPreviewEnvelope>(fieldPreviewProtector.Unprotect(ProtectedFieldPreview))
+                ?? throw new InvalidOperationException("Preview unavailable.");
+            if (envelope.Actor != staff.Id) return BadRequest("This preview belongs to a different staff session.");
+            await integrationStatusService.ApplyFieldsAsync(staff.Id, envelope.Preview, ApprovedFields, HttpContext.RequestAborted);
+            TempData["Success"] = "Approved FFP Manager fields updated and read back successfully.";
+        }
+        catch (UnauthorizedAccessException) { return Forbid(StaffOidcOptions.StaffCookieScheme); }
+        catch (Exception exception) when (exception is CryptographicException or JsonException or InvalidOperationException or IntegrationTransferException or HttpRequestException or TimeoutException or TaskCanceledException)
+        {
+            TempData["Error"] = exception is InvalidOperationException ? exception.Message :
+                "Field update was not confirmed. Do not retry automatically; generate a new preview to verify current destination values.";
+        }
         return RedirectToPage(ReturnRoutes());
     }
 

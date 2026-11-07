@@ -55,6 +55,9 @@
                             <form method="post" asp-page-handler="Reconcile" asp-all-route-data="Model.Routes(result.Page)"><input type="hidden" name="RequestId" value="@item.RequestId"/><button class="button button-small button-outline" type="submit">Recheck</button></form>
                         }
                         <a class="button button-small button-outline" asp-page="/Staff/Integrations" asp-all-route-data="Model.DetailRoutes(item.RequestId)" asp-fragment="@panelId" data-view-diagnostics>View</a>
+                        @if (Model.CanOperate && item.CanUpdateFields) {
+                            <a class="button button-small button-outline" asp-page="/Staff/Integrations" asp-page-handler="FieldPreview" asp-all-route-data="Model.DetailRoutes(item.RequestId)">Update FFP Manager Fields</a>
+                        }
                         <details class="integration-more-menu"><summary class="integration-more" aria-label="More actions for @item.PublicReference" title="More actions">⋮</summary><div class="integration-more-options"><a asp-page="/Staff/Review" asp-route-id="@item.RequestId">Open original request</a><button type="button" data-system-toggle aria-expanded="false" aria-controls="integration-operations">System diagnostics</button></div></details>
                     </span>
                 </div>

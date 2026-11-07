@@ -33,6 +33,23 @@ public sealed class FfpManagerBridgeClient : IExternalApplicationBridgeClient
         return await ReadRequiredAsync<ExternalApplicationReceipt>(response, cancellationToken);
     }
 
+    public async Task<ApplicationFieldSnapshot> ReadFieldsAsync(Guid requestId, CancellationToken cancellationToken = default)
+    {
+        using var request = await CreateRequestAsync(HttpMethod.Get, $"api/applications/by-request/{requestId:D}/fields", cancellationToken);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await ReadRequiredAsync<ApplicationFieldSnapshot>(response, cancellationToken);
+    }
+
+    public async Task<ApplicationFieldSnapshot> UpdateFieldsAsync(ApplicationFieldUpdate update, CancellationToken cancellationToken = default)
+    {
+        using var request = await CreateRequestAsync(HttpMethod.Post, "api/applications/fields/update", cancellationToken);
+        request.Content = JsonContent.Create(update);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await ReadRequiredAsync<ApplicationFieldSnapshot>(response, cancellationToken);
+    }
+
     public async Task<ExternalReturnOutboxStatus> GetReturnOutboxAsync(CancellationToken cancellationToken = default)
     {
         using var request = await CreateRequestAsync(HttpMethod.Get, "api/integration-outbox", cancellationToken);
