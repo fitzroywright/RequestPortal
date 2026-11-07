@@ -23,8 +23,7 @@ public static class BridgeApplicantProfile
 
     public static string? Normalize(string? value)
     {
-        try { return RequestPortal.Common.Contacts.ApplicantTelephone.Normalize(value); }
-        catch (ArgumentException exception) { throw new InvalidOperationException(exception.Message); }
+        return ExternalApplicantValidation.Telephone(value, "PrimaryTelephone");
     }
 
     public static IReadOnlyList<ApplicantPhone> Phones(ExternalApplicationSubmission submission)
@@ -36,14 +35,8 @@ public static class BridgeApplicantProfile
 
         void Add(string? value, long numberType)
         {
-            string? number;
-            try { number = Normalize(value); }
-            catch (InvalidOperationException)
-            {
-                throw new ExternalApplicationValidationException(
-                    numberType == ApplicantNumberType ? "PrimaryTelephone" : "SecondaryTelephone",
-                    "The applicant telephone requires correction before transfer.");
-            }
+            string? number = ExternalApplicantValidation.Telephone(value,
+                numberType == ApplicantNumberType ? "PrimaryTelephone" : "SecondaryTelephone");
             if (number is null || result.Any(p => p.Number == number)) return;
             var util = PhoneNumberUtil.GetInstance();
             result.Add(new(number, numberType, util.GetNumberType(util.Parse(number, "JM"))));
@@ -60,12 +53,7 @@ public static class BridgeApplicantProfile
 
     public static void Validate(ExternalApplicationSubmission submission)
     {
-        BridgeApplicationReceipt.Validate(submission.ApplicantEmploymentStatus);
-        _ = Phones(submission);
-        if (submission.DateOfBirth is { } date && date.Year < 1753)
-            throw new InvalidOperationException("Date of birth is outside the SQL datetime range.");
-        if (submission.ApplicantEmail?.Trim().Length > 100)
-            throw new InvalidOperationException("FFP Manager EmailAddresses.MailboxName permits at most 100 characters.");
+        ExternalApplicantValidation.Validate(submission);
     }
 
     public static long ResolveLineType(PhoneNumberType kind, IReadOnlyList<(long Id, string? Name, string? Description)> rows)

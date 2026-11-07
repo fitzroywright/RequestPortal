@@ -72,7 +72,7 @@ public sealed class FfpManagerApplicantProfileTests
     [InlineData("8765230123/8765230124")]
     [InlineData("++18765230123")]
     public void UnsafeOrOversizedTelephoneFailsWithoutTruncation(string number) =>
-        Assert.Throws<InvalidOperationException>(()=>BridgeApplicantProfile.Normalize(number));
+        Assert.Throws<ExternalApplicationValidationException>(()=>BridgeApplicantProfile.Normalize(number));
 
     [Theory]
     [InlineData("876 523-0123", "+18765230123")]
@@ -129,7 +129,7 @@ public sealed class FfpManagerApplicantProfileTests
     [Fact]
     public void SqlFieldLimitsAreCheckedBeforeOpeningTheConnection()
     {
-        Assert.Throws<InvalidOperationException>(()=>BridgeApplicantProfile.Validate(Submission() with { ApplicantEmail=new string('a',101) }));
-        Assert.Throws<InvalidOperationException>(()=>BridgeApplicantProfile.Validate(Submission() with { DateOfBirth=new(1752,12,31) }));
+        Assert.Throws<ExternalApplicationValidationException>(()=>BridgeApplicantProfile.Validate(Submission() with { ApplicantEmail=new string('a',101) }));
+        Assert.Throws<ExternalApplicationValidationException>(()=>BridgeApplicantProfile.Validate(Submission() with { DateOfBirth=new(1752,12,31) }));
     }
 }

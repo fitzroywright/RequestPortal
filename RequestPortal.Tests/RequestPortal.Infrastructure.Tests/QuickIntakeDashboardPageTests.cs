@@ -32,7 +32,8 @@ public sealed class QuickIntakeDashboardPageTests
             new(Rows(["Yes","No","Not provided / unknown"],[21,21,0]),false),new(Rows(["Employed","Self Employed","Unemployed","Student","Not provided / unknown"],[18,8,8,8,0]),false),
             new(Rows(["No income","≤ 50,000","50,000.01–100,000","100,000.01–200,000","> 200,000","Not provided / unknown"],[10,12,9,6,5,0]),false),
             new(Rows(["Male","Female","Prefer not to Say","Not provided / unknown"],[28,14,0,0]),false),new(Rows(["< 25","25–34","35–44","45–54","55–64","65+","Not provided / unknown"],[0,6,11,12,7,6,0]),false),
-            ["33.3% of Quick Intakes request food assistance.","Gender: Male is the largest recorded group (66.7% of all Quick Intakes).","Age at intake: 45–54 is the largest recorded group (28.6% of all Quick Intakes).","23.8% report no income."]);
+            ["33.3% of Quick Intakes request food assistance.","Gender: Male is the largest recorded group (66.7% of all Quick Intakes).","Age at intake: 45–54 is the largest recorded group (28.6% of all Quick Intakes).","23.8% report no income."])
+        { WeeklyIncome = new(Rows(["No income", "≤ 5,000", "Over 5,000 to 10,000", "Over 10,000 to 20,000", "> 20,000", "Not provided / unknown"], [10, 8, 10, 9, 5, 0]), false) };
     }
     sealed class Clock : TimeProvider { public override DateTimeOffset GetUtcNow()=>new(2026,11,5,12,0,0,TimeSpan.Zero); }
     internal sealed class Service : IQuickIntakeDashboardService
@@ -85,7 +86,12 @@ public sealed class QuickIntakeDashboardPageTests
         Assert.Equal(new[]{"/Management/QuickIntakeDashboard","/Management/RegisteredUsers","/Management","/Staff/Reports","/Staff/Reviewers"},
             links.Select(l=>l.Groups[1].Value));
         Assert.Single(Regex.Matches(html,"href=\"/Management\""));Assert.Single(Regex.Matches(html,"href=\"/Staff/Reports\""));
-        foreach(var title in new[]{"Quick Intake Dashboard","Requests by Location","Quick Intakes by Request Type","Children Under 18 Living at Home","Employment Status","Monthly Income (JMD)","Gender","Age Group","Key Insights"})Assert.Contains(title,html);
+        foreach(var title in new[]{"Quick Intake Dashboard","Requests by Location","Quick Intakes by Request Type","Children Under 18 Living at Home","Employment Status","Weekly Income (JMD)","Gender","Age Group","Key Insights"})Assert.Contains(title,html);
+        Assert.Contains("id=\"qi-income-period\"", html);
+        Assert.Contains("value=\"weekly\" selected", html);
+        Assert.Contains("data-income-table=\"weekly\"", html);
+        Assert.Matches("data-income-table=\"monthly\" hidden(?:=\"hidden\")?", html);
+        Assert.Contains("Monthly Income (JMD)", html);
         Assert.Contains("site-header",html);Assert.Contains("authenticated-app",html);Assert.Contains("main-nav",html);Assert.DoesNotContain("<aside",html);
         Assert.Contains("jamaica-parishes.528b7394d3b3.geojson",html);Assert.Contains("chart.js/4.6.1",html);
         Assert.Contains("Screening not recorded",html);Assert.Contains("Account origin unavailable",html);Assert.Contains("qi-children-under-18",html);
@@ -107,7 +113,7 @@ public sealed class QuickIntakeDashboardPageTests
         await using var f=await Fixture.Create();var ct=TestContext.Current.CancellationToken;
         using var response=await f.Client.GetAsync("/Management/QuickIntakeDashboard?handler=Data&Period=custom&From=2026-11-01&Through=2026-11-05",ct);
         Assert.Equal(HttpStatusCode.OK,response.StatusCode);Assert.Equal("application/json",response.Content.Headers.ContentType!.MediaType);
-        string json=await response.Content.ReadAsStringAsync(ct);using var doc=JsonDocument.Parse(json);Assert.Equal(42,doc.RootElement.GetProperty("total").GetInt32());Assert.Equal(15,doc.RootElement.GetProperty("parishes").GetArrayLength());
+        string json=await response.Content.ReadAsStringAsync(ct);using var doc=JsonDocument.Parse(json);Assert.Equal(42,doc.RootElement.GetProperty("total").GetInt32());Assert.Equal(15,doc.RootElement.GetProperty("parishes").GetArrayLength());Assert.Equal(6,doc.RootElement.GetProperty("weeklyIncome").GetProperty("items").GetArrayLength());
         Assert.Equal(new QuickIntakeRange(new(2026,11,1),new(2026,11,5)),f.Service.LastRange);
         foreach(var name in new[]{"requestId","userId","firstName","telephone","dateOfBirth","mobileNumber"})Assert.DoesNotContain(name,json);
         foreach(var query in new[]{"Period=custom","Period=custom&From=bad&Through=2026-11-05","Period=custom&From=2026-11-05&Through=2026-11-01","Period=custom&From=2026-11-01&Through=2030-11-05","Period=invalid"})

@@ -52,12 +52,43 @@
 }
 else
 {
-    <form method="get" class="identity-search"><div class="field"><label asp-for="Search">Applicant name, email or request reference</label><input asp-for="Search" maxlength="200"/></div><div class="field"><label asp-for="Status">Account status</label><select asp-for="Status"><option value="">All statuses</option>@foreach(string status in new[]{"Active","PendingAccess","Suspended","Disabled","Enrollment required"}) { <option value="@status">@status</option> }</select></div><button class="button">Search</button><a asp-page="ApplicantAccounts">Clear</a></form>
     <p>@Model.Results.Total applicant account(s)</p>
-    @if(Model.Results.Items.Count==0) { <p>No applicant accounts match the search.</p> }
-    else { <div class="table-wrap"><table><thead><tr><th>Applicant name</th><th>Email</th><th>Account status</th><th>Linked providers</th><th>Last successful sign-in</th><th>Open</th></tr></thead><tbody>
-    @foreach(var account in Model.Results.Items) { <tr><td>@account.Name</td><td>@account.Email</td><td>@account.Status</td><td>@(account.Providers.Length>0?string.Join(", ",account.Providers):"Not linked")</td><td>@(account.LastSignIn?.ToLocalTime().ToString("g")??"Not recorded")</td><td><a asp-page="ApplicantAccounts" asp-route-Id="@account.Id">Open</a></td></tr> }
-    </tbody></table></div> }
+    <form method="get" id="identity-filters">
+    <input type="hidden" name="PageNumber" value="1" />
+    <div class="table-wrap"><table><thead><tr>
+        <th><div class="identity-name-filter"><label asp-for="Search">Applicant name</label><input asp-for="Search" maxlength="200" placeholder="Name, email or request reference" /></div><noscript><button type="submit">Filter</button></noscript></th>
+        <th>Email</th><th><label class="identity-visually-hidden" asp-for="Status">Account status</label><select asp-for="Status"><option value="">All statuses</option>@foreach(string status in new[]{"Active","PendingAccess","Suspended","Disabled","Enrollment required"}) { <option value="@status">@status</option> }</select></th><th>Linked providers</th><th>Last successful sign-in</th>
+    </tr></thead><tbody>
+    @foreach(var account in Model.Results.Items) {
+        <tr class="identity-account-row" tabindex="0" role="link" aria-label="Open account for @account.Name" data-account-url="@Url.Page("ApplicantAccounts", new { Id = account.Id })"><td><a asp-page="ApplicantAccounts" asp-route-Id="@account.Id">@account.Name</a></td><td>@account.Email</td><td>@account.Status</td><td>@(account.Providers.Length>0?string.Join(", ",account.Providers):"Not linked")</td><td>@(account.LastSignIn?.ToLocalTime().ToString("g")??"Not recorded")</td></tr>
+    }
+    @if(Model.Results.Items.Count==0) { <tr><td colspan="5">No applicant accounts match the search.</td></tr> }
+    </tbody></table></div></form>
     <nav class="action-row" aria-label="Applicant account pages">@if(Model.Results.Page>1) { <a asp-page="ApplicantAccounts" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-PageNumber="@(Model.Results.Page-1)">Previous</a> }<span>Page @Model.Results.Page of @Math.Max(1,(int)Math.Ceiling(Model.Results.Total/25d))</span>@if(Model.Results.Page*25<Model.Results.Total) { <a asp-page="ApplicantAccounts" asp-route-Search="@Model.Search" asp-route-Status="@Model.Status" asp-route-PageNumber="@(Model.Results.Page+1)">Next</a> }</nav>
 }
 </div></section>
+
+@section Scripts {
+<script>
+(() => {
+    const form = document.getElementById('identity-filters');
+    if (!form) return;
+    let timer;
+    const submit = () => { clearTimeout(timer); form.requestSubmit(); };
+    form.addEventListener('submit', () => clearTimeout(timer));
+    form.elements.Search.addEventListener('input', event => {
+        clearTimeout(timer);
+        if (!event.isComposing) timer = setTimeout(submit, 350);
+    });
+    form.elements.Status.addEventListener('change', submit);
+    form.querySelectorAll('[data-account-url]').forEach(row => {
+        row.addEventListener('click', event => {
+            if (!event.target.closest('a, button, input, select') && !window.getSelection()?.toString()) location.assign(row.dataset.accountUrl);
+        });
+        row.addEventListener('keydown', event => {
+            if (event.target === row && event.key === 'Enter') { event.preventDefault(); location.assign(row.dataset.accountUrl); }
+        });
+    });
+})();
+</script>
+}

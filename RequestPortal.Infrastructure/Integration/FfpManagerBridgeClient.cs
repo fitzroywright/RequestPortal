@@ -151,7 +151,8 @@ public sealed class FfpManagerBridgeClient : IExternalApplicationBridgeClient
                                 "StreetAddress" => "Street address",
                                 "ApplicantGender" => "Applicant gender",
                                 "ApplicantMaritalStatus" => "Marital status",
-                                "Occupation" => "Occupation",
+                                "ApplicantEmail" => "Applicant email",
+                                "ApplicantEmploymentStatus" or "Occupation" => "Employment status",
                                 _ => "Unrecognized submission field"
                             };
                             string reason = "rejected by destination validation";
@@ -174,6 +175,9 @@ public sealed class FfpManagerBridgeClient : IExternalApplicationBridgeClient
                             : "The destination rejected: " + string.Join("; ", rejected) + ".";
                         string code = errors.TryGetProperty("PrimaryTelephone", out _) ? "VALIDATION_PRIMARY_TELEPHONE"
                             : errors.TryGetProperty("SecondaryTelephone", out _) ? "VALIDATION_SECONDARY_TELEPHONE"
+                            : errors.TryGetProperty("DateOfBirth", out _) ? "VALIDATION_DATE_OF_BIRTH"
+                            : errors.TryGetProperty("ApplicantEmail", out _) ? "VALIDATION_APPLICANT_EMAIL"
+                            : errors.TryGetProperty("ApplicantEmploymentStatus", out _) || errors.TryGetProperty("Occupation", out _) ? "VALIDATION_EMPLOYMENT_STATUS"
                             : errors.TryGetProperty("Parish", out _) ? "VALIDATION_PARISH" : "VALIDATION";
                         var failure = TransferFailures.For("BridgeValidation", code) with { Explanation = diagnosis };
                         throw new IntegrationTransferException(failure);

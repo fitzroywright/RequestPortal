@@ -2,17 +2,51 @@ namespace RequestPortal.Application.Integration;
 
 public sealed record TransferFailure(string Stage, string Classification, string Code, string Explanation, bool Transient)
 {
+    public string? Field => Code switch
+    {
+        "VALIDATION_PRIMARY_TELEPHONE" => "PrimaryTelephone",
+        "VALIDATION_SECONDARY_TELEPHONE" => "SecondaryTelephone",
+        "VALIDATION_DATE_OF_BIRTH" => "DateOfBirth",
+        "VALIDATION_APPLICANT_EMAIL" => "ApplicantEmail",
+        "VALIDATION_EMPLOYMENT_STATUS" => "ApplicantEmploymentStatus",
+        "VALIDATION_PARISH" => "Parish",
+        _ => null
+    };
+    public string? ValidationRule => Code switch
+    {
+        "VALIDATION_PRIMARY_TELEPHONE" or "VALIDATION_SECONDARY_TELEPHONE" => "A valid supported telephone number, including a country code for international numbers; normalized transfer length at most 15 characters including +. No extensions.",
+        "VALIDATION_DATE_OF_BIRTH" => "A real date from January 1, 1753 through today.",
+        "VALIDATION_APPLICANT_EMAIL" => "A valid email address; maximum 100 characters.",
+        "VALIDATION_EMPLOYMENT_STATUS" => "A supported intake option or historical occupation; maximum 255 characters, without control characters.",
+        "VALIDATION_PARISH" => "An explicitly selected parish with an approved destination mapping.",
+        _ => null
+    };
+    public string? CorrectiveAction => Field is null ? null : "Verify and correct this field in the original source. Then request an authorized retry, which verifies destination existence before submission. No automatic retry is permitted for invalid source data.";
     // Bridge-owned restricted diagnostic: method-only frames, no raw messages or paths.
     public string? TechnicalDetails { get; init; }
 }
 
 public static class TransferFailures
 {
+    public static string ValidationCode(string field) => field switch
+    {
+        "PrimaryTelephone" => "VALIDATION_PRIMARY_TELEPHONE",
+        "SecondaryTelephone" => "VALIDATION_SECONDARY_TELEPHONE",
+        "DateOfBirth" => "VALIDATION_DATE_OF_BIRTH",
+        "ApplicantEmail" => "VALIDATION_APPLICANT_EMAIL",
+        "ApplicantEmploymentStatus" or "Occupation" => "VALIDATION_EMPLOYMENT_STATUS",
+        "Parish" => "VALIDATION_PARISH",
+        _ => "VALIDATION"
+    };
+
     public static TransferFailure For(string stage, string code) => code switch
     {
         "VALIDATION" => new(stage, "PermanentValidation", code, "Required fields or mapping values are invalid. Correct the source or mapping before an authorized retry.", false),
         "VALIDATION_PRIMARY_TELEPHONE" => new(stage, "PermanentValidation", code, "The primary applicant telephone cannot be transferred. Verify the original submission and correct the source before an authorized reconciled retry.", false),
         "VALIDATION_SECONDARY_TELEPHONE" => new(stage, "PermanentValidation", code, "The secondary applicant telephone cannot be transferred. Verify the original submission and correct the source before an authorized reconciled retry.", false),
+        "VALIDATION_DATE_OF_BIRTH" => new(stage, "PermanentValidation", code, "Date of birth must be a real date from January 1, 1753 through today. Correct the source before an authorized retry.", false),
+        "VALIDATION_APPLICANT_EMAIL" => new(stage, "PermanentValidation", code, "Applicant email must be valid and at most 100 characters. Correct the source before an authorized retry.", false),
+        "VALIDATION_EMPLOYMENT_STATUS" => new(stage, "PermanentValidation", code, "Employment status must be at most 255 characters without control characters. Correct the source before an authorized retry.", false),
         "VALIDATION_PARISH" => new(stage, "PermanentValidation", code, "The explicitly selected parish is missing or has no approved FFP Manager mapping. Correct the intake/profile or mapping before retrying; address text cannot substitute for a parish.", false),
         "SQL_CONSTRAINT" => new(stage, "PermanentSql", code, "SQL Server rejected a constraint or field value. Review the mapping before retrying.", false),
         "SQL_AUTH" => new(stage, "Authentication", code, "SQL Server rejected the bridge service identity. Verify its approved credentials and database access.", false),

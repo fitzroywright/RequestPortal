@@ -12,8 +12,7 @@ public static class BridgeApplicationReceipt
 
     public static void Validate(string? employmentStatus)
     {
-        if (employmentStatus?.Trim().Length > OccupationMaxLength)
-            throw new InvalidOperationException("FFP Manager ApplicationLetters.Occupation permits at most 255 characters.");
+        ExternalApplicantValidation.Employment(employmentStatus);
     }
 
     public static void AddParameters(SqlCommand command, ExternalApplicationSubmission submission)

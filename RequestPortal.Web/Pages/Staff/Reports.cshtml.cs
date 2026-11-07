@@ -80,6 +80,6 @@ public sealed class ReportsModel : PageModel
     {
         DateTimeOffset? fromUtc = FromDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(FromDate.Value.Date, DateTimeKind.Utc)) : null;
         DateTimeOffset? toUtc = ToDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(ToDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc)) : null;
-        return new RequestReportFilter(Search, Status, CountryCode, Category, Priority, fromUtc, toUtc, PageNumber, 100);
+        return new RequestReportFilter(Search, Status, CountryCode, Category, Priority, fromUtc, toUtc, PageNumber, 20);
     }
 }

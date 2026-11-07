@@ -71,9 +71,10 @@ public sealed class BridgeApplicationReceiptTests
     {
         var options = Options.Create(new BridgeOptions());
         IFfpManagerGateway gateway = synced ? new SyncedSqlFfpManagerGateway(options, null!) : new SqlFfpManagerGateway(options);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.CreateApplicationAsync(
+        var error = await Assert.ThrowsAsync<ExternalApplicationValidationException>(() => gateway.CreateApplicationAsync(
             Submission(DateTimeOffset.UtcNow) with { ApplicantEmploymentStatus = new string('x', 256) }, TestContext.Current.CancellationToken));
-        Assert.Contains("ApplicationLetters.Occupation", error.Message);
+        Assert.Equal("VALIDATION_EMPLOYMENT_STATUS", error.Code);
+        Assert.Equal("ApplicantEmploymentStatus", error.Field);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using RequestPortal.Application.Integration;
 using RequestPortal.Common.Contacts;
 using RequestPortal.Common.Validation;
 using RequestPortal.Infrastructure.Identity;
@@ -83,12 +84,21 @@ public sealed class QuickIntakeModel : PageModel
         else Input.MonthlyIncome=weekly;
     }
 
+    private void ValidateApplicant()
+    {
+        try { ExternalApplicantValidation.DateOfBirth(Input.DateOfBirth); }
+        catch (ExternalApplicationValidationException error) { ModelState.AddModelError("Input.DateOfBirth", error.Message); }
+        try { ExternalApplicantValidation.Email(Input.Email); }
+        catch (ExternalApplicationValidationException error) { ModelState.AddModelError("Input.Email", error.Message); }
+    }
+
     public async Task<IActionResult> OnPostAsync()
     {
         if (!string.IsNullOrWhiteSpace(Input.Website))
             return Page();
 
         ValidateWeeklyIncome();
+        ValidateApplicant();
         if (Input.DateOfBirth is null)
             ModelState.AddModelError("Input.DateOfBirth", "Date of birth is required.");
 
@@ -171,6 +181,7 @@ public sealed class QuickIntakeModel : PageModel
     public async Task<IActionResult> OnPostStartAsync()
     {
         ValidateWeeklyIncome();
+        ValidateApplicant();
         if (SubmissionId == Guid.Empty || !string.IsNullOrWhiteSpace(Input.Website))
             return BadRequest(new { error = "Invalid submission." });
         if (Input.DateOfBirth is null)
@@ -250,7 +261,7 @@ public sealed class QuickIntakeModel : PageModel
         [ContactTelephone, StringLength(40)]
         public string? SecondaryTelephone { get; set; }
 
-        [ContactEmail, StringLength(320)]
+        [ContactEmail, StringLength(100, ErrorMessage = "Email cannot exceed 100 characters.")]
         public string? Email { get; set; }
 
         [Required, StringLength(250)]
@@ -262,7 +273,7 @@ public sealed class QuickIntakeModel : PageModel
         [Required, StringLength(100)]
         public string Parish { get; set; } = string.Empty;
 
-        [Required, RegularExpression("Employed|Self Employed|Unemployed|Student")]
+        [Required, StringLength(255), RegularExpression("Employed|Self Employed|Unemployed|Student", ErrorMessage = "Select a supported employment status.")]
         public string EmploymentStatus { get; set; } = string.Empty;
 
         [Range(typeof(decimal), "0", "999999999999.99")]

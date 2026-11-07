@@ -21,7 +21,7 @@ internal static class IntegrationFailureClassifier
             TaskCanceledException => "The integration operation was cancelled or timed out.",
             OperationCanceledException => "The integration operation was cancelled.",
             ExternalApplicationValidationException validation
-                => $"Invalid field: {validation.Field}.",
+                => TransferFailures.For(stage, validation.Code).Field is { } field ? $"Invalid field: {field}." : "A submission field failed validation.",
             InvalidOperationException invalid when
                 invalid.Message is "Draft requests cannot be sent to FFP Manager."
                 or "Quick Intake applicant first and last name are required for FFP Manager."
@@ -43,8 +43,7 @@ internal static class IntegrationFailureClassifier
     private static TransferFailure ClassifyCategory(Exception exception, string stage) => exception switch
     {
         IntegrationTransferException transfer => transfer.Failure with { Stage = stage },
-        ExternalApplicationValidationException { Field: "Parish" } => TransferFailures.For(stage, "VALIDATION_PARISH"),
-        ExternalApplicationValidationException => TransferFailures.For(stage, "VALIDATION"),
+        ExternalApplicationValidationException validation => TransferFailures.For(stage, validation.Code),
         HttpRequestException { StatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden } => TransferFailures.For(stage, "BRIDGE_AUTH"),
         HttpRequestException { StatusCode: HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity } => TransferFailures.For(stage, "VALIDATION"),
         HttpRequestException { StatusCode: HttpStatusCode.Conflict } => TransferFailures.For(stage, "DESTINATION_CONFLICT"),
