@@ -44,6 +44,10 @@ public sealed class IntegrationsModel : PageModel
     public ExternalReturnOutboxStatus? ReturnOutbox { get; private set; }
     public string? ReturnOutboxError { get; private set; }
     public IReadOnlyList<IntegrationReturnObservation> ReturnHistory { get; private set; } = [];
+    [BindProperty(SupportsGet = true)] public string? Source { get; set; }
+    [BindProperty(SupportsGet = true)] public bool NotVerified { get; set; }
+    public string ScopeLabel => (Source == "QuickIntake" ? "Quick Intakes" : Source == "RequestPortal" ? "Request Portal" : "All Sources") +
+        $" — {From?.ToString("dd MMM yyyy") ?? "Beginning"}–{Through?.ToString("dd MMM yyyy") ?? "Present"} (UTC, inclusive)";
     [BindProperty(SupportsGet = true)] public string? Search { get; set; }
     [BindProperty(SupportsGet = true)] public string? Status { get; set; }
     [BindProperty(SupportsGet = true)] public DateOnly? From { get; set; }
@@ -55,12 +59,12 @@ public sealed class IntegrationsModel : PageModel
     public static string StatusLabel(RequestPortal.Domain.Integration.SynchronizationStatus status) => status switch {
         RequestPortal.Domain.Integration.SynchronizationStatus.ReconciliationRequired => "Reconciliation Required",
         RequestPortal.Domain.Integration.SynchronizationStatus.NotSent => "Pending", _ => status.ToString() };
-    public Dictionary<string,string> Routes(int page) => new() { ["Search"] = Search ?? "", ["Status"] = Status ?? "",
+    public Dictionary<string,string> Routes(int page) => new() { ["Source"] = Source ?? "", ["NotVerified"] = NotVerified.ToString(), ["Search"] = Search ?? "", ["Status"] = Status ?? "",
         ["From"] = From?.ToString("yyyy-MM-dd") ?? "", ["Through"] = Through?.ToString("yyyy-MM-dd") ?? "", ["Sort"] = Sort ?? "activity", ["PageNumber"] = page.ToString() };
     private IntegrationMonitorQuery Query(int? page = null) => new(Search, Status,
         From.HasValue ? new DateTimeOffset(From.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
         Through.HasValue ? Through.Value == DateOnly.MaxValue ? DateTimeOffset.MaxValue : new DateTimeOffset(Through.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
-        Sort ?? "activity", page ?? PageNumber);
+        Sort ?? "activity", page ?? PageNumber, Source: Source, NotVerified: NotVerified);
     public static string StatusClass(RequestPortal.Domain.Integration.SynchronizationStatus status) => status switch {
         RequestPortal.Domain.Integration.SynchronizationStatus.Failed => "failed",
         RequestPortal.Domain.Integration.SynchronizationStatus.Retrying => "retrying",
@@ -97,9 +101,10 @@ public sealed class IntegrationsModel : PageModel
         routes["RequestId"] = requestId.ToString();
         return routes;
     }
-    private object ReturnRoutes() => new { Search, Status, From = From?.ToString("yyyy-MM-dd"),
+    private object ReturnRoutes() => new { Source, NotVerified, Search, Status, From = From?.ToString("yyyy-MM-dd"),
         Through = Through?.ToString("yyyy-MM-dd"), Sort, PageNumber, RequestId };
-    private bool ValidFilters => ModelState.IsValid && (Search?.Length ?? 0) <= 200 && (!From.HasValue || !Through.HasValue || From <= Through) &&
+    private bool ValidFilters => ModelState.IsValid &&
+        (string.IsNullOrEmpty(Source) || Source is "QuickIntake" or "RequestPortal") && (!NotVerified || Source == "QuickIntake") && (Search?.Length ?? 0) <= 200 && (!From.HasValue || !Through.HasValue || From <= Through) &&
         (string.IsNullOrWhiteSpace(Status) || Enum.TryParse<RequestPortal.Domain.Integration.SynchronizationStatus>(Status,true,out var status) && Enum.IsDefined(status));
     public IReadOnlyList<DeadLetterWorkItem> DeadLetters { get; private set; } = Array.Empty<DeadLetterWorkItem>();
     public IReadOnlyList<NotificationDeliveryWorkItem> FailedNotificationDeliveries { get; private set; } = Array.Empty<NotificationDeliveryWorkItem>();

@@ -5,13 +5,24 @@
     var result = Model.Transfers;
     var counts = result.Counts;
 }
+<p>@Model.ScopeLabel · @result.TotalCount matching requests</p>
+@if (result.VerifiedCount.HasValue) {
+    <p>Verified in FFP Manager: <strong>@result.VerifiedCount</strong> · Not Verified in FFP Manager: <strong>@result.NotVerifiedBreakdown.Values.Sum()</strong></p>
+    <p>Not Verified breakdown (each request counted once):
+    @foreach (var category in new[] { "Failed", "Reconciliation Required", "Pending", "Retrying", "Missing Integration Link", "Synchronized — verification incomplete", "Other" }) {
+        <span>@category: <strong>@result.NotVerifiedBreakdown.GetValueOrDefault(category)</strong>; </span>
+    }
+    </p>
+}
 <div class="integration-summary" role="group" aria-label="Filter transfers by status">
 @foreach(var item in new[] { ("failed","Failed",counts.Failed), ("pending","Pending",counts.Pending), ("retrying","Retrying",counts.Retrying), ("synchronized","Synchronized",counts.Synchronized), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired) }) {
-    <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
+    <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Source="@Model.Source" asp-route-NotVerified="@Model.NotVerified" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
 }
 </div>
 <form method="get" class="integration-filters" asp-page="/Staff/Integrations">
     <label class="integration-search">Search<span><svg class="integration-icon" aria-hidden="true"><use href="#integration-search"/></svg><input asp-for="Search" maxlength="200" placeholder="Request #, applicant name, TRN, or FFP Manager #" /></span></label>
+    <label>Source<select asp-for="Source"><option value="">All Sources</option><option value="QuickIntake">Quick Intake</option><option value="RequestPortal">Request Portal</option></select></label>
+    <label>Verification<select asp-for="NotVerified"><option value="false">All verification outcomes</option><option value="true">Not Verified in FFP Manager (Quick Intake only)</option></select></label>
     <label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@Monitor.StatusLabel(status)</option> }</select></label>
     <label>Date From (UTC)<input asp-for="From" type="date" /></label>
     <label>Date Through (UTC)<input asp-for="Through" type="date" /></label>
@@ -24,17 +35,17 @@
     </div>
     <div class="integration-rows" tabindex="0" aria-label="Scrollable integration records">
         <div role="rowgroup">
-        @foreach(var item in result.Items.Concat(Model.Selected is { } selected && !result.Items.Any(row => row.RequestId == selected.Transfer.RequestId) ? new[] { selected.Transfer } : Array.Empty<RequestPortal.Application.Integration.IntegrationTransferRow>())) {
+        @foreach(var item in result.Items) {
             bool expanded = Model.Selected?.Transfer.RequestId == item.RequestId;
             string panelId = "diagnostics-" + item.RequestId;
             string statusClass = Monitor.StatusClass(item.Status);
             <div class="integration-record @statusClass @(expanded ? "is-expanded" : "")" data-record="@item.RequestId">
                 <div class="integration-columns integration-data-row" role="row">
-                    <span role="cell" class="integration-expander"><a class="integration-expand" asp-page="/Staff/Integrations" asp-all-route-data="Model.DetailRoutes(item.RequestId)" asp-fragment="@panelId" data-diagnostics-url="@Url.Page("/Staff/Integrations", "Diagnostics", new { requestId = item.RequestId, Model.Search, Model.Status, Model.From, Model.Through, Model.Sort, Model.PageNumber })" aria-expanded="@expanded.ToString().ToLowerInvariant()" aria-controls="@panelId" aria-label="Diagnostics for @item.PublicReference"><svg class="integration-icon" aria-hidden="true"><use href="#integration-chevron"/></svg></a></span>
+                    <span role="cell" class="integration-expander"><a class="integration-expand" asp-page="/Staff/Integrations" asp-all-route-data="Model.DetailRoutes(item.RequestId)" asp-fragment="@panelId" data-diagnostics-url="@Url.Page("/Staff/Integrations", "Diagnostics", new { requestId = item.RequestId, Model.Source, Model.NotVerified, Model.Search, Model.Status, Model.From, Model.Through, Model.Sort, Model.PageNumber })" aria-expanded="@expanded.ToString().ToLowerInvariant()" aria-controls="@panelId" aria-label="Diagnostics for @item.PublicReference"><svg class="integration-icon" aria-hidden="true"><use href="#integration-chevron"/></svg></a></span>
                     <span role="cell" data-label="Request / Applicant" class="integration-applicant"><a asp-page="/Staff/Review" asp-route-id="@item.RequestId"><strong>@item.PublicReference</strong></a><span>@item.ApplicantName</span></span>
                     <span role="cell" data-label="Source / Target">@item.Source<span>@item.Target</span></span>
                     <span role="cell" data-label="Status"><span class="integration-status @statusClass"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@statusClass"/></svg>@Monitor.StatusLabel(item.Status)</span></span>
-                    <span role="cell" data-label="Error / Explanation" class="integration-explanation">@if(item.ErrorCode is not null) { <strong>@Monitor.DiagnosticTitle(item)</strong><span>@Monitor.DiagnosticDescription(item)</span> } else { <span>@(item.Explanation ?? (item.Status == SynchronizationStatus.Synchronized ? "Synchronized successfully. Request and applicant data are up to date in FFP Manager." : "No error was recorded."))</span> }</span>
+                    <span role="cell" data-label="Error / Explanation" class="integration-explanation">@if(item.ErrorCode is not null) { <strong>@Monitor.DiagnosticTitle(item)</strong><span>@Monitor.DiagnosticDescription(item)</span> } else { <span>@(item.Explanation ?? (item.Status == SynchronizationStatus.Synchronized ? (item.VerifiedInFfpManager ? "Verified in FFP Manager." : "Synchronized status recorded; verification incomplete.") : "No error was recorded."))</span> }</span>
                     <span role="cell" data-label="Last Activity (UTC)">@Monitor.LastActivity(item).ToString("MMM dd, yyyy HH:mm:ss'Z'")<span>@Monitor.StatusLabel(item.Status)</span></span>
                     <span role="cell" data-label="FFP Manager">@(item.ApplicationNumber ?? "Not verified")<span>@item.ApplicationId</span></span>
                     <span role="cell" data-label="Actions" class="integration-row-actions">

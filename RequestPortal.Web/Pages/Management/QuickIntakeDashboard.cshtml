@@ -20,10 +20,11 @@
     (Name:"Follow-up Required",Value:d.FollowUpRequired,Note:"Screening not recorded",Icon:"people",Tone:"blue"),
     (Name:"Screening Complete",Value:d.ScreeningComplete,Note:"Screening not recorded",Icon:"check",Tone:"green"),
     (Name:"New Applicants",Value:d.NewApplicants,Note:"Account origin unavailable",Icon:"person",Tone:"purple"),
-    (Name:"Sent to FFP Manager",Value:(int?)d.SentToFfpManager,Note:"Verified synchronization",Icon:"sync",Tone:"pink") }) {
+    (Name:"Verified in FFP Manager",Value:(int?)d.SentToFfpManager,Note:"Verified synchronization",Icon:"sync",Tone:"pink") }) {
 <div class="qi-metric qi-tone-@m.Tone"><span class="qi-metric-icon">@Html.Raw(QuickIntakeDashboardModel.Icon(m.Icon))</span><div><strong aria-label="@(m.Value.HasValue ? m.Value.Value.ToString() : "Unavailable")">@(m.Value.HasValue ? m.Value.Value.ToString("N0") : "—")</strong><span>@m.Name</span><small>@m.Note</small></div></div>
 }
 </section>
+<p class="qi-methodology"><a asp-page="/Staff/Integrations" asp-route-Source="QuickIntake" asp-route-NotVerified="true" asp-route-From="@Model.Range.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Range.Through.ToString("yyyy-MM-dd")"><strong>@d.NotVerifiedInFfpManager.ToString("N0")</strong> Not Verified in FFP Manager</a></p>
 <div class="qi-geographic-row">
 <section class="qi-panel qi-geography"><h2>Requests by Location</h2><p class="qi-panel-subtitle">Quick Intakes by parish (map view)</p><div id="quick-intake-parish-map" class="qi-map" aria-label="Quick Intake counts across all 14 Jamaican parishes"><p>Loading Jamaica map…</p></div><p class="qi-map-status" role="status"></p><small>Unknown / invalid parish: @d.Parishes.Last().Count · <a asp-page="/Management/QuickIntakes" asp-route-From="@Model.Range.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Range.Through.ToString("yyyy-MM-dd")">View Quick Intakes</a></small></section>
 <section class="qi-panel qi-type"><h2>Quick Intakes by Request Type</h2><div class="qi-doughnut-layout"><div class="qi-doughnut"><canvas id="qi-types" aria-label="Quick Intakes by request type" role="img"></canvas><span class="qi-doughnut-total"><strong>@d.Total</strong>Total</span></div><ul class="qi-legend" data-legend="types"></ul></div></section>
@@ -39,7 +40,7 @@
 <section class="qi-panel qi-insights"><h2><span aria-hidden="true">@Html.Raw(QuickIntakeDashboardModel.Icon("bulb"))</span> Key Insights</h2><ul>@foreach(var insight in d.Insights) { <li>@insight</li> }</ul></section>
 </div>
 <p class="qi-methodology">@Model.Range.From.ToString("dd MMM yyyy")–@Model.Range.Through.ToString("dd MMM yyyy") (UTC, inclusive). Percentages use all @d.Total Quick Intakes; missing responses have their own category. Screening stages and new-account attribution are not recorded.</p>
-<details class="qi-data-table"><summary>View accessible chart data and definitions</summary><p>“Sent” requires a verified FFP Manager destination, application reference and synchronized outcome. It is not the queued count. New Applicants cannot be inferred from anonymous tracking identities or account conversions.</p>
+<details class="qi-data-table"><summary>View accessible chart data and definitions</summary><p>“Verified” requires a verified FFP Manager destination, application reference and synchronized outcome. It is not the queued count. New Applicants cannot be inferred from anonymous tracking identities or account conversions.</p>
 @foreach(var dimension in new[] { (Name:"Parish",Rows:d.Parishes), (Name:"Request type",Rows:d.RequestTypes), (Name:"Children under 18 at home",Rows:d.ChildrenUnder18.Items), (Name:"Employment",Rows:d.Employment.Items), (Name:"Monthly income",Rows:d.Income.Items), (Name:"Gender",Rows:d.Gender.Items), (Name:"Age group",Rows:d.Ages.Items) }) {
 <h3>@dimension.Name</h3><table><thead><tr><th>Group</th><th>Count</th><th>Percent of all intakes</th></tr></thead><tbody>@foreach(var row in dimension.Rows) { <tr><td>@row.Name</td><td>@(row.Count?.ToString() ?? "—")</td><td>@(row.Percent.HasValue ? row.Percent.Value.ToString("0.#") + "%" : "—")</td></tr> }</tbody></table>
 }</details>

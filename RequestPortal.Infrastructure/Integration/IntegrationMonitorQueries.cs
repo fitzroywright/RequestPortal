@@ -7,9 +7,10 @@ namespace RequestPortal.Infrastructure.Integration;
 
 public sealed partial class IntegrationStatusService
 {
-    private IQueryable<MonitorRow> MonitorQuery()
+    private IQueryable<MonitorRow> MonitorQuery(bool quickIntake = false)
     {
         var stale = clock.UtcNow.AddMinutes(-5);
+        var verifiedIds = QuickIntakeReporting.VerifiedRequestIds(dbContext, ffpManagerOptions.SystemName);
         return from request in dbContext.AssistanceRequests.AsNoTracking()
                join link in dbContext.IntegrationLinks.AsNoTracking().Where(item => item.SystemName == ffpManagerOptions.SystemName)
                    on request.Id equals link.RequestId into links
@@ -18,17 +19,18 @@ public sealed partial class IntegrationStatusService
                from intake in intakes.DefaultIfEmpty()
                join user in dbContext.Users.AsNoTracking() on (request.SubmittedByUserId ?? request.CreatedByUserId) equals user.Id into users
                from user in users.DefaultIfEmpty()
-               where request.Status != RequestStatus.Draft
+               where quickIntake ? intake != null : request.Status != RequestStatus.Draft
                let queued = dbContext.OutboxMessages.Any(message => message.RequestId == request.Id &&
                    (message.MessageType.EndsWith("FfpManagerSubmissionRequestedMessage") || message.MessageType.EndsWith("RequestSubmittedMessage")))
                let missingQueue = !queued && (link == null || link.Status != SynchronizationStatus.Synchronized)
-               let received = request.SubmittedUtc ?? request.CreatedUtc
+               let received = quickIntake ? intake!.CreatedUtc : request.SubmittedUtc ?? request.CreatedUtc
                let stalePending = link != null && (link.Status == SynchronizationStatus.Pending || link.Status == SynchronizationStatus.NotSent) &&
                    (link.LastAttemptUtc ?? link.CreatedUtc) < stale
                let staleRetry = link != null && link.NextRetryUtc != null && link.NextRetryUtc < stale
                let unverified = link != null && link.Status == SynchronizationStatus.Synchronized && (link.VerifiedUtc == null || link.ArtifactsSynchronizedUtc == null)
                select new MonitorRow
                {
+                   Verified = verifiedIds.Contains(request.Id),
                    RequestId = request.Id, LinkId = link == null ? null : link.Id, PublicReference = request.PublicReference,
                    ApplicantName = intake != null ? (intake.FirstName + " " + intake.LastName).Trim()
                        : user == null ? "Name not provided" : ((user.FirstName ?? "") + " " + (user.LastName ?? "")).Trim() == ""
@@ -59,7 +61,14 @@ public sealed partial class IntegrationStatusService
 
     public async Task<IntegrationMonitorPage> SearchAsync(IntegrationMonitorQuery query, CancellationToken cancellationToken = default)
     {
-        var rows = MonitorQuery();
+        bool quickIntake = query.Source == "QuickIntake" || query.NotVerified;
+        var rows = MonitorQuery(quickIntake);
+        if (quickIntake)
+        {
+            var population = QuickIntakeReporting.Population(dbContext, query.FromUtc, query.ThroughUtc).Select(q => q.RequestId);
+            rows = rows.Where(item => population.Contains(item.RequestId));
+        }
+        else if (query.Source == "RequestPortal") rows = rows.Where(item => item.Source == "Request Portal");
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             foreach (string term in query.Search.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(10))
@@ -74,11 +83,25 @@ public sealed partial class IntegrationStatusService
         }
         if (query.FromUtc.HasValue) rows = rows.Where(item => item.SubmittedUtc >= query.FromUtc.Value);
         if (query.ThroughUtc.HasValue) rows = rows.Where(item => item.SubmittedUtc < query.ThroughUtc.Value);
+        int? verifiedCount = quickIntake ? await rows.CountAsync(item => item.Verified, cancellationToken) : null;
+        if (query.NotVerified) rows = rows.Where(item => !item.Verified);
+        var breakdown = quickIntake
+            ? await rows.Where(item => !item.Verified).GroupBy(item => item.LinkId == null ? "Missing Integration Link"
+                : item.Status == SynchronizationStatus.Failed ? "Failed"
+                : item.Status == SynchronizationStatus.ReconciliationRequired ? "Reconciliation Required"
+                : item.Status == SynchronizationStatus.Pending || item.Status == SynchronizationStatus.NotSent ? "Pending"
+                : item.Status == SynchronizationStatus.Retrying ? "Retrying"
+                : item.Status == SynchronizationStatus.Synchronized ? "Synchronized — verification incomplete" : "Other")
+                .Select(g => new { Name = g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Name, g => g.Count, cancellationToken)
+            : new Dictionary<string, int>();
         var counts = await rows.GroupBy(item => item.Status).Select(group => new { Status = group.Key, Count = group.Count() }).ToListAsync(cancellationToken);
         int Count(SynchronizationStatus status) => counts.FirstOrDefault(item => item.Status == status)?.Count ?? 0;
         var summary = new IntegrationMonitorCounts(Count(SynchronizationStatus.Failed), Count(SynchronizationStatus.Pending) + Count(SynchronizationStatus.NotSent),
             Count(SynchronizationStatus.Retrying), Count(SynchronizationStatus.Synchronized), Count(SynchronizationStatus.ReconciliationRequired));
-        if (Enum.TryParse<SynchronizationStatus>(query.Status, true, out var status)) rows = rows.Where(item => item.Status == status);
+        if (Enum.TryParse<SynchronizationStatus>(query.Status, true, out var status))
+            rows = status is SynchronizationStatus.Pending or SynchronizationStatus.NotSent
+                ? rows.Where(item => item.Status == SynchronizationStatus.Pending || item.Status == SynchronizationStatus.NotSent)
+                : rows.Where(item => item.Status == status);
         int total = await rows.CountAsync(cancellationToken);
         int size = query.PageSize is 25 or 50 or 100 ? query.PageSize : 25;
         int page = Math.Clamp(query.Page, 1, Math.Max(1, (int)Math.Ceiling(total / (double)size)));
@@ -94,7 +117,7 @@ public sealed partial class IntegrationStatusService
             _ => rows.OrderByDescending(item => item.SubmittedUtc)
         };
         var items = await sorted.ThenBy(item => item.RequestId).Skip((page - 1) * size).Take(size).ToListAsync(cancellationToken);
-        return new(items.Select(ToView).ToArray(), total, page, size, summary);
+        return new(items.Select(ToView).ToArray(), total, page, size, summary) { NotVerifiedBreakdown = breakdown, VerifiedCount = verifiedCount };
     }
 
     public async Task<int> CountAttentionAsync(CancellationToken cancellationToken = default)
@@ -147,7 +170,7 @@ public sealed partial class IntegrationStatusService
             null => null,
             _ => TransferFailures.For(row.Stage ?? "Unknown", row.Code).Explanation
         }), row.SubmittedUtc, row.LastAttemptUtc, row.AttemptCount, row.NextRetryUtc, row.SynchronizedUtc,
-        row.VerifiedUtc, row.ApplicationId, row.ApplicationNumber, row.HasQueuedSubmission) { RecordedError = row.RecordedError, RecoveryAction = RecoveryAction(row) };
+        row.VerifiedUtc, row.ApplicationId, row.ApplicationNumber, row.HasQueuedSubmission) { VerifiedInFfpManager = row.Verified, RecordedError = row.RecordedError, RecoveryAction = RecoveryAction(row) };
 
     private static string? RecoveryAction(MonitorRow row)
     {
@@ -165,6 +188,7 @@ public sealed partial class IntegrationStatusService
 
     private sealed class MonitorRow
     {
+        public bool Verified { get; set; }
         public Guid RequestId { get; set; }
         public Guid? LinkId { get; set; }
         public string PublicReference { get; set; } = "";

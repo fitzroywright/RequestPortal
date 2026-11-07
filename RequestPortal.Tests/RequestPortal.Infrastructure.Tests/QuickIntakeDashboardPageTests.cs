@@ -90,6 +90,13 @@ public sealed class QuickIntakeDashboardPageTests
         Assert.Contains("jamaica-parishes.528b7394d3b3.geojson",html);Assert.Contains("chart.js/4.6.1",html);
         Assert.Contains("Screening not recorded",html);Assert.Contains("Account origin unavailable",html);Assert.Contains("qi-children-under-18",html);
         Assert.Equal(new QuickIntakeRange(new(2026,10,7),new(2026,11,5)),f.Service.LastRange);
+        Assert.Contains("Verified in FFP Manager",html);
+        Assert.Contains("Not Verified in FFP Manager",html);
+        var metric = WebUtility.HtmlDecode(Regex.Match(html, "<a[^>]*href=\"([^\"]*NotVerified[^\"]*)\"[^>]*>").Groups[1].Value);
+        Assert.Contains("Source=QuickIntake", metric);
+        Assert.Contains("From=2026-10-07", metric);
+        Assert.Contains("Through=2026-11-05", metric);
+        Assert.Equal(2, Snapshot(f.Service.LastRange!).NotVerifiedInFfpManager);
         Assert.Contains("no-store",response.Headers.CacheControl!.ToString());
         string? output=Environment.GetEnvironmentVariable("REQUESTPORTAL_QI_RENDER_OUTPUT");if(output is not null){Directory.CreateDirectory(output);await File.WriteAllTextAsync(Path.Combine(output,"index.html"),html,ct);}
     }
