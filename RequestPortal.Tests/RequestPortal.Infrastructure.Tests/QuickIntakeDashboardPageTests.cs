@@ -92,6 +92,7 @@ public sealed class QuickIntakeDashboardPageTests
         Assert.Contains("data-income-table=\"weekly\"", html);
         Assert.Matches("data-income-table=\"monthly\" hidden(?:=\"hidden\")?", html);
         Assert.Contains("Monthly Income (JMD)", html);
+        Assert.Contains("Weekly uses the saved JMD amount. Monthly = weekly × 52 ÷ 12.", html);
         Assert.Contains("site-header",html);Assert.Contains("authenticated-app",html);Assert.Contains("main-nav",html);Assert.DoesNotContain("<aside",html);
         Assert.Contains("jamaica-parishes.528b7394d3b3.geojson",html);Assert.Contains("chart.js/4.6.1",html);
         Assert.Contains("Screening not recorded",html);Assert.Contains("Account origin unavailable",html);Assert.Contains("qi-children-under-18",html);
