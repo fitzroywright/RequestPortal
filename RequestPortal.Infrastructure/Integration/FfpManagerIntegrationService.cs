@@ -178,6 +178,12 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
                 intake?.DateOfBirth);
 
             ExternalApplicantValidation.Validate(submission);
+            // Only the outgoing DTO changes; persisted and displayed numbers remain E.164.
+            submission = submission with
+            {
+                PrimaryTelephone = ExternalApplicantValidation.Telephone(submission.PrimaryTelephone, "PrimaryTelephone")?[1..],
+                SecondaryTelephone = ExternalApplicantValidation.Telephone(submission.SecondaryTelephone, "SecondaryTelephone")?[1..]
+            };
 
             attempt.SetStage("DestinationLookup");
             await dbContext.SaveChangesAsync(cancellationToken);
