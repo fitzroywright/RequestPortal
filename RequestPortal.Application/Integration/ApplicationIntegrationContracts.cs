@@ -62,6 +62,10 @@ public sealed record ExternalStatusCallback(Guid MessageId, Guid PortalRequestId
 
 public interface IExternalApplicationBridgeClient
 {
+    Task<ApplicationFieldSnapshot> ReadFieldsAsync(Guid requestId, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("The bridge does not support field previews.");
+    Task<ApplicationFieldSnapshot> UpdateFieldsAsync(ApplicationFieldUpdate update, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("The bridge does not support field updates.");
     Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default)
         => throw new NotSupportedException("The bridge must support verified lookup by portal request ID before transfers can run.");
     Task<ExternalReturnOutboxStatus> GetReturnOutboxAsync(CancellationToken cancellationToken = default)

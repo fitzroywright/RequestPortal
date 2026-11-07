@@ -5,6 +5,10 @@ namespace FfpManager.Bridge;
 
 public interface IFfpManagerGateway
 {
+    Task<ApplicationFieldSnapshot> ReadFieldsAsync(Guid requestId, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Field previews are unavailable for this gateway.");
+    Task<ApplicationFieldSnapshot> UpdateFieldsAsync(ApplicationFieldUpdate update, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Field updates are unavailable for this gateway.");
     Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid requestId, CancellationToken cancellationToken = default);
     Task<ExternalApplicationReference> CreateApplicationAsync(
         ExternalApplicationSubmission submission,

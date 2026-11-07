@@ -19,18 +19,19 @@ public static class BridgeQuickIntakeFields
         command.Parameters.Add("@Programme", SqlDbType.NVarChar, 255).Value =
             string.IsNullOrWhiteSpace(programme) ? DBNull.Value : programme;
         if (!QuickIntakeApplicationFields.AppliesTo(submission)) return;
+        var mapped = QuickIntakeApplicationFields.MappedValues(submission);
         var income = command.Parameters.Add("@Income", SqlDbType.Decimal);
         income.Precision = 18;
         income.Scale = 10;
-        income.Value = submission.WeeklyIncome is { } amount ? amount : DBNull.Value;
-        command.Parameters.Add("@PayFrequency", SqlDbType.Int).Value = 2;
+        income.Value = mapped.Income is { } amount ? amount : DBNull.Value;
+        command.Parameters.Add("@PayFrequency", SqlDbType.Int).Value = mapped.PayFrequency;
         command.Parameters.Add("@MaritalStatus", SqlDbType.Int).Value =
-            QuickIntakeApplicationFields.MaritalStatus(submission.ApplicantMaritalStatus) is { } marital ? marital : DBNull.Value;
+            mapped.MaritalStatus is { } marital ? marital : DBNull.Value;
         command.Parameters.Add("@Dependents", SqlDbType.NVarChar, 255).Value =
-            (object?)QuickIntakeApplicationFields.Dependents(submission.HasChildrenUnder18LivingFullTime) ?? DBNull.Value;
+            (object?)mapped.Dependents ?? DBNull.Value;
         command.Parameters.Add("@Disabled", SqlDbType.Bit).Value =
-            submission.HasDisabilityOrSeriousMedicalCondition is { } disabled ? disabled : DBNull.Value;
+            mapped.Disabled is { } disabled ? disabled : DBNull.Value;
         command.Parameters.Add("@Circumstance", SqlDbType.NVarChar, 255).Value =
-            (object?)QuickIntakeApplicationFields.Circumstance(submission) ?? DBNull.Value;
+            (object?)mapped.Circumstance ?? DBNull.Value;
     }
 }

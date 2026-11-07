@@ -5,6 +5,14 @@ namespace RequestPortal.Application.Integration;
 /// <summary>Destination values for Quick Intake only; omitted old wire fields remain unknown.</summary>
 public static class QuickIntakeApplicationFields
 {
+    public static ApplicationMappedFields MappedValues(ExternalApplicationSubmission submission)
+    {
+        if (!AppliesTo(submission)) throw new InvalidOperationException("Field updates are available only for Quick Intake.");
+        Validate(submission);
+        return new(submission.WeeklyIncome, 2, MaritalStatus(submission.ApplicantMaritalStatus),
+            Dependents(submission.HasChildrenUnder18LivingFullTime), submission.HasDisabilityOrSeriousMedicalCondition,
+            Programme(submission), Circumstance(submission));
+    }
     public static bool AppliesTo(ExternalApplicationSubmission submission) =>
         string.Equals(submission.DocumentSource?.Trim(), "Request Portal - Quick Intake", StringComparison.OrdinalIgnoreCase);
 

@@ -354,7 +354,7 @@ public sealed class IntegrationMonitoringTests
     }
 
     [Fact]
-    public async Task CommitThenLostAcknowledgementReconcilesAndRetriesWithoutDuplicateOrLostHistory()
+    public async Task CommitThenLostAcknowledgementReconcilesAndOffersPreviewWithoutDuplicateOrLostHistory()
     {
         await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         Guid request = await Intake(database);
@@ -366,10 +366,10 @@ public sealed class IntegrationMonitoringTests
         var detail = (await monitor.GetRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken))!;
         Assert.Equal("123",detail.Transfer.ApplicationId);
         Assert.Equal(SynchronizationStatus.ReconciliationRequired,detail.Transfer.Status);
-        await monitor.RetryAsync(Guid.NewGuid(),detail.Transfer.LinkId!.Value, cancellationToken: TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<ExistingDestinationPreviewRequiredException>(()=>monitor.RetryAsync(Guid.NewGuid(),detail.Transfer.LinkId!.Value, cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(1,bridge.Inserts);
         detail=(await monitor.GetRequestAsync(request, cancellationToken: TestContext.Current.CancellationToken))!;
-        Assert.Equal(SynchronizationStatus.Synchronized,detail.Transfer.Status);
+        Assert.Equal(SynchronizationStatus.ReconciliationRequired,detail.Transfer.Status);
         Assert.Contains(detail.Attempts,item=>!item.Succeeded);
         Assert.Contains(detail.OperatorEvents,item=>item.Action=="IntegrationRetryRequested");
         Assert.Contains(detail.OperatorEvents,item=>item.Action=="IntegrationReconciled");
@@ -518,6 +518,47 @@ public sealed class IntegrationMonitoringTests
         Assert.Equal(SynchronizationStatus.Synchronized,detail.Transfer.Status);
     }
 
+    [Fact]
+    public async Task FailedRetryWithoutDestinationUsesExistingValidatedSubmissionOnce()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await using var database=await PostgreSqlTestDatabase.CreateAsync(ct);
+        Guid request=await Intake(database);
+        var link=await database.Db.IntegrationLinks.SingleAsync(ct);
+        link.MarkFailed(DateTimeOffset.UtcNow,"Failure before submission");
+        await database.Db.SaveChangesAsync(ct);
+        var bridge=new Bridge();
+        await Monitor(database,bridge).RetryAsync(Guid.NewGuid(),link.Id,ct);
+        Assert.Equal(1,bridge.Inserts);
+        Assert.Equal(SynchronizationStatus.Synchronized,link.Status);
+    }
+
+    [Fact]
+    public async Task FieldUpdateUsesVerifiedIdentityAuditsReadbackAndPreservesStatusAndQueue()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await using var database=await PostgreSqlTestDatabase.CreateAsync(ct);
+        Guid request=await Intake(database);
+        var bridge=new Bridge();
+        await Submit(database,bridge).SubmitRequestAsync(request,ct);
+        var receipt=bridge.Records[request];
+        bridge.Fields=new(receipt,new(null,null,null,null,null,null,null),null,5);
+        var monitor=Monitor(database,bridge);
+        var actor=Guid.NewGuid();
+        var preview=await monitor.PreviewFieldsAsync(actor,request,ct);
+        int queueCount=await database.Db.OutboxMessages.CountAsync(ct);
+        await monitor.ApplyFieldsAsync(actor,preview,["Income","PayFrequency"],ct);
+        Assert.Equal(1,bridge.FieldUpdates);
+        Assert.Equal(1,bridge.Inserts);
+        Assert.Equal(SynchronizationStatus.Synchronized,(await database.Db.IntegrationLinks.SingleAsync(ct)).Status);
+        Assert.Equal(queueCount,await database.Db.OutboxMessages.CountAsync(ct));
+        Assert.Contains(await database.Db.AuditEntries.ToListAsync(ct),entry=>entry.Action=="IntegrationFieldsUpdatedVerified");
+        await Assert.ThrowsAsync<IntegrationTransferException>(()=>monitor.ApplyFieldsAsync(actor,preview,["Income"],ct));
+        Assert.Equal(1,bridge.FieldUpdates);
+        Assert.NotNull(bridge.Fields);
+        Assert.Equal(5,bridge.Fields.WorkflowStatus);
+    }
+
     private sealed class Authorization(bool allowed) : IIntegrationOperatorAuthorization
     { public Task DemandAsync(Guid actorId,CancellationToken cancellationToken=default) => allowed?Task.CompletedTask:throw new UnauthorizedAccessException(); }
     private sealed class Documents : IDocumentService
@@ -548,6 +589,18 @@ public sealed class IntegrationMonitoringTests
         public bool ReturnUnavailable {get;set;}
         public Task<ExternalReturnOutboxStatus> GetReturnOutboxAsync(CancellationToken cancellationToken=default)
             => ReturnUnavailable ? throw new HttpRequestException("TOP-SECRET") : Task.FromResult(ReturnStatus);
+        public ApplicationFieldSnapshot? Fields;
+        public int FieldUpdates;
+        public Task<ApplicationFieldSnapshot> ReadFieldsAsync(Guid requestId,CancellationToken ct=default)=>Task.FromResult(Fields!);
+        public Task<ApplicationFieldSnapshot> UpdateFieldsAsync(ApplicationFieldUpdate update,CancellationToken ct=default)
+        {
+            var preview=new ApplicationFieldPreview(update.Source.PortalRequestId,update.Source.PublicReference,update.Expected,QuickIntakeApplicationFields.MappedValues(update.Source));
+            preview.ValidateApproval(update.ApprovedFields);
+            var current=Fields ?? throw new InvalidOperationException("Snapshot unavailable.");
+            preview.ValidateCurrent(current);
+            var updated=current with{Fields=current.Fields.WithApproved(preview.Proposed,update.ApprovedFields)};
+            Fields=updated;FieldUpdates++;return Task.FromResult(updated);
+        }
         public int Lookups { get; private set; }
         public Task<ExternalApplicationReceipt?> FindApplicationAsync(Guid id,CancellationToken cancellationToken=default)
         { Lookups++; return Task.FromResult(HideDestination?null:Records.GetValueOrDefault(id)); }

@@ -45,6 +45,8 @@ public sealed class StaffSearchNavigationPageTests
         public string TransferApplicant = "John Brown";
         public IReadOnlyList<IntegrationTransferRow>? TransferRows;
         public Exception? RecoveryFailure;
+        public ApplicationFieldPreview? FieldPreview;
+        public int FieldPreviews, FieldUpdates;
         public IntegrationTransferRow Transfer => new(RequestId,Organization,"REQ-FIXTURE",TransferApplicant,"Quick Intake","FFPManager",
             "JMDB01 / FFPJM",SynchronizationStatus.Failed,"SqlSubmission",ValidationCode is null ? "PermanentSql" : "PermanentValidation",ValidationCode ?? "SQL_CONSTRAINT","SQL Server rejected a field value.",
             DateTimeOffset.UtcNow,DateTimeOffset.UtcNow,1,null,null,null,null,null,true) { RecordedError = "SQL Server rejected a field value. Review the mapping before retrying.", RecoveryAction = "Review the mapping before retrying." };
@@ -161,9 +163,13 @@ public sealed class StaffSearchNavigationPageTests
                     [new(Guid.NewGuid(),1,"Submission",DateTimeOffset.UtcNow,DateTimeOffset.UtcNow,false,"SqlSubmission","PermanentSql","SQL_CONSTRAINT","SQL Server rejected a field value.")],[],1) : null),
                 "GetAttemptPageAsync" => Task.FromResult<IReadOnlyList<IntegrationAttemptView>>([]),
                 "SearchAsync" => Task.FromResult(new IntegrationMonitorPage(data.TransferRows ?? [data.Transfer], data.TransferRows?.Count ?? 1,1,25,new(2,0,0,1,74))),
+                "PreviewFieldsAsync" => Preview(),
+                "ApplyFieldsAsync" => UpdateFields(),
                 "ReconcileRequestAsync" or "RetryAsync" => Write(),
                 _ => throw new InvalidOperationException(method)
             };
+            Task<ApplicationFieldPreview> Preview(){data.FieldPreviews++;return Task.FromResult(data.FieldPreview!);}
+            Task UpdateFields(){((ApplicationFieldPreview)args[1]!).ValidateApproval((IReadOnlyList<string>)args[2]!);data.FieldUpdates++;return Task.CompletedTask;}
             Task Write(){data.Writes++;return data.RecoveryFailure is { } error ? Task.FromException(error) : Task.CompletedTask;}
         }));
         builder.Services.AddSingleton(Proxy.For<IExternalApplicationBridgeClient>((method,_)=>method=="GetReturnOutboxAsync" ? Task.FromResult(new ExternalReturnOutboxStatus(2,1,0,DateTimeOffset.UtcNow)) : throw new InvalidOperationException(method)));
@@ -183,6 +189,70 @@ public sealed class StaffSearchNavigationPageTests
         var client = app.GetTestServer().CreateClient(); client.BaseAddress = new("https://localhost"); client.DefaultRequestHeaders.Add("X-Test-Actor", actor);
         return new() { App = app, Client = client, Data = data };
     }
+    [Fact]
+    public async Task IntegrationFieldPreviewRendersConflictsAndRequiresExplicitConfirmationAndAntiforgery()
+    {
+        await using var f=await Setup();
+        f.Data.FieldPreview=ApplicationFieldUpdateTests.Preview(RequestId);
+        f.Data.TransferRows=[f.Data.Transfer with{Status=SynchronizationStatus.Synchronized,VerifiedUtc=DateTimeOffset.UtcNow,ApplicationId="123",ApplicationNumber="REF"}];
+        using var listing=await f.Get("/Staff/Integrations");
+        Assert.Contains("Update FFP Manager Fields",await listing.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var response=await f.Get("/Staff/Integrations?handler=FieldPreview&RequestId="+RequestId);
+        Assert.Equal(HttpStatusCode.OK,response.StatusCode);
+        string html=await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("Conflict — review required; excluded",html);
+        Assert.Contains("Existing staff programme",html);
+        Assert.Contains("PATH, Social Pension",html);
+        Assert.DoesNotMatch("name=\"ApprovedFields\"[^>]*value=\"Programme\"",html);
+        string protectedPreview=Href(Regex.Match(html,"<input[^>]*name=\"ProtectedFieldPreview\"[^>]*>"),"value");
+        Assert.NotEmpty(protectedPreview);
+        Assert.Equal(0,f.Data.FieldUpdates);
+        var form=new Dictionary<string,string>{["ProtectedFieldPreview"]=protectedPreview,["ApprovedFields"]="Income",["__RequestVerificationToken"]=Token(html)};
+        using var unconfirmed=await f.Send(new(HttpMethod.Post,"/Staff/Integrations?handler=UpdateFields"){Content=new FormUrlEncodedContent(form)});
+        Assert.Equal(HttpStatusCode.BadRequest,unconfirmed.StatusCode);
+        form["ConfirmFieldUpdate"]="true";
+        form["__RequestVerificationToken"]="invalid";
+        using var csrf=await f.Send(new(HttpMethod.Post,"/Staff/Integrations?handler=UpdateFields"){Content=new FormUrlEncodedContent(form)});
+        Assert.Equal(HttpStatusCode.BadRequest,csrf.StatusCode);
+        Assert.Equal(0,f.Data.FieldUpdates);
+        form["__RequestVerificationToken"]=Token(html);
+        using var applied=await f.Send(new(HttpMethod.Post,"/Staff/Integrations?handler=UpdateFields"){Content=new FormUrlEncodedContent(form)});
+        Assert.Equal(HttpStatusCode.Redirect,applied.StatusCode);
+        Assert.Equal(1,f.Data.FieldUpdates);
+        Assert.Equal(0,f.Data.Writes); // no Retry/reconciliation was invoked
+    }
+
+    [Theory][InlineData("tampered")][InlineData("expired")][InlineData("different-actor")]
+    public async Task IntegrationFieldUpdateRejectsInvalidProtectedPreviewWithoutCallingUpdate(string invalid)
+    {
+        await using var f=await Setup();
+        f.Data.FieldPreview=ApplicationFieldUpdateTests.Preview(RequestId);
+        using var response=await f.Get("/Staff/Integrations?handler=FieldPreview&RequestId="+RequestId);
+        string html=await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var protector=f.App.Services.GetRequiredService<IDataProtectionProvider>().CreateProtector("RequestPortal.IntegrationFields.v1").ToTimeLimitedDataProtector();
+        string payload=System.Text.Json.JsonSerializer.Serialize(new{Actor=invalid=="different-actor"?Guid.NewGuid():Staff,Preview=f.Data.FieldPreview});
+        string protectedPreview=invalid=="tampered"?"invalid":protector.Protect(payload,DateTimeOffset.UtcNow.AddMinutes(invalid=="expired"?-1:10));
+        using var result=await f.Send(new(HttpMethod.Post,"/Staff/Integrations?handler=UpdateFields"){Content=new FormUrlEncodedContent(new Dictionary<string,string>{
+            ["ProtectedFieldPreview"]=protectedPreview,["ApprovedFields"]="Income",["ConfirmFieldUpdate"]="true",["__RequestVerificationToken"]=Token(html)})});
+        Assert.True(result.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.BadRequest);
+        Assert.Equal(0,f.Data.FieldUpdates);
+    }
+
+    [Fact]
+    public async Task IntegrationFieldPreviewAndUpdatesDenyStaffWithoutOperatorPermission()
+    {
+        await using var f=await Setup("Reviewer");
+        using var response=await f.Get("/Staff/Integrations?handler=FieldPreview&RequestId="+RequestId);
+        Assert.Equal(HttpStatusCode.Forbidden,response.StatusCode);
+        using var page=await f.Get("/Staff/Integrations");
+        string html=await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var post=await f.Send(new(HttpMethod.Post,"/Staff/Integrations?handler=UpdateFields"){Content=new FormUrlEncodedContent(new Dictionary<string,string>{
+            ["ConfirmFieldUpdate"]="true",["__RequestVerificationToken"]=Token(html)})});
+        Assert.Equal(HttpStatusCode.Forbidden,post.StatusCode);
+        Assert.Equal(0,f.Data.FieldPreviews);
+        Assert.Equal(0,f.Data.FieldUpdates);
+    }
+
     private static string Href(Match tag, string attribute) => WebUtility.HtmlDecode(Regex.Match(tag.Value, attribute + "=\"([^\"]*)\"").Groups[1].Value);
     private static string Token(string html) => Href(Regex.Match(html, "<input[^>]*name=\"__RequestVerificationToken\"[^>]*>"), "value");
     private static void Snapshot(string name, string html)
