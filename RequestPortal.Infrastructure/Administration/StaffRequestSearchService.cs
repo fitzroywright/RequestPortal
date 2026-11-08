@@ -59,7 +59,8 @@ public sealed class StaffRequestSearchService(RequestPortalDbContext db) : IStaf
             string pattern = "%" + Escape(name[..Math.Min(200, name.Length)]) + "%";
             query = query.Where(r => EF.Functions.ILike(r.ApplicantName, pattern, "\\") ||
                                      EF.Functions.ILike(r.RegisteredName, pattern, "\\") ||
-                                     EF.Functions.ILike(r.DisplayName, pattern, "\\"));
+                                     EF.Functions.ILike(r.DisplayName, pattern, "\\") ||
+                                     EF.Functions.ILike(r.PublicReference, pattern, "\\"));
         }
         if (org.Length > 0)
         {

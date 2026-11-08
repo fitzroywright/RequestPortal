@@ -9,6 +9,60 @@ namespace RequestPortal.Infrastructure.Tests;
 
 public sealed class StaffQueuePaginationTests
 {
+    [Fact]
+    public async Task ApplicantFilterMatchesNamesOrLiteralRequestNumbersBeforePaginationWithOtherFilters()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var fixture = await PostgreSqlTestDatabase.CreateAsync(ct);
+        var db = fixture.Db;
+        var now = DateTimeOffset.UtcNow;
+        var user = new ApplicationUser { Id = Guid.NewGuid(), FirstName = "Alicia", LastName = "Campbell", DisplayName = "Ali", CreatedUtc = now };
+        db.Users.Add(user);
+        var org = new Organization(Guid.NewGuid(), "Search fixture organization", "JM", user.Id, now);
+        var otherOrg = new Organization(Guid.NewGuid(), "Other organization", "JM", user.Id, now);
+        db.Organizations.AddRange(org, otherOrg);
+        AssistanceRequest Add(string reference, Organization organization, bool submitted = true)
+        {
+            var request = new AssistanceRequest(Guid.NewGuid(), reference, organization.Id, user.Id, now);
+            request.SetKind(RequestKind.Project);
+            if (submitted) request.Submit(user.Id, now);
+            db.AssistanceRequests.Add(request);
+            return request;
+        }
+        for (int i = 0; i < 30; i++) Add($"REQ-2026-{i:D4}", org);
+        Add("REQ-2026-OTHER", otherOrg);
+        Add("REQ-2026-DRAFT", org, false);
+        Add("REQ-LITERAL%_", org);
+        await db.SaveChangesAsync(ct);
+        var service = new StaffRequestSearchService(db);
+
+        foreach (string term in new[] { "alicia campbell", " CAMPBELL ", "Ali", "req-2026-", "2026" })
+        {
+            var first = await service.GetFilteredQueueAsync(term, "search fixture", RequestStatus.Submitted, 1, 25, ct);
+            var second = await service.GetFilteredQueueAsync(term, "search fixture", RequestStatus.Submitted, 2, 25, ct);
+            Assert.Equal(term.Contains("2026") ? 30 : 31, first.TotalCount);
+            Assert.Equal(25, first.Items.Count);
+            Assert.Equal(first.TotalCount - 25, second.Items.Count);
+            Assert.Empty(first.Items.Select(r => r.RequestId).Intersect(second.Items.Select(r => r.RequestId)));
+            Assert.All(first.Items.Concat(second.Items), r => {
+                Assert.Equal(org.Name, r.OrganizationName);
+                Assert.Equal(RequestStatus.Submitted, r.Status);
+            });
+        }
+        foreach (string term in new[] { "REQ-2026-0029", "req-2026-0029", "0029" })
+        {
+            var result = await service.GetFilteredQueueAsync(term, null, null, 1, 25, ct);
+            Assert.Equal("REQ-2026-0029", Assert.Single(result.Items).PublicReference);
+            Assert.Equal(1, result.TotalCount);
+        }
+        Assert.Single((await service.GetFilteredQueueAsync("%_", null, null, cancellationToken: ct)).Items);
+        Assert.Empty((await service.GetFilteredQueueAsync("missing", null, null, cancellationToken: ct)).Items);
+        Assert.Empty((await service.GetFilteredQueueAsync("0029", "other", null, cancellationToken: ct)).Items);
+        Assert.Empty((await service.GetFilteredQueueAsync("0029", null, RequestStatus.Draft, cancellationToken: ct)).Items);
+        Assert.Single((await service.GetFilteredQueueAsync("2026-DRAFT", null, RequestStatus.Draft, cancellationToken: ct)).Items);
+        Assert.Equal(31, (await service.GetFilteredQueueAsync("2026", null, null, cancellationToken: ct)).TotalCount);
+    }
+
     [Theory]
     [InlineData(46,25)][InlineData(76,25)][InlineData(76,50)][InlineData(126,100)]
     public async Task EverySubmittedRequestIsReachableExactlyOnceInReceivedOrder(int count,int size)

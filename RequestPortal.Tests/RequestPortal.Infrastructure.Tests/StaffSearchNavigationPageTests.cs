@@ -300,6 +300,10 @@ public sealed class StaffSearchNavigationPageTests
             var panel=Regex.Match(html,"<main class=\"workspace-panel request-panel\">(.*?)</main>",RegexOptions.Singleline).Value;
             Assert.Equal(sample.Rows,Regex.Matches(panel,"<tr class=\"staff-select-row\"").Count);
             Assert.Contains(sample.Range,panel);Assert.Contains(sample.Page,panel);Assert.Contains("Requests per page",panel);
+            Assert.Contains("placeholder=\"Name or Request No\"", panel);
+            var filterForm = Regex.Match(panel, "<form id=\"requests-grid-filters\".*?</form>", RegexOptions.Singleline).Value;
+            Assert.NotEmpty(filterForm);
+            Assert.DoesNotContain("PageNumber", filterForm); // Automatic filter submission starts at page 1.
             Snapshot(sample.Query.Contains("PageNumber=2")?"queue-page-2":sample.Query.Contains("50")?"queue-size-50":sample.Query.Contains("100")?"queue-size-100":"queue",html);
             foreach(Match row in Regex.Matches(panel,"<tr class=\"staff-select-row\".*?</tr>",RegexOptions.Singleline))
                 Assert.Contains("href=\""+Href(row,"data-row-href")+"\"",row.Value);

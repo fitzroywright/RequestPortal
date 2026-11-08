@@ -33,7 +33,7 @@ const orgDoc='44444444-4444-4444-8444-444444444444',requestDoc='55555555-5555-45
    await page.selectOption('#request-page-size','50');await page.waitForURL('**PageSize=50');
    assert(!new URL(page.url()).searchParams.has('PageNumber'));
    assert.equal(await page.locator('.request-panel tbody tr').count(),46);
-   await page.getByRole('searchbox',{name:'Filter requests by applicant',exact:true}).fill('John');
+   await page.getByRole('searchbox',{name:'Filter requests by name or request number',exact:true}).fill('John');
    await page.waitForURL(url=>url.pathname==='/Staff'&&url.searchParams.get('Applicant')==='John');
    assert.equal(new URL(page.url()).searchParams.get('PageSize'),'50');
    // Historical Search URLs remain supported; exercise their result pagination separately.
