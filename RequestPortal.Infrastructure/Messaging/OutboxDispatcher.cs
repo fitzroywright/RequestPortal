@@ -540,9 +540,14 @@ public sealed class OutboxDispatcher
     private async Task SendRequestStatusChangedAsync(RequestStatusChangedMessage message, CancellationToken cancellationToken)
     {
         AssistanceRequest request = await dbContext.AssistanceRequests.AsNoTracking().Include(item => item.StatusHistory).SingleAsync(item => item.Id == message.RequestId, cancellationToken);
-        Guid recipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
+        Guid recipientUserId = await dbContext.QuickIntakes.AsNoTracking()
+            .Where(intake => intake.RequestId == request.Id)
+            .Select(intake => (Guid?)(intake.ConvertedToUserId ?? intake.AnonymousUserId))
+            .SingleOrDefaultAsync(cancellationToken) ?? request.SubmittedByUserId ?? request.CreatedByUserId;
         RequestStatus eventStatus = (RequestStatus)message.Status;
-        string? reason = request.StatusHistory.Where(item => item.Status == eventStatus && item.ChangedUtc <= message.OccurredUtc)
+        string? reason = message.Detail ?? request.StatusHistory.Where(item =>
+                message.StatusHistoryId.HasValue ? item.Id == message.StatusHistoryId.Value
+                    : item.Status == eventStatus && item.ChangedUtc <= message.OccurredUtc)
             .OrderByDescending(item => item.ChangedUtc).Select(item => item.Reason).FirstOrDefault();
         string body = $"Request # {request.PublicReference}: {RequestStatusPresentation.Label(eventStatus.ToString())}.";
         if (!string.IsNullOrWhiteSpace(reason)) body += $"\n\n{reason}";
@@ -561,7 +566,22 @@ public sealed class OutboxDispatcher
             request.Id,
             $"Request status: {request.PublicReference}",
             body,
-            cancellationToken);
+            cancellationToken, message.MessageId, emailOnly: true);
+        if (eventStatus == RequestStatus.SentForAssessment)
+        {
+            if (!notificationOptions.Enabled)
+                throw new InvalidOperationException("Assessment email is pending because notification delivery is disabled.");
+            string? reference = await dbContext.IntegrationLinks.AsNoTracking()
+                .Where(link => link.RequestId == request.Id && link.SystemName == ffpManagerOptions.SystemName)
+                .Select(link => link.ApplicationNumber).SingleOrDefaultAsync(cancellationToken);
+            string assessmentBody = $"Request Portal reference: {request.PublicReference}\nStatus: Sent for Assessment.";
+            if (!string.IsNullOrWhiteSpace(reference)) assessmentBody += $"\nFFP Manager reference: {reference}";
+            assessmentBody += $"\nStaff review: /Staff/Review/{request.Id:D}";
+            await notificationSender.SendAsync(new NotificationEnvelope("assessment@ffpja.org",
+                $"Sent for Assessment: {request.PublicReference}", assessmentBody,
+                CorrelationId: request.Id.ToString("D"),
+                DeliveryId: CreateDeterministicGuid(message.MessageId, "AssessmentEmail")), cancellationToken);
+        }
     }
 
     private async Task SendFfpManagerInformationRequestedAsync(FfpManagerInformationRequestedMessage message, CancellationToken cancellationToken)
@@ -581,7 +601,7 @@ public sealed class OutboxDispatcher
             request.Id,
             $"Information required: {request.PublicReference}",
             body,
-            cancellationToken);
+            cancellationToken, message.MessageId, emailOnly: true);
     }
 
     private async Task SendPortalMessageNotificationAsync(
@@ -688,10 +708,16 @@ public sealed class OutboxDispatcher
         string subject,
         string body,
         CancellationToken cancellationToken,
-        Guid? deliveryId = null)
+        Guid? deliveryId = null,
+        bool emailOnly = false)
     {
         foreach (Guid userId in recipients.Distinct())
         {
+            if (emailOnly)
+            {
+                await DeliverEmailAsync(userId, organizationId, requestId, subject, body, cancellationToken, deliveryId);
+                continue;
+            }
             await DeliverNotificationsAsync(
                 userId,
                 organizationId,
@@ -824,14 +850,23 @@ public sealed class OutboxDispatcher
         CancellationToken cancellationToken,
         Guid? deliveryId = null)
     {
-        string? accountEmail = await dbContext.Users.AsNoTracking().Where(user => user.Id == userId).Select(user => user.Email).SingleOrDefaultAsync(cancellationToken);
+        var account = await dbContext.Users.AsNoTracking().Where(user => user.Id == userId)
+            .Select(user => new { user.Email, user.IsInternalStaff }).SingleOrDefaultAsync(cancellationToken);
+        string? accountEmail = account?.Email;
         NotificationPreference? preference = await dbContext.NotificationPreferences.AsNoTracking().SingleOrDefaultAsync(item => item.UserId == userId && item.Channel == NotificationChannel.Email, cancellationToken);
-        string? intakeEmail = requestId.HasValue
+        var intake = requestId.HasValue
             ? await dbContext.QuickIntakes.AsNoTracking()
                 .Where(intake => intake.RequestId == requestId.Value &&
                     (intake.ConvertedToUserId ?? intake.AnonymousUserId) == userId)
-                .Select(intake => intake.Email).SingleOrDefaultAsync(cancellationToken)
+                .Select(intake => new { intake.Email }).SingleOrDefaultAsync(cancellationToken)
             : null;
+        string? intakeEmail = intake?.Email;
+        // A staff account that entered an intake is not the applicant email recipient.
+        if (intake is not null && account?.IsInternalStaff == true)
+        {
+            accountEmail = null;
+            preference = null;
+        }
         string primaryDestination = preference?.Destination ?? accountEmail ?? "(no email address)";
         string[] destinations = string.IsNullOrWhiteSpace(intakeEmail)
             ? [primaryDestination]

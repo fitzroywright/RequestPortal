@@ -15,6 +15,9 @@ public static class RequestStatusPresentation
         "Closed" => "Closed",
         "Duplicate" => "Duplicate",
         "RepresentativeReviewRequired" => "Representative Review Required",
+        "OnHold" => "On Hold",
+        "Investigated" => "Investigated",
+        "SentForAssessment" => "Sent for Assessment",
         _ => Humanize(status)
     };
 

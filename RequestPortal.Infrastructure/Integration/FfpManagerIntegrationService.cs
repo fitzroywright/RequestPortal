@@ -312,97 +312,59 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
         ExternalApplicationStatus status,
         CancellationToken cancellationToken = default)
     {
-        if (!await BeginInboxAsync(messageId, cancellationToken))
-        {
-            return;
-        }
-
-        AssistanceRequest request = await dbContext.AssistanceRequests
-            .Include(item => item.StatusHistory)
+        await using var requestLock = await IntegrationRequestLock.AcquireAsync(dbContext, requestId, cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (!await BeginInboxAsync(messageId, cancellationToken)) return;
+        AssistanceRequest request = await dbContext.AssistanceRequests.Include(item => item.StatusHistory)
             .SingleAsync(item => item.Id == requestId, cancellationToken);
-
-        RequestStatus originalStatus = request.Status;
-        ApplyCanonicalStatus(request, status);
-        if (request.Status != originalStatus)
-        {
-            AddStatusOutbox(request, status.ChangedUtc);
-        }
-
+        await dbContext.Entry(request).ReloadAsync(cancellationToken);
+        RequestStatus? mapped = FfpManagerStatusMapping.Map(status.StatusCode);
+        if (mapped.HasValue)
+            ApplyFfpTransition(request, mapped.Value, status.ChangedUtc, status.StatusCode, status.Detail);
+        else if (!string.IsNullOrWhiteSpace(status.StatusCode))
+            logger?.LogWarning("Unknown FFP Manager status Code for request {RequestId}: {SourceCode}",
+                requestId, new string(status.StatusCode.Where(c => !char.IsControl(c)).Take(100).ToArray()));
         await CompleteInboxAsync(messageId, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task ReceiveInformationRequestAsync(
         ExternalInformationRequest informationRequest,
         CancellationToken cancellationToken = default)
     {
-        if (!await BeginInboxAsync(informationRequest.MessageId, cancellationToken))
-        {
-            return;
-        }
-
-        AssistanceRequest request = await dbContext.AssistanceRequests
-            .Include(item => item.StatusHistory)
-            .SingleAsync(item => item.Id == informationRequest.PortalRequestId, cancellationToken);
-
-        if (request.Status == RequestStatus.Submitted)
-        {
-            request.RequestMoreInformation(ExternalSystemActorId, informationRequest.RequestedUtc, informationRequest.Message);
-        }
-
-        Guid primaryRecipientUserId = request.SubmittedByUserId ?? request.CreatedByUserId;
-        Guid[] subscribedManagerIds = await dbContext.OrganizationMemberships
-            .AsNoTracking()
-            .Where(membership =>
-                membership.OrganizationId == request.OrganizationId &&
-                membership.Status == MembershipStatus.Approved &&
-                membership.Role == OrganizationRole.Administrator &&
-                membership.ReceiveRequestNotifications)
-            .Select(membership => membership.UserId)
-            .ToArrayAsync(cancellationToken);
-
-        Guid[] recipients = subscribedManagerIds
-            .Concat(await routing.RecipientsAsync(request.Id, false, cancellationToken))
-            .Append(primaryRecipientUserId)
-            .Distinct()
-            .ToArray();
-
-        Guid? existingThreadId = await dbContext.MessageThreads
-            .AsNoTracking()
-            .Where(thread =>
-                thread.RequestId == request.Id &&
-                thread.StaffVisible &&
-                thread.Audience == RequestPortal.Domain.Messages.MessageAudience.Request)
-            .OrderByDescending(thread => thread.CreatedUtc)
-            .Select(thread => (Guid?)thread.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        string body = informationRequest.Message;
+        Guid requestId = informationRequest.PortalRequestId;
+        await using var requestLock = await IntegrationRequestLock.AcquireAsync(dbContext, requestId, cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (!await BeginInboxAsync(informationRequest.MessageId, cancellationToken)) return;
+        AssistanceRequest request = await dbContext.AssistanceRequests.Include(item => item.StatusHistory)
+            .SingleAsync(item => item.Id == requestId, cancellationToken);
+        await dbContext.Entry(request).ReloadAsync(cancellationToken);
+        string detail = informationRequest.Message;
         if (informationRequest.DueUtc.HasValue)
+            detail += $"\n\nPlease respond by {informationRequest.DueUtc.Value:yyyy-MM-dd}.";
+        bool changed = ApplyFfpTransition(request, RequestStatus.MoreInformationRequired,
+            informationRequest.RequestedUtc, null, detail);
+        // A status callback and its information-request callback describe one transition.
+        // Enrich a pending notification rather than enqueueing a second logical notification.
+        if (!changed && request.Status == RequestStatus.MoreInformationRequired)
         {
-            body += $"\n\nPlease respond by {informationRequest.DueUtc.Value:yyyy-MM-dd}.";
+            var history = request.StatusHistory.Where(item => item.ChangedByUserId == ExternalSystemActorId)
+                .OrderByDescending(item => item.ChangedUtc).FirstOrDefault();
+            if (history is not null)
+            {
+                var pending = await dbContext.OutboxMessages.SingleOrDefaultAsync(item =>
+                    item.Id == history.Id && item.ProcessedUtc == null, cancellationToken);
+                if (pending is not null)
+                {
+                    var notification = JsonSerializer.Deserialize<RequestStatusChangedMessage>(pending.Payload)!;
+                    pending.Payload = JsonSerializer.Serialize(notification with { Detail = BoundDetail(detail) });
+                }
+            }
         }
-
-        await portalMessageService.SendSystemMessageAsync(
-            request.OrganizationId,
-            request.Id,
-            existingThreadId,
-            $"Information required: {request.PublicReference}",
-            body,
-            recipients,
-            cancellationToken,
-            stableMessageId: informationRequest.MessageId,
-            notifyExternally: false);
-
-        FfpManagerInformationRequestedMessage message = new(
-            Guid.NewGuid(),
-            clock.UtcNow,
-            request.Id,
-            informationRequest.Message,
-            informationRequest.DueUtc);
-        AddOutbox(message);
         await CompleteInboxAsync(informationRequest.MessageId, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task RespondToInformationRequestAsync(
@@ -554,55 +516,31 @@ public sealed class FfpManagerIntegrationService : IExternalApplicationIntegrati
             document.SizeBytes,
             document.UploadedUtc);
 
-    private static void ApplyCanonicalStatus(AssistanceRequest request, ExternalApplicationStatus status)
+    private bool ApplyFfpTransition(AssistanceRequest request, RequestStatus mapped, DateTimeOffset changedUtc,
+        string? sourceCode, string? detail)
     {
-        string code = status.StatusCode.Trim().Replace('-', '_').Replace(' ', '_').ToUpperInvariant();
-        if (code is "MORE_INFORMATION_REQUIRED" or "MORE_INFORMATION" or "AWAITING_INFORMATION")
-        {
-            if (request.Status == RequestStatus.Submitted)
-            {
-                request.RequestMoreInformation(ExternalSystemActorId, status.ChangedUtc, status.Detail ?? status.StatusText);
-            }
-            return;
-        }
-
-        if (code == "APPROVED" && request.Status == RequestStatus.Submitted)
-        {
-            request.Approve(ExternalSystemActorId, status.ChangedUtc);
-            return;
-        }
-
-        if (code is "REJECTED" or "DECLINED")
-        {
-            if (request.Status == RequestStatus.Submitted)
-            {
-                request.Reject(ExternalSystemActorId, status.ChangedUtc, status.Detail ?? status.StatusText);
-            }
-            return;
-        }
-
-        if (code == "PENDING_FULFILMENT" && request.Status == RequestStatus.Approved)
-        {
-            request.MarkPendingFulfilment(ExternalSystemActorId, status.ChangedUtc);
-            return;
-        }
-
-        if (code == "FULFILLED" && request.Status == RequestStatus.PendingFulfilment)
-        {
-            request.MarkFulfilled(ExternalSystemActorId, status.ChangedUtc);
-            return;
-        }
-
-        if (code == "CLOSED" && request.Status == RequestStatus.Fulfilled)
-        {
-            request.Close(ExternalSystemActorId, status.ChangedUtc);
-        }
+        var latest = request.StatusHistory.Where(item => item.ChangedByUserId == ExternalSystemActorId)
+            .OrderByDescending(item => item.ChangedUtc).FirstOrDefault();
+        if (latest is not null && changedUtc < latest.ChangedUtc) return false;
+        RequestStatus previous = request.Status;
+        if (!request.ApplyFfpManagerStatus(mapped, ExternalSystemActorId, changedUtc, BoundDetail(detail))) return false;
+        var history = request.StatusHistory.Last();
+        dbContext.AuditEntries.Add(new RequestPortal.Domain.Auditing.AuditEntry(
+            Guid.NewGuid(), ExternalSystemActorId, "FfpManagerStatusChanged", "AssistanceRequest", request.Id,
+            request.OrganizationId, changedUtc, JsonSerializer.Serialize(new {
+                RequestId = request.Id, PreviousStatus = previous.ToString(), NewStatus = mapped.ToString(),
+                SourceCode = sourceCode, SourceSystem = options.SystemName, TransitionUtc = changedUtc
+            })));
+        AddOutbox(new RequestStatusChangedMessage(history.Id, changedUtc, request.Id, (int)mapped,
+            BoundDetail(detail), history.Id, options.SystemName));
+        return true;
     }
 
-    private void AddStatusOutbox(AssistanceRequest request, DateTimeOffset occurredUtc)
-    {
+    private static string? BoundDetail(string? detail) => string.IsNullOrWhiteSpace(detail) ? null
+        : detail.Trim()[..Math.Min(detail.Trim().Length, 3800)];
+
+    private void AddStatusOutbox(AssistanceRequest request, DateTimeOffset occurredUtc) =>
         AddOutbox(new RequestStatusChangedMessage(Guid.NewGuid(), occurredUtc, request.Id, (int)request.Status));
-    }
 
     private void AddOutbox<TMessage>(TMessage message) where TMessage : IMessage
     {

@@ -121,7 +121,10 @@ public sealed record RequestStatusChangedMessage(
     Guid MessageId,
     DateTimeOffset OccurredUtc,
     Guid RequestId,
-    int Status) : IMessage;
+    int Status,
+    string? Detail = null,
+    Guid? StatusHistoryId = null,
+    string? SourceSystem = null) : IMessage;
 
 public sealed record FfpManagerInformationRequestedMessage(
     Guid MessageId,

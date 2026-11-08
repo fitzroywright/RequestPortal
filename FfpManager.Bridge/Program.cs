@@ -120,10 +120,6 @@ if (builder.Environment.IsProduction())
     {
         throw new InvalidOperationException("Bridge:EnableOutboxDispatch must be enabled in production.");
     }
-    if (productionOptions.StatusMap.Count == 0)
-    {
-        throw new InvalidOperationException("Bridge:StatusMap must define the FFP-to-Portal status contract in production.");
-    }
     if (productionOptions.DocumentTypeMap.Count == 0)
     {
         throw new InvalidOperationException("Bridge:DocumentTypeMap must define the Portal-to-FFP document contract in production.");

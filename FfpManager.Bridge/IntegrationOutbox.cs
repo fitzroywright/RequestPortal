@@ -273,6 +273,7 @@ public sealed class SqlIntegrationOutboxStore : IIntegrationOutboxStore
 public sealed class IntegrationOutboxDispatcher : BackgroundService
 {
     private readonly IIntegrationOutboxStore store;
+    private readonly IFfpManagerGateway gateway;
     private readonly IHttpClientFactory httpClientFactory;
     private readonly IOptions<BridgeOptions> options;
     private readonly ILogger<IntegrationOutboxDispatcher> logger;
@@ -281,9 +282,11 @@ public sealed class IntegrationOutboxDispatcher : BackgroundService
         IIntegrationOutboxStore store
         , IHttpClientFactory httpClientFactory
         , IOptions<BridgeOptions> options
-        , ILogger<IntegrationOutboxDispatcher> logger)
+        , ILogger<IntegrationOutboxDispatcher> logger
+        , IFfpManagerGateway gateway)
     {
         this.store = store;
+        this.gateway = gateway;
         this.httpClientFactory = httpClientFactory;
         this.options = options;
         this.logger = logger;
@@ -379,42 +382,23 @@ public sealed class IntegrationOutboxDispatcher : BackgroundService
         };
     }
 
-    private Task PostStatusAsync(
-        IntegrationOutboxMessage message
-        , BridgeOptions current
-        , CancellationToken cancellationToken)
+    private async Task PostStatusAsync(
+        IntegrationOutboxMessage message,
+        BridgeOptions current,
+        CancellationToken cancellationToken)
     {
-        string statusCode = NormalizeStatus(
-            message.StatusCode
-            ?? message.StatusText
-            ?? "RECEIVED");
-
-        if (current.StatusMap.TryGetValue(
-                message.StatusText ?? string.Empty
-                , out string? mapped) &&
-            !string.IsNullOrWhiteSpace(mapped))
-        {
-            statusCode = NormalizeStatus(mapped);
-        }
-
-        bool terminal = statusCode is "REJECTED"
-            or "DECLINED"
-            or "CLOSED";
-
-        ExternalApplicationStatus status = new(
-            message.ApplicationId
-            , statusCode
-            , message.StatusText ?? statusCode
-            , message.OccurredUtc
-            , message.Detail
-            , terminal);
+        // Older outbox producers substituted Name/RECEIVED for missing Codes.
+        // Read the authoritative Code through the same gateway as polling; do not
+        // interpret those lossy snapshots or require any FFPJM procedure changes.
+        ExternalApplicationStatus status = await gateway.GetStatusAsync(message.ApplicationId, cancellationToken)
+            ?? throw new InvalidOperationException("The status callback application no longer exists.");
 
         ExternalStatusCallback callback = new(
             message.EventId
             , message.PortalRequestId
             , status);
 
-        return PostAsync(
+        await PostAsync(
             "api/integration/ffpmanager/status"
             , callback
             , current
@@ -487,9 +471,5 @@ public sealed class IntegrationOutboxDispatcher : BackgroundService
         }
     }
 
-    private static string NormalizeStatus(string value) =>
-        value.Trim()
-            .Replace('-', '_')
-            .Replace(' ', '_')
-            .ToUpperInvariant();
+
 }

@@ -254,15 +254,16 @@ public sealed partial class SqlFfpManagerGateway : IFfpManagerGateway
             return null;
         }
 
-        string rawCode = reader.IsDBNull(3) ? "RECEIVED" : reader.GetString(3);
+        string rawCode = reader.IsDBNull(3) ? "" : reader.GetString(3);
         string statusText = reader.IsDBNull(4) ? rawCode : reader.GetString(4);
-        string canonical = MapStatus(rawCode, statusText);
         DateTime? changed = !reader.IsDBNull(2)
             ? reader.GetDateTime(2)
             : !reader.IsDBNull(1) ? reader.GetDateTime(1) : null;
         string? detail = reader.IsDBNull(5) ? null : reader.GetString(5);
-        bool terminal = canonical is "REJECTED" or "DECLINED" or "CLOSED";
-        return new ExternalApplicationStatus(id.ToString(), canonical, statusText, changed.HasValue ? JamaicaBusinessTime.ToUtc(changed.Value) : DateTimeOffset.UtcNow, detail, terminal);
+        bool terminal = rawCode.Trim().Equals("Complete", StringComparison.OrdinalIgnoreCase)
+            || rawCode.Trim().Equals("Unable to Assist", StringComparison.OrdinalIgnoreCase)
+            || rawCode.Trim().Equals("No Longer In Need", StringComparison.OrdinalIgnoreCase);
+        return new ExternalApplicationStatus(id.ToString(), rawCode, statusText, changed.HasValue ? JamaicaBusinessTime.ToUtc(changed.Value) : DateTimeOffset.UtcNow, detail, terminal);
     }
 
     public async Task SaveInformationResponseAsync(
@@ -584,22 +585,6 @@ public sealed partial class SqlFfpManagerGateway : IFfpManagerGateway
         }
         return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, options.SqlTarget, cancellationToken);
     }
-
-    private string MapStatus(string rawCode, string rawName)
-    {
-        if (options.StatusMap.TryGetValue(rawCode, out string? mapped) && !string.IsNullOrWhiteSpace(mapped))
-        {
-            return NormalizeStatus(mapped);
-        }
-        if (options.StatusMap.TryGetValue(rawName, out mapped) && !string.IsNullOrWhiteSpace(mapped))
-        {
-            return NormalizeStatus(mapped);
-        }
-        return NormalizeStatus(string.IsNullOrWhiteSpace(rawCode) ? rawName : rawCode);
-    }
-
-    private static string NormalizeStatus(string value) =>
-        value.Trim().Replace('-', '_').Replace(' ', '_').ToUpperInvariant();
 
     private static long ParseApplicationId(string applicationId) =>
         long.TryParse(applicationId, out long id) && id > 0

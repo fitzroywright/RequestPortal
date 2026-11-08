@@ -261,6 +261,19 @@ public sealed class AssistanceRequest
         TransitionTo(RequestStatus.Closed, staffUserId, changedUtc, "Request closed.");
     }
 
+    public bool ApplyFfpManagerStatus(RequestStatus status, Guid actorUserId, DateTimeOffset changedUtc, string? detail)
+    {
+        if (Status is RequestStatus.Draft or RequestStatus.Duplicate or RequestStatus.RepresentativeReviewRequired or RequestStatus.Closed)
+            return false;
+        if (status is not (RequestStatus.Submitted or RequestStatus.MoreInformationRequired or RequestStatus.Approved
+            or RequestStatus.Rejected or RequestStatus.Cancelled or RequestStatus.Fulfilled or RequestStatus.OnHold
+            or RequestStatus.Investigated or RequestStatus.SentForAssessment))
+            throw new ArgumentOutOfRangeException(nameof(status));
+        if (Status == status) return false;
+        TransitionTo(status, actorUserId, changedUtc, detail);
+        return true;
+    }
+
     private void TransitionTo(RequestStatus status, Guid changedByUserId, DateTimeOffset changedUtc, string? reason)
     {
         Status = status;

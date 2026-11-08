@@ -169,16 +169,16 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
     {
         long id = ParseApplicationId(applicationId);
         await using SqlConnection connection = await OpenConnectionAsync(cancellationToken);
-        const string sql = "SELECT al.DateCreated,al.DateUpdated,ast.ID,ast.Name,ast.Description FROM dbo.ApplicationLetters al LEFT JOIN dbo.ApplicationStatusTypes ast ON ast.ID=al.ApplicationStatus WHERE al.ID=@ID AND al.GCRecord IS NULL;";
+        const string sql = "SELECT al.DateCreated,al.DateUpdated,ast.Code,ast.Name,ast.Description FROM dbo.ApplicationLetters al LEFT JOIN dbo.ApplicationStatusTypes ast ON ast.ID=al.ApplicationStatus WHERE al.ID=@ID AND al.GCRecord IS NULL;";
         await using SqlCommand command = new(sql, connection);
         command.Parameters.Add("@ID", SqlDbType.BigInt).Value = id;
         await using SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken)) return null;
-        string name = reader.IsDBNull(3) ? "RECEIVED" : reader.GetString(3);
-        string canonical = MapStatus(name);
+        string code = reader.IsDBNull(2) ? "" : reader.GetString(2);
+        string name = reader.IsDBNull(3) ? code : reader.GetString(3);
         DateTime? changed = !reader.IsDBNull(1) ? reader.GetDateTime(1) : !reader.IsDBNull(0) ? reader.GetDateTime(0) : null;
         string? detail = reader.IsDBNull(4) ? null : reader.GetString(4);
-        return new ExternalApplicationStatus(id.ToString(), canonical, name, changed.HasValue ? JamaicaBusinessTime.ToUtc(changed.Value) : DateTimeOffset.UtcNow, detail, false);
+        return new ExternalApplicationStatus(id.ToString(), code, name, changed.HasValue ? JamaicaBusinessTime.ToUtc(changed.Value) : DateTimeOffset.UtcNow, detail, false);
     }
 
     public Task SaveInformationResponseAsync(ExternalInformationResponse response, CancellationToken cancellationToken = default) => legacy.SaveInformationResponseAsync(response, cancellationToken);
@@ -212,19 +212,12 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         }
     }
 
-    private string MapStatus(string rawName)
-    {
-        if (options.StatusMap.TryGetValue(rawName, out string? mapped) && !string.IsNullOrWhiteSpace(mapped)) return NormalizeStatus(mapped);
-        return NormalizeStatus(rawName);
-    }
-
     private async Task<SqlConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(options.SqlConnectionString)) throw new InvalidOperationException("Bridge:SqlConnectionString is required when Bridge:Gateway is Sql.");
         return await FfpSqlConnection.OpenAsync(options.SqlConnectionString, options.SqlTarget, cancellationToken);
     }
 
-    private static string NormalizeStatus(string value) => value.Trim().Replace('-', '_').Replace(' ', '_').ToUpperInvariant();
     private static long ParseApplicationId(string value) => long.TryParse(value, out long id) && id > 0 ? id : throw new ArgumentException($"'{value}' is not a valid FFP Manager ApplicationLetters.ID.");
     private static string SanitizeFileName(string value) => BridgeDocumentPath.SafeFileName(value);
     private static string? Truncate(string? value, int max) => string.IsNullOrWhiteSpace(value) ? null : value.Length <= max ? value : value[..max];
