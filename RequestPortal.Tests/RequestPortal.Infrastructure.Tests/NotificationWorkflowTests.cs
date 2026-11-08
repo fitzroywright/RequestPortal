@@ -280,6 +280,78 @@ public sealed class NotificationWorkflowTests
     }
 
     [Theory]
+    [InlineData("intake@example.com", "account@example.com", true, false, 2)]
+    [InlineData("intake@example.com", null, true, false, 1)]
+    [InlineData("intake@example.com", null, false, false, 1)]
+    [InlineData("ACCOUNT@example.com", "account@example.com", true, false, 1)]
+    [InlineData(null, "account@example.com", true, false, 1)]
+    [InlineData(null, null, false, false, 0)]
+    [InlineData("intake@example.com", "account@example.com", true, true, 0)]
+    public async Task QuickIntakeApplicantEmailUsesExistingDeliveryWithoutWhatsAppOrHistoricalReplay(
+        string? intakeEmail, string? accountEmail, bool signedIn, bool optedOut, int expectedEmails)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(token);
+        database.Db.UnitsOfMeasure.Add(new RequestPortal.Domain.ReferenceData.UnitOfMeasure(Guid.NewGuid(), "EA", "Each"));
+        Guid? applicantId = signedIn ? Guid.NewGuid() : null;
+        if (applicantId.HasValue)
+            database.Db.Users.Add(new ApplicationUser { Id = applicantId.Value, UserName = "fixture@example.com",
+                Email = accountEmail, DisplayName = "Fixture applicant", CreatedUtc = Now });
+        await database.Db.SaveChangesAsync(token);
+        var created = await new RequestPortal.Infrastructure.Requests.QuickIntakeService(database.Db).CreateAsync(
+            new RequestPortal.Application.Requests.QuickIntakeSubmission("Test", "Applicant", new DateOnly(1980, 1, 1),
+                "Male", "Single", "8765550123", intakeEmail, "Test road", "Test community", "Kingston",
+                "Unemployed", 0, false, false, ["None"], "Food"), token, applicantUserId: applicantId);
+        var request = await database.Db.AssistanceRequests.SingleAsync(token);
+        if (optedOut)
+            database.Db.NotificationPreferences.Add(new(Guid.NewGuid(), request.CreatedByUserId,
+                NotificationChannel.Email, accountEmail!, enabled: false));
+        // Isolated fixtures stand in for already-processed historical events; never replay them.
+        var historical = await database.Db.OutboxMessages.ToArrayAsync(token);
+        foreach (var item in historical) item.ProcessedUtc = Now;
+        var message = new FfpManagerClientConfirmationRequestedMessage(Guid.NewGuid(), Now, created.RequestId, "FIXTURE/26/0042");
+        database.Db.OutboxMessages.Add(new OutboxMessage { Id = message.MessageId, OccurredUtc = message.OccurredUtc,
+            MessageType = typeof(FfpManagerClientConfirmationRequestedMessage).FullName!, Payload = JsonSerializer.Serialize(message) });
+        await database.Db.SaveChangesAsync(token);
+        var queue = new ApplicantEmailQueue();
+        var sender = new CommonQueuedNotificationSender(queue, new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["Messaging:MicrosoftGraph:Email:Enabled"] = "true" }).Build());
+        var dispatcher = new OutboxDispatcher(database.Db, sender, new DisabledFfpManagerIntegrationService(),
+            Options.Create(new FfpManagerBridgeOptions { Enabled = false }),
+            Options.Create(new NotificationOptions { Enabled = true, WhatsAppEnabled = false }),
+            NullLogger<OutboxDispatcher>.Instance, new NullOperationsFlowPublisher(),
+            new RequestPortal.Infrastructure.Messages.PortalMessageService(database.Db, new NullRealtimeNotifier(),
+                new DisabledBridgeClient(), Options.Create(new FfpManagerBridgeOptions { Enabled = false })));
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(expectedEmails, queue.Items.Count);
+        Assert.All(queue.Items, item => {
+            Assert.Equal(MessageChannel.MsEmail, item.RequestedChannels);
+            Assert.Contains("FIXTURE/26/0042", item.Request.Body);
+        });
+        var addresses = queue.Items.SelectMany(item => item.Recipients).Select(recipient => recipient.Email).ToArray();
+        if (expectedEmails > 0 && intakeEmail is not null)
+            Assert.Contains(addresses, address => string.Equals(address, intakeEmail, StringComparison.OrdinalIgnoreCase));
+        if (signedIn && accountEmail is not null && !optedOut) Assert.Contains(accountEmail, addresses);
+        Assert.Equal(queue.Items.Count, queue.Items.Select(item => item.NotificationId).Distinct().Count());
+        Assert.DoesNotContain(database.Db.NotificationHistory, history => history.Channel == NotificationChannel.WhatsApp);
+        Assert.All(historical, item => Assert.Equal(Now, item.ProcessedUtc));
+    }
+
+    private sealed class ApplicantEmailQueue : IExternalDeliveryQueue
+    {
+        public List<ExternalDeliveryWorkItem> Items { get; } = [];
+        public ValueTask EnqueueAsync(ExternalDeliveryWorkItem item, CancellationToken cancellationToken = default)
+        {
+            Assert.Equal(MessageChannel.MsEmail, item.RequestedChannels);
+            Items.Add(item);
+            return ValueTask.CompletedTask;
+        }
+        public IAsyncEnumerable<ExternalDeliveryWorkItem> ReadAllAsync(CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This fixture records queued email without submitting deliveries.");
+    }
+
+    [Theory]
     [InlineData(false, true)]
     [InlineData(true, true)]
     [InlineData(true, false)]

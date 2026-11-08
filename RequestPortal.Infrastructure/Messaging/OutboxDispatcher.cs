@@ -826,42 +826,59 @@ public sealed class OutboxDispatcher
     {
         string? accountEmail = await dbContext.Users.AsNoTracking().Where(user => user.Id == userId).Select(user => user.Email).SingleOrDefaultAsync(cancellationToken);
         NotificationPreference? preference = await dbContext.NotificationPreferences.AsNoTracking().SingleOrDefaultAsync(item => item.UserId == userId && item.Channel == NotificationChannel.Email, cancellationToken);
-        string destination = preference?.Destination ?? accountEmail ?? "(no email address)";
-        NotificationHistory history = new(Guid.NewGuid(), userId, organizationId, requestId, NotificationChannel.Email, destination, subject, DateTimeOffset.UtcNow);
-        dbContext.NotificationHistory.Add(history);
+        string? intakeEmail = requestId.HasValue
+            ? await dbContext.QuickIntakes.AsNoTracking()
+                .Where(intake => intake.RequestId == requestId.Value &&
+                    (intake.ConvertedToUserId ?? intake.AnonymousUserId) == userId)
+                .Select(intake => intake.Email).SingleOrDefaultAsync(cancellationToken)
+            : null;
+        string primaryDestination = preference?.Destination ?? accountEmail ?? "(no email address)";
+        string[] destinations = string.IsNullOrWhiteSpace(intakeEmail)
+            ? [primaryDestination]
+            : new[] { preference?.Destination ?? accountEmail, intakeEmail }
+                .Where(destination => !string.IsNullOrWhiteSpace(destination))
+                .Select(destination => destination!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        foreach (string destination in destinations)
+        {
+            NotificationHistory history = new(Guid.NewGuid(), userId, organizationId, requestId, NotificationChannel.Email, destination, subject, DateTimeOffset.UtcNow);
+            dbContext.NotificationHistory.Add(history);
 
-        if (preference is not null && !preference.Enabled)
-        {
-            history.MarkSkipped("Email notifications are disabled in the user's notification preferences.");
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(accountEmail) && preference is null)
-        {
-            history.MarkSkipped("No email destination is available for this portal user.");
-            return;
-        }
-        if (!notificationOptions.Enabled)
-        {
-            history.MarkSkipped("Notification delivery is disabled in the current environment.");
-            return;
-        }
+            if (preference is not null && !preference.Enabled)
+            {
+                history.MarkSkipped("Email notifications are disabled in the user's notification preferences.");
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(accountEmail) && preference is null && string.IsNullOrWhiteSpace(intakeEmail))
+            {
+                history.MarkSkipped("No email destination is available for this portal user.");
+                continue;
+            }
+            if (!notificationOptions.Enabled)
+            {
+                history.MarkSkipped("Notification delivery is disabled in the current environment.");
+                continue;
+            }
 
-        try
-        {
-            await notificationSender.SendAsync(
-                new NotificationEnvelope(
-                    destination,
-                    subject,
-                    body,
-                    CorrelationId: requestId?.ToString("D"),
-                    DeliveryId: deliveryId is null ? null : CreateDeterministicGuid(deliveryId.Value, $"Email:{userId:D}")),
-                cancellationToken);
-            history.MarkSent(DateTimeOffset.UtcNow);
-        }
-        catch (Exception exception)
-        {
-            history.MarkFailed(exception.Message);
-            throw;
+            try
+            {
+                await notificationSender.SendAsync(
+                    new NotificationEnvelope(
+                        destination,
+                        subject,
+                        body,
+                        CorrelationId: requestId?.ToString("D"),
+                        DeliveryId: deliveryId is null ? null : CreateDeterministicGuid(deliveryId.Value,
+                            string.Equals(destination, primaryDestination, StringComparison.OrdinalIgnoreCase)
+                                ? $"Email:{userId:D}" : $"Email:{userId:D}:{destination.ToUpperInvariant()}")),
+                    cancellationToken);
+                history.MarkSent(DateTimeOffset.UtcNow);
+            }
+            catch (Exception exception)
+            {
+                history.MarkFailed(exception.Message);
+                throw;
+            }
         }
     }
 
