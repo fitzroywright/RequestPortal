@@ -49,6 +49,7 @@ internal sealed class RequestStatusHistoryConfiguration : IEntityTypeConfigurati
     {
         builder.ToTable("request_status_history");
         builder.HasKey(history => history.Id);
+        builder.Property(history => history.Id).ValueGeneratedNever();
         builder.Property(history => history.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(history => history.Reason).HasMaxLength(4000);
         builder.HasIndex(history => new { history.RequestId, history.ChangedUtc });

@@ -26,6 +26,64 @@ namespace RequestPortal.Infrastructure.Tests;
 public sealed class IntegrationMonitoringTests
 {
     [Fact]
+    public async Task ApprovedStatusOnReloadedRequestPersistsOneHistoryAndNotificationDespiteMessageReplay()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
+        Guid requestId = await Intake(database);
+        Guid messageId = Guid.NewGuid();
+        var status = new ExternalApplicationStatus("test-application", "APPROVED", "Approved", Clock.UtcNow);
+        int historyCount;
+        int outboxCount = await database.Db.OutboxMessages.CountAsync(item =>
+            item.MessageType == typeof(RequestStatusChangedMessage).FullName, ct);
+
+        await using (var receiving = database.CreateSiblingContext())
+        {
+            var request = await receiving.AssistanceRequests.Include(item => item.StatusHistory)
+                .SingleAsync(item => item.Id == requestId, ct);
+            Assert.Equal(RequestPortal.Domain.Requests.RequestStatus.Submitted, request.Status);
+            historyCount = request.StatusHistory.Count;
+            var service = new FfpManagerIntegrationService(receiving, new Documents(), new Bridge(),
+                Options.Create(OptionsValue), Clock, null!);
+            await service.ReceiveStatusAsync(messageId, requestId, status, ct);
+        }
+
+        Guid historyId;
+        Guid notificationId;
+        await using (var replay = database.CreateSiblingContext())
+        {
+            var request = await replay.AssistanceRequests.Include(item => item.StatusHistory)
+                .SingleAsync(item => item.Id == requestId, ct);
+            Assert.Equal(RequestPortal.Domain.Requests.RequestStatus.Approved, request.Status);
+            Assert.Equal(historyCount + 1, request.StatusHistory.Count);
+            historyId = Assert.Single(request.StatusHistory, item =>
+                item.Status == RequestPortal.Domain.Requests.RequestStatus.Approved).Id;
+            Assert.Equal(outboxCount + 1, await replay.OutboxMessages.CountAsync(item =>
+                item.MessageType == typeof(RequestStatusChangedMessage).FullName, ct));
+            notificationId = (await replay.OutboxMessages.SingleAsync(item =>
+                item.MessageType == typeof(RequestStatusChangedMessage).FullName, ct)).Id;
+            Assert.NotNull((await replay.InboxMessages.SingleAsync(item => item.MessageId == messageId, ct)).ProcessedUtc);
+
+            var service = new FfpManagerIntegrationService(replay, new Documents(), new Bridge(),
+                Options.Create(OptionsValue), Clock, null!);
+            await service.ReceiveStatusAsync(messageId, requestId, status, ct);
+        }
+
+        await using var verification = database.CreateSiblingContext();
+        var persisted = await verification.AssistanceRequests.Include(item => item.StatusHistory)
+            .SingleAsync(item => item.Id == requestId, ct);
+        Assert.Equal(RequestPortal.Domain.Requests.RequestStatus.Approved, persisted.Status);
+        Assert.Equal(historyCount + 1, persisted.StatusHistory.Count);
+        Assert.Equal(historyId, Assert.Single(persisted.StatusHistory, item =>
+            item.Status == RequestPortal.Domain.Requests.RequestStatus.Approved).Id);
+        Assert.Equal(outboxCount + 1, await verification.OutboxMessages.CountAsync(item =>
+            item.MessageType == typeof(RequestStatusChangedMessage).FullName, ct));
+        Assert.Equal(notificationId, (await verification.OutboxMessages.SingleAsync(item =>
+            item.MessageType == typeof(RequestStatusChangedMessage).FullName, ct)).Id);
+        Assert.Single(await verification.InboxMessages.Where(item => item.MessageId == messageId).ToListAsync(ct));
+    }
+
+    [Fact]
     public async Task BridgeBadRequestRetainsRejectedValidationFieldInsteadOfHttpWrapper()
     {
         var method = typeof(FfpManagerBridgeClient).GetMethod(
