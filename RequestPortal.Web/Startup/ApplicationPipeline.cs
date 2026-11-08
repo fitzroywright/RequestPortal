@@ -52,10 +52,10 @@ internal static class ApplicationPipeline
             }
         });
         app.UseRouting();
-        app.UseRateLimiter();
         app.UseAuthentication();
         app.Use(ApplyAlternateAuthenticatedPrincipalAsync);
         app.Use(PreventAuthenticatedPageCachingAsync);
+        app.UseRateLimiter();
         app.UseAuthorization();
     }
 

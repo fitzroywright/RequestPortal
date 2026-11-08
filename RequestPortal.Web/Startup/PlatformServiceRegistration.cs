@@ -129,13 +129,38 @@ internal static class PlatformServiceRegistration
         {
             options.RejectionStatusCode =
                 StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (rejected, cancellationToken) =>
+            {
+                var context = rejected.HttpContext;
+                if (rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    context.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                context.Response.Headers.CacheControl = "no-store";
+                // An empty, untyped rejection can be treated as a download for /Staff.
+                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path.StartsWithSegments("/Staff"))
+                {
+                    context.Response.ContentType = "text/html; charset=utf-8";
+                    string retryUrl = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(
+                        context.Request.PathBase + context.Request.Path + context.Request.QueryString);
+                    await context.Response.WriteAsync($"<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Please wait - Request Portal</title><h1>Please wait</h1><p>Too many requests. Please wait a minute, then <a href=\"{retryUrl}\">retry this page</a>.</p></html>", cancellationToken);
+                }
+                else
+                {
+                    context.Response.ContentType = "text/plain; charset=utf-8";
+                    await context.Response.WriteAsync("Too many requests. Please wait a minute and try again.", cancellationToken);
+                }
+            };
 
             options.GlobalLimiter =
                 PartitionedRateLimiter.Create<HttpContext, string>(
                     context =>
                         RateLimitPartition.GetFixedWindowLimiter(
-                            context.Connection.RemoteIpAddress?.ToString()
-                                ?? "unknown"
+                            // Staff sharing an office/NAT address must not consume
+                            // one another's navigation quota. Authentication runs first.
+                            context.User.Identity?.IsAuthenticated == true &&
+                            context.User.HasClaim(RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceClaim, RequestPortal.Web.Security.StaffOidcOptions.StaffSurfaceValue) &&
+                            context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value is { } staffId
+                                ? "staff:" + staffId
+                                : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown")
                             , _ => new FixedWindowRateLimiterOptions
                             {
                                 PermitLimit = 120

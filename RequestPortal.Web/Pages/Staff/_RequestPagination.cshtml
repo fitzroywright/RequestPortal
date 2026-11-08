@@ -22,7 +22,7 @@
         else { <span aria-disabled="true">Previous</span> }
         @if (result.PageNumber < result.TotalPages)
         {
-            <a asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageSize="@result.PageSize" asp-route-PageNumber="@(result.PageNumber + 1)">Next</a>
+            <a asp-page="/Staff/Index" asp-route-Search="@Model.Search" asp-route-PageSize="@result.PageSize" asp-route-Applicant="@Model.Applicant" asp-route-Organization="@Model.Organization" asp-route-WorkStatus="@Model.WorkStatus" asp-route-PageNumber="@(result.PageNumber + 1)">Next</a>
         }
         else { <span aria-disabled="true">Next</span> }
     </nav>
