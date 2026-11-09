@@ -59,13 +59,20 @@ public sealed class OutboxDispatcher
         this.routing = routing ?? new StaffNotificationRouting(dbContext);
     }
 
-    public async Task<int> DispatchBatchAsync(int batchSize = 20, CancellationToken cancellationToken = default)
+    public async Task<int> DispatchBatchAsync(int batchSize = 20, CancellationToken cancellationToken = default, DateTimeOffset? nowUtc = null)
     {
-        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = nowUtc ?? DateTimeOffset.UtcNow;
+        if (notificationOptions.Enabled && !string.IsNullOrWhiteSpace(notificationOptions.QuickIntakeClientRelationsEmail))
+        {
+            await ClientRelationsDigest.QueueAsync(dbContext, now, cancellationToken);
+        }
+        bool digestWindow = ClientRelationsDigest.SlotFor(now).HasValue;
         List<OutboxMessage> candidates = await dbContext.OutboxMessages
             .Where(message => message.ProcessedUtc == null && !message.IsTerminal && message.AttemptCount < MaxAttempts &&
                 (message.NextAttemptUtc == null || message.NextAttemptUtc <= now) &&
                 message.MessageType != QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType &&
+                message.MessageType != typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName &&
+                (digestWindow || message.MessageType != typeof(ClientRelationsDigest).FullName) &&
                 message.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType)
             .OrderBy(message => message.OccurredUtc)
             .Take(Math.Max(batchSize * 4, batchSize))
@@ -143,10 +150,22 @@ public sealed class OutboxDispatcher
                 DeliveryId: recovered.MessageId), cancellationToken);
             return;
         }
-        if (outbox.MessageType == typeof(QuickIntakeClientRelationsEmailRequestedMessage).FullName)
+        if (outbox.MessageType == typeof(ClientRelationsDigest).FullName)
         {
-            await SendQuickIntakeClientRelationsEmailAsync(
-                Deserialize<QuickIntakeClientRelationsEmailRequestedMessage>(outbox.Payload), cancellationToken);
+            var digest = Deserialize<ClientRelationsDigest>(outbox.Payload);
+            if (!notificationOptions.Enabled)
+                throw new InvalidOperationException("Client Relations digest delivery is disabled.");
+            string recipient = new System.Net.Mail.MailAddress(notificationOptions.QuickIntakeClientRelationsEmail.Trim()).Address;
+            var localSlot = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(digest.SlotUtc, "America/Jamaica");
+            string body = $"Client Relations Quick Intake digest — {localSlot:yyyy-MM-dd HH:mm} Jamaica time\n\n" +
+                string.Join("\n", digest.Items.Select(item =>
+                    $"Request Portal reference: {item.PublicReference} | FFP Manager reference: {item.FfpManagerReference}")) +
+                "\n\nPlease review these requests in Request Portal.";
+            await notificationSender.SendAsync(new NotificationEnvelope(recipient,
+                $"Client Relations digest — {localSlot:yyyy-MM-dd HH:mm} ({digest.Items.Length} requests)",
+                body, CorrelationId: digest.MessageId.ToString("D"), DeliveryId: digest.MessageId), cancellationToken);
+            logger.LogInformation("Client Relations digest {DigestId} queued for {ItemCount} requests at {SlotUtc}.",
+                digest.MessageId, digest.Items.Length, digest.SlotUtc);
             return;
         }
         if (outbox.MessageType.EndsWith(nameof(OrganizationApprovedMessage), StringComparison.Ordinal))
@@ -513,28 +532,6 @@ public sealed class OutboxDispatcher
             recipients, request.OrganizationId, message.RequestId,
             $"Request submitted: {confirmationReference}", body, cancellationToken,
             applicationNumber is null ? null : message.MessageId);
-    }
-
-    private async Task SendQuickIntakeClientRelationsEmailAsync(
-        QuickIntakeClientRelationsEmailRequestedMessage message, CancellationToken cancellationToken)
-    {
-        if (!notificationOptions.Enabled)
-            throw new InvalidOperationException("Client Relations email is pending because notification delivery is disabled.");
-        if (string.IsNullOrWhiteSpace(message.FfpManagerReference) ||
-            string.Equals(message.FfpManagerReference, message.PublicReference, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Client Relations email requires the FFP Manager reference.");
-        if (!await dbContext.QuickIntakes.AsNoTracking().AnyAsync(item => item.RequestId == message.RequestId, cancellationToken))
-            throw new InvalidOperationException("Client Relations notification requires a Quick Intake request.");
-
-        string recipient = new System.Net.Mail.MailAddress(notificationOptions.QuickIntakeClientRelationsEmail.Trim()).Address;
-        // This is a durable handoff. Common.Messaging owns transport retries and
-        // provider-completion receipts; outbox completion alone is not delivery.
-        await notificationSender.SendAsync(new NotificationEnvelope(
-            recipient,
-            $"New Quick Intake Request — {message.PublicReference}",
-            $"A new Quick Intake request has been submitted.\n\nRequest Portal reference: {message.PublicReference}\n" +
-            $"FFP Manager reference: {message.FfpManagerReference}\n\nPlease review this request in Request Portal.",
-            CorrelationId: message.MessageId.ToString("D"), DeliveryId: message.MessageId), cancellationToken);
     }
 
     private async Task SendRequestStatusChangedAsync(RequestStatusChangedMessage message, CancellationToken cancellationToken)

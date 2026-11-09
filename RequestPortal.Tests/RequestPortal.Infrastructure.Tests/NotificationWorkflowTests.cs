@@ -382,13 +382,16 @@ public sealed class NotificationWorkflowTests
             MessageType=typeof(FfpManagerClientConfirmationRequestedMessage).FullName!, Payload=JsonSerializer.Serialize(client) });
         await database.Db.SaveChangesAsync(token);
         var sender = new RecordingReferenceSender();
+        var digestDay = DateTimeOffset.UtcNow.AddDays(1).Date;
+        while (digestDay.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) digestDay = digestDay.AddDays(1);
+        var digestTime = new DateTimeOffset(digestDay.AddHours(13), TimeSpan.Zero);
         var options = new NotificationOptions { Enabled=true, WhatsAppEnabled=whatsApp, QuickIntakeClientRelationsEmail="" };
         var dispatcher = new OutboxDispatcher(database.Db, sender, new DisabledFfpManagerIntegrationService(),
             Options.Create(new FfpManagerBridgeOptions { Enabled=true }), Options.Create(options),
             NullLogger<OutboxDispatcher>.Instance, new NullOperationsFlowPublisher(),
             new RequestPortal.Infrastructure.Messages.PortalMessageService(database.Db, new NullRealtimeNotifier(),
                 new DisabledBridgeClient(), Options.Create(new FfpManagerBridgeOptions { Enabled=false })));
-        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: digestTime));
         Assert.NotNull(database.Db.OutboxMessages.Single(m=>m.Id==client.MessageId).ProcessedUtc);
         Assert.Null(staff.ProcessedUtc);
         var email = Assert.Single(sender.Notifications, m=>m.Transport==NotificationTransport.Email);
@@ -402,15 +405,15 @@ public sealed class NotificationWorkflowTests
         options.QuickIntakeClientRelationsEmail="clientrelations@example.com";
         staff.AttemptCount=0; staff.LastError=null; staff.NextAttemptUtc=null; staff.IsTerminal=false;
         await database.Db.SaveChangesAsync(token);
-        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: digestTime));
         Assert.Single(sender.Notifications, m=>m.Recipient=="clientrelations@example.com");
         // Replaying a handoff retains stable delivery identities for provider deduplication.
         var before = sender.Notifications.Where(m=>m.Recipient!="clientrelations@example.com").Select(m=>m.DeliveryId).ToArray();
         database.Db.OutboxMessages.Single(m=>m.Id==client.MessageId).ProcessedUtc=null;
         await database.Db.SaveChangesAsync(token);
-        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: digestTime));
         Assert.Equal(before, sender.Notifications.Where(m=>m.Recipient!="clientrelations@example.com").Skip(before.Length).Select(m=>m.DeliveryId).ToArray());
-        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: digestTime));
     }
 
     [Fact]
