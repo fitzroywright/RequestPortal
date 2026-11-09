@@ -20,6 +20,14 @@ namespace RequestPortal.Infrastructure.Tests;
 
 public sealed class QuickIntakeClientRelationsEmailTests
 {
+    private static readonly DateTimeOffset DigestTime = NextDigestTime();
+    private static DateTimeOffset NextDigestTime()
+    {
+        var day = DateTimeOffset.UtcNow.AddDays(1).Date;
+        while (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) day = day.AddDays(1);
+        return new DateTimeOffset(day.AddHours(13), TimeSpan.Zero);
+    }
+
     private static readonly QuickIntakeSubmission Submission = new(
         "Email", "Verification", new DateOnly(1980, 1, 1), "Male", "Single", "8765550199", null,
         "Test address", "Test community", "Kingston", "Unemployed", 0, false, false, ["None"], "Food");
@@ -117,9 +125,9 @@ public sealed class QuickIntakeClientRelationsEmailTests
         await CompleteOriginalSubmissionEvent(database, token);
         var sender = new CapturingSender();
         var dispatcher = Dispatcher(database, sender);
-        for (int i = 0; i < 12; i++) Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        for (int i = 0; i < 12; i++) Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
         Assert.Empty(sender.Sent);
-        var email = await Email(database, result.RequestId, token);
+        var email = await database.Db.OutboxMessages.SingleAsync(m => m.MessageType == typeof(ClientRelationsDigest).FullName, token);
         Assert.Null(email.ProcessedUtc);
         Assert.Equal(0, email.AttemptCount);
         Assert.Null(email.LastError);
@@ -141,18 +149,18 @@ public sealed class QuickIntakeClientRelationsEmailTests
         await CompleteOriginalSubmissionEvent(database, token);
         var sender = new CapturingSender();
         var dispatcher = Dispatcher(database, sender, new NotificationOptions { Enabled = true, QuickIntakeClientRelationsEmail = "configured@example.com" });
-        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token));
-        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
+        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
         var sent = Assert.Single(sender.Sent);
         Assert.Equal("configured@example.com", sent.Recipient);
-        Assert.Equal($"New Quick Intake Request — {result.PublicReference}", sent.Subject);
-        Assert.Contains("A new Quick Intake request has been submitted.", sent.Body);
+        Assert.Contains("Client Relations digest", sent.Subject);
+        Assert.Contains("Client Relations Quick Intake digest", sent.Body);
         Assert.Contains($"Request Portal reference: {result.PublicReference}", sent.Body);
         Assert.Contains("FFP Manager reference: KGN/26/GR/0042", sent.Body);
-        Assert.Contains("review this request in Request Portal", sent.Body);
-        Assert.Equal(QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(result.RequestId), sent.DeliveryId);
+        Assert.Contains("review these requests in Request Portal", sent.Body);
+        Assert.Equal(ClientRelationsDigest.IdFor(ClientRelationsDigest.SlotFor(DigestTime)!.Value), sent.DeliveryId);
         Assert.Equal(NotificationTransport.Email, sent.Transport);
-        Assert.Equal(3, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
+        Assert.Equal(4, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
     }
 
     [Fact]
@@ -164,9 +172,9 @@ public sealed class QuickIntakeClientRelationsEmailTests
         await Integration(database, new BridgeClient()).SubmitRequestAsync(result.RequestId, token);
         await CompleteOriginalSubmissionEvent(database, token);
         var sender = new CapturingSender { Fail = true };
-        Assert.Equal(0, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(0, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
         database.Db.ChangeTracker.Clear();
-        var email = await Email(database, result.RequestId, token);
+        var email = await database.Db.OutboxMessages.SingleAsync(m => m.MessageType == typeof(ClientRelationsDigest).FullName, token);
         Assert.Null(email.ProcessedUtc);
         Assert.Equal(1, email.AttemptCount);
         Assert.StartsWith("RETRY_AT=", email.LastError);
@@ -175,10 +183,10 @@ public sealed class QuickIntakeClientRelationsEmailTests
         email.NextAttemptUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
         await database.Db.SaveChangesAsync(token);
         sender.Fail = false;
-        Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token));
+        Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
         Assert.Single(sender.Sent);
         Assert.NotNull((await Email(database, result.RequestId, token)).ProcessedUtc);
-        Assert.Equal(3, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
+        Assert.Equal(4, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
         Assert.Equal(1, await database.Db.AssistanceRequests.CountAsync(token));
     }
 
@@ -200,7 +208,7 @@ public sealed class QuickIntakeClientRelationsEmailTests
             var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
                 ["Messaging:MicrosoftGraph:Email:Enabled"] = graph.ToString() }).Build();
             var sender = new CommonQueuedNotificationSender(queue, config);
-            Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token));
+            Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
             var channel = new FailingOnceChannel(graph ? MessageChannel.MsEmail : MessageChannel.Smtp);
             var store = new FileExternalDeliveryIdempotencyStore(options);
             var delivery = new ExternalDeliveryDispatcher([channel], options, idempotencyStore: store);
@@ -211,15 +219,15 @@ public sealed class QuickIntakeClientRelationsEmailTests
             var processor = new ExternalDeliveryProcessor(reopened, delivery, options);
             Task run = processor.RunAsync(stop.Token);
             await channel.Delivered.Task.WaitAsync(stop.Token);
-            Guid id = QuickIntakeClientRelationsEmailRequestedMessage.IdForRequest(result.RequestId);
+            Guid id = ClientRelationsDigest.IdFor(ClientRelationsDigest.SlotFor(DigestTime)!.Value);
             string recipient = new NotificationOptions().QuickIntakeClientRelationsEmail;
             await WaitUntil(async () => (await reopened.CheckHealthAsync(token)).Pending == 0, stop.Token);
             Assert.True(await store.HasDeliveredAsync(id, recipient, channel.Channel, token));
             // Simulate replay after a crash between durable handoff and outbox commit.
-            var email = await Email(database, result.RequestId, token);
+            var email = await database.Db.OutboxMessages.SingleAsync(m => m.Id == id, token);
             email.ProcessedUtc = null;
             await database.Db.SaveChangesAsync(token);
-            Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token));
+            Assert.Equal(1, await Dispatcher(database, sender).DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
             await WaitUntil(async () => (await reopened.CheckHealthAsync(token)).Pending == 0, stop.Token);
             Assert.Equal(2, channel.Attempts);
             Assert.Equal(1, channel.Successes);
