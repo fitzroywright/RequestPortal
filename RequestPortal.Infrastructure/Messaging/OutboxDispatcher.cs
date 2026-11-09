@@ -157,13 +157,29 @@ public sealed class OutboxDispatcher
                 throw new InvalidOperationException("Client Relations digest delivery is disabled.");
             string recipient = new System.Net.Mail.MailAddress(notificationOptions.QuickIntakeClientRelationsEmail.Trim()).Address;
             var localSlot = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(digest.SlotUtc, "America/Jamaica");
-            string body = $"Client Relations Quick Intake digest — {localSlot:yyyy-MM-dd HH:mm} Jamaica time\n\n" +
-                string.Join("\n", digest.Items.Select(item =>
-                    $"Request Portal reference: {item.PublicReference} | FFP Manager reference: {item.FfpManagerReference}")) +
-                "\n\nPlease review these requests in Request Portal.";
+            // Encode every reference: intake data must never become email markup.
+            string rows = string.Join("", digest.Items.Select((item, index) =>
+                $"<tr style=\"background:{(index % 2 == 0 ? "#ffffff" : "#f3f6f8")}\">" +
+                $"<td style=\"padding:10px;border-bottom:1px solid #dce3e8\">{index + 1}</td>" +
+                $"<td style=\"padding:10px;border-bottom:1px solid #dce3e8\">{System.Net.WebUtility.HtmlEncode(item.PublicReference)}</td>" +
+                $"<td style=\"padding:10px;border-bottom:1px solid #dce3e8\">{System.Net.WebUtility.HtmlEncode(item.FfpManagerReference)}</td></tr>"));
+            string body = "<!doctype html><html lang=\"en\"><body style=\"margin:0;padding:20px;font-family:Arial,sans-serif;color:#243746;background:#ffffff\">" +
+                "<div style=\"max-width:760px;margin:0 auto\">" +
+                "<p style=\"font-size:12px;color:#526779;letter-spacing:1px\">REQUEST PORTAL</p>" +
+                "<h1 style=\"font-size:24px;margin-bottom:8px\">Client Relations Digest</h1>" +
+                $"<p style=\"color:#526779\">{localSlot.ToString("dddd, d MMMM yyyy · h:mm tt", CultureInfo.GetCultureInfo("en-JM"))} · Jamaica time</p>" +
+                $"<h2 style=\"font-size:18px;margin-top:28px\">New Quick Intake Submissions — {digest.Items.Length}</h2>" +
+                "<p>These submissions are ready for review. Use the references below to locate each request in Request Portal or FFP Manager.</p>" +
+                "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;font-size:14px;text-align:left\">" +
+                "<thead><tr style=\"background:#173b53;color:#ffffff\">" +
+                "<th scope=\"col\" style=\"padding:10px\">#</th><th scope=\"col\" style=\"padding:10px\">Request Portal reference</th>" +
+                "<th scope=\"col\" style=\"padding:10px\">FFP Manager reference</th></tr></thead>" +
+                $"<tbody>{rows}</tbody></table>" +
+                "<p style=\"font-size:12px;color:#526779;margin-top:24px\">This digest includes queued Quick Intake notices, including any carried forward from outside delivery hours. It is not the full outstanding workload.</p>" +
+                "</div></body></html>";
             await notificationSender.SendAsync(new NotificationEnvelope(recipient,
-                $"Client Relations digest — {localSlot:yyyy-MM-dd HH:mm} ({digest.Items.Length} requests)",
-                body, CorrelationId: digest.MessageId.ToString("D"), DeliveryId: digest.MessageId), cancellationToken);
+                $"Request Portal | {localSlot:yyyy-MM-dd HH:mm} | {digest.Items.Length} new Quick Intake submissions",
+                body, IsHtml: true, CorrelationId: digest.MessageId.ToString("D"), DeliveryId: digest.MessageId), cancellationToken);
             logger.LogInformation("Client Relations digest {DigestId} queued for {ItemCount} requests at {SlotUtc}.",
                 digest.MessageId, digest.Items.Length, digest.SlotUtc);
             return;
