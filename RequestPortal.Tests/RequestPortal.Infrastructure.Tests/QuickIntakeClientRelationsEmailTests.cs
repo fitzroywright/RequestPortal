@@ -127,7 +127,9 @@ public sealed class QuickIntakeClientRelationsEmailTests
         var dispatcher = Dispatcher(database, sender);
         for (int i = 0; i < 12; i++) Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
         Assert.Empty(sender.Sent);
-        var email = await database.Db.OutboxMessages.SingleAsync(m => m.MessageType == typeof(ClientRelationsDigest).FullName, token);
+        Assert.False(await database.Db.OutboxMessages.AnyAsync(m => m.MessageType == typeof(ClientRelationsDigest).FullName, token));
+        var email = await Email(database, result.RequestId, token);
+        Assert.Equal(QuickIntakeClientRelationsEmailRequestedMessage.AwaitingReferenceMessageType, email.MessageType);
         Assert.Null(email.ProcessedUtc);
         Assert.Equal(0, email.AttemptCount);
         Assert.Null(email.LastError);
