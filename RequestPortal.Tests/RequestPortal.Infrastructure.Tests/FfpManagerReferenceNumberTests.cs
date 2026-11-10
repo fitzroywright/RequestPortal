@@ -50,12 +50,42 @@ public sealed class FfpManagerReferenceNumberTests
             : new SqlFfpManagerGateway(options);
         try
         {
+            var beforeCreate = JamaicaBusinessTime.ToLocal(DateTimeOffset.UtcNow);
             var first = await gateway.CreateApplicationAsync(submission, token);
             var repeated = await gateway.CreateApplicationAsync(submission, token);
             Assert.Equal(first.ApplicationId, repeated.ApplicationId);
             Assert.Equal(first.ApplicationNumber, repeated.ApplicationNumber);
             Assert.NotEqual(submission.PublicReference, first.ApplicationNumber);
             Assert.True(repeated.AlreadyExisted);
+            await using (SqlCommand notes = new("""
+                SELECT al.Comments, n.Description, n.UserName, n.CreatedBy, n.DateCreated, n.DateUpdated
+                FROM dbo.ApplicationLetters al
+                JOIN dbo.ApplicationNotes n ON n.ApplicationLetterID = al.ID
+                WHERE al.ExternalRequestId = @Id;
+                """, connection))
+            {
+                notes.Parameters.AddWithValue("@Id", requestId);
+                await using var note = await notes.ExecuteReaderAsync(token);
+                Assert.True(await note.ReadAsync(token));
+                Assert.True(note.IsDBNull(0));
+                Assert.Equal(string.Join(Environment.NewLine, submission.Summary, submission.Circumstances,
+                    submission.OrganizationAddress, submission.OrganizationEmail), note.GetString(1));
+                Assert.Equal(options.Value.UserName, note.GetString(2));
+                Assert.Equal(options.Value.UserName, note.GetString(3));
+                Assert.InRange(note.GetDateTime(4), beforeCreate.AddSeconds(-1), JamaicaBusinessTime.ToLocal(DateTimeOffset.UtcNow).AddSeconds(1));
+                Assert.Equal(note.GetDateTime(4), note.GetDateTime(5));
+                Assert.False(await note.ReadAsync(token)); // Duplicate delivery must leave exactly one intake note.
+            }
+            await using (SqlCommand historical = new("UPDATE dbo.ApplicationLetters SET Comments=N'Existing historical comment' WHERE ExternalRequestId=@Id", connection))
+            {
+                historical.Parameters.AddWithValue("@Id", requestId);
+                await historical.ExecuteNonQueryAsync(token);
+                await gateway.CreateApplicationAsync(submission, token);
+                historical.CommandText = "SELECT Comments FROM dbo.ApplicationLetters WHERE ExternalRequestId=@Id";
+                Assert.Equal("Existing historical comment", (string?)await historical.ExecuteScalarAsync(token));
+                historical.CommandText = "SELECT COUNT(*) FROM dbo.ApplicationNotes n JOIN dbo.ApplicationLetters al ON al.ID=n.ApplicationLetterID WHERE al.ExternalRequestId=@Id";
+                Assert.Equal(1, Convert.ToInt32(await historical.ExecuteScalarAsync(token)));
+            }
             await using SqlCommand stored = new(
                 "SELECT Code,ReferenceNo,DocumentSource,Parish FROM dbo.ApplicationLetters WHERE ExternalRequestId=@Id AND GCRecord IS NULL",
                 connection);
@@ -113,7 +143,7 @@ public sealed class FfpManagerReferenceNumberTests
         finally
         {
             // No production access and no counter rewinds: sequence gaps are valid.
-            await using SqlCommand cleanup = new("SET XACT_ABORT ON; BEGIN TRANSACTION; DELETE ir FROM dbo.ItemsRequested ir JOIN dbo.ApplicationLetters al ON al.ID=ir.ApplicationLetterID WHERE al.ExternalRequestId=@Id; DELETE FROM dbo.ApplicationLetters WHERE ExternalRequestId=@Id; COMMIT;", connection);
+            await using SqlCommand cleanup = new("SET XACT_ABORT ON; BEGIN TRANSACTION; DELETE n FROM dbo.ApplicationNotes n JOIN dbo.ApplicationLetters al ON al.ID=n.ApplicationLetterID WHERE al.ExternalRequestId=@Id; DELETE ir FROM dbo.ItemsRequested ir JOIN dbo.ApplicationLetters al ON al.ID=ir.ApplicationLetterID WHERE al.ExternalRequestId=@Id; DELETE FROM dbo.ApplicationLetters WHERE ExternalRequestId=@Id; COMMIT;", connection);
             cleanup.Parameters.AddWithValue("@Id", requestId);
             await cleanup.ExecuteNonQueryAsync(CancellationToken.None);
         }

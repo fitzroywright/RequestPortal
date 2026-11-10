@@ -65,10 +65,10 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         long statusId = await referenceData.ResolveApplicationStatusIdAsync(options.InitialApplicationStatus, cancellationToken);
         string insert = $$"""
             INSERT INTO dbo.ApplicationLetters
-            (Code,ReferenceNo,Name,ContactPerson,FirstName,LastName,Street,Town,DateOfBirth,Gender,Occupation,MainContactNo,ApplicationDate,DateReceived,Comments,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource{{BridgeQuickIntakeFields.Columns(submission)}})
+            (Code,ReferenceNo,Name,ContactPerson,FirstName,LastName,Street,Town,DateOfBirth,Gender,Occupation,MainContactNo,ApplicationDate,DateReceived,Programme,Requirements,ApplicationStatus,UserName,DateCreated,DateUpdated,AuditID,CreatedBy,ExternalRequestId,Parish,DocumentSource{{BridgeQuickIntakeFields.Columns(submission)}})
             OUTPUT INSERTED.ID
             VALUES
-            (@Code,@ReferenceNo,@Name,@ContactPerson,@FirstName,@LastName,@Street,@Town,@DateOfBirth,@Gender,@Occupation,@MainContactNo,@ApplicationDate,@DateReceived,@Comments,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource{{BridgeQuickIntakeFields.Values(submission)}});
+            (@Code,@ReferenceNo,@Name,@ContactPerson,@FirstName,@LastName,@Street,@Town,@DateOfBirth,@Gender,@Occupation,@MainContactNo,@ApplicationDate,@DateReceived,@Programme,@Requirements,@ApplicationStatus,@UserName,@DateCreated,@DateUpdated,@AuditID,@CreatedBy,@ExternalRequestId,@Parish,@DocumentSource{{BridgeQuickIntakeFields.Values(submission)}});
             """;
         await using SqlCommand command = new(insert, connection, transaction);
         AddNullable(command, "@Code", submission.PublicReference, SqlDbType.NVarChar, 500);
@@ -83,7 +83,6 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         command.Parameters.Add("@Gender", SqlDbType.Int).Value = BridgeApplicantProfile.Gender(submission.ApplicantGender) is { } gender ? gender : DBNull.Value;
         BridgeApplicationReceipt.AddParameters(command, submission);
         AddNullable(command, "@MainContactNo", BridgeApplicantProfile.MainContact(submission), SqlDbType.NVarChar, 255);
-        AddNullable(command, "@Comments", CombineComments(submission), SqlDbType.NVarChar, 2500);
         BridgeQuickIntakeFields.AddParameters(command, submission);
         AddNullable(command, "@Requirements", CombineRequirements(submission), SqlDbType.NVarChar, 255);
         command.Parameters.Add("@ApplicationStatus", SqlDbType.BigInt).Value = statusId;
@@ -96,6 +95,22 @@ public sealed class SyncedSqlFfpManagerGateway : IFfpManagerGateway
         command.Parameters.Add("@Parish", SqlDbType.BigInt).Value = generatedReference.ParishId;
         AddNullable(command, "@DocumentSource", submission.DocumentSource, SqlDbType.NVarChar, 255);
         long applicationId = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
+
+        // Commit the intake note with its new application; retries reuse the existing application above.
+        await using (SqlCommand note = new("""
+            INSERT INTO dbo.ApplicationNotes
+                (DateCreated, Description, UserName, DateUpdated, ApplicationLetterID, CreatedBy)
+            VALUES
+                (@Now, @Description, @UserName, @Now, @ApplicationLetterID, @CreatedBy);
+            """, connection, transaction))
+        {
+            note.Parameters.Add("@Now", SqlDbType.DateTime).Value = JamaicaBusinessTime.ToLocal(DateTimeOffset.UtcNow);
+            AddNullable(note, "@Description", CombineComments(submission), SqlDbType.NVarChar, 2500);
+            AddNullable(note, "@UserName", options.UserName, SqlDbType.NVarChar, 50);
+            AddNullable(note, "@CreatedBy", options.UserName, SqlDbType.NVarChar, 100);
+            note.Parameters.Add("@ApplicationLetterID", SqlDbType.BigInt).Value = applicationId;
+            await note.ExecuteNonQueryAsync(cancellationToken);
+        }
 
         await BridgeApplicantProfile.InsertChildrenAsync(connection, transaction, applicationId, applicantProfile, submission, options, cancellationToken);
 
