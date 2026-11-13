@@ -15,7 +15,7 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
     private static readonly string[] Types = ["Food", "Housing", "Earn an Income", "Education", "Health", "Water & Hygiene"];
     private static readonly string[] Jobs = ["Unemployed", "Employed", "Self Employed", "Student"];
     private static readonly string[] Genders = ["Male", "Female", "Prefer not to Say"];
-    private static readonly string[] AgeLabels = ["< 25", "25–34", "35–44", "45–54", "55–64", "65+", Missing];
+    private static readonly string[] AgeLabels = ["Under 25 years", "25–34 years", "35–44 years", "45–54 years", "55–64 years", "65 years and over", Missing];
     private static readonly string[] IncomeLabels = ["No income", "≤ 50,000", "50,000.01–100,000", "100,000.01–200,000", "> 200,000", Missing];
 
     private static readonly string[] WeeklyIncomeLabels = ["No income", "≤ 5,000", "Over 5,000 to 10,000", "Over 10,000 to 20,000", "> 20,000", Missing];
