@@ -108,8 +108,7 @@ public sealed record ManagementRequestFilter(
     Guid? OrganizationId = null,
     Guid? RequestId = null,
     DateTimeOffset? FromUtc = null,
-    DateTimeOffset? ToUtc = null,
-    string? Parish = null);
+    DateTimeOffset? ToUtc = null);
 
 public sealed record ManagementDeliveryFilter(
     string? Status = null,
@@ -145,7 +144,8 @@ public sealed record ManagementDashboardFilter(
     Guid? OrganizationId = null,
     Guid? RequestId = null,
     DateTimeOffset? FromUtc = null,
-    DateTimeOffset? ToUtc = null);
+    DateTimeOffset? ToUtc = null,
+    string? Parish = null);
 
 public interface IManagementDashboardService
 {
