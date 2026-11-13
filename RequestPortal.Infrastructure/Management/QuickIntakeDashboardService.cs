@@ -25,11 +25,20 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
         range.Validate();
         return QuickIntakeReporting.Population(db, range.StartUtc, range.EndUtc);
     }
-    public async Task<QuickIntakeDashboardSnapshot> GetAsync(QuickIntakeRange range, CancellationToken ct = default)
+    public async Task<QuickIntakeDashboardSnapshot> GetAsync(QuickIntakeRange range, CancellationToken ct = default, string? parish = null)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", ct);
         var query = Cohort(range);
+        if (!string.IsNullOrWhiteSpace(parish))
+        {
+            var normalized = JamaicaParishes.Normalize(parish);
+            if (!JamaicaParishes.Names.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException("Choose a valid parish.");
+            var matching = await query.Select(q => q.Parish).Distinct().ToArrayAsync(ct);
+            var names = matching.Where(name => JamaicaParishes.Normalize(name) == normalized).ToArray();
+            query = query.Where(q => names.Contains(q.Parish));
+        }
         int total = await query.CountAsync(ct);
         var verifiedIds = QuickIntakeReporting.VerifiedRequestIds(db, integration.Value.SystemName);
         int sent = await query.CountAsync(q => verifiedIds.Contains(q.RequestId), ct);
