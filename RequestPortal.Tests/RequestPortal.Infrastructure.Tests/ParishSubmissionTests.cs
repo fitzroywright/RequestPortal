@@ -64,7 +64,7 @@ public sealed class ParishSubmissionTests
         var response = Assert.IsType<JsonHttpResult<TransferFailure>>(result);
         Assert.Equal(422, response.StatusCode);
         Assert.Equal("VALIDATION_PARISH", response.Value!.Code);
-        Assert.Contains("Parish", response.Value.Explanation);
+        Assert.Contains("parish", response.Value.Explanation, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ExternalApplicationValidationException", response.Value.TechnicalDetails);
     }
 

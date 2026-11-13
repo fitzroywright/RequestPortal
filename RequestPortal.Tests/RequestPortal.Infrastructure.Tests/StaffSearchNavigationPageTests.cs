@@ -268,7 +268,7 @@ public sealed class StaffSearchNavigationPageTests
         using var queue = await f.Get("/Staff"); Assert.Equal(HttpStatusCode.OK, queue.StatusCode);
         string html = await queue.Content.ReadAsStringAsync(TestContext.Current.CancellationToken); Snapshot("queue", html);
         Assert.Contains("Showing 1", html); Assert.Contains("25 of 46 requests", html); Assert.Contains("Page 1 of 2", html); Assert.DoesNotContain("View queue", html); Assert.DoesNotContain("View all submitted requests", html);
-        Assert.Contains("John Brown", html); Assert.DoesNotContain("Registered requester", html); Assert.Contains("Filter requests by applicant", html);
+        Assert.Contains("John Brown", html); Assert.DoesNotContain("Registered requester", html); Assert.Contains("Filter requests by name or request number", html);
         var requestLink = Regex.Match(html, "data-row-href=\"([^\"]*Staff/Review[^\"]*)\""); Assert.Contains("/Staff/Review/" + RequestId, Href(requestLink, "data-row-href"));
         using var result = await f.Get("/Staff?Search=John&PageNumber=1"); Assert.Equal(HttpStatusCode.OK, result.StatusCode);
         html = await result.Content.ReadAsStringAsync(TestContext.Current.CancellationToken); Snapshot("search", html);
