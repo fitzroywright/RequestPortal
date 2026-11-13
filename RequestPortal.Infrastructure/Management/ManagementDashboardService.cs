@@ -62,6 +62,8 @@ public sealed class ManagementDashboardService : IManagementDashboardService, IM
     {
         DateTimeOffset now = clock.GetUtcNow();
         List<ManagementRequestRow> rows = await LoadRowsAsync(now, filter, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(filter.Parish))
+            rows = rows.Where(row => JamaicaParishes.Normalize(row.Parish) == JamaicaParishes.Normalize(filter.Parish)).ToList();
         Guid[] scopedRequestIds = rows.Select(row => row.Id).ToArray();
         List<LifecycleTiming> timings = await LoadLifecycleTimingsAsync(scopedRequestIds, cancellationToken);
 
