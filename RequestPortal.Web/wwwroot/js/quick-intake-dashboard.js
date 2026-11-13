@@ -3,6 +3,8 @@
     const root = document.querySelector('[data-quick-intake-dashboard]');
     if (!root) return;
     const data = JSON.parse(document.getElementById('quick-intake-dashboard-data').textContent);
+    const parishSelect = root.querySelector('#qi-map-parish');
+    parishSelect?.addEventListener('change', () => { const url = new URL(location.href); if (parishSelect.value) url.searchParams.set('Parish', parishSelect.value); else url.searchParams.delete('Parish'); location.assign(url.href); });
     const palette = ['#2e82ff', '#22b95d', '#9951ff', '#ffd24e', '#20b4bb', '#ef7c9c', '#cbd1db'];
     const charts = [];
     let map, observer;
@@ -113,7 +115,8 @@
         map = L.map(container, { zoomControl: false, scrollWheelZoom: false, dragging: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false, zoomSnap: .1, attributionControl: true });
         map.attributionControl.setPrefix(false);
         map.attributionControl.addAttribution('Parishes: <a href="https://www.geoboundaries.org/">geoBoundaries</a> · CC BY-SA 2.0');
-        const boundaries = L.geoJSON(geography, { style: f => ({ color: '#fff', weight: 1.3, fillColor: color(metrics.get(f.properties.name)), fillOpacity: 1 }),
+        const selectedParish = parishSelect?.value;
+        const boundaries = L.geoJSON(geography, { style: f => ({ color: '#fff', weight: 1.3, fillColor: color(metrics.get(f.properties.name)), fillOpacity: selectedParish && f.properties.name !== selectedParish ? .12 : 1 }),
             onEachFeature(feature, layer) {
                 const name = feature.properties.name, count = metrics.get(name);
                 const tooltip = document.createElement('span'); tooltip.textContent = `${name}: ${count} Quick Intakes`;
@@ -130,7 +133,7 @@
             map.invalidateSize({ pan: false }); map.fitBounds(boundaries.getBounds(), { padding: [10, 7], animate: false }); labels.clearLayers();
             boundaries.eachLayer(layer => {
                 const name = layer.feature.properties.name, count = metrics.get(name);
-                const element = document.createElement('div'); element.append(document.createTextNode(name)); const strong = document.createElement('strong'); strong.textContent = count; element.append(strong);
+                const element = document.createElement('div'); if (selectedParish && name !== selectedParish) element.style.opacity = '.3'; element.append(document.createTextNode(name)); const strong = document.createElement('strong'); strong.textContent = count; element.append(strong);
                 const center = name === 'Kingston' ? L.latLng(17.97, -76.79) : layer.getBounds().getCenter();
                 const offsets = { 'St. Andrew': [15, -5], 'St. Catherine': [-12, -5], 'Kingston': [3, 17], 'Manchester': [3, 8] };
                 const [dx, dy] = offsets[name] || [0, 0];
