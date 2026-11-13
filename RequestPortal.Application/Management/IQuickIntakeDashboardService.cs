@@ -27,6 +27,6 @@ public sealed record QuickIntakeDashboardSnapshot(QuickIntakeRange Range, int To
 public sealed record QuickIntakeRecordLink(Guid RequestId, string Reference, string Parish, DateTimeOffset ReceivedUtc);
 public interface IQuickIntakeDashboardService
 {
-    Task<QuickIntakeDashboardSnapshot> GetAsync(QuickIntakeRange range, CancellationToken ct = default);
+    Task<QuickIntakeDashboardSnapshot> GetAsync(QuickIntakeRange range, CancellationToken ct = default, string? parish = null);
     Task<IReadOnlyList<QuickIntakeRecordLink>> GetRecordsAsync(QuickIntakeRange range, string? parish, int page, CancellationToken ct = default);
 }
