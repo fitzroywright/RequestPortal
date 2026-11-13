@@ -13,7 +13,7 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
 {
     private const string Missing = "Not provided / unknown";
     private static readonly string[] Types = ["Food", "Housing", "Earn an Income", "Education", "Health", "Water & Hygiene"];
-    private static readonly string[] Jobs = ["Employed", "Self Employed", "Unemployed", "Student"];
+    private static readonly string[] Jobs = ["Unemployed", "Employed", "Self Employed", "Student"];
     private static readonly string[] Genders = ["Male", "Female", "Prefer not to Say"];
     private static readonly string[] AgeLabels = ["< 25", "25–34", "35–44", "45–54", "55–64", "65+", Missing];
     private static readonly string[] IncomeLabels = ["No income", "≤ 50,000", "50,000.01–100,000", "100,000.01–200,000", "> 200,000", Missing];
