@@ -39,7 +39,7 @@ public sealed class QuickIntakeDashboardPageTests
     internal sealed class Service : IQuickIntakeDashboardService
     {
         public int Calls; public QuickIntakeRange? LastRange;
-        public Task<QuickIntakeDashboardSnapshot> GetAsync(QuickIntakeRange range,CancellationToken ct=default) {Calls++;LastRange=range;return Task.FromResult(Snapshot(range));}
+        public Task<QuickIntakeDashboardSnapshot> GetAsync(QuickIntakeRange range,CancellationToken ct=default,string? parish=null) {Calls++;LastRange=range;return Task.FromResult(Snapshot(range));}
         public Task<IReadOnlyList<QuickIntakeRecordLink>> GetRecordsAsync(QuickIntakeRange range,string? parish,int page,CancellationToken ct=default)=>Task.FromResult<IReadOnlyList<QuickIntakeRecordLink>>([]);
     }
     sealed class Authentication(IOptionsMonitor<AuthenticationSchemeOptions> options,ILoggerFactory logger,UrlEncoder encoder):AuthenticationHandler<AuthenticationSchemeOptions>(options,logger,encoder)
