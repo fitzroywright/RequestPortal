@@ -10,6 +10,7 @@ public sealed class QuickIntakeDashboardModel(IQuickIntakeDashboardService servi
     [BindProperty(SupportsGet = true)] public string? Period { get; set; }
     [BindProperty(SupportsGet = true)] public DateOnly? From { get; set; }
     [BindProperty(SupportsGet = true)] public DateOnly? Through { get; set; }
+    [BindProperty(SupportsGet = true)] public string? Parish { get; set; }
     public QuickIntakeDashboardSnapshot Dashboard { get; private set; } = null!;
     public QuickIntakeRange Range { get; private set; } = null!;
     private QuickIntakeRange Resolve()
@@ -29,13 +30,13 @@ public sealed class QuickIntakeDashboardModel(IQuickIntakeDashboardService servi
     {
         if (!ModelState.IsValid) return BadRequest("Invalid date range.");
         Period ??= "30";
-        try { Range = Resolve(); Dashboard = await service.GetAsync(Range, ct); return Page(); }
+        try { Range = Resolve(); Dashboard = await service.GetAsync(Range, ct, Parish); return Page(); }
         catch (ArgumentException error) { return BadRequest(error.Message); }
     }
     public async Task<IActionResult> OnGetDataAsync(CancellationToken ct)
     {
         if (!ModelState.IsValid) return BadRequest("Invalid date range.");
-        try { return new JsonResult(await service.GetAsync(Resolve(), ct)); }
+        try { return new JsonResult(await service.GetAsync(Resolve(), ct, Parish)); }
         catch (ArgumentException error) { return BadRequest(error.Message); }
     }
     public static string Icon(string name) => "<svg viewBox=\"0 0 32 32\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">" + (name switch {
