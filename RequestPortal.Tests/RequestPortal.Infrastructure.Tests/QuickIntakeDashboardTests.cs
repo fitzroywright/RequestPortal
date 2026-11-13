@@ -101,12 +101,12 @@ public sealed class QuickIntakeDashboardTests
         Assert.Equal(0,result.ChildrenUnder18.Items.Single(c=>c.Name=="Not provided / unknown").Count);
     }
     [Theory]
-    [InlineData("2001-11-06","< 25")]
-    [InlineData("2001-11-05","25–34")]
-    [InlineData("1991-11-05","35–44")]
-    [InlineData("1981-11-05","45–54")]
-    [InlineData("1971-11-05","55–64")]
-    [InlineData("1961-11-05","65+")]
+    [InlineData("2001-11-06","Under 25 years")]
+    [InlineData("2001-11-05","25–34 years")]
+    [InlineData("1991-11-05","35–44 years")]
+    [InlineData("1981-11-05","45–54 years")]
+    [InlineData("1971-11-05","55–64 years")]
+    [InlineData("1961-11-05","65 years and over")]
     [InlineData("2030-01-01","Not provided / unknown")]
     [InlineData("1900-01-01","Not provided / unknown")]
     public async Task AgeUsesBirthdayAtSubmissionNotCurrentAge(string birth,string expected)
@@ -125,7 +125,7 @@ public sealed class QuickIntakeDashboardTests
         Assert.Equal(1,result.Gender.Items.Single(c=>c.Name=="Female").Count);
         Assert.Equal(1,result.Employment.Items.Single(c=>c.Name=="Student").Count);
         Assert.Equal(1,result.Income.Items.Single(c=>c.Name=="No income").Count);
-        Assert.Equal(1,result.Ages.Items.Single(c=>c.Name=="25–34").Count);
+        Assert.Equal(1,result.Ages.Items.Single(c=>c.Name=="25–34 years").Count);
     }
     [Fact]
     public async Task LegacyBackfillDefaultsDoNotBecomeFoodUnemployedOrNoIncomeStatistics()

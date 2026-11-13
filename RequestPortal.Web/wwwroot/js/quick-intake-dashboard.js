@@ -86,7 +86,7 @@
         incomeChart = chart('qi-income', container.dataset.dimension, 'bar', true);
     });
     chart('qi-gender', 'gender', 'doughnut', false, 'gender', ['#2e82ff', '#9951ff', '#c6bbff', '#cbd1db']);
-    chart('qi-ages', 'ages', 'bar');
+    chart('qi-ages', 'ages', 'bar', true);
     const metrics = new Map(data.parishes.map(p => [p.name, p.count]));
     // Relative color scale: a parish with the most requests always has the
     // darkest blue. Rank distinct positive counts so that large reporting
