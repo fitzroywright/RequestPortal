@@ -4,7 +4,9 @@
     if (!root) return;
     const data = JSON.parse(document.getElementById('management-dashboard-data').textContent);
     const palette = ['#edf8e9', '#c5e6b5', '#83c8a5', '#40a99b', '#197d87', '#173955'];
-    const select = root.querySelector('#management-parish');
+    const select = root.querySelector('#mg-map-parish');
+    const recordsSelect = root.querySelector('#management-parish');
+    if (recordsSelect) recordsSelect.value = select.value;
     const selection = root.querySelector('[data-parish-selection]');
     const message = root.querySelector('[data-map-message]');
     const loading = root.querySelector('[data-map-loading]');
@@ -39,17 +41,19 @@
     };
     const style = feature => ({ color: '#527c7a', weight: .8, fillColor: color(metrics(feature.properties.name).total), fillOpacity: .72 });
     const updateSelection = () => {
+        if (recordsSelect) recordsSelect.value = select.value;
         selection.textContent = select.value ? totalsText(metrics(select.value)) : allText;
         const details = root.querySelector('[data-parish-details]');
         details.hidden = !select.value;
         if (select.value) { const url = new URL(root.dataset.parishUrl, location.origin); url.searchParams.set('parish', select.value); details.href = url.href; }
         if (boundaries) boundaries.eachLayer(layer => {
             const selected = layer.feature.properties.name === select.value;
-            layer.setStyle({ ...style(layer.feature), color: selected ? '#163653' : '#527c7a', weight: selected ? 3 : .8 });
+            layer.setStyle({ ...style(layer.feature), color: selected ? '#163653' : '#527c7a', weight: selected ? 3 : .8, fillOpacity: select.value && !selected ? .13 : .72 });
             if (selected) layer.bringToFront();
         });
     };
-    select.addEventListener('change', updateSelection);
+    select.addEventListener('change', () => { const url = new URL(location.href); if (select.value) url.searchParams.set('Parish', select.value); else url.searchParams.delete('Parish'); location.assign(url.href); });
+    recordsSelect?.addEventListener('change', () => { select.value = recordsSelect.value; updateSelection(); });
     root.querySelector('[data-map-clear]').addEventListener('click', () => { select.value = ''; updateSelection(); });
     root.querySelector('[data-map-reset]').addEventListener('click', () => { if (map && boundaries) map.fitBounds(boundaries.getBounds(), { padding: [18, 18], animate: false }); });
     root.querySelector('.mg-parish-filter').addEventListener('submit', event => {
