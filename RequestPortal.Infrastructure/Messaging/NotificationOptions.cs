@@ -6,7 +6,7 @@ public sealed class NotificationOptions
 
     public bool Enabled { get; set; }
 
-    public string QuickIntakeClientRelationsEmail { get; set; } = "clientrelations@foodforthepoorja.org";
+    public string QuickIntakeClientRelationsEmail { get; set; } = "intake@foodforthepoorja.org";
 
     public bool WhatsAppEnabled { get; set; }
 
