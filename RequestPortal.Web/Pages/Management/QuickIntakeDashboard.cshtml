@@ -36,7 +36,7 @@
 </div>
 <div class="qi-three-column qi-bottom-row">
 <section class="qi-panel"><h2>Gender</h2><div class="qi-doughnut-layout" data-dimension="gender"><div class="qi-doughnut"><canvas id="qi-gender" aria-label="Gender" role="img"></canvas><span class="qi-doughnut-total"><strong>@d.Total</strong>Total</span></div><ul class="qi-legend" data-legend="gender"></ul></div></section>
-<section class="qi-panel"><h2>Age Group</h2><div class="qi-chart" data-dimension="ages"><canvas id="qi-ages" aria-label="Age at Quick Intake submission" role="img"></canvas></div><small>Age at submission, calculated from date of birth.</small></section>
+<section class="qi-panel"><h2>Age Group</h2><div class="qi-chart" data-dimension="ages" style="height:210px"><canvas id="qi-ages" aria-label="Age at Quick Intake submission" role="img"></canvas></div><small>Age in completed years at submission, calculated from date of birth. Ranges include both endpoints; “Under 25” means ages 0–24.</small></section>
 <section class="qi-panel qi-insights"><h2><span aria-hidden="true">@Html.Raw(QuickIntakeDashboardModel.Icon("bulb"))</span> Key Insights</h2><ul>@foreach(var insight in d.Insights) { <li>@insight</li> }</ul></section>
 </div>
 <p class="qi-methodology">@Model.Range.From.ToString("dd MMM yyyy")–@Model.Range.Through.ToString("dd MMM yyyy") (UTC, inclusive). Percentages use all @d.Total Quick Intakes; missing responses have their own category. Screening stages and new-account attribution are not recorded.</p>
