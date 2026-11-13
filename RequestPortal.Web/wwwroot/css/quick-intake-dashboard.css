@@ -11,3 +11,5 @@
 
 .qi-range-choice{position:relative;display:inline-flex;align-items:center}.qi-range-choice svg{position:absolute;left:13px;top:10px;width:23px;height:23px;pointer-events:none}.qi-date-filter .qi-range-choice select{padding-left:46px;min-width:232px;height:44px}.qi-date-filter[data-custom="false"] .qi-date-apply{display:none}.qi-doughnut-total{font-size:15px}
 @media(max-width:540px){.qi-map-label{display:none}}
+
+.qi-map-frame{position:relative}.qi-map-parish-control{position:absolute;top:6px;right:6px;z-index:900;display:flex;gap:6px;align-items:center;padding:4px 7px;border:1px solid #cbd8e3;border-radius:5px;background:#fffffff2;color:#173955;font-size:11px;font-weight:700;box-shadow:0 1px 4px #17395520}.qi-map-parish-control select{min-width:106px;max-width:150px;padding:3px;border:1px solid #ccd8e5;border-radius:4px;background:#fff;font:inherit;font-weight:400}

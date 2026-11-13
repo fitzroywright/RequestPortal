@@ -14,11 +14,15 @@ public sealed class IndexModel : PageModel
 
     public ManagementDashboardSnapshot Dashboard { get; private set; } = null!;
 
+    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)] public string? Parish { get; set; }
+
     public bool IsInitializing { get; private set; }
 
     public async Task OnGetAsync()
     {
-        try { Dashboard = await dashboardService.GetDashboardAsync(HttpContext.RequestAborted); }
+        try { Dashboard = string.IsNullOrWhiteSpace(Parish)
+            ? await dashboardService.GetDashboardAsync(HttpContext.RequestAborted)
+            : await dashboardService.GetDashboardAsync(new ManagementDashboardFilter(Parish: Parish), HttpContext.RequestAborted); }
         catch (ManagementDashboardInitializingException) { IsInitializing = true; }
     }
 }

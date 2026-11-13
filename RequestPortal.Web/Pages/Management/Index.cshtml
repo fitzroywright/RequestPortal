@@ -58,6 +58,7 @@
             <div class="mg-section-heading"><div><h2 id="service-reach-title">Service Reach Across Jamaica</h2><p>Requests received by parish</p></div>
                 <button type="button" class="mg-small-button" data-map-reset>Reset to Jamaica</button></div>
             <div class="mg-map-frame">
+                <label class="mg-map-parish-control" for="mg-map-parish">Parish <select id="mg-map-parish" aria-label="Filter dashboard by parish"><option value="">All Parishes</option>@foreach (var name in JamaicaParishes.Names) { <option value="@name" selected="@(Model.Parish == name)">@name</option> }</select></label>
                 <div id="management-parish-map" class="mg-map" aria-label="Interactive Jamaica parish request map" aria-describedby="map-instructions" aria-busy="true"></div>
                 <p class="mg-map-loading" data-map-loading role="status">Loading Jamaica map…</p>
             </div>
