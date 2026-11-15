@@ -19,9 +19,10 @@
     const controllers = new Set();
     const charts = [];
     let map, boundaries, resizeObserver, mapPending = false, disposed = false;
-    const totalsText = item => `${item.name}: ${item.total} total requests; ${item.outstanding} outstanding; ${item.completed} completed`;
+    const formatCount = value => Number(value).toLocaleString('en-JM');
+    const totalsText = item => `${item.name}: ${formatCount(item.total)} total requests; ${formatCount(item.outstanding)} outstanding; ${formatCount(item.completed)} completed`;
     const metrics = name => parishMetrics.get(name) || { name, total: 0, outstanding: 0, completed: 0 };
-    const allText = `All parishes · ${data.parishes.reduce((total, item) => total + item.total, 0)} requests`;
+    const allText = `All parishes · ${formatCount(data.parishes.reduce((total, item) => total + item.total, 0))} requests`;
     const color = count => palette[maximum === 0 ? 0 : Math.round(count / maximum * (palette.length - 1))];
     const loadScript = url => {
         if (!scripts.has(url)) scripts.set(url, new Promise((resolve, reject) => {
@@ -89,7 +90,7 @@
                     const item = metrics(feature.properties.name);
                     const tooltip = document.createElement('div');
                     const heading = document.createElement('strong'); heading.textContent = item.name; tooltip.append(heading, document.createElement('br'));
-                    tooltip.append(`${item.total} total requests`, document.createElement('br'), `${item.outstanding} outstanding`, document.createElement('br'), `${item.completed} completed`);
+                    tooltip.append(`${formatCount(item.total)} total requests`, document.createElement('br'), `${formatCount(item.outstanding)} outstanding`, document.createElement('br'), `${formatCount(item.completed)} completed`);
                     layer.bindTooltip(tooltip, { sticky: true, direction: 'auto', className: 'mg-parish-tooltip' });
                     layer.on('mouseover', () => layer.setStyle({ weight: 2, color: '#173955' }));
                     layer.on('mouseout', updateSelection);
@@ -145,7 +146,7 @@
                 const colors = document.createElement('div'); colors.className = 'mg-map-colors'; colors.setAttribute('aria-hidden', 'true');
                 palette.forEach(value => { const swatch = document.createElement('i'); swatch.style.backgroundColor = value; colors.append(swatch); });
                 const labels = document.createElement('div'); labels.className = 'mg-map-legend-labels';
-                const low = document.createElement('span'); low.textContent = '0'; const high = document.createElement('span'); high.textContent = String(maximum);
+                const low = document.createElement('span'); low.textContent = '0'; const high = document.createElement('span'); high.textContent = formatCount(maximum);
                 labels.append(low, high); box.append(colors, labels); box.title = maximum ? 'Colors scale from zero to the highest parish request count.' : 'No mapped requests recorded.';
                 L.DomEvent.disableClickPropagation(box); return box;
             };
