@@ -58,7 +58,7 @@
             <div class="mg-section-heading"><div><h2 id="service-reach-title">Service Reach Across Jamaica</h2><p>Requests received by parish</p></div>
                 <button type="button" class="mg-small-button" data-map-reset>Reset to Jamaica</button></div>
             <div class="mg-map-frame">
-                <label class="mg-map-parish-control" for="mg-map-parish"><select id="mg-map-parish" aria-label="Filter dashboard by parish"><option value="">All Parishes</option>@foreach (var name in JamaicaParishes.Names) { <option value="@name" selected="@(Model.Parish == name)">@name</option> }</select></label>
+                <label class="mg-map-parish-control" for="mg-map-parish"><select id="mg-map-parish" aria-label="Filter dashboard by parish"><option value="">All Parishes</option>@foreach (var name in JamaicaParishes.Names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)) { <option value="@name" selected="@(Model.Parish == name)">@name</option> }</select></label>
                 <div id="management-parish-map" class="mg-map" aria-label="Interactive Jamaica parish request map" aria-describedby="map-instructions" aria-busy="true"></div>
                 <p class="mg-map-loading" data-map-loading role="status">Loading Jamaica map…</p>
             </div>
@@ -69,19 +69,19 @@
                 <label class="mg-sr-only" for="management-parish">Parish</label>
                 <select id="management-parish" name="parish">
                     <option value="">All parishes</option>
-                    @foreach (var name in JamaicaParishes.Names)
+                    @foreach (var name in JamaicaParishes.Names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
                     {
                         var count = dashboard.Parishes.FirstOrDefault(item => item.Parish == name)?.Requests ?? 0;
-                        <option value="@name">@name (@count)</option>
+                        <option value="@name">@name (@count.ToString("N0"))</option>
                     }
-                    <option value="@JamaicaParishes.Unknown">@JamaicaParishes.Unknown (@(unknown?.Requests ?? 0))</option>
+                    <option value="@JamaicaParishes.Unknown">@JamaicaParishes.Unknown (@((unknown?.Requests ?? 0).ToString("N0")))</option>
                 </select>
                 <button class="mg-small-button mg-primary" type="submit">View requests</button>
                 <button class="mg-small-button" type="button" data-map-clear>Clear selection</button>
             </form>
             <div class="mg-geography-footer"><span data-parish-selection aria-live="polite">All parishes · @dashboard.Parishes.Sum(item => item.Requests) requests</span>
                 <a data-parish-details hidden>Communities and requests</a>
-                <a asp-page="/Management/Requests" asp-route-parish="@JamaicaParishes.Unknown">Unknown / not provided: @(unknown?.Requests ?? 0)</a></div>
+                <a asp-page="/Management/Requests" asp-route-parish="@JamaicaParishes.Unknown">Unknown / not provided: @((unknown?.Requests ?? 0).ToString("N0"))</a></div>
             <noscript><p>Use the parish filter to view requests. JavaScript enables the interactive map.</p></noscript>
         </section>
         <section class="mg-section mg-insights" aria-labelledby="operational-insights-title">
