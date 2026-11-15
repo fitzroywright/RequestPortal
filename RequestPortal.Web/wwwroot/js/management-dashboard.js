@@ -48,7 +48,7 @@
         if (select.value) { const url = new URL(root.dataset.parishUrl, location.origin); url.searchParams.set('parish', select.value); details.href = url.href; }
         if (boundaries) boundaries.eachLayer(layer => {
             const selected = layer.feature.properties.name === select.value;
-            layer.setStyle({ ...style(layer.feature), color: selected ? '#163653' : '#527c7a', weight: selected ? 3 : .8, fillOpacity: select.value && !selected ? .66 : .72 });
+            layer.setStyle({ ...style(layer.feature), color: selected ? '#163653' : '#527c7a', weight: selected ? 3 : .8, fillOpacity: .72 });
             if (selected) layer.bringToFront();
         });
     };
