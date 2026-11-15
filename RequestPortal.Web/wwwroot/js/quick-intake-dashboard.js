@@ -133,7 +133,7 @@
             map.invalidateSize({ pan: false }); map.fitBounds(boundaries.getBounds(), { padding: [10, 7], animate: false }); labels.clearLayers();
             boundaries.eachLayer(layer => {
                 const name = layer.feature.properties.name, count = metrics.get(name);
-                const element = document.createElement('div'); if (selectedParish && name !== selectedParish) element.style.opacity = '.7'; element.append(document.createTextNode(name)); const strong = document.createElement('strong'); strong.textContent = count; element.append(strong);
+                const element = document.createElement('div'); if (selectedParish && name !== selectedParish) element.style.opacity = '.7'; element.append(document.createTextNode(name)); if (!selectedParish || name === selectedParish) { const strong = document.createElement('strong'); strong.textContent = count; element.append(strong); }
                 const center = name === 'Kingston' ? L.latLng(17.97, -76.79) : layer.getBounds().getCenter();
                 const offsets = { 'St. Andrew': [15, -5], 'St. Catherine': [-12, -5], 'Kingston': [3, 17], 'Manchester': [3, 8] };
                 const [dx, dy] = offsets[name] || [0, 0];
