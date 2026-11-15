@@ -17,6 +17,7 @@ public sealed record QuickIntakeDashboardSnapshot(QuickIntakeRange Range, int To
     QuickIntakeDistribution ChildrenUnder18, QuickIntakeDistribution Employment, QuickIntakeDistribution Income,
     QuickIntakeDistribution Gender, QuickIntakeDistribution Ages, IReadOnlyList<string> Insights)
 {
+    public IReadOnlyList<QuickIntakeCount> MapParishes { get; init; } = Parishes;
     public int NotVerifiedInFfpManager => Total - SentToFfpManager;
     public QuickIntakeDistribution WeeklyIncome { get; init; } = new([], false, "Weekly income unavailable.");
     public int? AwaitingScreening => null;
