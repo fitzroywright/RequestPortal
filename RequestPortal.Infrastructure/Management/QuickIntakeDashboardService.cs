@@ -30,6 +30,10 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", ct);
         var query = Cohort(range);
+        // Capture nationwide map values before applying the dashboard's parish filter.
+        var mapRows = await query.GroupBy(q => q.Parish).Select(g => new RawCount(g.Key, g.Count())).ToArrayAsync(ct);
+        var mapTotal = mapRows.Sum(row => row.Count);
+        var mapParishes = Counts(mapRows, JamaicaParishes.Names.Append(JamaicaParishes.Unknown).ToArray(), JamaicaParishes.Normalize, mapTotal);
         if (!string.IsNullOrWhiteSpace(parish))
         {
             var normalized = JamaicaParishes.Normalize(parish);
@@ -93,7 +97,7 @@ public sealed class QuickIntakeDashboardService(RequestPortalDbContext db, IOpti
         return new(range, total, sent, parishes, requestTypes,
             children,
             employment, incomes, gender, ageGroups, insights)
-        { WeeklyIncome = Protect(Counts(weeklyIncome, WeeklyIncomeLabels, name => name, total)) };
+        { WeeklyIncome = Protect(Counts(weeklyIncome, WeeklyIncomeLabels, name => name, total)), MapParishes = mapParishes };
     }
     public async Task<IReadOnlyList<QuickIntakeRecordLink>> GetRecordsAsync(QuickIntakeRange range, string? parish, int page, CancellationToken ct = default)
     {
