@@ -17,7 +17,7 @@
     int maxStatus = Math.Max(1, dashboard.Statuses.Select(item => item.Count).DefaultIfEmpty().Max());
     var unknown = dashboard.Parishes.FirstOrDefault(item => item.Parish == JamaicaParishes.Unknown);
     var clientData = new {
-        parishes = dashboard.Parishes.Select(item => new { name = item.Parish, total = item.Requests, outstanding = item.Outstanding, completed = item.Completed }),
+        parishes = Model.MapParishes.Select(item => new { name = item.Parish, total = item.Requests, outstanding = item.Outstanding, completed = item.Completed }),
         delivery = dashboard.DeliveryAnalytics.Trend.Select(item => new { label = item.WeekStarting.ToString("MMM d"), delivered = item.Delivered, partial = item.PartiallyDelivered, failed = item.Failed }),
         requests = dashboard.Trend.Select(item => new { label = item.WeekStarting.ToString("MMM d"), received = item.Received, completed = item.Completed })
     };
