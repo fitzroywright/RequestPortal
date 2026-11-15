@@ -13,6 +13,7 @@ public sealed class IndexModel : PageModel
     }
 
     public ManagementDashboardSnapshot Dashboard { get; private set; } = null!;
+    public IReadOnlyList<ParishReachSummary> MapParishes { get; private set; } = [];
 
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)] public string? Parish { get; set; }
 
@@ -20,9 +21,21 @@ public sealed class IndexModel : PageModel
 
     public async Task OnGetAsync()
     {
-        try { Dashboard = string.IsNullOrWhiteSpace(Parish)
-            ? await dashboardService.GetDashboardAsync(HttpContext.RequestAborted)
-            : await dashboardService.GetDashboardAsync(new ManagementDashboardFilter(Parish: Parish), HttpContext.RequestAborted); }
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Parish))
+            {
+                Dashboard = await dashboardService.GetDashboardAsync(HttpContext.RequestAborted);
+                MapParishes = Dashboard.Parishes;
+            }
+            else
+            {
+                // Map coloration always uses nationwide actuals, not the filtered dashboard snapshot.
+                var nationwide = await dashboardService.GetDashboardAsync(HttpContext.RequestAborted);
+                MapParishes = nationwide.Parishes;
+                Dashboard = await dashboardService.GetDashboardAsync(new ManagementDashboardFilter(Parish: Parish), HttpContext.RequestAborted);
+            }
+        }
         catch (ManagementDashboardInitializingException) { IsInitializing = true; }
     }
 }
