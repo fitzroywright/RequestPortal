@@ -116,7 +116,7 @@
         map.attributionControl.setPrefix(false);
         map.attributionControl.addAttribution('Parishes: <a href="https://www.geoboundaries.org/">geoBoundaries</a> · CC BY-SA 2.0');
         const selectedParish = parishSelect?.value;
-        const boundaries = L.geoJSON(geography, { style: f => ({ color: '#fff', weight: 1.3, fillColor: color(metrics.get(f.properties.name)), fillOpacity: selectedParish && f.properties.name !== selectedParish ? .85 : 1 }),
+        const boundaries = L.geoJSON(geography, { style: f => ({ color: '#fff', weight: 1.3, fillColor: color(metrics.get(f.properties.name)), fillOpacity: 1 }),
             onEachFeature(feature, layer) {
                 const name = feature.properties.name, count = metrics.get(name);
                 const tooltip = document.createElement('span'); tooltip.textContent = `${name}: ${count} Quick Intakes`;
@@ -133,7 +133,7 @@
             map.invalidateSize({ pan: false }); map.fitBounds(boundaries.getBounds(), { padding: [10, 7], animate: false }); labels.clearLayers();
             boundaries.eachLayer(layer => {
                 const name = layer.feature.properties.name, count = metrics.get(name);
-                const element = document.createElement('div'); if (selectedParish && name !== selectedParish) element.style.opacity = '.9'; element.append(document.createTextNode(name)); if (!selectedParish || name === selectedParish) { const strong = document.createElement('strong'); strong.textContent = count; element.append(strong); }
+                const element = document.createElement('div'); element.append(document.createTextNode(name)); if (!selectedParish || name === selectedParish) { const strong = document.createElement('strong'); strong.textContent = count; element.append(strong); }
                 const center = name === 'Kingston' ? L.latLng(17.97, -76.79) : layer.getBounds().getCenter();
                 const offsets = { 'St. Andrew': [15, -5], 'St. Catherine': [-12, -5], 'Kingston': [3, 17], 'Manchester': [3, 8] };
                 const [dx, dy] = offsets[name] || [0, 0];
