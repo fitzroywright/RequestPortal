@@ -87,7 +87,7 @@
     });
     chart('qi-gender', 'gender', 'doughnut', false, 'gender', ['#2e82ff', '#9951ff', '#c6bbff', '#cbd1db']);
     chart('qi-ages', 'ages', 'bar', true);
-    const metrics = new Map(data.parishes.map(p => [p.name, p.count]));
+    const metrics = new Map((data.mapParishes || data.parishes).map(p => [p.name, p.count]));
     // Relative color scale: a parish with the most requests always has the
     // darkest blue. Rank distinct positive counts so that large reporting
     // periods do not collapse every parish above a fixed threshold into one shade.
