@@ -188,10 +188,10 @@
                 })) },
                 options: { responsive: true, maintainAspectRatio: false, animation: false,
                     interaction: { intersect: false, mode: 'index' },
-                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, boxHeight: 2, font: { size: 10 }, padding: 10 } } },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, boxHeight: 2, font: { size: 10 }, padding: 10 } }, tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatCount(context.parsed.y)}` } } },
                     scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8, maxRotation: 0, font: { size: 9 } } },
                         y: { beginAtZero: true, suggestedMax: rows.every(row => series.every(([key]) => row[key] === 0)) ? 1 : undefined,
-                            ticks: { precision: 0, font: { size: 9 } }, grid: { color: '#edf1f5' } } }
+                            ticks: { precision: 0, font: { size: 9 }, callback: value => formatCount(value) }, grid: { color: '#edf1f5' } } }
                 }
             }));
         } catch (error) {
