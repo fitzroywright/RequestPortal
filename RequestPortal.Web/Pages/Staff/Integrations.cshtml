@@ -7,10 +7,14 @@
 @section Styles { <link rel="stylesheet" href="~/css/integrations.css" asp-append-version="true" /> }
 <partial name="_IntegrationIcons" />
 <section class="integration-monitor" aria-labelledby="integrations-title">
-    <header class="integration-heading">
-        <div class="eyebrow">Administration</div>
-        <h1 id="integrations-title">Integrations</h1>
-        <p>Administrators can inspect failures, reconciliation issues, and synchronization history to diagnose and recover integration requests.</p>
+    <header class="integration-heading integration-heading-compact">
+        <div class="integration-title-line">
+            <h1 id="integrations-title">Integrations</h1>
+            <span class="integration-title-divider" aria-hidden="true">/</span>
+            <strong>Transfer records</strong>
+            <span class="integration-result-count">@Model.Transfers.TotalCount.ToString("N0") results</span>
+        </div>
+        <p>Inspect synchronization, review failures and reconciliation, and manage eligible requests.</p>
     </header>
     <partial name="_IntegrationTransfers" model="Model" />
     <partial name="_IntegrationFieldPreview" model="Model" />
