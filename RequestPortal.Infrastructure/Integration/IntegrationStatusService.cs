@@ -61,8 +61,11 @@ public sealed partial class IntegrationStatusService : IIntegrationStatusService
         await using var requestLock = await IntegrationRequestLock.AcquireAsync(dbContext, requestId, cancellationToken);
         var link = await dbContext.IntegrationLinks.SingleOrDefaultAsync(
             item => item.RequestId == requestId && item.SystemName == ffpManagerOptions.SystemName, cancellationToken);
-        // Idempotent: never touch successful, pending, or other failed transfers.
-        if (link is null || link.Status != SynchronizationStatus.Failed || link.FailureStage != "Artifacts")
+        // Only explicit operator-approved artifact-acknowledgement failures qualify.
+        // Never touch completed artifacts, other failures or pending transfers.
+        if (link is null || link.Status != SynchronizationStatus.Failed ||
+            !(link.FailureStage == "Artifacts" || link.ErrorCode == "ARTIFACT") ||
+            link.ArtifactsSynchronizedUtc.HasValue)
             return false;
         EnsureSupported(link);
         // A missing/ambiguous destination is never inserted or treated as synchronized.
