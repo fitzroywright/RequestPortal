@@ -5,15 +5,31 @@
     var result = Model.Transfers;
     var counts = result.Counts;
 }
-<p>@Model.ScopeLabel · @result.TotalCount matching requests</p>
-@if (result.VerifiedCount.HasValue) {
-    <p>Verified in FFP Manager: <strong>@result.VerifiedCount</strong> · Not Verified in FFP Manager: <strong>@result.NotVerifiedBreakdown.Values.Sum()</strong></p>
-    <p>Not Verified breakdown (each request counted once):
-    @foreach (var category in new[] { "Failed", "Reconciliation Required", "Pending", "Retrying", "Missing Integration Link", "Synchronized — verification incomplete", "Other" }) {
-        <span>@category: <strong>@result.NotVerifiedBreakdown.GetValueOrDefault(category)</strong>; </span>
-    }
-    </p>
+<div class="integration-section-intro">
+    <div>
+        <h2>Synchronization overview</h2>
+        <p>@Model.ScopeLabel</p>
+    </div>
+    <span class="integration-result-count">@result.TotalCount.ToString("N0") matching requests</span>
+</div>
+<div class="integration-summary" role="group" aria-label="Filter transfers by status">
+@foreach(var item in new[] { ("failed","Failed",counts.Failed), ("pending","Pending",counts.Pending), ("retrying","Retrying",counts.Retrying), ("synchronized","Synchronized",counts.Synchronized), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired) }) {
+    <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Source="@Model.Source" asp-route-NotVerified="@Model.NotVerified" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
 }
+</div>
+<section class="integration-filter-section" aria-labelledby="integration-filter-heading">
+    <div class="integration-section-intro"><div><h2 id="integration-filter-heading">Find requests</h2><p>Filter by applicant, transfer status, source, or date.</p></div></div>
+<form method="get" class="integration-filters" asp-page="/Staff/Integrations">
+    <label class="integration-search">Search<span><svg class="integration-icon" aria-hidden="true"><use href="#integration-search"/></svg><input asp-for="Search" maxlength="200" placeholder="Request #, applicant name, TRN, or FFP Manager #" /></span></label>
+    <label>Source<select asp-for="Source"><option value="">All Sources</option><option value="QuickIntake">Quick Intake</option><option value="RequestPortal">Request Portal</option></select></label>
+    <label>Verification<select asp-for="NotVerified"><option value="false">All verification outcomes</option><option value="true">Not Verified in FFP Manager (Quick Intake only)</option></select></label>
+    <input type="hidden" asp-for="ErrorCode" /><label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@Monitor.StatusLabel(status)</option> }</select></label>
+    <label>Date From (UTC)<input asp-for="From" type="date" /></label>
+    <label>Date Through (UTC)<input asp-for="Through" type="date" /></label>
+    <label>Sort<select asp-for="Sort"><option value="activity">Newest activity</option><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
+    <button class="button" type="submit">Apply filters</button><a class="integration-clear" asp-page="/Staff/Integrations">Clear</a>
+</form>
+</section>
 @if (result.VerifiedCount.HasValue)
 {
     var knownCodes = new[] {
@@ -26,44 +42,52 @@
     };
     var otherValidations = result.NotVerifiedErrorCodes
         .Where(entry => !knownCodes.Any(known => known.Item1 == entry.Key)).Sum(entry => entry.Value);
-    <section class="workspace-panel" style="margin-bottom:14px;padding:14px 18px" aria-label="Fixable Quick Intake synchronization errors">
-        <strong>Quick Intake errors that may be corrected manually</strong>
-        <p class="muted">Select a category to view the affected records. Counts are based on the latest recorded validation error; saving a correction does not retry synchronization.</p>
-        <div class="action-row" style="flex-wrap:wrap">
+    <section class="integration-corrections" aria-labelledby="integration-corrections-heading">
+        <div class="integration-section-intro">
+            <div>
+                <h2 id="integration-corrections-heading">Quick Intake correction queue</h2>
+                <p>Select a validation category to locate requests requiring manual source-data correction.</p>
+            </div>
+            <span class="integration-corrections-count">@result.NotVerifiedErrorCodes.Values.Sum().ToString("N0") validation failures</span>
+        </div>
+        <div class="integration-correction-grid">
             @foreach (var (code, title) in knownCodes)
             {
-                <a class="button button-small button-secondary" asp-page="/Staff/Integrations" asp-route-Source="QuickIntake"
-                   asp-route-NotVerified="true" asp-route-ErrorCode="@code" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))"
+                var count = result.NotVerifiedErrorCodes.GetValueOrDefault(code);
+                <a class="integration-correction-option @(Model.ErrorCode == code ? "is-selected" : "")"
+                   asp-page="/Staff/Integrations" asp-route-Source="QuickIntake" asp-route-NotVerified="true"
+                   asp-route-ErrorCode="@code" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))"
                    asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))">
-                    @title: @result.NotVerifiedErrorCodes.GetValueOrDefault(code).ToString("N0")
+                    <span>@title</span><strong>@count.ToString("N0")</strong>
                 </a>
             }
             @if (otherValidations > 0)
             {
-                <span class="status">Other validation errors: @otherValidations.ToString("N0")</span>
+                <div class="integration-correction-option integration-other-validations"><span>Other validation</span><strong>@otherValidations.ToString("N0")</strong></div>
             }
         </div>
+        <p class="integration-correction-note">Correct source data in a request's diagnostics, then explicitly retry. Saving alone does not submit to FFP Manager.</p>
+        <details class="integration-breakdown">
+            <summary>View complete unverified synchronization breakdown</summary>
+            <div class="integration-breakdown-grid">
+                <span>Verified in FFP Manager <strong>@result.VerifiedCount.Value.ToString("N0")</strong></span>
+                @foreach (var category in new[] { "Failed", "Reconciliation Required", "Pending", "Retrying", "Missing Integration Link", "Synchronized — verification incomplete", "Other" })
+                {
+                    <span>@category <strong>@result.NotVerifiedBreakdown.GetValueOrDefault(category).ToString("N0")</strong></span>
+                }
+            </div>
+        </details>
     </section>
 }
-<div class="integration-summary" role="group" aria-label="Filter transfers by status">
-@foreach(var item in new[] { ("failed","Failed",counts.Failed), ("pending","Pending",counts.Pending), ("retrying","Retrying",counts.Retrying), ("synchronized","Synchronized",counts.Synchronized), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired) }) {
-    <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Source="@Model.Source" asp-route-NotVerified="@Model.NotVerified" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
-}
-</div>
-<form method="get" class="integration-filters" asp-page="/Staff/Integrations">
-    <label class="integration-search">Search<span><svg class="integration-icon" aria-hidden="true"><use href="#integration-search"/></svg><input asp-for="Search" maxlength="200" placeholder="Request #, applicant name, TRN, or FFP Manager #" /></span></label>
-    <label>Source<select asp-for="Source"><option value="">All Sources</option><option value="QuickIntake">Quick Intake</option><option value="RequestPortal">Request Portal</option></select></label>
-    <label>Verification<select asp-for="NotVerified"><option value="false">All verification outcomes</option><option value="true">Not Verified in FFP Manager (Quick Intake only)</option></select></label>
-    <input type="hidden" asp-for="ErrorCode" /><label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@Monitor.StatusLabel(status)</option> }</select></label>
-    <label>Date From (UTC)<input asp-for="From" type="date" /></label>
-    <label>Date Through (UTC)<input asp-for="Through" type="date" /></label>
-    <label>Sort<select asp-for="Sort"><option value="activity">Newest activity</option><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
-    <button class="button" type="submit">Apply filters</button><a class="integration-clear" asp-page="/Staff/Integrations">Clear</a>
-</form>
+
 @if (!string.IsNullOrEmpty(Model.ErrorCode))
 {
     <p>Validation filter: <strong>@Model.ErrorCode</strong> · <a asp-page="/Staff/Integrations" asp-route-Source="QuickIntake" asp-route-NotVerified="true" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))">Clear validation filter</a></p>
 }
+<div class="integration-section-intro integration-results-heading">
+    <div><h2>Transfer records</h2><p>Select View to inspect failure details and manually correct eligible Quick Intakes.</p></div>
+    <span class="integration-result-count">@result.TotalCount.ToString("N0") results</span>
+</div>
 <div class="integration-grid" role="table" aria-label="Integration diagnostics" aria-colcount="8">
     <div class="integration-columns integration-grid-header" role="row">
         <span role="columnheader" aria-label="Expand diagnostics"></span><span role="columnheader">Request / Applicant</span><span role="columnheader">Source / Target</span><span role="columnheader">Status</span><span role="columnheader">Error / Explanation</span><span role="columnheader">Last Activity (UTC)</span><span role="columnheader">FFP Manager</span><span role="columnheader">Actions</span>
