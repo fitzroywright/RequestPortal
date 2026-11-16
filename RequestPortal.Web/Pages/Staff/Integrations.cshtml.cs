@@ -27,6 +27,7 @@ public sealed class IntegrationsModel : PageModel
     private readonly IStaffOperationsService staffOperationsService;
     private readonly IExternalApplicationBridgeClient bridgeClient;
     private readonly ITimeLimitedDataProtector? fieldPreviewProtector;
+    private readonly IServiceScopeFactory scopeFactory;
 
     public IntegrationsModel(
         IIntegrationStatusService integrationStatusService,
@@ -35,6 +36,7 @@ public sealed class IntegrationsModel : PageModel
         IDiagnosticOperationsRouter diagnostics,
         IStaffOperationsService staffOperationsService,
         IExternalApplicationBridgeClient bridgeClient,
+        IServiceScopeFactory scopeFactory,
         IDataProtectionProvider? dataProtectionProvider = null)
     {
         this.integrationStatusService = integrationStatusService;
@@ -43,6 +45,7 @@ public sealed class IntegrationsModel : PageModel
         this.diagnostics = diagnostics;
         this.staffOperationsService = staffOperationsService;
         this.bridgeClient = bridgeClient;
+        this.scopeFactory = scopeFactory;
         fieldPreviewProtector = dataProtectionProvider?.CreateProtector("RequestPortal.IntegrationFields.v1").ToTimeLimitedDataProtector();
     }
 
@@ -178,7 +181,7 @@ public sealed class IntegrationsModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostRecoverArtifactsOnceAsync([FromServices] IServiceScopeFactory scopeFactory)
+    public async Task<IActionResult> OnPostRecoverArtifactsOnceAsync()
     {
         if (!CanOperate) return Forbid(StaffOidcOptions.StaffCookieScheme);
         if (!string.Equals(ArtifactRecoveryConfirmation, "SKIP DOCUMENTS ONCE", StringComparison.Ordinal))
