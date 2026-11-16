@@ -115,7 +115,9 @@ public sealed class IntegrationsModel : PageModel
         return sentence < 0 ? null : text[(sentence + 2)..];
     }
     public static bool CanRetry(IntegrationTransferRow transfer) => transfer.LinkId.HasValue &&
-        transfer.Status == RequestPortal.Domain.Integration.SynchronizationStatus.Failed;
+        (transfer.Status == RequestPortal.Domain.Integration.SynchronizationStatus.Failed ||
+         (transfer.Status == RequestPortal.Domain.Integration.SynchronizationStatus.ReconciliationRequired &&
+          string.Equals(transfer.ErrorCode, "DESTINATION_NOT_FOUND", StringComparison.OrdinalIgnoreCase)));
     public static DateTimeOffset LastActivity(IntegrationTransferRow transfer) =>
         new[] { transfer.SubmittedUtc, transfer.LastAttemptUtc ?? DateTimeOffset.MinValue,
             transfer.SynchronizedUtc ?? DateTimeOffset.MinValue, transfer.VerifiedUtc ?? DateTimeOffset.MinValue }.Max();
