@@ -391,3 +391,40 @@ body.integrations-page{height:auto;min-height:100vh;min-height:100dvh;display:bl
  .integrations-page .integration-top-workspace .integration-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
  .integrations-page .integration-top-workspace .integration-filters>label.integration-search{grid-column:1/-1}
 }
+
+/* Match the synchronization overview to the compact Filters card. */
+.integrations-page .integration-top-workspace>.integration-overview-block{
+  width:100%;
+  min-width:0;
+  padding:10px 12px;
+  border:1px solid #cbd8e6;
+  border-radius:7px;
+  background:#fff;
+  box-shadow:0 1px 3px #12345609;
+}
+.integrations-page .integration-overview-block>.integration-section-intro{
+  min-height:0;
+  margin-bottom:8px;
+  padding-bottom:7px;
+  border-bottom:1px solid #e6edf5;
+}
+.integrations-page .integration-overview-block>.integration-section-intro h2{
+  font-size:14px;
+}
+.integrations-page .integration-overview-block>.integration-section-intro p{
+  font-size:11px;
+}
+.integrations-page .integration-overview-block>.integration-summary{
+  gap:7px;
+  margin:0;
+}
+.integrations-page .integration-overview-block .integration-tile{
+  min-height:53px;
+  padding:7px 9px;
+  border-radius:6px;
+}
+@media(max-width:760px){
+  .integrations-page .integration-top-workspace>.integration-overview-block{
+    padding:10px 12px;
+  }
+}
