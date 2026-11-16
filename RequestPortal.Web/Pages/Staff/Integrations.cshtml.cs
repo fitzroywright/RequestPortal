@@ -119,16 +119,41 @@ public sealed class IntegrationsModel : PageModel
     }
     private object ReturnRoutes() => new { Source, NotVerified, Search, Status, From = From?.ToString("yyyy-MM-dd"),
         Through = Through?.ToString("yyyy-MM-dd"), Sort, PageNumber, RequestId, ErrorCode };
-    private bool ValidFilters => ModelState.IsValid && (string.IsNullOrWhiteSpace(ErrorCode) || ErrorCode.StartsWith("VALIDATION_", StringComparison.Ordinal) && ErrorCode.Length <= 80) &&
-        (string.IsNullOrEmpty(Source) || Source is "QuickIntake" or "RequestPortal") && (!NotVerified || Source == "QuickIntake") && (Search?.Length ?? 0) <= 200 && (!From.HasValue || !Through.HasValue || From <= Through) &&
-        (string.IsNullOrWhiteSpace(Status) || Enum.TryParse<RequestPortal.Domain.Integration.SynchronizationStatus>(Status,true,out var status) && Enum.IsDefined(status));
+    private string? FilterError()
+    {
+        // An unverified-only view always refers to Quick Intakes, including when
+        // the user arrives without an explicit Source query parameter.
+        if (NotVerified && string.IsNullOrWhiteSpace(Source)) Source = "QuickIntake";
+        if (!ModelState.IsValid)
+        {
+            var invalid = ModelState.Where(entry => entry.Value?.Errors.Count > 0)
+                .Select(entry => entry.Key).Where(key => !string.IsNullOrWhiteSpace(key)).Take(5);
+            return "Invalid filter value: " + string.Join(", ", invalid) + ". Check the selected dates and filters.";
+        }
+        if (Source is not (null or "" or "QuickIntake" or "RequestPortal"))
+            return "Select a valid Source.";
+        if (NotVerified && Source != "QuickIntake")
+            return "Not Verified is available only with Source set to Quick Intake.";
+        if (!string.IsNullOrWhiteSpace(ErrorCode) &&
+            (!ErrorCode.StartsWith("VALIDATION_", StringComparison.Ordinal) || ErrorCode.Length > 80))
+            return "The validation-error filter is invalid. Clear the filter and try again.";
+        if ((Search?.Length ?? 0) > 200)
+            return "Search text must be 200 characters or fewer.";
+        if (From > Through)
+            return "Date From must be on or before Date Through.";
+        if (!string.IsNullOrWhiteSpace(Status) &&
+            (!Enum.TryParse<RequestPortal.Domain.Integration.SynchronizationStatus>(Status, true, out var status) || !Enum.IsDefined(status)))
+            return "Select a valid synchronization Status.";
+        return null;
+    }
     public IReadOnlyList<DeadLetterWorkItem> DeadLetters { get; private set; } = Array.Empty<DeadLetterWorkItem>();
     public IReadOnlyList<NotificationDeliveryWorkItem> FailedNotificationDeliveries { get; private set; } = Array.Empty<NotificationDeliveryWorkItem>();
 
     public async Task<IActionResult> OnGetAsync()
     {
         Response.Headers.CacheControl = "no-store";
-        if(!ValidFilters) return BadRequest("Select valid integration filters and a valid date range.");
+        string? filterError = FilterError();
+        if (filterError is not null) return BadRequest(filterError);
         Transfers = await integrationStatusService.SearchAsync(Query(), HttpContext.RequestAborted);
         if (RequestId.HasValue)
         {
