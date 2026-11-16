@@ -5,6 +5,7 @@
     const source = document.getElementById('ru-dashboard-data');
     if (!source) return;
     const data = JSON.parse(source.textContent);
+    const formatCount = value => Number(value).toLocaleString('en-JM');
     const form = root.querySelector('.ru-period');
     const period = root.querySelector('#ru-period');
     const custom = root.querySelector('.ru-custom');
@@ -26,10 +27,10 @@
                 borderColor: '#fff', backgroundColor: colors, fill: type === 'line', tension: .35, pointRadius: 4, borderRadius: type === 'bar' ? 4 : 0 }] },
             options: { responsive: true, maintainAspectRatio: false, animation: false,
                 cutout: type === 'doughnut' ? '70%' : undefined,
-                plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                plugins: { legend: { display: false }, tooltip: { enabled: true, callbacks: { label: context => `${context.label}: ${formatCount(context.parsed)}` } } },
                 scales: type === 'doughnut' ? undefined : {
                     x: { grid: { display: false }, ticks: { color: '#52627a', maxRotation: 0 } },
-                    y: { beginAtZero: true, ticks: { precision: 0, color: '#52627a' }, grid: { color: '#e6edf4' } }
+                    y: { beginAtZero: true, ticks: { precision: 0, color: '#52627a', callback: value => formatCount(value) }, grid: { color: '#e6edf4' } }
                 } }
         }));
     }
@@ -48,9 +49,9 @@
                     borderColor: '#2a82ef', backgroundColor: '#2a82ef22',
                     fill: true, tension: .3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderWidth: 2 }] },
             options: { responsive: true, maintainAspectRatio: false, animation: false,
-                plugins: { legend: { display: false } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatCount(context.parsed.y)}` } } },
                 scales: { x: { grid: { display: false }, ticks: { maxRotation: 0 } },
-                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e4ecf3' } } } }
+                    y: { beginAtZero: true, ticks: { precision: 0, callback: value => formatCount(value) }, grid: { color: '#e4ecf3' } } } }
         }));
     } else if (trendCanvas) {
         trendCanvas.replaceWith(document.createTextNode('No registrations during the selected period.'));
@@ -81,7 +82,7 @@
                     const name = feature.properties.name;
                     const count = parishCounts.get(name);
                     const label = document.createElement('span');
-                    label.textContent = name + ': ' + count + ' registered users';
+                    label.textContent = name + ': ' + formatCount(count) + ' registered users';
                     layer.bindTooltip(label, { sticky: true });
                     layer.on('mouseover', () => layer.setStyle({ weight: 2, color: '#266d56' }));
                     layer.on('mouseout', () => layer.setStyle({ weight: 1.3, color: '#fff' }));
@@ -98,7 +99,7 @@
                     const el = document.createElement('div');
                     el.append(document.createTextNode(name));
                     const count = document.createElement('strong');
-                    count.textContent = parishCounts.get(name);
+                    count.textContent = formatCount(parishCounts.get(name));
                     el.append(count);
                     const center = name === 'Kingston' ? L.latLng(17.97, -76.79) : layer.getBounds().getCenter();
                     L.marker(center, { interactive: false, icon: L.divIcon({ html: el, className: 'ru-map-label',
