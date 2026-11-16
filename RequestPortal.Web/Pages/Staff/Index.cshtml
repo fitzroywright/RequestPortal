@@ -111,9 +111,9 @@
                     </div>
                 </div>
                 <div class="attention-list">
-                    <a asp-page="/Staff/Organizations">
+                    <a asp-page="/Staff/DocumentVerification">
                         <strong>Documents</strong>
-                        <span>@Model.Operations.DocumentsAwaitingVerification.Count awaiting verification</span>
+                        <span>@Model.Operations.PendingDocumentCount awaiting verification</span>
                     </a>
                     <a asp-page="/Staff/Organizations">
                         <strong>Reverification</strong>
