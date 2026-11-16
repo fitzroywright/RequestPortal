@@ -8,8 +8,8 @@
 <section class="integration-artifact-recovery" aria-labelledby="artifact-recovery-heading">
     <div class="integration-section-intro">
         <div>
-            <h2 id="artifact-recovery-heading">One-time artifact recovery</h2>
-            <p>Application-only synchronization for requests that failed during supporting-document transfer.</p>
+            <h2 id="artifact-recovery-heading">Batch approval — accept applications without documents</h2>
+            <p>Approve all eligible artifact-transfer failures in one operation. Each application is verified individually.</p>
         </div>
         @if (Model.CanOperate)
         {
@@ -26,12 +26,12 @@
     }
     else if (Model.ArtifactRecoveryCandidateCount == 0)
     {
-        <p class="integration-correction-note">No records currently match the recovery criteria: stored status Failed and failure stage Artifacts. No recovery is needed for this category. Other failed or reconciliation-required records are not included.</p>
+        <p class="integration-correction-note">No eligible records currently have a stored Failed status with artifact-stage or ARTIFACT error evidence and incomplete document acknowledgement. Other failures are excluded.</p>
     }
     else
     {
         <details>
-            <summary>Review eligible recovery and confirmation</summary>
+            <summary>Review batch approval and confirmation</summary>
             <p>Each application is verified in FFP Manager (JMDB01 / FFPJM). Supporting documents are <strong>not uploaded or marked as transferred</strong>. Missing or conflicting applications remain failed. Results are audited.</p>
             <form method="post" asp-page-handler="RecoverArtifactsOnce" class="integration-artifact-recovery-form">
                 <label>Type <strong>SKIP DOCUMENTS ONCE</strong> to confirm:
@@ -39,7 +39,7 @@
                 </label>
                 <button type="submit" class="button button-small">Run one-time application-only recovery</button>
             </form>
-            <small>Only current Failed / Artifacts entries are eligible. This is not a general document-transfer bypass or a recurring job.</small>
+            <small>Only unresolved Failed / Artifacts or ARTIFACT-code records with incomplete document acknowledgement are eligible. This is a one-time operator-approved batch, not a recurring bypass.</small>
         </details>
     }
 </section>
