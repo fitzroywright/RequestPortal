@@ -5,6 +5,7 @@
     const data = JSON.parse(document.getElementById('quick-intake-dashboard-data').textContent);
     const parishSelect = root.querySelector('#qi-map-parish');
     parishSelect?.addEventListener('change', () => { const url = new URL(location.href); if (parishSelect.value) url.searchParams.set('Parish', parishSelect.value); else url.searchParams.delete('Parish'); location.assign(url.href); });
+    const formatCount = value => Number(value).toLocaleString('en-JM');
     const palette = ['#2e82ff', '#22b95d', '#9951ff', '#ffd24e', '#20b4bb', '#ef7c9c', '#cbd1db'];
     const charts = [];
     let map, observer;
@@ -29,7 +30,7 @@
         chart.getDatasetMeta(0).data.forEach((bar, index) => {
             const value = chart.data.datasets[0].data[index];
             ctx.textAlign = horizontal ? 'left' : 'center';
-            ctx.fillText(String(value), horizontal ? bar.x + 7 : bar.x, horizontal ? bar.y + 4 : bar.y - 6);
+            ctx.fillText(formatCount(value), horizontal ? bar.x + 7 : bar.x, horizontal ? bar.y + 4 : bar.y - 6);
         }); ctx.restore();
     }};
     function legend(key, items, colors) {
@@ -39,7 +40,7 @@
             if (!item.count) return;
             const li = document.createElement('li'), swatch = document.createElement('i'), name = document.createElement('span'), count = document.createElement('strong'), percent = document.createElement('small');
             swatch.style.backgroundColor = colors[index % colors.length]; name.textContent = item.name;
-            count.textContent = item.count; percent.textContent = `${item.percent}%`;
+            count.textContent = formatCount(item.count); percent.textContent = `${item.percent}%`;
             li.append(swatch, name, count, percent); list.append(li);
         });
     }
@@ -57,10 +58,10 @@
             plugins: [valuesPlugin],
             options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: type === 'doughnut' ? '67%' : undefined,
                 indexAxis: horizontal ? 'y' : 'x', layout: { padding: type === 'bar' ? { top: 15, right: 25 } : 3 },
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${dimension === 'income' ? 'Monthly income (JMD): ' : dimension === 'weeklyIncome' ? 'Weekly income (JMD): ' : ''}${items[ctx.dataIndex].count} (${items[ctx.dataIndex].percent}% of all Quick Intakes)` } } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${dimension === 'income' ? 'Monthly income (JMD): ' : dimension === 'weeklyIncome' ? 'Weekly income (JMD): ' : ''}${formatCount(items[ctx.dataIndex].count)} (${items[ctx.dataIndex].percent}% of all Quick Intakes)` } } },
                 scales: type === 'bar' ? {
-                    x: { beginAtZero: true, display: !horizontal, grid: { display: false }, border: { display: false }, ticks: { color: '#09132f', font: { size: 12 }, maxRotation: 0 }, grace: horizontal ? '18%' : undefined },
-                    y: { beginAtZero: true, grid: { display: !horizontal, color: '#e6eaf1' }, border: { display: false }, ticks: { color: '#09132f', precision: 0, font: { size: 12 }, autoSkip: false }, grace: horizontal ? undefined : '18%' }
+                    x: { beginAtZero: true, display: !horizontal, grid: { display: false }, border: { display: false }, ticks: { color: '#09132f', font: { size: 12 }, maxRotation: 0, callback: value => formatCount(value) }, grace: horizontal ? '18%' : undefined },
+                    y: { beginAtZero: true, grid: { display: !horizontal, color: '#e6eaf1' }, border: { display: false }, ticks: { color: '#09132f', precision: 0, font: { size: 12 }, autoSkip: false, callback: value => formatCount(value) }, grace: horizontal ? undefined : '18%' }
                 } : undefined }
         });
         charts.push(instance);
