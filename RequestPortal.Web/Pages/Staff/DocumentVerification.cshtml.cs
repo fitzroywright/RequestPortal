@@ -66,8 +66,11 @@ public sealed class DocumentVerificationModel(RequestPortalDbContext db) : PageM
                     ? r == null : o == null || d.OwnerId != o.Id,
                 PotentialTest =
                     (r != null && (r.PublicReference.StartsWith("RP-DEMO") ||
-                        r.PublicReference.StartsWith("RP-202609") ||
-                        r.PublicReference.StartsWith("RP-202608"))) ||
+                        r.PublicReference == "RP-20260905-INFO01" ||
+                        r.PublicReference == "RP-20260831-FULF01" ||
+                        r.PublicReference == "RP-20260907-PROJ01" ||
+                        r.PublicReference == "RP-20260903-APPR01" ||
+                        r.PublicReference == "RP-20260909-DEMO01")) ||
                     (o != null && (o.Name.ToLower().Contains("demo") ||
                         o.Name.ToLower().Contains("test"))) ||
                     d.OriginalFileName.ToLower().StartsWith("demo") ||
