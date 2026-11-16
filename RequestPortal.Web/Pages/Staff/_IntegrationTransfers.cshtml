@@ -5,6 +5,35 @@
     var result = Model.Transfers;
     var counts = result.Counts;
 }
+<div class="integration-workspace">
+<aside class="integration-side-rail" aria-label="Integration controls">
+<div class="integration-overview-block">
+<div class="integration-section-intro">
+    <div>
+        <h2>Synchronization overview</h2>
+        <p>@Model.ScopeLabel</p>
+    </div>
+    <span class="integration-result-count">@result.TotalCount.ToString("N0") matching requests</span>
+</div>
+<div class="integration-summary" role="group" aria-label="Filter transfers by status">
+@foreach(var item in new[] { ("failed","Failed",counts.Failed), ("pending","Pending",counts.Pending), ("retrying","Retrying",counts.Retrying), ("synchronized","Synchronized",counts.Synchronized), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired) }) {
+    <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Source="@Model.Source" asp-route-NotVerified="@Model.NotVerified" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
+}
+</div>
+</div>
+<section class="integration-filter-section" aria-labelledby="integration-filter-heading">
+    <div class="integration-section-intro"><div><h2 id="integration-filter-heading">Filters</h2></div></div>
+<form method="get" class="integration-filters" asp-page="/Staff/Integrations">
+    <label class="integration-search">Search<span><svg class="integration-icon" aria-hidden="true"><use href="#integration-search"/></svg><input asp-for="Search" maxlength="200" placeholder="Request #, applicant, TRN" /></span></label>
+    <label>Source<select asp-for="Source"><option value="">All Sources</option><option value="QuickIntake">Quick Intake</option><option value="RequestPortal">Request Portal</option></select></label>
+    <label>Verification<select asp-for="NotVerified"><option value="false">All verification outcomes</option><option value="true">Not Verified in FFP Manager (Quick Intake only)</option></select></label>
+    <input type="hidden" asp-for="ErrorCode" /><label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@Monitor.StatusLabel(status)</option> }</select></label>
+    <label>Date From (UTC)<input asp-for="From" type="date" /></label>
+    <label>Date Through (UTC)<input asp-for="Through" type="date" /></label>
+    <label>Sort<select asp-for="Sort"><option value="activity">Newest activity</option><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
+    <button class="button" type="submit">Apply filters</button><a class="integration-clear" asp-page="/Staff/Integrations">Clear</a>
+</form>
+</section>
 <section class="integration-artifact-recovery" aria-labelledby="artifact-recovery-heading">
     <div class="integration-section-intro">
         <div>
@@ -43,35 +72,8 @@
         </details>
     }
 </section>
-<div class="integration-top-workspace">
-<div class="integration-overview-block">
-<div class="integration-section-intro">
-    <div>
-        <h2>Synchronization overview</h2>
-        <p>@Model.ScopeLabel</p>
-    </div>
-    <span class="integration-result-count">@result.TotalCount.ToString("N0") matching requests</span>
-</div>
-<div class="integration-summary" role="group" aria-label="Filter transfers by status">
-@foreach(var item in new[] { ("failed","Failed",counts.Failed), ("pending","Pending",counts.Pending), ("retrying","Retrying",counts.Retrying), ("synchronized","Synchronized",counts.Synchronized), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired) }) {
-    <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Source="@Model.Source" asp-route-NotVerified="@Model.NotVerified" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
-}
-</div>
-</div>
-<section class="integration-filter-section" aria-labelledby="integration-filter-heading">
-    <div class="integration-section-intro"><div><h2 id="integration-filter-heading">Filters</h2></div></div>
-<form method="get" class="integration-filters" asp-page="/Staff/Integrations">
-    <label class="integration-search">Search<span><svg class="integration-icon" aria-hidden="true"><use href="#integration-search"/></svg><input asp-for="Search" maxlength="200" placeholder="Request #, applicant, TRN" /></span></label>
-    <label>Source<select asp-for="Source"><option value="">All Sources</option><option value="QuickIntake">Quick Intake</option><option value="RequestPortal">Request Portal</option></select></label>
-    <label>Verification<select asp-for="NotVerified"><option value="false">All verification outcomes</option><option value="true">Not Verified in FFP Manager (Quick Intake only)</option></select></label>
-    <input type="hidden" asp-for="ErrorCode" /><label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@Monitor.StatusLabel(status)</option> }</select></label>
-    <label>Date From (UTC)<input asp-for="From" type="date" /></label>
-    <label>Date Through (UTC)<input asp-for="Through" type="date" /></label>
-    <label>Sort<select asp-for="Sort"><option value="activity">Newest activity</option><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
-    <button class="button" type="submit">Apply filters</button><a class="integration-clear" asp-page="/Staff/Integrations">Clear</a>
-</form>
-</section>
-</div>
+</aside>
+<main class="integration-workspace-main" aria-label="Transfer records workspace">
 @if (result.VerifiedCount.HasValue)
 {
     var knownCodes = new[] {
@@ -179,5 +181,7 @@
         @if(result.Page>1) { <a asp-page="/Staff/Integrations" asp-all-route-data="Model.Routes(result.Page-1)">Previous</a> }
         @if(result.Page<result.TotalPages) { <a asp-page="/Staff/Integrations" asp-all-route-data="Model.Routes(result.Page+1)">Next</a> }</nav>
     }
+</div>
+</main>
 </div>
 <p class="integration-announcement" role="status" aria-live="polite"></p>
