@@ -34,33 +34,33 @@
 }
 </div>
 </div>
-<section class="integration-artifact-recovery" aria-labelledby="artifact-recovery-heading">
-    <div class="integration-section-intro">
-        <div>
-            <h2 id="artifact-recovery-heading">Batch approval — accept applications without documents</h2>
-            <p>Approve all eligible artifact-transfer failures in one operation. Each application is verified individually.</p>
+<details class="integration-artifact-recovery integration-batch-disclosure">
+    <summary id="artifact-recovery-heading">Batch Update</summary>
+    <div class="integration-batch-body">
+        <div class="integration-section-intro">
+            <div>
+                <h2>Accept applications without documents</h2>
+                <p>Manual, one-time approval. Each application is independently verified in FFP Manager.</p>
+            </div>
+            @if (Model.CanOperate)
+            {
+                <span class="integration-result-count">@Model.ArtifactRecoveryCandidateCount.ToString("N0") eligible</span>
+            }
+            else
+            {
+                <span class="integration-result-count">Restricted</span>
+            }
         </div>
-        @if (Model.CanOperate)
+        @if (!Model.CanOperate)
         {
-            <span class="integration-result-count">@Model.ArtifactRecoveryCandidateCount.ToString("N0") eligible</span>
+            <p class="integration-correction-note">Manual recovery requires the Manage Security permission. Contact an authorized administrator.</p>
+        }
+        else if (Model.ArtifactRecoveryCandidateCount == 0)
+        {
+            <p class="integration-correction-note">No eligible Failed / Artifacts records currently have incomplete document acknowledgement.</p>
         }
         else
         {
-            <span class="integration-result-count">Restricted</span>
-        }
-    </div>
-    @if (!Model.CanOperate)
-    {
-        <p class="integration-correction-note">Manual recovery requires the Manage Security permission. Contact an authorized administrator.</p>
-    }
-    else if (Model.ArtifactRecoveryCandidateCount == 0)
-    {
-        <p class="integration-correction-note">No eligible records currently have a stored Failed status with artifact-stage or ARTIFACT error evidence and incomplete document acknowledgement. Other failures are excluded.</p>
-    }
-    else
-    {
-        <details>
-            <summary>Review batch approval and confirmation</summary>
             <p>Each application is verified in FFP Manager (JMDB01 / FFPJM). Supporting documents are <strong>not uploaded or marked as transferred</strong>. Missing or conflicting applications remain failed. Results are audited.</p>
             <form method="post" asp-page-handler="RecoverArtifactsOnce" class="integration-artifact-recovery-form">
                 <label>Type <strong>SKIP DOCUMENTS ONCE</strong> to confirm:
@@ -68,10 +68,10 @@
                 </label>
                 <button type="submit" class="button button-small">Run one-time application-only recovery</button>
             </form>
-            <small>Only unresolved Failed / Artifacts or ARTIFACT-code records with incomplete document acknowledgement are eligible. This is a one-time operator-approved batch, not a recurring bypass.</small>
-        </details>
-    }
-</section>
+            <small>This action is manual only and applies to the current eligible batch. It does not enable automatic document skipping.</small>
+        }
+    </div>
+</details>
 </aside>
 <main class="integration-workspace-main" aria-label="Transfer records workspace">
 @if (result.VerifiedCount.HasValue)
