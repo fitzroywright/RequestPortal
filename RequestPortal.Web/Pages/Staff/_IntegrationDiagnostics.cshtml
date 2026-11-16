@@ -25,6 +25,33 @@
                     <dt>Required action:</dt><dd>@(validation.CorrectiveAction ?? "Verify and correct source information using recorded evidence, then request an authorized destination-verified retry.")</dd>
                     <dt>Retry eligibility:</dt><dd>No automatic retry. An authorized retry is eligible only after source correction and destination verification.</dd>
                 </dl>
+                @if (Model.CanOperate && Model.Correction is { } correction)
+                {
+                    <form method="post" asp-page-handler="CorrectQuickIntake" asp-all-route-data="Model.Routes(Model.PageNumber)"
+                          style="display:grid;gap:10px;max-width:520px;margin-top:12px">
+                        <input type="hidden" name="CorrectionRequestId" value="@correction.RequestId" />
+                        <input type="hidden" name="CorrectionErrorCode" value="@correction.ErrorCode" />
+                        <label for="integration-corrected-value">Correct @correction.Field</label>
+                        @if (correction.Field == "Parish")
+                        {
+                            <select id="integration-corrected-value" name="CorrectedValue" required>
+                                @foreach (var parish in RequestPortal.Application.Management.JamaicaParishes.Names.OrderBy(n => n))
+                                {
+                                    <option value="@parish" selected="@(parish == correction.CurrentValue)">@parish</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input id="integration-corrected-value" type="@(correction.Field == "DateOfBirth" ? "date" : correction.Field == "ApplicantEmail" ? "email" : "text")"
+                                   name="CorrectedValue" value="@correction.CurrentValue" maxlength="320"
+                                   required="@(correction.Field != "SecondaryTelephone" && correction.Field != "ApplicantEmail")" />
+                        }
+                        <small>Check the applicant's corrected information before saving. This changes the Request Portal source only and does not retry synchronization.</small>
+                        <button type="submit" class="button button-small">Save Source Correction</button>
+                    </form>
+                    <p class="muted" style="margin-top:10px">After saving, use <strong>Retry Integration</strong> below. The retry checks FFP Manager for an existing destination first.</p>
+                }
             </section>
         }
         <div class="integration-diagnostic-columns">
