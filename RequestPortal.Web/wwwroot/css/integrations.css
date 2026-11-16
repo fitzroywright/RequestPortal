@@ -511,3 +511,17 @@ body.integrations-page{height:100vh;height:100dvh;min-height:0;display:flex;flex
  .integrations-page .integration-side-rail>.integration-artifact-recovery{grid-column:auto}
  .integrations-page .integration-workspace{grid-template-rows:minmax(150px,43%) minmax(0,1fr)}
 }
+
+/* Main transfer grid on the left; three-card control rail on the right. */
+@media(min-width:701px){
+ .integrations-page .integration-workspace{
+  grid-template-columns:minmax(0,1fr) minmax(270px,310px);
+ }
+ .integrations-page .integration-workspace-main{grid-column:1;grid-row:1}
+ .integrations-page .integration-side-rail{grid-column:2;grid-row:1;padding:0 0 4px 3px}
+}
+@media(min-width:701px) and (max-width:1000px){
+ .integrations-page .integration-workspace{
+  grid-template-columns:minmax(0,1fr) minmax(240px,270px);
+ }
+}
