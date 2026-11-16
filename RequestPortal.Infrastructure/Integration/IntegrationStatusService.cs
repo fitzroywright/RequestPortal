@@ -335,7 +335,9 @@ public sealed partial class IntegrationStatusService : IIntegrationStatusService
                     throw new IntegrationTransferException(TransferFailures.For("Reconciliation", "DESTINATION_CONFLICT"));
                 link.RecordVerifiedDestination(receipt.ApplicationId, receipt.ApplicationNumber, receipt.Server, receipt.Database, clock.UtcNow);
                 // Reconciliation never claims that untransferred artifacts have succeeded.
-                if (link.ArtifactsSynchronizedUtc.HasValue)
+                if (link.FailureClassification == "DocumentsOmitted")
+                    link.MarkApplicationSynchronizedWithoutArtifacts(receipt.ApplicationId, receipt.ApplicationNumber, clock.UtcNow);
+                else if (link.ArtifactsSynchronizedUtc.HasValue)
                     link.MarkSynchronized(receipt.ApplicationId, clock.UtcNow, receipt.ApplicationNumber);
                 else
                     link.RequireReconciliation(clock.UtcNow, "ARTIFACT", "Destination record verified. Document transfer and acknowledgement must complete through a safe retry.");
