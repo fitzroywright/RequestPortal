@@ -580,3 +580,9 @@ body.integrations-page{height:100vh;height:100dvh;min-height:0;display:flex;flex
 .integrations-page .integration-heading-compact .integration-result-count{margin-left:auto;font-size:10px;padding:3px 7px}
 .integrations-page .integration-heading-compact>p{margin:1px 0 0;font-size:11px;line-height:15px;color:#4b637c}
 @media(max-width:530px){.integrations-page .integration-heading-compact .integration-title-line{flex-wrap:wrap;gap:4px 7px}.integrations-page .integration-heading-compact h1{font-size:18px}}
+
+/* Sort follows the two adjacent UTC date inputs on its own full-width row. */
+.integrations-page .integration-side-rail .integration-filters>label.integration-sort-field{
+    grid-column:1/-1;
+    grid-row:auto;
+}
