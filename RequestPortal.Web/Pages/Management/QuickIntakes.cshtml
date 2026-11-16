@@ -1,5 +1,6 @@
 @page
 @model RequestPortal.Web.Pages.Management.QuickIntakesModel
+@using RequestPortal.Domain.Requests
 @{
     ViewData["Title"] = "Quick Intakes";
     var hasPrevious = Model.PageNumber > 1;
@@ -41,15 +42,24 @@
                 <div class="table-wrap workspace-table-wrap">
                     <table class="workspace-table">
                         <thead>
-                            <tr><th>Reference</th><th>Parish</th><th>Received (UTC)</th></tr>
+                            <tr><th>Reference</th><th>Applicant</th><th>Summary</th><th>Work Status</th><th class="staff-submitted-column">Date Submitted</th></tr>
                         </thead>
                         <tbody>
                             @foreach (var request in Model.Records)
                             {
+                                Model.RequestDetails.TryGetValue(request.RequestId, out var detail);
                                 <tr class="qi-drilldown-row staff-select-row" role="link" tabindex="0" aria-label="Open Quick Intake @request.Reference" data-review-url="@Url.Page("/Staff/Review", new { id = request.RequestId })">
                                     <td><a asp-page="/Staff/Review" asp-route-id="@request.RequestId"><strong>@request.Reference</strong></a></td>
-                                    <td><span class="status">@request.Parish</span></td>
-                                    <td>@request.ReceivedUtc.UtcDateTime.ToString("dd MMM yyyy HH:mm")</td>
+                                    <td>
+                                        <strong>@(detail?.ApplicantName ?? "Name not provided")</strong>
+                                        @if (detail?.IsUnverifiedQuickIntake == true)
+                                        {
+                                            <span class="muted" style="display:block;font-size:.8rem">Unverified User · Anonymous Quick Intake</span>
+                                        }
+                                    </td>
+                                    <td>@(string.IsNullOrWhiteSpace(detail?.Summary) ? "—" : detail.Summary)</td>
+                                    <td>@if (detail is not null) { <span class="status">@RequestStatusPresentation.Label(detail.Status.ToString())</span> } else { <span class="muted">—</span> }</td>
+                                    <td class="staff-submitted-column">@(detail?.SubmittedUtc?.ToString("dd MMM yyyy") ?? "—")</td>
                                 </tr>
                             }
                         </tbody>
