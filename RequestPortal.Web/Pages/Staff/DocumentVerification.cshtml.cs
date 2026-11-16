@@ -55,6 +55,8 @@ public sealed class DocumentVerificationModel(RequestPortalDbContext db) : PageM
             from d in pending
             join r in db.AssistanceRequests.AsNoTracking() on d.OwnerId equals r.Id into requests
             from r in requests.DefaultIfEmpty()
+            join q in db.QuickIntakes.AsNoTracking() on d.OwnerId equals q.RequestId into intakes
+            from q in intakes.DefaultIfEmpty()
             join o in db.Organizations.AsNoTracking() on d.OrganizationId equals o.Id into organizations
             from o in organizations.DefaultIfEmpty()
             select new
@@ -70,7 +72,13 @@ public sealed class DocumentVerificationModel(RequestPortalDbContext db) : PageM
                         r.PublicReference == "RP-20260831-FULF01" ||
                         r.PublicReference == "RP-20260907-PROJ01" ||
                         r.PublicReference == "RP-20260903-APPR01" ||
-                        r.PublicReference == "RP-20260909-DEMO01")) ||
+                        r.PublicReference == "RP-20260909-DEMO01" ||
+                        r.PublicReference == "RP-26-10020" ||
+                        r.PublicReference == "RP-26-10021" ||
+                        r.PublicReference == "RP-26-10022" ||
+                        r.PublicReference == "RP-26-10023")) ||
+                    (q != null && (q.FirstName.ToLower().StartsWith("smady") ||
+                        q.LastName.ToLower().StartsWith("smady"))) ||
                     (o != null && (o.Name.ToLower().Contains("demo") ||
                         o.Name.ToLower().Contains("test"))) ||
                     d.OriginalFileName.ToLower().StartsWith("demo") ||
