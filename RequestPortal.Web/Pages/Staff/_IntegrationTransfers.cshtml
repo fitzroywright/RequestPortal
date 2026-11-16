@@ -22,11 +22,7 @@
 </section>
 <div class="integration-overview-block">
 <div class="integration-section-intro">
-    <div>
-        <h2>Synchronization overview</h2>
-        <p>@Model.ScopeLabel</p>
-    </div>
-    <span class="integration-result-count">@result.TotalCount.ToString("N0") matching requests</span>
+    <h2>Synchronization Overview</h2>
 </div>
 <div class="integration-summary" role="group" aria-label="Filter transfers by status">
 @foreach(var item in new[] { ("failed","Failed",counts.Failed), ("pending","Pending",counts.Pending), ("retrying","Retrying",counts.Retrying), ("synchronized","Synchronized",counts.Synchronized), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired) }) {
