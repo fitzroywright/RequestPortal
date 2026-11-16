@@ -45,6 +45,53 @@ public sealed partial class IntegrationStatusService : IIntegrationStatusService
         this.operatorAuthorization = operatorAuthorization;
     }
 
+    // Read-only candidate snapshot. Limited to the FFP Manager integration and
+    // durable failures specifically recorded during the Artifacts stage.
+    public async Task<IReadOnlyList<Guid>> GetFailedArtifactRecoveryIdsAsync(CancellationToken cancellationToken = default)
+        => await dbContext.IntegrationLinks.AsNoTracking()
+            .Where(link => link.SystemName == ffpManagerOptions.SystemName &&
+                link.Status == SynchronizationStatus.Failed && link.FailureStage == "Artifacts")
+            .OrderBy(link => link.CreatedUtc).Select(link => link.RequestId)
+            .Take(1000).ToListAsync(cancellationToken);
+
+    public async Task<bool> RecoverApplicationWithoutArtifactsAsync(Guid staffUserId, Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        await operatorAuthorization.DemandAsync(staffUserId, cancellationToken);
+        await using var requestLock = await IntegrationRequestLock.AcquireAsync(dbContext, requestId, cancellationToken);
+        var link = await dbContext.IntegrationLinks.SingleOrDefaultAsync(
+            item => item.RequestId == requestId && item.SystemName == ffpManagerOptions.SystemName, cancellationToken);
+        // Idempotent: never touch successful, pending, or other failed transfers.
+        if (link is null || link.Status != SynchronizationStatus.Failed || link.FailureStage != "Artifacts")
+            return false;
+        EnsureSupported(link);
+        // A missing/ambiguous destination is never inserted or treated as synchronized.
+        var receipt = await bridgeClient.FindApplicationAsync(requestId, cancellationToken);
+        if (receipt is null) throw new InvalidOperationException("No confirmed FFP Manager application exists.");
+        FfpManagerIntegrationService.ValidateReceipt(requestId, receipt);
+        if (link.ExternalReference is not null && link.ExternalReference != receipt.ApplicationId ||
+            link.ApplicationNumber is not null && link.ApplicationNumber != receipt.ApplicationNumber)
+            throw new IntegrationTransferException(TransferFailures.For("DestinationVerification", "DESTINATION_CONFLICT"));
+        var portalReference = await dbContext.AssistanceRequests.AsNoTracking()
+            .Where(item => item.Id == requestId).Select(item => item.PublicReference)
+            .SingleAsync(cancellationToken);
+        if (string.Equals(portalReference, receipt.ApplicationNumber, StringComparison.OrdinalIgnoreCase))
+            throw new IntegrationTransferException(TransferFailures.For("DestinationVerification", "DESTINATION_CONFLICT"));
+        await IntegrationLegacyHistory.PreserveAsync(dbContext, link, cancellationToken);
+        await auditWriter.WriteAsync(staffUserId, "ArtifactTransferBypassRecoveryRequested", "IntegrationLink", link.Id, null,
+            $"request={requestId}; target=JMDB01/FFPJM; documents=skipped; reason=one-time-artifacts-recovery", cancellationToken);
+        link.RecordVerifiedDestination(receipt.ApplicationId, receipt.ApplicationNumber, receipt.Server, receipt.Database, clock.UtcNow);
+        link.MarkApplicationSynchronizedWithoutArtifacts(receipt.ApplicationId, receipt.ApplicationNumber, clock.UtcNow);
+        var attempt = new IntegrationAttempt(link.Id, link.AttemptCount, clock.UtcNow, "ApplicationOnlyRecovery");
+        attempt.SetStage("DestinationVerification");
+        attempt.Complete(clock.UtcNow);
+        dbContext.IntegrationAttempts.Add(attempt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync(staffUserId, "ArtifactTransferBypassRecoveryCompleted", "IntegrationLink", link.Id, null,
+            $"request={requestId}; application={receipt.ApplicationNumber}; documents=skipped; no-upload=true", cancellationToken);
+        return true;
+    }
+
     private static readonly HashSet<string> CorrectableCodes = new(StringComparer.Ordinal)
     {
         "VALIDATION_PRIMARY_TELEPHONE", "VALIDATION_SECONDARY_TELEPHONE",
