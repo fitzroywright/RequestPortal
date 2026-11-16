@@ -1,0 +1,112 @@
+@page
+@model RequestPortal.Web.Pages.Staff.DocumentVerificationModel
+@using RequestPortal.Domain.Documents
+@{
+    ViewData["Title"] = "Document verification";
+}
+<section class="section">
+    <div class="shell" style="max-width:1500px">
+        <header class="section-heading">
+            <div class="eyebrow">FFP internal</div>
+            <h1>Document verification</h1>
+            <p>Review pending documents in their original request or organization context. Potential test documents are flagged for inspection only; nothing is deleted automatically.</p>
+        </header>
+        <div class="card" style="padding:14px 18px;margin-bottom:12px">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+                <strong>@Model.TotalPending.ToString("N0") total pending · @Model.PotentialTestCount.ToString("N0") potential demo/test · @Model.MatchingCount.ToString("N0") matching filters</strong>
+                <a asp-page="/Staff/Index">Back to Requests</a>
+            </div>
+            <form method="get" style="display:grid;grid-template-columns:minmax(180px,2fr) minmax(150px,1fr) auto auto auto;align-items:end;gap:10px">
+                <label>Search
+                    <input asp-for="Search" type="search" maxlength="150" placeholder="Filename, request or organization" />
+                </label>
+                <label>Owner
+                    <select asp-for="Scope">
+                        <option value="">All documents</option>
+                        <option value="Requests">Requests</option>
+                        <option value="Organizations">Organizations</option>
+                    </select>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;padding-bottom:8px">
+                    <input asp-for="PotentialTestOnly" type="checkbox" />
+                    Potential demo/test only
+                </label>
+                <button type="submit" class="button">Apply</button>
+                <a asp-page="/Staff/DocumentVerification">Clear</a>
+            </form>
+        </div>
+        <div class="card">
+            <div class="table-wrap" style="max-height:60vh;overflow:auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Uploaded (UTC)</th>
+                            <th>File</th>
+                            <th>Type</th>
+                            <th>Request / Organization</th>
+                            <th>Review</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var document in Model.Rows)
+                        {
+                            <tr>
+                                <td style="white-space:nowrap">@document.UploadedUtc.ToString("dd MMM yyyy HH:mm")</td>
+                                <td><strong>@document.FileName</strong>
+                                    @if (document.PotentialTest)
+                                    {
+                                        <div><span class="status">Potential demo/test — inspect</span></div>
+                                    }
+                                    @if (document.OwnerMissing)
+                                    {
+                                        <div><strong>Owner missing or inconsistent</strong></div>
+                                    }
+                                </td>
+                                <td>@document.DocumentType</td>
+                                <td>
+                                    @if (document.OwnerType == DocumentOwnerType.AssistanceRequest)
+                                    {
+                                        <span>@(document.RequestReference ?? "Request not found")</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@document.OrganizationName</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!document.OwnerMissing && document.OwnerType == DocumentOwnerType.AssistanceRequest)
+                                    {
+                                        <a asp-page="/Staff/Review" asp-route-id="@document.OwnerId" asp-route-selectedDocumentId="@document.DocumentId">Review document</a>
+                                    }
+                                    else if (!document.OwnerMissing && document.OwnerType == DocumentOwnerType.Organization)
+                                    {
+                                        <a asp-page="/Staff/Organization" asp-route-id="@document.OwnerId" asp-route-selectedDocumentId="@document.DocumentId">Review document</a>
+                                    }
+                                    else
+                                    {
+                                        <span>Requires investigation</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Rows.Count == 0)
+                        {
+                            <tr><td colspan="5">No pending documents match the selected filters.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <nav style="display:flex;gap:16px;align-items:center;justify-content:flex-end;padding:10px" aria-label="Document queue pages">
+                <span>Page @Model.PageNumber of @Model.TotalPages</span>
+                @if (Model.PageNumber > 1)
+                {
+                    <a asp-page="/Staff/DocumentVerification" asp-route-Search="@Model.Search" asp-route-Scope="@Model.Scope" asp-route-PotentialTestOnly="@Model.PotentialTestOnly" asp-route-PageNumber="@(Model.PageNumber - 1)">Previous</a>
+                }
+                @if (Model.PageNumber < Model.TotalPages)
+                {
+                    <a asp-page="/Staff/DocumentVerification" asp-route-Search="@Model.Search" asp-route-Scope="@Model.Scope" asp-route-PotentialTestOnly="@Model.PotentialTestOnly" asp-route-PageNumber="@(Model.PageNumber + 1)">Next</a>
+                }
+            </nav>
+        </div>
+    </div>
+</section>
