@@ -141,7 +141,7 @@
             map.invalidateSize({ pan: false }); map.fitBounds(boundaries.getBounds(), { padding: [10, 7], animate: false }); labels.clearLayers();
             boundaries.eachLayer(layer => {
                 const name = layer.feature.properties.name, count = metrics.get(name);
-                const element = document.createElement('div'); const parishName = document.createElement('span'); parishName.textContent = name; if (selectedParish === name) { parishName.style.color = selectedParishColor; parishName.style.fontWeight = '800'; parishName.style.textShadow = '0 0 3px #fff, 1px 1px 2px #fff'; } element.append(parishName); if (!selectedParish || name === selectedParish) { const strong = document.createElement('strong'); strong.textContent = Number(count).toLocaleString('en-JM'); element.append(strong); }
+                const element = document.createElement('div'); const parishName = document.createElement('span'); parishName.textContent = name; if (selectedParish === name) { parishName.style.color = '#000'; parishName.style.fontWeight = '800'; parishName.style.textShadow = '0 0 3px #fff, 1px 1px 2px #fff'; } element.append(parishName); if (!selectedParish || name === selectedParish) { const strong = document.createElement('strong'); strong.textContent = Number(count).toLocaleString('en-JM'); element.append(strong); }
                 const center = name === 'Kingston' ? L.latLng(17.97, -76.79) : layer.getBounds().getCenter();
                 const offsets = { 'St. Andrew': [15, -5], 'St. Catherine': [-12, -5], 'Kingston': [3, 17], 'Manchester': [3, 8] };
                 const [dx, dy] = offsets[name] || [0, 0];
