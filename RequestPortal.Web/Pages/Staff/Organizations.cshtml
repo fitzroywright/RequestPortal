@@ -107,7 +107,7 @@
         }
         else
         {
-            <div class="table-wrap">
+            <div class="table-wrap organization-documents-scroll" role="region" aria-label="Documents awaiting verification" tabindex="0">
                 <table>
                     <thead>
                         <tr>
@@ -139,3 +139,20 @@
         }
     </div>
 </section>
+
+<style>
+/* Keep long document queues contained rather than expanding the Organizations page. */
+.organization-documents-scroll{
+    max-height:min(48vh,460px);
+    overflow-y:auto;
+    overflow-x:auto;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+}
+.organization-documents-scroll thead th{
+    position:sticky;
+    top:0;
+    z-index:1;
+    background:#fff;
+}
+</style>
