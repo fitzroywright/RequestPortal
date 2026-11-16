@@ -128,10 +128,6 @@
 {
     <p>Validation filter: <strong>@Model.ErrorCode</strong> · <a asp-page="/Staff/Integrations" asp-route-Source="QuickIntake" asp-route-NotVerified="true" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))">Clear validation filter</a></p>
 }
-<div class="integration-section-intro integration-results-heading">
-    <div><h2>Transfer records</h2><p>Select View to inspect failure details and manually correct eligible Quick Intakes.</p></div>
-    <span class="integration-result-count">@result.TotalCount.ToString("N0") results</span>
-</div>
 <div class="integration-grid" role="table" aria-label="Integration diagnostics" aria-colcount="8">
     <div class="integration-columns integration-grid-header" role="row">
         <span role="columnheader" aria-label="Expand diagnostics"></span><span role="columnheader">Request / Applicant</span><span role="columnheader">Source / Target</span><span role="columnheader">Status</span><span role="columnheader">Error / Explanation</span><span role="columnheader">Last Activity (UTC)</span><span role="columnheader">FFP Manager</span><span role="columnheader">Actions</span>
