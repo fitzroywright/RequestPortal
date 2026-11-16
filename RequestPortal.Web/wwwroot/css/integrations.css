@@ -298,3 +298,69 @@ body.integrations-page{height:auto;min-height:100vh;min-height:100dvh;display:bl
 .integrations-page .integration-artifact-recovery .integration-section-intro h2{font-size:15px;color:#684417}
 .integrations-page .integration-artifact-recovery>details>summary{cursor:pointer;font-weight:700;color:#684417;font-size:13px}
 .integrations-page .integration-artifact-recovery .integration-correction-note{font-size:13px;line-height:1.5;margin:6px 0 0;color:#644c2e}
+
+/* Compact operational workspace: keep the same controls and diagnostics. */
+.integrations-page .integration-monitor{padding-top:12px;padding-bottom:22px}
+.integrations-page .integration-heading{margin-bottom:9px}
+.integrations-page .integration-heading h1{font-size:24px;line-height:27px}
+.integrations-page .integration-heading p{font-size:12px;margin-top:2px}
+.integrations-page .integration-section-intro{gap:9px;margin-bottom:6px}
+.integrations-page .integration-section-intro h2{font-size:14px}
+.integrations-page .integration-section-intro p{margin-top:1px;font-size:11px}
+.integrations-page .integration-result-count,.integrations-page .integration-corrections-count{padding:3px 8px;font-size:11px}
+.integrations-page .integration-summary{gap:7px;margin-bottom:10px}
+.integrations-page .integration-summary .integration-tile{min-height:50px;padding:6px 9px;gap:7px}
+.integrations-page .integration-summary .integration-tile>.integration-icon{width:20px;height:20px}
+.integrations-page .integration-summary .integration-tile-label{font-size:11px}
+.integrations-page .integration-summary .integration-tile-count{font-size:20px;line-height:1.1}
+.integrations-page .integration-filter-section,.integrations-page .integration-corrections{padding:10px 12px;margin-bottom:10px}
+.integrations-page .integration-filters{gap:7px}
+.integrations-page .integration-filters label{font-size:11px;gap:3px}
+.integrations-page .integration-filters input,.integrations-page .integration-filters select{height:32px;padding-block:4px;font-size:12px}
+.integrations-page .integration-search input{padding-left:33px}
+.integrations-page .integration-search .integration-icon{top:7px}
+.integrations-page .integration-filters>.button,.integrations-page .integration-clear{min-height:32px;height:32px}
+.integrations-page .integration-correction-grid{gap:6px}
+.integrations-page .integration-correction-option{padding:6px 9px;font-size:12px}
+.integrations-page .integration-correction-option strong{font-size:15px}
+.integrations-page .integration-correction-note{margin-top:6px;font-size:11px}
+.integrations-page .integration-breakdown{margin-top:7px;padding-top:7px}
+.integrations-page .integration-artifact-recovery{padding:8px 12px;margin-bottom:10px}
+.integrations-page .integration-artifact-recovery p{margin:5px 0;font-size:12px}
+.integrations-page .integration-artifact-recovery .integration-section-intro{margin-bottom:3px}
+.integrations-page .integration-results-heading{margin-top:0}
+.integrations-page .integration-grid-header{min-height:31px;font-size:10px}
+.integrations-page .integration-grid-header>span{padding:5px 7px}
+.integrations-page .integration-columns{grid-template-columns:26px minmax(145px,1.55fr) minmax(110px,1fr) minmax(110px,1fr) minmax(180px,2fr) minmax(112px,1fr) minmax(100px,1.1fr) minmax(112px,1.1fr)}
+.integrations-page .integration-data-row,.integrations-page .integration-record.failed .integration-data-row,.integrations-page .integration-record.synchronized .integration-data-row{min-height:45px}
+.integrations-page .integration-data-row{font-size:12px;line-height:1.25}
+.integrations-page .integration-data-row>[role=cell]{padding:5px 6px}
+.integrations-page .integration-data-row .integration-applicant strong{font-size:13px}
+.integrations-page .integration-explanation{font-size:11px;line-height:1.25}
+.integrations-page .integration-status{min-height:23px;padding:3px 7px;font-size:11px;gap:4px}
+.integrations-page .integration-status .integration-icon{width:13px;height:13px}
+.integrations-page .integration-row-actions{gap:4px;flex-wrap:nowrap;align-items:center}
+.integrations-page .integration-row-actions .button{min-height:26px;padding-inline:7px;font-size:11px}
+.integrations-page .integration-more-menu{position:relative;z-index:auto}
+.integrations-page .integration-more-menu[open]{z-index:30}
+.integrations-page .integration-more{display:flex;align-items:center;justify-content:center;width:27px;height:28px;padding:0;border-radius:5px;font-size:20px}
+.integrations-page .integration-more:hover{background:#e9f2fb}
+.integrations-page .integration-more-options{min-width:210px;z-index:35}
+.integrations-page .integration-more-options>a,.integrations-page .integration-more-options>button{padding:8px 10px;font-size:12px}
+.integrations-page .integration-diagnostic-row{padding:3px 5px 5px}
+.integrations-page .integration-diagnostics{padding:10px}
+.integrations-page .integration-diagnostic-columns{gap:8px}
+.integrations-page .integration-diagnostic-columns>section{padding:9px}
+.integrations-page .integration-paging{padding:7px 10px}
+@media(max-width:1200px) and (min-width:761px){
+ .integrations-page .integration-columns{min-width:980px}
+ .integrations-page .integration-grid{overflow-x:auto}
+}
+@media(max-width:760px){
+ .integrations-page .integration-monitor{padding:10px 12px 20px}
+ .integrations-page .integration-summary{gap:6px}
+ .integrations-page .integration-columns{min-width:0;grid-template-columns:24px minmax(0,1fr) minmax(0,1fr)}
+ .integrations-page .integration-row-actions{flex-wrap:wrap}
+ .integrations-page .integration-data-row{padding:5px 6px}
+ .integrations-page .integration-diagnostic-columns{grid-template-columns:minmax(0,1fr)}
+}
