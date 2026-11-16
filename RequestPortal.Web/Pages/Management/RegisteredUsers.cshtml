@@ -35,11 +35,11 @@
         </form>
     </header>
     <section class="ru-kpis" aria-label="Registered user summary">
-        <div class="ru-kpi ru-blue"><span class="ru-kpi-icon" aria-hidden="true">♙</span><div><strong>@d.Total</strong><span>Registered Users</span><small>Accounts registered in period</small></div></div>
-        <div class="ru-kpi ru-green"><span class="ru-kpi-icon" aria-hidden="true">✓</span><div><strong>@d.RecentlyActive</strong><span>Recently Active</span><small>Signed in during last 30 days</small></div></div>
-        <div class="ru-kpi ru-purple"><span class="ru-kpi-icon" aria-hidden="true">♧</span><div><strong>@d.Individuals</strong><span>Individual Accounts</span><small>Without approved organization membership</small></div></div>
-        <div class="ru-kpi ru-amber"><span class="ru-kpi-icon" aria-hidden="true">◷</span><div><strong>@d.PendingMemberships</strong><span>Pending Memberships</span><small>Approval requests from registered users</small></div></div>
-        <div class="ru-kpi ru-sky"><span class="ru-kpi-icon" aria-hidden="true">▦</span><div><strong>@d.Organizations</strong><span>Organizations</span><small>With approved registered members</small></div></div>
+        <div class="ru-kpi ru-blue"><span class="ru-kpi-icon" aria-hidden="true">♙</span><div><strong>@d.Total.ToString("N0")</strong><span>Registered Users</span><small>Accounts registered in period</small></div></div>
+        <div class="ru-kpi ru-green"><span class="ru-kpi-icon" aria-hidden="true">✓</span><div><strong>@d.RecentlyActive.ToString("N0")</strong><span>Recently Active</span><small>Signed in during last 30 days</small></div></div>
+        <div class="ru-kpi ru-purple"><span class="ru-kpi-icon" aria-hidden="true">♧</span><div><strong>@d.Individuals.ToString("N0")</strong><span>Individual Accounts</span><small>Without approved organization membership</small></div></div>
+        <div class="ru-kpi ru-amber"><span class="ru-kpi-icon" aria-hidden="true">◷</span><div><strong>@d.PendingMemberships.ToString("N0")</strong><span>Pending Memberships</span><small>Approval requests from registered users</small></div></div>
+        <div class="ru-kpi ru-sky"><span class="ru-kpi-icon" aria-hidden="true">▦</span><div><strong>@d.Organizations.ToString("N0")</strong><span>Organizations</span><small>With approved registered members</small></div></div>
     </section>
     <div class="ru-first-row">
         <section class="ru-panel ru-geography">
@@ -54,11 +54,11 @@
             <p class="ru-subtitle">Each registered user counted once</p>
             <div class="ru-donut-row">
                 <div class="ru-donut"><canvas id="ru-types" role="img" aria-label="Individual and organization representative accounts"></canvas>
-                    <span class="ru-donut-center"><strong>@d.Total</strong>Total</span>
+                    <span class="ru-donut-center"><strong>@d.Total.ToString("N0")</strong>Total</span>
                 </div>
                 <ul class="ru-donut-legend">
-                    <li><i class="ru-swatch ru-swatch-blue"></i><span>Individual accounts</span><strong>@d.Individuals</strong></li>
-                    <li><i class="ru-swatch ru-swatch-purple"></i><span>Organization representatives</span><strong>@d.Representatives</strong></li>
+                    <li><i class="ru-swatch ru-swatch-blue"></i><span>Individual accounts</span><strong>@d.Individuals.ToString("N0")</strong></li>
+                    <li><i class="ru-swatch ru-swatch-purple"></i><span>Organization representatives</span><strong>@d.Representatives.ToString("N0")</strong></li>
                 </ul>
             </div>
         </section>
@@ -74,22 +74,22 @@
             <p class="ru-subtitle">Email verification and temporary lockouts</p>
             <div class="ru-donut-row">
                 <div class="ru-donut"><canvas id="ru-status" role="img" aria-label="Registered account status"></canvas>
-                    <span class="ru-donut-center"><strong>@d.Total</strong>Total</span>
+                    <span class="ru-donut-center"><strong>@d.Total.ToString("N0")</strong>Total</span>
                 </div>
                 <ul class="ru-donut-legend">
                 @for (var i = 0; i < d.AccountStates.Count; i++)
                 {
-                    <li><i class="ru-swatch ru-status-@i"></i><span>@d.AccountStates[i].Name</span><strong>@d.AccountStates[i].Count</strong></li>
+                    <li><i class="ru-swatch ru-status-@i"></i><span>@d.AccountStates[i].Name</span><strong>@d.AccountStates[i].Count.ToString("N0")</strong></li>
                 }
                 </ul>
             </div>
         </section>
         <section class="ru-panel ru-activity">
             <h2>Activity</h2>
-            <div><span aria-hidden="true">◉</span><strong>@d.RecentlyActive</strong><span>Signed in (last 30 days)</span></div>
-            <div><span aria-hidden="true">▤</span><strong>@d.RegularSubmissions</strong><span>Regular submissions in period</span></div>
-            <div><span aria-hidden="true">♙</span><strong>@d.Representatives</strong><span>Approved organization representatives</span></div>
-            <div><span aria-hidden="true">▦</span><strong>@d.Organizations</strong><span>Organizations with members in cohort</span></div>
+            <div><span aria-hidden="true">◉</span><strong>@d.RecentlyActive.ToString("N0")</strong><span>Signed in (last 30 days)</span></div>
+            <div><span aria-hidden="true">▤</span><strong>@d.RegularSubmissions.ToString("N0")</strong><span>Regular submissions in period</span></div>
+            <div><span aria-hidden="true">♙</span><strong>@d.Representatives.ToString("N0")</strong><span>Approved organization representatives</span></div>
+            <div><span aria-hidden="true">▦</span><strong>@d.Organizations.ToString("N0")</strong><span>Organizations with members in cohort</span></div>
         </section>
     </div>
     <p class="ru-footnote">Reporting cohort: accounts created @d.From.ToString("dd MMM yyyy")–@d.Through.ToString("dd MMM yyyy") (UTC). Quick Intake-only placeholder identities and Quick Intake submissions are excluded. Signed-in users who also submitted a Quick Intake remain counted as registered users. Organizational representatives are users with an approved membership in a non-individual organization. Recent activity is based on recorded sign-ins, which may be incomplete for older accounts.</p>
@@ -97,11 +97,11 @@
         <summary>View chart values and definitions</summary>
         <h3>Registered users by parish</h3>
         <table><thead><tr><th>Parish</th><th>Accounts</th></tr></thead><tbody>
-        @foreach (var item in d.Parishes) { <tr><td>@item.Name</td><td>@item.Count</td></tr> }
+        @foreach (var item in d.Parishes) { <tr><td>@item.Name</td><td>@item.Count.ToString("N0")</td></tr> }
         <tr><td>Unknown</td><td>@d.UnknownParish</td></tr>
         </tbody></table>
         <h3>Registration trend</h3><table><thead><tr><th>Period starting</th><th>Registrations</th></tr></thead><tbody>
-        @foreach (var item in d.Trend) { <tr><td>@item.Label</td><td>@item.Count</td></tr> }
+        @foreach (var item in d.Trend) { <tr><td>@item.Label</td><td>@item.Count.ToString("N0")</td></tr> }
         </tbody></table>
     </details>
 </div>
