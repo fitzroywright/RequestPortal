@@ -138,6 +138,34 @@ public sealed class QuickIntakeDashboardTests
         Assert.DoesNotContain(result.Insights,s=>s.Contains("no income")||s.Contains("food assistance"));
     }
     [Fact]
+    public async Task ExplicitApplicationOnlyRecoveryCountsAsVerifiedWithoutClaimingDocumentsTransferred()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
+        var intake = Intake(0);
+        database.Db.QuickIntakes.Add(intake);
+        var link = new IntegrationLink(Guid.NewGuid(), intake.RequestId, "FFPManager", Received);
+        link.BeginAttempt(Received);
+        link.RecordFailure(Received, "Artifacts", "Artifacts", "ARTIFACT",
+            "Supporting documents did not complete.", false);
+        database.Db.IntegrationLinks.Add(link);
+        await database.Db.SaveChangesAsync(ct);
+        var before = await Service(database).GetAsync(Range, ct);
+        Assert.Equal(1, before.Total);
+        Assert.Equal(0, before.SentToFfpManager);
+        Assert.Equal(1, before.NotVerifiedInFfpManager);
+
+        link.RecordVerifiedDestination("ffp-id-123", "FFP-26-123", "JMDB01", "FFPJM", Received);
+        link.MarkApplicationSynchronizedWithoutArtifacts("ffp-id-123", "FFP-26-123", Received);
+        await database.Db.SaveChangesAsync(ct);
+        var after = await Service(database).GetAsync(Range, ct);
+        Assert.Equal(1, after.SentToFfpManager);
+        Assert.Equal(0, after.NotVerifiedInFfpManager);
+        Assert.Null(link.ArtifactsSynchronizedUtc);
+        Assert.Equal("DocumentsOmitted", link.FailureClassification);
+    }
+
+    [Fact]
     public async Task EmptyCohortHasZeroCountsExplicitUnavailableMetricsAndNoInventedInsights()
     {
         var ct=TestContext.Current.CancellationToken;await using var db=await PostgreSqlTestDatabase.CreateAsync(ct);
