@@ -271,3 +271,12 @@ body.integrations-page{height:auto;min-height:100vh;min-height:100dvh;display:bl
  .integrations-page .integration-filters{grid-template-columns:1fr}
  .integrations-page .integration-filters .integration-search{grid-column:1}
 }
+
+/* Keep the filter actions next to the final filter instead of a sparse second row. */
+@media(min-width:1201px){
+ .integrations-page .integration-filters{grid-template-columns:minmax(170px,2fr) repeat(3,minmax(120px,1fr))}
+ .integrations-page .integration-search{grid-column:span 2}
+ .integrations-page .integration-filters>.button,.integrations-page .integration-clear{grid-column:auto;grid-row:auto}
+ .integrations-page .integration-filters>.button{justify-self:stretch}
+ .integrations-page .integration-clear{justify-self:start}
+}
