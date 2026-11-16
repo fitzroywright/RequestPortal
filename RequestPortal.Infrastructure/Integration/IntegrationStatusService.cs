@@ -210,8 +210,16 @@ public sealed partial class IntegrationStatusService : IIntegrationStatusService
     {
         IntegrationLink link = await GetLinkAsync(linkId, cancellationToken);
         await IntegrationLegacyHistory.PreserveAsync(dbContext,link,cancellationToken);
-        if (link.VerifiedUtc >= clock.UtcNow.AddMinutes(-5) && link.ArtifactsSynchronizedUtc.HasValue && link.ExternalReference == externalReference)
-            link.MarkSynchronized(externalReference, clock.UtcNow);
+        if (link.VerifiedUtc >= clock.UtcNow.AddMinutes(-5) && link.ExternalReference == externalReference)
+        {
+            if (link.FailureClassification == "DocumentsOmitted" && !link.ArtifactsSynchronizedUtc.HasValue &&
+                !string.IsNullOrWhiteSpace(link.ApplicationNumber))
+                link.MarkApplicationSynchronizedWithoutArtifacts(externalReference, link.ApplicationNumber, clock.UtcNow);
+            else if (link.ArtifactsSynchronizedUtc.HasValue)
+                link.MarkSynchronized(externalReference, clock.UtcNow);
+            else
+                link.RequireReconciliation(clock.UtcNow, "ARTIFACT", "Destination verification or document acknowledgement is incomplete. Use an authorized safe retry.");
+        }
         else
             link.RequireReconciliation(clock.UtcNow, "ARTIFACT", "Destination verification or document acknowledgement is incomplete. Use an authorized safe retry.");
         await dbContext.SaveChangesAsync(cancellationToken);
