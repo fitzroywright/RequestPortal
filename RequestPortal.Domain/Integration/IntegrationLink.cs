@@ -111,6 +111,15 @@ public sealed class IntegrationLink
         LastError = null;
     }
 
+    // Exceptional, explicitly audited application-only recovery. This does NOT
+    // acknowledge or imply successful document transfer.
+    public void MarkApplicationSynchronizedWithoutArtifacts(string externalReference, string applicationNumber, DateTimeOffset now)
+    {
+        MarkSynchronized(externalReference, now, applicationNumber);
+        ArtifactsSynchronizedUtc = null;
+        FailureClassification = "DocumentsOmitted";
+    }
+
     public void MarkFailed(DateTimeOffset attemptedUtc, string error)
     {
         Status = SynchronizationStatus.Failed;
