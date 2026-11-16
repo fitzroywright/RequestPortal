@@ -1,10 +1,79 @@
 @page
 @model RequestPortal.Web.Pages.Management.QuickIntakesModel
-@{ ViewData["Title"] = "Quick Intakes"; }
-<section class="section"><div class="shell"><h1>Quick Intakes</h1><p>@Model.From.ToString("dd MMM yyyy")–@Model.Through.ToString("dd MMM yyyy") UTC · @(Model.Parish ?? "All parishes") · Page @Model.PageNumber</p>
-<p><a asp-page="/Management/QuickIntakeDashboard" asp-route-Period="custom" asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")">Back to Quick Intake Dashboard</a></p>
-<table><thead><tr><th>Request reference</th><th>Parish</th><th>Received (UTC)</th></tr></thead><tbody>@foreach(var row in Model.Records) { <tr><td><a asp-page="/Staff/Review" asp-route-id="@row.RequestId">@row.Reference</a></td><td>@row.Parish</td><td>@row.ReceivedUtc.UtcDateTime.ToString("dd MMM yyyy HH:mm")</td></tr> }</tbody></table>
-@if(Model.Records.Count == 0) { <p>No Quick Intakes match this filter.</p> }
-@if(Model.PageNumber > 1) { <a asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")" asp-route-Parish="@Model.Parish" asp-route-PageNumber="@(Model.PageNumber-1)">Previous</a> }
-@if(Model.Records.Count == 50) { <a asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")" asp-route-Parish="@Model.Parish" asp-route-PageNumber="@(Model.PageNumber+1)">Next</a> }
-</div></section>
+@{
+    ViewData["Title"] = "Quick Intakes";
+    var hasPrevious = Model.PageNumber > 1;
+    var hasNext = Model.Records.Count == 50;
+}
+<section class="section">
+    <div class="shell" style="max-width:1440px">
+        <div class="section-heading">
+            <div class="eyebrow" style="color:#b45b09">Quick Intake drill-down</div>
+            <h1>Quick Intakes</h1>
+            <p>Requests received in the selected period. Open any request in the existing staff review workflow.</p>
+            <div class="action-row">
+                <a class="button button-secondary" asp-page="/Management/QuickIntakeDashboard" asp-route-Period="custom" asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")" asp-route-Parish="@Model.Parish">Quick Intake Dashboard</a>
+                @if (!string.IsNullOrWhiteSpace(Model.Parish))
+                {
+                    <a class="button button-secondary" asp-page="/Management/QuickIntakes" asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")">Clear parish filter</a>
+                }
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;padding:14px 18px">
+            <strong>Filters:</strong>
+            <span class="status">period: @Model.From.ToString("dd MMM yyyy") – @Model.Through.ToString("dd MMM yyyy") UTC</span>
+            <span class="status">parish: @(string.IsNullOrWhiteSpace(Model.Parish) ? "All parishes" : Model.Parish)</span>
+        </div>
+
+        <section class="card">
+            <div class="action-row" style="justify-content:space-between;align-items:center">
+                <h2 style="margin:0">Quick Intake requests</h2>
+                <span class="muted">@Model.Records.Count.ToString("N0") shown · Page @Model.PageNumber.ToString("N0")</span>
+            </div>
+            @if (Model.Records.Count == 0)
+            {
+                <p class="muted">No Quick Intakes match this filter.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Reference</th><th>Parish</th><th>Received (UTC)</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var request in Model.Records)
+                            {
+                                <tr>
+                                    <td><strong>@request.Reference</strong></td>
+                                    <td><span class="status">@request.Parish</span></td>
+                                    <td>@request.ReceivedUtc.UtcDateTime.ToString("dd MMM yyyy HH:mm")</td>
+                                    <td><a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.RequestId">Open</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            @if (hasPrevious || hasNext)
+            {
+                <div class="action-row" style="justify-content:space-between;margin-top:16px;align-items:center">
+                    <div>
+                        @if (hasPrevious)
+                        {
+                            <a class="button button-secondary" asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")" asp-route-Parish="@Model.Parish" asp-route-PageNumber="@(Model.PageNumber - 1)">Previous</a>
+                        }
+                    </div>
+                    <span class="muted">Page @Model.PageNumber.ToString("N0")</span>
+                    <div>
+                        @if (hasNext)
+                        {
+                            <a class="button button-secondary" asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")" asp-route-Parish="@Model.Parish" asp-route-PageNumber="@(Model.PageNumber + 1)">Next</a>
+                        }
+                    </div>
+                </div>
+            }
+        </section>
+    </div>
+</section>
