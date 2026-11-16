@@ -45,6 +45,90 @@ public sealed partial class IntegrationStatusService : IIntegrationStatusService
         this.operatorAuthorization = operatorAuthorization;
     }
 
+    private static readonly HashSet<string> CorrectableCodes = new(StringComparer.Ordinal)
+    {
+        "VALIDATION_PRIMARY_TELEPHONE", "VALIDATION_SECONDARY_TELEPHONE",
+        "VALIDATION_DATE_OF_BIRTH", "VALIDATION_APPLICANT_EMAIL",
+        "VALIDATION_EMPLOYMENT_STATUS", "VALIDATION_PARISH"
+    };
+
+    public async Task<QuickIntakeCorrection?> GetQuickIntakeCorrectionAsync(Guid staffUserId, Guid requestId, CancellationToken cancellationToken = default)
+    {
+        await operatorAuthorization.DemandAsync(staffUserId, cancellationToken);
+        var link = await dbContext.IntegrationLinks.AsNoTracking()
+            .SingleOrDefaultAsync(l => l.RequestId == requestId && l.SystemName == ffpManagerOptions.SystemName, cancellationToken);
+        if (link is null || link.Status != SynchronizationStatus.Failed || !CorrectableCodes.Contains(link.ErrorCode ?? ""))
+            return null;
+        var intake = await dbContext.QuickIntakes.AsNoTracking().SingleOrDefaultAsync(q => q.RequestId == requestId, cancellationToken);
+        if (intake is null) return null;
+        var reference = await dbContext.AssistanceRequests.AsNoTracking().Where(r => r.Id == requestId)
+            .Select(r => r.PublicReference).SingleAsync(cancellationToken);
+        string field = TransferFailures.For(link.FailureStage ?? "Validation", link.ErrorCode!).Field
+            ?? throw new InvalidOperationException("The rejected field cannot be identified.");
+        string current = field switch
+        {
+            "PrimaryTelephone" => intake.MobileNumber,
+            "SecondaryTelephone" => intake.SecondaryTelephone ?? "",
+            "DateOfBirth" => intake.DateOfBirth.ToString("yyyy-MM-dd"),
+            "ApplicantEmail" => intake.Email ?? "",
+            "ApplicantEmploymentStatus" => intake.EmploymentStatus,
+            "Parish" => intake.Parish,
+            _ => throw new InvalidOperationException("Unsupported correction field.")
+        };
+        return new(requestId, reference, link.ErrorCode!, field, current);
+    }
+
+    public async Task CorrectQuickIntakeAsync(Guid staffUserId, Guid requestId, string errorCode, string? correctedValue,
+        CancellationToken cancellationToken = default)
+    {
+        await operatorAuthorization.DemandAsync(staffUserId, cancellationToken);
+        if (!CorrectableCodes.Contains(errorCode) || (correctedValue?.Length ?? 0) > 320)
+            throw new ArgumentException("Invalid correction.");
+        await using var requestLock = await IntegrationRequestLock.AcquireAsync(dbContext, requestId, cancellationToken);
+        var link = await dbContext.IntegrationLinks.SingleOrDefaultAsync(
+            l => l.RequestId == requestId && l.SystemName == ffpManagerOptions.SystemName, cancellationToken);
+        if (link is null || link.Status != SynchronizationStatus.Failed || link.ErrorCode != errorCode)
+            throw new InvalidOperationException("The recorded failure changed. Refresh diagnostics before correcting.");
+        // Prevent edits when the destination is already known to exist: use the verified field-preview workflow instead.
+        if (link.VerifiedUtc.HasValue || !string.IsNullOrEmpty(link.ExternalReference))
+            throw new InvalidOperationException("A verified destination exists. Use the existing destination field-preview workflow.");
+        var intake = await dbContext.QuickIntakes.SingleAsync(q => q.RequestId == requestId, cancellationToken);
+        string field = TransferFailures.For(link.FailureStage ?? "Validation", errorCode).Field
+            ?? throw new InvalidOperationException("Unknown validation field.");
+        string? value = correctedValue?.Trim();
+        switch (field)
+        {
+            case "PrimaryTelephone":
+                value = ExternalApplicantValidation.Telephone(value, field);
+                if (value is null) throw new ArgumentException("Primary telephone cannot be empty.");
+                break;
+            case "SecondaryTelephone": value = ExternalApplicantValidation.Telephone(value, field); break;
+            case "ApplicantEmail": ExternalApplicantValidation.Email(value); break;
+            case "DateOfBirth":
+                if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out var date))
+                    throw new ArgumentException("Enter a valid date in YYYY-MM-DD format.");
+                ExternalApplicantValidation.DateOfBirth(date);
+                break;
+            case "ApplicantEmploymentStatus":
+                if (string.IsNullOrWhiteSpace(value) || value.Length > 50)
+                    throw new ArgumentException("Employment status is required (maximum 50 characters).");
+                ExternalApplicantValidation.Employment(value);
+                break;
+            case "Parish":
+                if (string.IsNullOrWhiteSpace(value) || RequestPortal.Application.Management.JamaicaParishes.Normalize(value)
+                        == RequestPortal.Application.Management.JamaicaParishes.Unknown)
+                    throw new ArgumentException("Select a recognized Jamaican parish.");
+                value = RequestPortal.Application.Management.JamaicaParishes.Normalize(value);
+                break;
+        }
+        intake.CorrectTransferField(field, value);
+        // Audit only metadata, never source personal data or submitted values.
+        await auditWriter.WriteAsync(staffUserId, "QuickIntakeTransferFieldCorrected", "IntegrationLink", link.Id, null,
+            $"field={field}; errorCode={errorCode}; request={requestId}; noRetry=true", cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<Guid> EnsureLinkAsync(Guid requestId, string systemName, CancellationToken cancellationToken = default)
     {
         IntegrationLink? existing = await dbContext.IntegrationLinks.SingleOrDefaultAsync(item => item.RequestId == requestId && item.SystemName == systemName, cancellationToken);
