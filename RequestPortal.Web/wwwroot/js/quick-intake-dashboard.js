@@ -100,11 +100,8 @@
         return distinctPositive.length === 1 ? 4 : 1 + Math.floor(3 * rank / (distinctPositive.length - 1));
     };
     const color = count => fills[shadeIndex(count)];
-    // Lighten only the selected parish; all other fills retain their true-value shades.
-    const brighten = hex => '#' + [1, 3, 5].map(index => {
-        const channel = parseInt(hex.slice(index, index + 2), 16);
-        return Math.round(channel + (255 - channel) * .18).toString(16).padStart(2, '0');
-    }).join('');
+    // The selected parish uses one vibrant accent for both its fill and its name.
+    const selectedParishColor = '#d92089';
     const legendBands = [4, 3, 2, 1, 0].map(index => {
         const counts = [...metrics.values()].filter(n => shadeIndex(n) === index);
         if (!counts.length) return null;
@@ -125,7 +122,7 @@
         const parishStyle = feature => {
             const selected = selectedParish && feature.properties.name === selectedParish;
             const base = color(metrics.get(feature.properties.name));
-            return { color: selected ? '#187be3' : '#fff', weight: selected ? 3 : 1.3, fillColor: selected ? brighten(base) : base, fillOpacity: 1 };
+            return { color: selected ? '#a00d60' : '#fff', weight: selected ? 3 : 1.3, fillColor: selected ? selectedParishColor : base, fillOpacity: 1 };
         };
         const boundaries = L.geoJSON(geography, { style: parishStyle,
             onEachFeature(feature, layer) {
@@ -134,7 +131,7 @@
                 layer.bindTooltip(tooltip, { sticky: true });
                 const open = () => { const url = new URL(root.dataset.recordsUrl, location.origin); url.searchParams.set('From', data.range.from); url.searchParams.set('Through', data.range.through); url.searchParams.set('Parish', name); location.assign(url); };
                 layer.on('click', open);
-                layer.on('mouseover', () => layer.setStyle({ weight: 2, color: '#173955' }));
+                layer.on('mouseover', () => layer.setStyle({ weight: selectedParish === name ? 3 : 2, color: selectedParish === name ? '#a00d60' : '#173955' }));
                 layer.on('mouseout', () => layer.setStyle(parishStyle(feature)));
                 layer.on('add', () => { const path = layer.getElement(); if (path) { path.setAttribute('tabindex', '0'); path.setAttribute('role', 'link'); path.setAttribute('aria-label', `${name}: ${Number(count).toLocaleString('en-JM')} Quick Intakes. View records.`); path.addEventListener('keydown', e => { if (e.key === 'Enter') open(); }); } });
             }
@@ -144,7 +141,7 @@
             map.invalidateSize({ pan: false }); map.fitBounds(boundaries.getBounds(), { padding: [10, 7], animate: false }); labels.clearLayers();
             boundaries.eachLayer(layer => {
                 const name = layer.feature.properties.name, count = metrics.get(name);
-                const element = document.createElement('div'); element.append(document.createTextNode(name)); if (!selectedParish || name === selectedParish) { const strong = document.createElement('strong'); strong.textContent = Number(count).toLocaleString('en-JM'); element.append(strong); }
+                const element = document.createElement('div'); const parishName = document.createElement('span'); parishName.textContent = name; if (selectedParish === name) { parishName.style.color = selectedParishColor; parishName.style.fontWeight = '800'; parishName.style.textShadow = '0 0 3px #fff, 1px 1px 2px #fff'; } element.append(parishName); if (!selectedParish || name === selectedParish) { const strong = document.createElement('strong'); strong.textContent = Number(count).toLocaleString('en-JM'); element.append(strong); }
                 const center = name === 'Kingston' ? L.latLng(17.97, -76.79) : layer.getBounds().getCenter();
                 const offsets = { 'St. Andrew': [15, -5], 'St. Catherine': [-12, -5], 'Kingston': [3, 17], 'Manchester': [3, 8] };
                 const [dx, dy] = offsets[name] || [0, 0];
