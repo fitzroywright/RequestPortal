@@ -65,7 +65,7 @@ public sealed class IndexModel : PageModel
         Operations.ReverificationOrganizations.Count +
         Queue.TotalCount +
         Operations.ActionRequiredRequests.Count +
-        Operations.DocumentsAwaitingVerification.Count +
+        Operations.PendingDocumentCount +
         Operations.DeadLetters.Count +
         Operations.FailedNotificationDeliveries.Count;
 
