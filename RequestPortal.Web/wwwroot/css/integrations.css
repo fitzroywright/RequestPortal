@@ -428,3 +428,86 @@ body.integrations-page{height:auto;min-height:100vh;min-height:100dvh;display:bl
     padding:10px 12px;
   }
 }
+
+/* Two-pane operations console: no page-level scrolling.
+   Left: three compact cards. Right: transfer table with its own scroll. */
+html:has(body.integrations-page){height:100%;overflow:hidden}
+body.integrations-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.integrations-page .app-main{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.integrations-page .integration-monitor{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;max-width:none;width:100%;margin:0;padding:9px 1.2vw 10px;overflow:hidden}
+.integrations-page .integration-heading{flex:none;margin-bottom:6px}
+.integrations-page .integration-heading .eyebrow{display:none}
+.integrations-page .integration-heading h1{font-size:21px;line-height:25px;margin:0}
+.integrations-page .integration-heading p{font-size:11px;line-height:1.25;margin:2px 0 0}
+.integrations-page .integration-workspace{display:grid;grid-template-columns:minmax(270px,310px) minmax(0,1fr);gap:10px;flex:1;min-width:0;min-height:0;overflow:hidden}
+.integrations-page .integration-side-rail{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;padding:0 3px 4px 0;scrollbar-width:thin}
+.integrations-page .integration-side-rail>.integration-overview-block,
+.integrations-page .integration-side-rail>.integration-filter-section,
+.integrations-page .integration-side-rail>.integration-artifact-recovery{flex:none;width:100%;min-width:0;margin:0;padding:9px 11px;background:#fff;border:1px solid #cbd8e6;border-radius:7px;box-shadow:0 1px 3px #12345609}
+.integrations-page .integration-side-rail>.integration-artifact-recovery{border-color:#e6c48a;background:#fffbf2}
+.integrations-page .integration-side-rail .integration-section-intro{gap:5px;align-items:center;margin:0 0 7px}
+.integrations-page .integration-side-rail .integration-section-intro h2{font-size:13px;line-height:1.25}
+.integrations-page .integration-side-rail .integration-section-intro p{font-size:10px;line-height:1.3}
+.integrations-page .integration-side-rail .integration-result-count{font-size:10px;padding:3px 5px;white-space:normal;text-align:center}
+.integrations-page .integration-side-rail .integration-overview-block>.integration-section-intro{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;padding-bottom:6px;border-bottom:1px solid #e3eaf2}
+.integrations-page .integration-side-rail .integration-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin:0}
+.integrations-page .integration-side-rail .integration-summary .integration-tile{min-height:43px;padding:5px 6px;gap:5px;border-radius:5px}
+.integrations-page .integration-side-rail .integration-summary .integration-tile>.integration-icon{width:16px;height:16px}
+.integrations-page .integration-side-rail .integration-summary .integration-tile-label{font-size:10px}
+.integrations-page .integration-side-rail .integration-summary .integration-tile-count{font-size:16px}
+.integrations-page .integration-side-rail .integration-summary .integration-tile-affordance{display:none}
+.integrations-page .integration-side-rail .integration-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-items:end;padding:0;margin:0}
+.integrations-page .integration-side-rail .integration-filters>label{grid-column:auto;grid-row:auto;font-size:10px;gap:3px;line-height:1.2}
+.integrations-page .integration-side-rail .integration-filters>label.integration-search{grid-column:1/-1}
+.integrations-page .integration-side-rail .integration-filters input,
+.integrations-page .integration-side-rail .integration-filters select{width:100%;min-width:0;height:29px;padding:3px 6px;font-size:11px}
+.integrations-page .integration-side-rail .integration-search input{padding-left:29px}
+.integrations-page .integration-side-rail .integration-search .integration-icon{top:6px;left:8px;width:14px;height:14px}
+.integrations-page .integration-side-rail .integration-filters>.button{grid-column:1;grid-row:auto;height:29px;min-height:29px;font-size:11px}
+.integrations-page .integration-side-rail .integration-filters>.integration-clear{grid-column:2;grid-row:auto;height:29px;min-height:29px;justify-self:center;font-size:11px}
+.integrations-page .integration-side-rail .integration-artifact-recovery .integration-section-intro{display:flex;align-items:start;flex-wrap:wrap}
+.integrations-page .integration-side-rail .integration-artifact-recovery .integration-section-intro h2{font-size:12px;line-height:1.3}
+.integrations-page .integration-side-rail .integration-artifact-recovery .integration-section-intro p{font-size:10px}
+.integrations-page .integration-side-rail .integration-artifact-recovery>details>summary{font-size:11px}
+.integrations-page .integration-side-rail .integration-artifact-recovery p,
+.integrations-page .integration-side-rail .integration-artifact-recovery .integration-correction-note{font-size:11px;line-height:1.35}
+.integrations-page .integration-side-rail .integration-artifact-recovery-form{display:grid;grid-template-columns:minmax(0,1fr);gap:7px}
+.integrations-page .integration-side-rail .integration-artifact-recovery-form input{min-width:0;width:100%}
+.integrations-page .integration-side-rail .integration-artifact-recovery-form .button{width:100%;font-size:11px}
+.integrations-page .integration-workspace-main{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.integrations-page .integration-workspace-main>.integration-corrections{flex:none;margin:0 0 7px;padding:8px 10px}
+.integrations-page .integration-workspace-main>.integration-corrections .integration-correction-grid{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+.integrations-page .integration-workspace-main>.integration-corrections .integration-correction-option{padding:5px 6px;font-size:10px;gap:4px}
+.integrations-page .integration-workspace-main>.integration-corrections .integration-correction-option strong{font-size:13px}
+.integrations-page .integration-workspace-main>.integration-corrections .integration-correction-note{margin-top:4px;font-size:10px}
+.integrations-page .integration-workspace-main>.integration-corrections .integration-breakdown{margin-top:5px;padding-top:5px}
+.integrations-page .integration-workspace-main>.integration-results-heading{flex:none;margin:3px 0 6px}
+.integrations-page .integration-workspace-main>.integration-grid{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:hidden}
+.integrations-page .integration-workspace-main .integration-grid-header{flex:none}
+.integrations-page .integration-workspace-main .integration-rows{flex:1;min-height:0;max-height:none;overflow-x:auto;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.integrations-page .integration-workspace-main .integration-paging{flex:none}
+.integrations-page .integration-workspace-main .integration-grid{min-height:0}
+.integrations-page .integration-announcement{flex:none;margin:0}
+@media(max-width:1450px){
+ .integrations-page .integration-workspace-main>.integration-corrections .integration-correction-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .integrations-page .integration-workspace-main .integration-columns{min-width:950px}
+}
+@media(max-width:1000px){
+ .integrations-page .integration-workspace{grid-template-columns:minmax(240px,270px) minmax(0,1fr);gap:7px}
+ .integrations-page .integration-workspace-main .integration-columns{min-width:920px}
+}
+@media(max-width:700px){
+ .integrations-page .integration-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(160px,42%) minmax(0,1fr)}
+ .integrations-page .integration-side-rail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:7px;overflow-y:auto}
+ .integrations-page .integration-side-rail>.integration-artifact-recovery{grid-column:1/-1}
+ .integrations-page .integration-side-rail .integration-filters{grid-template-columns:1fr 1fr}
+ .integrations-page .integration-workspace-main>.integration-corrections .integration-correction-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .integrations-page .integration-workspace-main .integration-columns{min-width:0}
+ .integrations-page .integration-workspace-main .integration-grid{overflow:hidden}
+ .integrations-page .integration-workspace-main .integration-rows{overflow-y:auto;overflow-x:hidden}
+}
+@media(max-width:420px){
+ .integrations-page .integration-side-rail{grid-template-columns:minmax(0,1fr)}
+ .integrations-page .integration-side-rail>.integration-artifact-recovery{grid-column:auto}
+ .integrations-page .integration-workspace{grid-template-rows:minmax(150px,43%) minmax(0,1fr)}
+}
