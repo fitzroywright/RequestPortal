@@ -570,3 +570,13 @@ body.integrations-page{height:100vh;height:100dvh;min-height:0;display:flex;flex
     font-size:11px;
     line-height:1.4;
 }
+
+/* Two-line title: Integrations / Transfer records, followed by one description. */
+.integrations-page .integration-heading-compact{display:block;flex:none;margin:0 0 7px}
+.integrations-page .integration-heading-compact .integration-title-line{display:flex;align-items:baseline;gap:8px;min-width:0}
+.integrations-page .integration-heading-compact h1{font-size:20px;line-height:24px;margin:0;white-space:nowrap}
+.integrations-page .integration-heading-compact .integration-title-divider{font-size:16px;color:#8191a4}
+.integrations-page .integration-heading-compact .integration-title-line>strong{font-size:13px;line-height:20px;color:#314f6a;white-space:nowrap}
+.integrations-page .integration-heading-compact .integration-result-count{margin-left:auto;font-size:10px;padding:3px 7px}
+.integrations-page .integration-heading-compact>p{margin:1px 0 0;font-size:11px;line-height:15px;color:#4b637c}
+@media(max-width:530px){.integrations-page .integration-heading-compact .integration-title-line{flex-wrap:wrap;gap:4px 7px}.integrations-page .integration-heading-compact h1{font-size:18px}}
