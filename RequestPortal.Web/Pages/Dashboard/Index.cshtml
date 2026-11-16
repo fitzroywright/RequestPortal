@@ -50,34 +50,34 @@
                         <span class="dashboard-card-icon">▥</span>
                         <div>
                             <strong>Request Status</strong>
-                            <small>@Model.Requests.Count total requests</small>
+                            <small>@Model.Requests.Count.ToString("N0") total requests</small>
                         </div>
                     </div>
                     <div class="dashboard-filter-list">
                         <button type="button" class="dashboard-filter-row is-active" data-status-filter="all">
                             <span class="dashboard-filter-icon">▤</span>
                             <span>All requests</span>
-                            <strong>@Model.Requests.Count</strong>
+                            <strong>@Model.Requests.Count.ToString("N0")</strong>
                         </button>
                         <button type="button" class="dashboard-filter-row" data-status-filter="Draft">
                             <span class="dashboard-filter-icon muted">▤</span>
                             <span>Draft</span>
-                            <strong>@Model.DraftCount</strong>
+                            <strong>@Model.DraftCount.ToString("N0")</strong>
                         </button>
                         <button type="button" class="dashboard-filter-row" data-status-filter="Submitted">
                             <span class="dashboard-filter-icon orange">◷</span>
                             <span>Awaiting FFP</span>
-                            <strong>@Model.SubmittedCount</strong>
+                            <strong>@Model.SubmittedCount.ToString("N0")</strong>
                         </button>
                         <button type="button" class="dashboard-filter-row" data-status-filter="MoreInformationRequired">
                             <span class="dashboard-filter-icon orange">▲</span>
                             <span>Information required</span>
-                            <strong>@Model.MoreInformationCount</strong>
+                            <strong>@Model.MoreInformationCount.ToString("N0")</strong>
                         </button>
                         <button type="button" class="dashboard-filter-row" data-status-filter="approved">
                             <span class="dashboard-filter-icon green">✓</span>
                             <span>Approved / fulfilment</span>
-                            <strong>@Model.ApprovedCount</strong>
+                            <strong>@Model.ApprovedCount.ToString("N0")</strong>
                         </button>
                     </div>
                 </section>
@@ -180,7 +180,7 @@
                         <span class="dashboard-card-icon warning">▲</span>
                         <div class="dashboard-card-head-copy">
                             <strong>Needs Attention</strong>
-                            <small>@Model.ActionRequired.Count requests</small>
+                            <small>@Model.ActionRequired.Count.ToString("N0") requests</small>
                         </div>
                     </div>
                     <div class="dashboard-attention-list">
@@ -247,7 +247,7 @@
                         <span class="dashboard-card-icon">♟</span>
                         <div class="dashboard-card-head-copy">
                             <strong>Organizations</strong>
-                            <small>@Model.ApprovedOrganizations approved</small>
+                            <small>@Model.ApprovedOrganizations.ToString("N0") approved</small>
                         </div>
                         <a class="dashboard-head-link" asp-page="/Organizations/Index">Manage</a>
                     </div>
