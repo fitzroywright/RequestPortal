@@ -12,6 +12,10 @@
         ? "The original exception was not preserved. First verify whether this request already exists in FFP Manager; then inspect retained portal, bridge, and SQL logs for this request and time. Do not resubmit until the destination outcome is known."
         : (transfer.RecoveryAction ?? "No specific recovery action was recorded. Verify destination status and review recorded attempt details before retrying.");
     <section class="integration-diagnostics @statusClass" aria-label="Diagnostics for @transfer.PublicReference">
+        @if (transfer.DocumentsOmitted)
+        {
+            <p class="integration-documents-omitted"><strong>Application-only recovery:</strong> FFP Manager application identity was verified; supporting documents were intentionally skipped and have NOT been recorded as transferred. Review the operator audit before any future document recovery.</p>
+        }
         <header class="integration-error-heading"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@statusClass"/></svg><div><strong>@(legacyUnknown ? "Original error unavailable" : transfer.Status is SynchronizationStatus.Failed or SynchronizationStatus.ReconciliationRequired or SynchronizationStatus.Retrying ? "Recorded failure" : "Transfer diagnostics")</strong><h2>@(legacyUnknown ? "Cause cannot be determined from this historical record" : Monitor.DiagnosticTitle(transfer))</h2><p>@(legacyUnknown ? "This failure was logged before detailed attempt diagnostics were available. LEGACY_FAILURE is a historical marker, not the exception that caused the transfer to fail." : validation?.Explanation ?? transfer.RecordedError ?? transfer.Explanation ?? "No error was recorded.")</p></div></header>
         @if (validation is not null) {
             <section class="integration-recovery" aria-label="Actionable validation failure">
