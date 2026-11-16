@@ -94,6 +94,17 @@ public sealed partial class IntegrationStatusService
                 : item.Status == SynchronizationStatus.Synchronized ? "Synchronized — verification incomplete" : "Other")
                 .Select(g => new { Name = g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Name, g => g.Count, cancellationToken)
             : new Dictionary<string, int>();
+        var errorCodes = quickIntake
+            ? await rows.Where(item => !item.Verified && item.Code != null && item.Code.StartsWith("VALIDATION_"))
+                .GroupBy(item => item.Code!).Select(g => new { Code = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(item => item.Code, item => item.Count, cancellationToken)
+            : new Dictionary<string, int>();
+        if (!string.IsNullOrWhiteSpace(query.ErrorCode))
+        {
+            if (!query.ErrorCode.StartsWith("VALIDATION_", StringComparison.Ordinal) || query.ErrorCode.Length > 80)
+                throw new ArgumentException("Invalid error code filter.");
+            rows = rows.Where(item => item.Code == query.ErrorCode);
+        }
         var counts = await rows.GroupBy(item => item.Status).Select(group => new { Status = group.Key, Count = group.Count() }).ToListAsync(cancellationToken);
         int Count(SynchronizationStatus status) => counts.FirstOrDefault(item => item.Status == status)?.Count ?? 0;
         var summary = new IntegrationMonitorCounts(Count(SynchronizationStatus.Failed), Count(SynchronizationStatus.Pending) + Count(SynchronizationStatus.NotSent),
@@ -117,7 +128,7 @@ public sealed partial class IntegrationStatusService
             _ => rows.OrderByDescending(item => item.SubmittedUtc)
         };
         var items = await sorted.ThenBy(item => item.RequestId).Skip((page - 1) * size).Take(size).ToListAsync(cancellationToken);
-        return new(items.Select(ToView).ToArray(), total, page, size, summary) { NotVerifiedBreakdown = breakdown, VerifiedCount = verifiedCount };
+        return new(items.Select(ToView).ToArray(), total, page, size, summary) { NotVerifiedBreakdown = breakdown, VerifiedCount = verifiedCount, NotVerifiedErrorCodes = errorCodes };
     }
 
     public async Task<int> CountAttentionAsync(CancellationToken cancellationToken = default)
