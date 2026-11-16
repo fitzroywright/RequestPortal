@@ -5,9 +5,9 @@
     var hasPrevious = Model.PageNumber > 1;
     var hasNext = Model.Records.Count == 50;
 }
-<section class="section">
-    <div class="shell" style="max-width:1440px">
-        <div class="section-heading">
+<section class="section portal-workspace staff-workspace">
+    <div class="shell">
+        <header class="workspace-titlebar">
             <div class="eyebrow" style="color:#b45b09">Quick Intake drill-down</div>
             <h1>Quick Intakes</h1>
             <p>Requests received in the selected period. Open any request in the existing staff review workflow.</p>
@@ -18,7 +18,7 @@
                     <a class="button button-secondary" asp-page="/Management/QuickIntakes" asp-route-From="@Model.From.ToString("yyyy-MM-dd")" asp-route-Through="@Model.Through.ToString("yyyy-MM-dd")">Clear parish filter</a>
                 }
             </div>
-        </div>
+        </header>
 
         <div class="card" style="margin-bottom:16px;padding:14px 18px">
             <strong>Filters:</strong>
@@ -26,26 +26,27 @@
             <span class="status">parish: @(string.IsNullOrWhiteSpace(Model.Parish) ? "All parishes" : Model.Parish)</span>
         </div>
 
-        <section class="card">
+        <section class="workspace-panel request-panel">
+            <div class="panel-titlebar">
             <div class="action-row" style="justify-content:space-between;align-items:center">
                 <h2 style="margin:0">Quick Intake requests</h2>
                 <span class="muted">@Model.Records.Count.ToString("N0") shown · Page @Model.PageNumber.ToString("N0")</span>
-            </div>
+            </div></div>
             @if (Model.Records.Count == 0)
             {
                 <p class="muted">No Quick Intakes match this filter.</p>
             }
             else
             {
-                <div class="table-wrap">
-                    <table>
+                <div class="table-wrap workspace-table-wrap">
+                    <table class="workspace-table">
                         <thead>
                             <tr><th>Reference</th><th>Parish</th><th>Received (UTC)</th></tr>
                         </thead>
                         <tbody>
                             @foreach (var request in Model.Records)
                             {
-                                <tr class="qi-drilldown-row" tabindex="0" aria-label="Open Quick Intake @request.Reference" data-review-url="@Url.Page("/Staff/Review", new { id = request.RequestId })">
+                                <tr class="qi-drilldown-row staff-select-row" role="link" tabindex="0" aria-label="Open Quick Intake @request.Reference" data-review-url="@Url.Page("/Staff/Review", new { id = request.RequestId })">
                                     <td><a asp-page="/Staff/Review" asp-route-id="@request.RequestId"><strong>@request.Reference</strong></a></td>
                                     <td><span class="status">@request.Parish</span></td>
                                     <td>@request.ReceivedUtc.UtcDateTime.ToString("dd MMM yyyy HH:mm")</td>
