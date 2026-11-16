@@ -5,20 +5,44 @@
     var result = Model.Transfers;
     var counts = result.Counts;
 }
-@if (Model.CanOperate && Model.ArtifactRecoveryCandidateCount > 0)
-{
-    <details class="integration-artifact-recovery">
-        <summary>One-time recovery: @Model.ArtifactRecoveryCandidateCount.ToString("N0") failed artifact-stage transfers</summary>
-        <p>This exceptional operation verifies each existing application in FFP Manager (JMDB01 / FFPJM), then marks only the application as synchronized. <strong>Supporting documents will not be uploaded or marked transferred.</strong> Missing or conflicting applications remain failed. Results are audited.</p>
-        <form method="post" asp-page-handler="RecoverArtifactsOnce" class="integration-artifact-recovery-form">
-            <label>Type <strong>SKIP DOCUMENTS ONCE</strong> to confirm:
-                <input name="ArtifactRecoveryConfirmation" required autocomplete="off" placeholder="SKIP DOCUMENTS ONCE" />
-            </label>
-            <button type="submit" class="button button-small">Run one-time application-only recovery</button>
-        </form>
-        <small>Only current Failed / Artifacts entries are eligible. This is not a general document-transfer bypass and is not a recurring job.</small>
-    </details>
-}
+<section class="integration-artifact-recovery" aria-labelledby="artifact-recovery-heading">
+    <div class="integration-section-intro">
+        <div>
+            <h2 id="artifact-recovery-heading">One-time artifact recovery</h2>
+            <p>Application-only synchronization for requests that failed during supporting-document transfer.</p>
+        </div>
+        @if (Model.CanOperate)
+        {
+            <span class="integration-result-count">@Model.ArtifactRecoveryCandidateCount.ToString("N0") eligible</span>
+        }
+        else
+        {
+            <span class="integration-result-count">Restricted</span>
+        }
+    </div>
+    @if (!Model.CanOperate)
+    {
+        <p class="integration-correction-note">Manual recovery requires the Manage Security permission. Contact an authorized administrator.</p>
+    }
+    else if (Model.ArtifactRecoveryCandidateCount == 0)
+    {
+        <p class="integration-correction-note">No records currently match the recovery criteria: stored status Failed and failure stage Artifacts. No recovery is needed for this category. Other failed or reconciliation-required records are not included.</p>
+    }
+    else
+    {
+        <details>
+            <summary>Review eligible recovery and confirmation</summary>
+            <p>Each application is verified in FFP Manager (JMDB01 / FFPJM). Supporting documents are <strong>not uploaded or marked as transferred</strong>. Missing or conflicting applications remain failed. Results are audited.</p>
+            <form method="post" asp-page-handler="RecoverArtifactsOnce" class="integration-artifact-recovery-form">
+                <label>Type <strong>SKIP DOCUMENTS ONCE</strong> to confirm:
+                    <input name="ArtifactRecoveryConfirmation" required autocomplete="off" placeholder="SKIP DOCUMENTS ONCE" />
+                </label>
+                <button type="submit" class="button button-small">Run one-time application-only recovery</button>
+            </form>
+            <small>Only current Failed / Artifacts entries are eligible. This is not a general document-transfer bypass or a recurring job.</small>
+        </details>
+    }
+</section>
 <div class="integration-section-intro">
     <div>
         <h2>Synchronization overview</h2>
