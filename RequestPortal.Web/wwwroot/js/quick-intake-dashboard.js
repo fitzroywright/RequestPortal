@@ -53,7 +53,7 @@
         const items = group.items.filter(item => item.count > 0 || item.name !== "Not provided / unknown");
         const instance = new Chart(canvas, {
             type,
-            data: { labels: items.map(v => v.name), datasets: [{ data: items.map(v => v.count), backgroundColor: type === 'doughnut' ? colors : '#3788ff', borderColor: type === 'doughnut' ? '#fff' : '#3788ff', borderWidth: type === 'doughnut' ? 1 : 0, borderRadius: type === 'bar' ? 3 : 0, maxBarThickness: horizontal ? 15 : 48 }] },
+            data: { labels: items.map(v => v.name), datasets: [{ data: items.map(v => v.count), backgroundColor: type === 'bar' ? items.map((_, index) => colors[index % colors.length]) : colors, borderColor: type === 'doughnut' ? '#fff' : 'transparent', borderWidth: type === 'doughnut' ? 1 : 0, borderRadius: type === 'bar' ? 3 : 0, maxBarThickness: horizontal ? 15 : 48 }] },
             plugins: [valuesPlugin],
             options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: type === 'doughnut' ? '67%' : undefined,
                 indexAxis: horizontal ? 'y' : 'x', layout: { padding: type === 'bar' ? { top: 15, right: 25 } : 3 },
