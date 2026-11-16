@@ -280,3 +280,15 @@ body.integrations-page{height:auto;min-height:100vh;min-height:100dvh;display:bl
  .integrations-page .integration-filters>.button{justify-self:stretch}
  .integrations-page .integration-clear{justify-self:start}
 }
+
+/* Audited, exceptional application-only recovery. */
+.integrations-page .integration-artifact-recovery{margin:0 0 16px;padding:12px 16px;border:1px solid #e6c48a;border-radius:8px;background:#fffbf2;color:#513c1d}
+.integrations-page .integration-artifact-recovery>summary{cursor:pointer;font-size:14px;font-weight:750;color:#734818}
+.integrations-page .integration-artifact-recovery p{font-size:13px;line-height:1.5;max-width:880px;margin:9px 0}
+.integrations-page .integration-artifact-recovery small{display:block;font-size:11px;line-height:1.5;margin-top:7px}
+.integrations-page .integration-artifact-recovery-form{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:10px 0}
+.integrations-page .integration-artifact-recovery-form label{display:flex;flex-direction:column;gap:5px;font-size:12px}
+.integrations-page .integration-artifact-recovery-form input{height:36px;min-width:240px;max-width:100%;padding:6px 10px;border:1px solid #caa76c;border-radius:6px;background:#fff}
+.integrations-page .integration-artifact-recovery-form .button{min-height:36px}
+.integrations-page .integration-documents-omitted{display:block;margin-top:4px;font-size:11px;font-weight:700;color:#91551b}
+@media(max-width:600px){.integrations-page .integration-artifact-recovery-form{display:grid;grid-template-columns:minmax(0,1fr)}.integrations-page .integration-artifact-recovery-form input{min-width:0;width:100%}}
