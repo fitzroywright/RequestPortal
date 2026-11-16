@@ -24,6 +24,8 @@ public interface IIntegrationStatusService
         => throw new NotSupportedException("Field previews are unavailable.");
     Task ApplyFieldsAsync(Guid staffUserId, ApplicationFieldPreview preview, IReadOnlyList<string> approved, CancellationToken cancellationToken = default)
         => throw new NotSupportedException("Field updates are unavailable.");
+    Task<QuickIntakeCorrection?> GetQuickIntakeCorrectionAsync(Guid staffUserId, Guid requestId, CancellationToken cancellationToken = default);
+    Task CorrectQuickIntakeAsync(Guid staffUserId, Guid requestId, string errorCode, string? correctedValue, CancellationToken cancellationToken = default);
     Task<IntegrationMonitorPage> SearchAsync(IntegrationMonitorQuery query, CancellationToken cancellationToken = default);
     Task<IntegrationTransferDetail?> GetRequestAsync(Guid requestId, CancellationToken cancellationToken = default);
     // Restricted diagnostic retrieval. Web callers MUST enforce ManageSecurity.
@@ -45,8 +47,10 @@ public interface IIntegrationStatusService
     Task ReconcileAsync(Guid staffUserId, Guid linkId, CancellationToken cancellationToken = default);
 }
 
+public sealed record QuickIntakeCorrection(Guid RequestId, string PublicReference, string ErrorCode, string Field, string CurrentValue);
+
 public sealed record IntegrationMonitorQuery(string? Search = null, string? Status = null,
-    DateTimeOffset? FromUtc = null, DateTimeOffset? ThroughUtc = null, string Sort = "received", int Page = 1, int PageSize = 25, string? Source = null, bool NotVerified = false);
+    DateTimeOffset? FromUtc = null, DateTimeOffset? ThroughUtc = null, string Sort = "received", int Page = 1, int PageSize = 25, string? Source = null, bool NotVerified = false, string? ErrorCode = null);
 public sealed record IntegrationTransferRow(Guid RequestId, Guid? LinkId, string PublicReference, string ApplicantName,
     string Source, string SystemName, string Target, SynchronizationStatus Status, string? FailureStage,
     string? FailureClassification, string? ErrorCode, string? Explanation, DateTimeOffset SubmittedUtc,
@@ -68,6 +72,7 @@ public sealed record IntegrationMonitorPage(IReadOnlyList<IntegrationTransferRow
 {
   public IReadOnlyDictionary<string, int> NotVerifiedBreakdown { get; init; } = new Dictionary<string, int>();
   public int? VerifiedCount { get; init; }
+  public IReadOnlyDictionary<string, int> NotVerifiedErrorCodes { get; init; } = new Dictionary<string, int>();
   public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize)); }
 public sealed record IntegrationAttemptView(Guid Id, int Number, string Operation, DateTimeOffset StartedUtc,
     DateTimeOffset? CompletedUtc, bool Succeeded, string Stage, string? Classification, string? ErrorCode, string? Explanation);
