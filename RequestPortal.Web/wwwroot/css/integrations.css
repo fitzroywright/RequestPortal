@@ -632,3 +632,18 @@ body.integrations-page{height:100vh;height:100dvh;min-height:0;display:flex;flex
     grid-column:2;
     grid-row:5;
 }
+
+/* Synchronization Overview: three rows in priority order.
+   Row 1: Synchronized | Pending
+   Row 2: Reconciliation Required (full width)
+   Row 3: Retrying | Failed */
+.integrations-page .integration-side-rail .integration-overview-block>.integration-summary{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+}
+.integrations-page .integration-side-rail .integration-overview-block>.integration-summary>.integration-tile.synchronized{grid-column:1;grid-row:1}
+.integrations-page .integration-side-rail .integration-overview-block>.integration-summary>.integration-tile.pending{grid-column:2;grid-row:1}
+.integrations-page .integration-side-rail .integration-overview-block>.integration-summary>.integration-tile.reconciliation{grid-column:1/-1;grid-row:2}
+.integrations-page .integration-side-rail .integration-overview-block>.integration-summary>.integration-tile.retrying{grid-column:1;grid-row:3}
+.integrations-page .integration-side-rail .integration-overview-block>.integration-summary>.integration-tile.failed{grid-column:2;grid-row:3}
