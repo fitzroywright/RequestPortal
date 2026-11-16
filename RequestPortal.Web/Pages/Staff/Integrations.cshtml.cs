@@ -48,6 +48,9 @@ public sealed class IntegrationsModel : PageModel
     public IntegrationMonitorPage Transfers { get; private set; } = new([], 0, 1, 25, new(0,0,0,0,0));
     public IntegrationTransferDetail? Selected { get; private set; }
     public QuickIntakeCorrection? Correction { get; private set; }
+    public int ArtifactRecoveryCandidateCount { get; private set; }
+    [BindProperty] public string? ArtifactRecoveryConfirmation { get; set; }
+
     [BindProperty] public Guid CorrectionRequestId { get; set; }
     [BindProperty] public string? CorrectionErrorCode { get; set; }
     [BindProperty] public string? CorrectedValue { get; set; }
@@ -155,6 +158,8 @@ public sealed class IntegrationsModel : PageModel
         string? filterError = FilterError();
         if (filterError is not null) return BadRequest(filterError);
         Transfers = await integrationStatusService.SearchAsync(Query(), HttpContext.RequestAborted);
+        if (CanOperate)
+            ArtifactRecoveryCandidateCount = (await integrationStatusService.GetFailedArtifactRecoveryIdsAsync(HttpContext.RequestAborted)).Count;
         if (RequestId.HasValue)
         {
             Selected = await integrationStatusService.GetRequestAsync(RequestId.Value, HttpContext.RequestAborted);
@@ -170,6 +175,34 @@ public sealed class IntegrationsModel : PageModel
         catch (Exception exception) when (exception is HttpRequestException or IntegrationTransferException or NotSupportedException or TaskCanceledException)
         { ReturnOutboxError = "Return-event diagnostics could not be read. Initial submission status is shown separately; inspect bridge readiness and callback delivery."; }
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostRecoverArtifactsOnceAsync([FromServices] IServiceScopeFactory scopeFactory)
+    {
+        if (!CanOperate) return Forbid(StaffOidcOptions.StaffCookieScheme);
+        if (!string.Equals(ArtifactRecoveryConfirmation, "SKIP DOCUMENTS ONCE", StringComparison.Ordinal))
+            return BadRequest("Type SKIP DOCUMENTS ONCE to confirm this exceptional recovery.");
+        var staff = await GetStaffUserAsync();
+        var ids = await integrationStatusService.GetFailedArtifactRecoveryIdsAsync(HttpContext.RequestAborted);
+        int recovered = 0, skipped = 0, errors = 0;
+        // Resolve a fresh scoped service per record: failures cannot leave tracked
+        // mutations behind for subsequent records.
+        foreach (var id in ids)
+        {
+            if (HttpContext.RequestAborted.IsCancellationRequested) break;
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<IIntegrationStatusService>();
+                if (await service.RecoverApplicationWithoutArtifactsAsync(staff.Id, id, HttpContext.RequestAborted))
+                    recovered++;
+                else skipped++;
+            }
+            catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested) { break; }
+            catch (Exception) { errors++; }
+        }
+        TempData["Success"] = $"Application-only recovery: {recovered} verified and marked synchronized (documents deliberately skipped); {skipped} no longer eligible; {errors} could not be verified or recovered and remain unchanged. See operator audit.";
+        return RedirectToPage("/Staff/Integrations", new { Source = "QuickIntake", NotVerified = true });
     }
 
     public async Task<IActionResult> OnPostCorrectQuickIntakeAsync()
