@@ -364,3 +364,30 @@ body.integrations-page{height:auto;min-height:100vh;min-height:100dvh;display:bl
  .integrations-page .integration-data-row{padding:5px 6px}
  .integrations-page .integration-diagnostic-columns{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Filters live in a compact top-right card, beside the synchronization overview. */
+.integrations-page .integration-top-workspace{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start;margin-bottom:10px}
+.integrations-page .integration-overview-block{min-width:0}
+.integrations-page .integration-overview-block>.integration-section-intro{min-height:26px}
+.integrations-page .integration-overview-block>.integration-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0}
+.integrations-page .integration-top-workspace>.integration-filter-section{width:100%;margin:0;padding:10px 12px;border:1px solid #cbd8e6;border-radius:7px;background:#fff}
+.integrations-page .integration-top-workspace .integration-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 8px;align-items:end}
+.integrations-page .integration-top-workspace .integration-filters>.integration-search{grid-column:1/-1}
+.integrations-page .integration-top-workspace .integration-filters>label{grid-column:auto;grid-row:auto;font-size:11px}
+.integrations-page .integration-top-workspace .integration-filters>label.integration-search{grid-column:1/-1}
+.integrations-page .integration-top-workspace .integration-filters input,
+.integrations-page .integration-top-workspace .integration-filters select{height:31px;width:100%;min-width:0;font-size:11px;border-radius:5px}
+.integrations-page .integration-top-workspace .integration-filters>.button{grid-column:1;grid-row:auto;min-height:31px;height:31px;width:100%;font-size:12px}
+.integrations-page .integration-top-workspace .integration-filters>.integration-clear{grid-column:2;grid-row:auto;min-height:31px;height:31px;justify-self:center;font-size:12px}
+.integrations-page .integration-top-workspace .integration-summary .integration-tile{min-height:59px}
+@media(max-width:1080px){
+ .integrations-page .integration-top-workspace{grid-template-columns:minmax(0,1fr) 310px;gap:10px}
+ .integrations-page .integration-overview-block>.integration-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ .integrations-page .integration-top-workspace{grid-template-columns:minmax(0,1fr)}
+ .integrations-page .integration-overview-block>.integration-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .integrations-page .integration-top-workspace>.integration-filter-section{max-width:none}
+ .integrations-page .integration-top-workspace .integration-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .integrations-page .integration-top-workspace .integration-filters>label.integration-search{grid-column:1/-1}
+}
