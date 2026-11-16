@@ -12,11 +12,11 @@
 <form method="get" class="integration-filters" asp-page="/Staff/Integrations">
     <label class="integration-search">Search<span><svg class="integration-icon" aria-hidden="true"><use href="#integration-search"/></svg><input asp-for="Search" maxlength="200" placeholder="Request #, applicant, TRN" /></span></label>
     <label>Source<select asp-for="Source"><option value="">All Sources</option><option value="QuickIntake">Quick Intake</option><option value="RequestPortal">Request Portal</option></select></label>
-    <label>Sort<select asp-for="Sort"><option value="activity">Newest activity</option><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
+    <label>Verification<select asp-for="NotVerified"><option value="false">All verification outcomes</option><option value="true">Not Verified in FFP Manager (Quick Intake only)</option></select></label>
     <input type="hidden" asp-for="ErrorCode" /><label>Status<select asp-for="Status"><option value="">All statuses</option>@foreach(var status in new[] { SynchronizationStatus.Failed,SynchronizationStatus.Pending,SynchronizationStatus.Retrying,SynchronizationStatus.Synchronized,SynchronizationStatus.ReconciliationRequired }) { <option value="@status">@Monitor.StatusLabel(status)</option> }</select></label>
     <label>Date From (UTC)<input asp-for="From" type="date" /></label>
-    <label>Verification<select asp-for="NotVerified"><option value="false">All verification outcomes</option><option value="true">Not Verified in FFP Manager (Quick Intake only)</option></select></label>
     <label>Date Through (UTC)<input asp-for="Through" type="date" /></label>
+    <label class="integration-sort-field">Sort<select asp-for="Sort"><option value="activity">Newest activity</option><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
     <button class="button" type="submit">Apply filters</button><a class="integration-clear" asp-page="/Staff/Integrations">Clear</a>
 </form>
 </section>
