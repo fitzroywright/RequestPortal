@@ -123,6 +123,37 @@ public sealed class QuickIntakeRecord
         ConvertedUtc = convertedUtc;
     }
 
+    /// <summary>Operator-corrected source information; original phone evidence is preserved.</summary>
+    public void CorrectTransferField(string field, string? value)
+    {
+        switch (field)
+        {
+            case "PrimaryTelephone":
+                MobileNumber = value ?? throw new ArgumentException("Primary telephone is required.");
+                break;
+            case "SecondaryTelephone":
+                SecondaryTelephone = Normalize(value);
+                break;
+            case "ApplicantEmail":
+                Email = Normalize(value);
+                break;
+            case "DateOfBirth":
+                if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out var date))
+                    throw new ArgumentException("Enter a valid date in YYYY-MM-DD format.");
+                DateOfBirth = date;
+                break;
+            case "ApplicantEmploymentStatus":
+                EmploymentStatus = value ?? throw new ArgumentException("Employment status is required.");
+                break;
+            case "Parish":
+                Parish = value ?? throw new ArgumentException("Parish is required.");
+                break;
+            default:
+                throw new ArgumentException("Unsupported transfer correction field.", nameof(field));
+        }
+    }
+
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
