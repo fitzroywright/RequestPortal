@@ -55,7 +55,7 @@ else
     <p>@Model.Results.Total applicant account(s)</p>
     <form method="get" id="identity-filters">
     <input type="hidden" name="PageNumber" value="1" />
-    <div class="table-wrap"><table><thead><tr>
+    <div class="table-wrap identity-accounts-grid-scroll" role="region" aria-label="Applicant accounts grid" tabindex="0"><table><thead><tr>
         <th><div class="identity-name-filter"><label asp-for="Search">Applicant name</label><input asp-for="Search" maxlength="200" placeholder="Name, email or request reference" /></div><noscript><button type="submit">Filter</button></noscript></th>
         <th>Email</th><th><label class="identity-visually-hidden" asp-for="Status">Account status</label><select asp-for="Status"><option value="">All statuses</option>@foreach(string status in new[]{"Active","PendingAccess","Suspended","Disabled","Enrollment required"}) { <option value="@status">@status</option> }</select></th><th>Linked providers</th><th>Last successful sign-in</th>
     </tr></thead><tbody>
