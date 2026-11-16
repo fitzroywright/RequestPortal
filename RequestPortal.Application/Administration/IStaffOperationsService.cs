@@ -22,7 +22,11 @@ public sealed record StaffOperationsSnapshot(
     IReadOnlyList<RequestWorkItem> ActionRequiredRequests,
     IReadOnlyList<DocumentWorkItem> DocumentsAwaitingVerification,
     IReadOnlyList<DeadLetterWorkItem> DeadLetters,
-    IReadOnlyList<NotificationDeliveryWorkItem> FailedNotificationDeliveries);
+    IReadOnlyList<NotificationDeliveryWorkItem> FailedNotificationDeliveries)
+{
+    // Uncapped count; DocumentsAwaitingVerification remains a bounded preview.
+    public int PendingDocumentCount { get; init; }
+}
 
 public interface IStaffOperationsService
 {
