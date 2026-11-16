@@ -50,7 +50,9 @@ public sealed partial class IntegrationStatusService : IIntegrationStatusService
     public async Task<IReadOnlyList<Guid>> GetFailedArtifactRecoveryIdsAsync(CancellationToken cancellationToken = default)
         => await dbContext.IntegrationLinks.AsNoTracking()
             .Where(link => link.SystemName == ffpManagerOptions.SystemName &&
-                link.Status == SynchronizationStatus.Failed && link.FailureStage == "Artifacts")
+                link.Status == SynchronizationStatus.Failed &&
+                (link.FailureStage == "Artifacts" || link.ErrorCode == "ARTIFACT") &&
+                link.ArtifactsSynchronizedUtc == null)
             .OrderBy(link => link.CreatedUtc).Select(link => link.RequestId)
             .Take(1000).ToListAsync(cancellationToken);
 
