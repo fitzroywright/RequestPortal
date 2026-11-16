@@ -62,6 +62,9 @@ public sealed class StaffOperationsService : IStaffOperationsService
             .ToListAsync(cancellationToken);
         List<RequestQueueRow> reviewRows = await (from request in dbContext.AssistanceRequests.AsNoTracking() join organization in dbContext.Organizations.AsNoTracking() on request.OrganizationId equals organization.Id where request.Status == RequestStatus.Submitted orderby request.SubmittedUtc ?? request.CreatedUtc select new RequestQueueRow(request.Id, request.PublicReference, organization.Id, organization.Name, request.Status, request.SubmittedUtc, request.CreatedUtc)).Take(200).ToListAsync(cancellationToken);
         List<RequestQueueRow> actionRows = await (from request in dbContext.AssistanceRequests.AsNoTracking() join organization in dbContext.Organizations.AsNoTracking() on request.OrganizationId equals organization.Id where request.Status == RequestStatus.MoreInformationRequired orderby request.SubmittedUtc ?? request.CreatedUtc select new RequestQueueRow(request.Id, request.PublicReference, organization.Id, organization.Name, request.Status, request.SubmittedUtc, request.CreatedUtc)).Take(200).ToListAsync(cancellationToken);
+        int pendingDocumentCount = await dbContext.Documents.AsNoTracking()
+            .CountAsync(document => document.VerificationStatus == DocumentVerificationStatus.Pending && !document.IsArchived,
+                cancellationToken);
         var documentRows = await (
             from document in dbContext.Documents.AsNoTracking()
             join organization in dbContext.Organizations.AsNoTracking() on document.OrganizationId equals organization.Id into organizations
@@ -110,7 +113,7 @@ public sealed class StaffOperationsService : IStaffOperationsService
             actionRows.Select(item => ToRequestWorkItem(item, now)).ToArray(),
             documentRows.Select(item => new DocumentWorkItem(item.Document.Id, item.Document.OrganizationId, item.OrganizationName, item.Document.DocumentType, item.Document.OriginalFileName, item.Document.UploadedUtc, CalculateAgeDays(item.Document.UploadedUtc, now), item.RequestId, item.RequestId.HasValue ? item.ApplicantName : null, item.HasValidContext)).ToArray(),
             deadLetters,
-            failedDeliveries);
+            failedDeliveries) { PendingDocumentCount = pendingDocumentCount };
     }
 
     public async Task ReplayDeadLetterAsync(Guid staffUserId, Guid messageId, CancellationToken cancellationToken = default)
