@@ -40,16 +40,15 @@
                 <div class="table-wrap">
                     <table>
                         <thead>
-                            <tr><th>Reference</th><th>Parish</th><th>Received (UTC)</th><th></th></tr>
+                            <tr><th>Reference</th><th>Parish</th><th>Received (UTC)</th></tr>
                         </thead>
                         <tbody>
                             @foreach (var request in Model.Records)
                             {
-                                <tr>
-                                    <td><strong>@request.Reference</strong></td>
+                                <tr class="qi-drilldown-row" tabindex="0" aria-label="Open Quick Intake @request.Reference" data-review-url="@Url.Page("/Staff/Review", new { id = request.RequestId })">
+                                    <td><a asp-page="/Staff/Review" asp-route-id="@request.RequestId"><strong>@request.Reference</strong></a></td>
                                     <td><span class="status">@request.Parish</span></td>
                                     <td>@request.ReceivedUtc.UtcDateTime.ToString("dd MMM yyyy HH:mm")</td>
-                                    <td><a class="button button-small" asp-page="/Staff/Review" asp-route-id="@request.RequestId">Open</a></td>
                                 </tr>
                             }
                         </tbody>
@@ -77,3 +76,27 @@
         </section>
     </div>
 </section>
+
+<style>
+    .qi-drilldown-row{cursor:pointer}
+    .qi-drilldown-row:hover td{background:#eaf3ff}
+    .qi-drilldown-row:focus-visible{outline:2px solid #286fcc;outline-offset:-2px}
+    .qi-drilldown-row:focus-visible td{background:#eaf3ff}
+    .qi-drilldown-row td{transition:background-color .12s ease}
+</style>
+@section Scripts {
+<script>
+    document.querySelectorAll('.qi-drilldown-row').forEach(row => {
+        row.addEventListener('click', event => {
+            if (event.target.closest('a, button, input, select')) return;
+            if (window.getSelection()?.toString()) return;
+            window.location.assign(row.dataset.reviewUrl);
+        });
+        row.addEventListener('keydown', event => {
+            if (event.target !== row || (event.key !== 'Enter' && event.key !== ' ')) return;
+            event.preventDefault();
+            window.location.assign(row.dataset.reviewUrl);
+        });
+    });
+</script>
+}
