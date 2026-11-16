@@ -47,6 +47,10 @@ public sealed class IntegrationsModel : PageModel
 
     public IntegrationMonitorPage Transfers { get; private set; } = new([], 0, 1, 25, new(0,0,0,0,0));
     public IntegrationTransferDetail? Selected { get; private set; }
+    public QuickIntakeCorrection? Correction { get; private set; }
+    [BindProperty] public Guid CorrectionRequestId { get; set; }
+    [BindProperty] public string? CorrectionErrorCode { get; set; }
+    [BindProperty] public string? CorrectedValue { get; set; }
     public ExternalReturnOutboxStatus? ReturnOutbox { get; private set; }
     public string? ReturnOutboxError { get; private set; }
     public IReadOnlyList<IntegrationReturnObservation> ReturnHistory { get; private set; } = [];
@@ -56,6 +60,7 @@ public sealed class IntegrationsModel : PageModel
         $" — {From?.ToString("dd MMM yyyy") ?? "Beginning"}–{Through?.ToString("dd MMM yyyy") ?? "Present"} (UTC, inclusive)";
     [BindProperty(SupportsGet = true)] public string? Search { get; set; }
     [BindProperty(SupportsGet = true)] public string? Status { get; set; }
+    [BindProperty(SupportsGet = true)] public string? ErrorCode { get; set; }
     [BindProperty(SupportsGet = true)] public DateOnly? From { get; set; }
     [BindProperty(SupportsGet = true)] public DateOnly? Through { get; set; }
     [BindProperty(SupportsGet = true)] public string? Sort { get; set; } = "activity";
@@ -70,12 +75,12 @@ public sealed class IntegrationsModel : PageModel
     public static string StatusLabel(RequestPortal.Domain.Integration.SynchronizationStatus status) => status switch {
         RequestPortal.Domain.Integration.SynchronizationStatus.ReconciliationRequired => "Reconciliation Required",
         RequestPortal.Domain.Integration.SynchronizationStatus.NotSent => "Pending", _ => status.ToString() };
-    public Dictionary<string,string> Routes(int page) => new() { ["Source"] = Source ?? "", ["NotVerified"] = NotVerified.ToString(), ["Search"] = Search ?? "", ["Status"] = Status ?? "",
+    public Dictionary<string,string> Routes(int page) => new() { ["Source"] = Source ?? "", ["NotVerified"] = NotVerified.ToString(), ["Search"] = Search ?? "", ["Status"] = Status ?? "", ["ErrorCode"] = ErrorCode ?? "",
         ["From"] = From?.ToString("yyyy-MM-dd") ?? "", ["Through"] = Through?.ToString("yyyy-MM-dd") ?? "", ["Sort"] = Sort ?? "activity", ["PageNumber"] = page.ToString() };
     private IntegrationMonitorQuery Query(int? page = null) => new(Search, Status,
         From.HasValue ? new DateTimeOffset(From.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
         Through.HasValue ? Through.Value == DateOnly.MaxValue ? DateTimeOffset.MaxValue : new DateTimeOffset(Through.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
-        Sort ?? "activity", page ?? PageNumber, Source: Source, NotVerified: NotVerified);
+        Sort ?? "activity", page ?? PageNumber, Source: Source, NotVerified: NotVerified, ErrorCode: ErrorCode);
     public static string StatusClass(RequestPortal.Domain.Integration.SynchronizationStatus status) => status switch {
         RequestPortal.Domain.Integration.SynchronizationStatus.Failed => "failed",
         RequestPortal.Domain.Integration.SynchronizationStatus.Retrying => "retrying",
@@ -113,8 +118,8 @@ public sealed class IntegrationsModel : PageModel
         return routes;
     }
     private object ReturnRoutes() => new { Source, NotVerified, Search, Status, From = From?.ToString("yyyy-MM-dd"),
-        Through = Through?.ToString("yyyy-MM-dd"), Sort, PageNumber, RequestId };
-    private bool ValidFilters => ModelState.IsValid &&
+        Through = Through?.ToString("yyyy-MM-dd"), Sort, PageNumber, RequestId, ErrorCode };
+    private bool ValidFilters => ModelState.IsValid && (string.IsNullOrWhiteSpace(ErrorCode) || ErrorCode.StartsWith("VALIDATION_", StringComparison.Ordinal) && ErrorCode.Length <= 80) &&
         (string.IsNullOrEmpty(Source) || Source is "QuickIntake" or "RequestPortal") && (!NotVerified || Source == "QuickIntake") && (Search?.Length ?? 0) <= 200 && (!From.HasValue || !Through.HasValue || From <= Through) &&
         (string.IsNullOrWhiteSpace(Status) || Enum.TryParse<RequestPortal.Domain.Integration.SynchronizationStatus>(Status,true,out var status) && Enum.IsDefined(status));
     public IReadOnlyList<DeadLetterWorkItem> DeadLetters { get; private set; } = Array.Empty<DeadLetterWorkItem>();
@@ -129,6 +134,8 @@ public sealed class IntegrationsModel : PageModel
         {
             Selected = await integrationStatusService.GetRequestAsync(RequestId.Value, HttpContext.RequestAborted);
             if (Selected is null) return NotFound();
+            if (CanOperate && Selected.Transfer.Source == "Quick Intake")
+                Correction = await integrationStatusService.GetQuickIntakeCorrectionAsync((await GetStaffUserAsync()).Id, RequestId.Value, HttpContext.RequestAborted);
         }
         StaffOperationsSnapshot snapshot = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
         DeadLetters = snapshot.DeadLetters;
@@ -138,6 +145,26 @@ public sealed class IntegrationsModel : PageModel
         catch (Exception exception) when (exception is HttpRequestException or IntegrationTransferException or NotSupportedException or TaskCanceledException)
         { ReturnOutboxError = "Return-event diagnostics could not be read. Initial submission status is shown separately; inspect bridge readiness and callback delivery."; }
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostCorrectQuickIntakeAsync()
+    {
+        if (!CanOperate) return Forbid(StaffOidcOptions.StaffCookieScheme);
+        if (CorrectionRequestId == Guid.Empty || string.IsNullOrWhiteSpace(CorrectionErrorCode) || (CorrectedValue?.Length ?? 0) > 320)
+            return BadRequest("Invalid correction.");
+        try
+        {
+            var operatorUser = await GetStaffUserAsync();
+            await integrationStatusService.CorrectQuickIntakeAsync(operatorUser.Id, CorrectionRequestId, CorrectionErrorCode,
+                CorrectedValue, HttpContext.RequestAborted);
+            TempData["Success"] = "Source information corrected and audited. Synchronization has NOT been retried. Review the record, then use Retry to verify the destination and resubmit.";
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or ExternalApplicationValidationException)
+        {
+            TempData["Error"] = exception.Message;
+        }
+        return RedirectToPage("/Staff/Integrations", new { RequestId = CorrectionRequestId, Source = "QuickIntake", NotVerified = true,
+            ErrorCode, Status, Search, From, Through, Sort, PageNumber });
     }
 
     // Exception frames are privileged and loaded only on explicit demand.
