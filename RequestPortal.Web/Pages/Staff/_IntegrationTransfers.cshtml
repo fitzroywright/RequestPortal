@@ -5,6 +5,20 @@
     var result = Model.Transfers;
     var counts = result.Counts;
 }
+@if (Model.CanOperate && Model.ArtifactRecoveryCandidateCount > 0)
+{
+    <details class="integration-artifact-recovery">
+        <summary>One-time recovery: @Model.ArtifactRecoveryCandidateCount.ToString("N0") failed artifact-stage transfers</summary>
+        <p>This exceptional operation verifies each existing application in FFP Manager (JMDB01 / FFPJM), then marks only the application as synchronized. <strong>Supporting documents will not be uploaded or marked transferred.</strong> Missing or conflicting applications remain failed. Results are audited.</p>
+        <form method="post" asp-page-handler="RecoverArtifactsOnce" class="integration-artifact-recovery-form">
+            <label>Type <strong>SKIP DOCUMENTS ONCE</strong> to confirm:
+                <input name="ArtifactRecoveryConfirmation" required autocomplete="off" placeholder="SKIP DOCUMENTS ONCE" />
+            </label>
+            <button type="submit" class="button button-small">Run one-time application-only recovery</button>
+        </form>
+        <small>Only current Failed / Artifacts entries are eligible. This is not a general document-transfer bypass and is not a recurring job.</small>
+    </details>
+}
 <div class="integration-section-intro">
     <div>
         <h2>Synchronization overview</h2>
@@ -106,7 +120,7 @@
                     <span role="cell" data-label="Status"><span class="integration-status @statusClass"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@statusClass"/></svg>@Monitor.StatusLabel(item.Status)</span></span>
                     <span role="cell" data-label="Error / Explanation" class="integration-explanation">@if(item.ErrorCode is not null) { <strong>@Monitor.DiagnosticTitle(item)</strong><span>@Monitor.DiagnosticDescription(item)</span> } else { <span>@(item.Explanation ?? (item.Status == SynchronizationStatus.Synchronized ? (item.VerifiedInFfpManager ? "Verified in FFP Manager." : "Synchronized status recorded; verification incomplete.") : "No error was recorded."))</span> }</span>
                     <span role="cell" data-label="Last Activity (UTC)">@Monitor.LastActivity(item).ToString("MMM dd, yyyy HH:mm:ss'Z'")<span>@Monitor.StatusLabel(item.Status)</span></span>
-                    <span role="cell" data-label="FFP Manager">@(item.ApplicationNumber ?? "Not verified")<span>@item.ApplicationId</span></span>
+                    <span role="cell" data-label="FFP Manager">@(item.ApplicationNumber ?? "Not verified")<span>@item.ApplicationId</span>@if(item.DocumentsOmitted) { <span class="integration-documents-omitted">Documents skipped — application only</span> }</span>
                     <span role="cell" data-label="Actions" class="integration-row-actions">
                         @if(Model.CanOperate && Monitor.CanRetry(item)) {
                             <form method="post" asp-page-handler="Retry" asp-all-route-data="Model.Routes(result.Page)"><input type="hidden" name="linkId" value="@item.LinkId"/><input type="hidden" name="RequestId" value="@item.RequestId"/><button class="button button-small" type="submit" title="Verify destination and retry">Retry</button></form>
