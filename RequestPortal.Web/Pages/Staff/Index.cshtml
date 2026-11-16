@@ -182,6 +182,20 @@
 .staff-requests-grid .workspace-table tbody tr.staff-select-row:focus-visible{outline:2px solid var(--workspace-focus,#245b8a);outline-offset:-2px;background:#edf3f8}
 @@media(max-width:1100px){.portal-workspace.staff-workspace .portal-workspace-grid.staff-requests-grid{grid-template-columns:minmax(0,1fr)!important}.staff-requests-grid>.request-panel,.staff-requests-grid>.staff-context-stack{grid-column:1}}
 .staff-context-stack{display:grid;gap:10px;align-content:start;min-width:0}
+/* Neutral attention card: remove red/orange left accent without changing layout. */
+.staff-requests-grid .staff-context-stack .attention-list,
+.staff-requests-grid .staff-context-stack .attention-list a{
+    border-left:0!important;
+    border-inline-start:0!important;
+    box-shadow:none!important;
+}
+.staff-requests-grid .staff-context-stack .attention-list a::before,
+.staff-requests-grid .staff-context-stack .attention-list a::after{
+    border-left:0!important;
+    border-inline-start:0!important;
+    box-shadow:none!important;
+}
+
 .staff-waiting-action{min-width:0}
 
 .staff-waiting-list{display:grid;max-height:360px;overflow-y:auto;overscroll-behavior:contain}
