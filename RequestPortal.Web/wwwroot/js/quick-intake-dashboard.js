@@ -60,8 +60,8 @@
                 indexAxis: horizontal ? 'y' : 'x', layout: { padding: type === 'bar' ? { top: 15, right: 25 } : 3 },
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${dimension === 'income' ? 'Monthly income (JMD): ' : dimension === 'weeklyIncome' ? 'Weekly income (JMD): ' : ''}${formatCount(items[ctx.dataIndex].count)} (${items[ctx.dataIndex].percent}% of all Quick Intakes)` } } },
                 scales: type === 'bar' ? {
-                    x: { beginAtZero: true, display: !horizontal, grid: { display: false }, border: { display: false }, ticks: { color: '#09132f', font: { size: 12 }, maxRotation: 0, callback: value => formatCount(value) }, grace: horizontal ? '18%' : undefined },
-                    y: { beginAtZero: true, grid: { display: !horizontal, color: '#e6eaf1' }, border: { display: false }, ticks: { color: '#09132f', precision: 0, font: { size: 12 }, autoSkip: false, callback: value => formatCount(value) }, grace: horizontal ? undefined : '18%' }
+                    x: { beginAtZero: true, display: !horizontal, grid: { display: false }, border: { display: false }, ticks: { color: '#09132f', font: { size: 12 }, maxRotation: 0, callback: function(value) { return horizontal ? formatCount(value) : this.getLabelForValue(value); } }, grace: horizontal ? '18%' : undefined },
+                    y: { beginAtZero: true, grid: { display: !horizontal, color: '#e6eaf1' }, border: { display: false }, ticks: { color: '#09132f', precision: 0, font: { size: 12 }, autoSkip: false, callback: function(value) { return horizontal ? this.getLabelForValue(value) : formatCount(value); } }, grace: horizontal ? undefined : '18%' }
                 } : undefined }
         });
         charts.push(instance);
