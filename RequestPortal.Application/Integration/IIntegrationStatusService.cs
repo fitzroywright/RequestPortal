@@ -61,6 +61,7 @@ public sealed record IntegrationTransferRow(Guid RequestId, Guid? LinkId, string
 {
     // Only classified, sanitized failures may be exposed; legacy provider payloads stay protected.
     public bool VerifiedInFfpManager { get; init; }
+    public bool DocumentsOmitted { get; init; }
     public bool CanUpdateFields => Source == "Quick Intake" && LinkId.HasValue && VerifiedUtc.HasValue &&
         !string.IsNullOrWhiteSpace(ApplicationId) && !string.IsNullOrWhiteSpace(ApplicationNumber) &&
         Status is SynchronizationStatus.Synchronized or SynchronizationStatus.ReconciliationRequired;
