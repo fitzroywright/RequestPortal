@@ -27,7 +27,7 @@ public sealed partial class IntegrationStatusService
                let stalePending = link != null && (link.Status == SynchronizationStatus.Pending || link.Status == SynchronizationStatus.NotSent) &&
                    (link.LastAttemptUtc ?? link.CreatedUtc) < stale
                let staleRetry = link != null && link.NextRetryUtc != null && link.NextRetryUtc < stale
-               let unverified = link != null && link.Status == SynchronizationStatus.Synchronized && (link.VerifiedUtc == null || link.ArtifactsSynchronizedUtc == null)
+               let unverified = link != null && link.Status == SynchronizationStatus.Synchronized && (link.VerifiedUtc == null || (link.ArtifactsSynchronizedUtc == null && link.FailureClassification != "DocumentsOmitted"))
                select new MonitorRow
                {
                    Verified = verifiedIds.Contains(request.Id),
@@ -55,7 +55,7 @@ public sealed partial class IntegrationStatusService
                    LastAttemptUtc = link == null ? null : link.LastAttemptUtc,
                    NextRetryUtc = link == null ? null : link.NextRetryUtc, SynchronizedUtc = link == null ? null : link.SynchronizedUtc,
                    VerifiedUtc = link == null ? null : link.VerifiedUtc, ApplicationId = link == null ? null : link.ExternalReference,
-                   ApplicationNumber = link == null ? null : link.ApplicationNumber, HasQueuedSubmission = queued
+                   ApplicationNumber = link == null ? null : link.ApplicationNumber, HasQueuedSubmission = queued, DocumentsOmitted = link != null && link.FailureClassification == "DocumentsOmitted"
                };
     }
 
@@ -181,7 +181,7 @@ public sealed partial class IntegrationStatusService
             null => null,
             _ => TransferFailures.For(row.Stage ?? "Unknown", row.Code).Explanation
         }), row.SubmittedUtc, row.LastAttemptUtc, row.AttemptCount, row.NextRetryUtc, row.SynchronizedUtc,
-        row.VerifiedUtc, row.ApplicationId, row.ApplicationNumber, row.HasQueuedSubmission) { VerifiedInFfpManager = row.Verified, RecordedError = row.RecordedError, RecoveryAction = RecoveryAction(row) };
+        row.VerifiedUtc, row.ApplicationId, row.ApplicationNumber, row.HasQueuedSubmission) { VerifiedInFfpManager = row.Verified, RecordedError = row.RecordedError, RecoveryAction = RecoveryAction(row), DocumentsOmitted = row.DocumentsOmitted };
 
     private static string? RecoveryAction(MonitorRow row)
     {
@@ -222,5 +222,6 @@ public sealed partial class IntegrationStatusService
         public string? ApplicationId { get; set; }
         public string? ApplicationNumber { get; set; }
         public bool HasQueuedSubmission { get; set; }
+        public bool DocumentsOmitted { get; set; }
     }
 }
