@@ -26,6 +26,8 @@ public interface IIntegrationStatusService
         => throw new NotSupportedException("Field updates are unavailable.");
     Task<QuickIntakeCorrection?> GetQuickIntakeCorrectionAsync(Guid staffUserId, Guid requestId, CancellationToken cancellationToken = default);
     Task CorrectQuickIntakeAsync(Guid staffUserId, Guid requestId, string errorCode, string? correctedValue, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Guid>> GetFailedArtifactRecoveryIdsAsync(CancellationToken cancellationToken = default);
+    Task<bool> RecoverApplicationWithoutArtifactsAsync(Guid staffUserId, Guid requestId, CancellationToken cancellationToken = default);
     Task<IntegrationMonitorPage> SearchAsync(IntegrationMonitorQuery query, CancellationToken cancellationToken = default);
     Task<IntegrationTransferDetail?> GetRequestAsync(Guid requestId, CancellationToken cancellationToken = default);
     // Restricted diagnostic retrieval. Web callers MUST enforce ManageSecurity.
