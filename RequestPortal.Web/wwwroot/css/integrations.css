@@ -292,3 +292,9 @@ body.integrations-page{height:auto;min-height:100vh;min-height:100dvh;display:bl
 .integrations-page .integration-artifact-recovery-form .button{min-height:36px}
 .integrations-page .integration-documents-omitted{display:block;margin-top:4px;font-size:11px;font-weight:700;color:#91551b}
 @media(max-width:600px){.integrations-page .integration-artifact-recovery-form{display:grid;grid-template-columns:minmax(0,1fr)}.integrations-page .integration-artifact-recovery-form input{min-width:0;width:100%}}
+
+/* Keep recovery discoverable even when there are no candidates or no operator permission. */
+.integrations-page .integration-artifact-recovery .integration-section-intro{margin-bottom:6px}
+.integrations-page .integration-artifact-recovery .integration-section-intro h2{font-size:15px;color:#684417}
+.integrations-page .integration-artifact-recovery>details>summary{cursor:pointer;font-weight:700;color:#684417;font-size:13px}
+.integrations-page .integration-artifact-recovery .integration-correction-note{font-size:13px;line-height:1.5;margin:6px 0 0;color:#644c2e}
