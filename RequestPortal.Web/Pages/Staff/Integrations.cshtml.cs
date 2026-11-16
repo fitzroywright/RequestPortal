@@ -183,7 +183,10 @@ public sealed class IntegrationsModel : PageModel
     {
         Response.Headers.CacheControl = "no-store";
         Selected = await integrationStatusService.GetRequestAsync(requestId, HttpContext.RequestAborted);
-        return Selected is null ? NotFound() : Partial("_IntegrationDiagnostics", this);
+        if (Selected is null) return NotFound();
+        if (CanOperate && Selected.Transfer.Source == "Quick Intake")
+            Correction = await integrationStatusService.GetQuickIntakeCorrectionAsync((await GetStaffUserAsync()).Id, requestId, HttpContext.RequestAborted);
+        return Partial("_IntegrationDiagnostics", this);
     }
 
     public async Task<IActionResult> OnPostTestSharePointAsync()
