@@ -48,7 +48,7 @@
             (Label: "Completed", Key: "completed", Icon: "✓", Value: dashboard.Executive.Completed, Tone: "green") })
         {
             <a class="mg-kpi mg-tone-@metric.Tone" asp-page="/Management/Requests" asp-route-period="@metric.Key">
-                <span class="mg-kpi-label">@metric.Label</span><strong>@metric.Value</strong>
+                <span class="mg-kpi-label">@metric.Label</span><strong>@metric.Value.ToString("N0")</strong>
             </a>
         }
     </section>
@@ -78,7 +78,7 @@
                 <button class="mg-small-button mg-primary" type="submit">View requests</button>
                 <button class="mg-small-button" type="button" data-map-clear>Clear selection</button>
             </form>
-            <div class="mg-geography-footer"><span data-parish-selection aria-live="polite">All parishes · @dashboard.Parishes.Sum(item => item.Requests) requests</span>
+            <div class="mg-geography-footer"><span data-parish-selection aria-live="polite">All parishes · @(dashboard.Parishes.Sum(item => item.Requests).ToString("N0")) requests</span>
                 <a data-parish-details hidden>Communities and requests</a>
                 <a asp-page="/Management/Requests" asp-route-parish="@JamaicaParishes.Unknown">Unknown / not provided: @((unknown?.Requests ?? 0).ToString("N0"))</a></div>
             <noscript><p>Use the parish filter to view requests. JavaScript enables the interactive map.</p></noscript>
@@ -86,9 +86,9 @@
         <section class="mg-section mg-insights" aria-labelledby="operational-insights-title">
             <h2 id="operational-insights-title">Operational Insights</h2><h3>Needs Attention</h3>
             <div class="mg-attention">
-                <a asp-page="/Management/Requests" asp-route-attention="overdue"><strong>@dashboard.Attention.Overdue</strong><span>Overdue</span></a>
-                <a asp-page="/Management/Requests" asp-route-attention="stalled"><strong>@dashboard.Attention.Stalled</strong><span>Stalled</span></a>
-                <a asp-page="/Management/Requests" asp-route-attention="missing-docs"><strong>@dashboard.Attention.MissingDocuments</strong><span>Missing Documents</span></a>
+                <a asp-page="/Management/Requests" asp-route-attention="overdue"><strong>@dashboard.Attention.Overdue.ToString("N0")</strong><span>Overdue</span></a>
+                <a asp-page="/Management/Requests" asp-route-attention="stalled"><strong>@dashboard.Attention.Stalled.ToString("N0")</strong><span>Stalled</span></a>
+                <a asp-page="/Management/Requests" asp-route-attention="missing-docs"><strong>@dashboard.Attention.MissingDocuments.ToString("N0")</strong><span>Missing Documents</span></a>
             </div>
             <dl class="mg-insight-rows">
                 <div><dt>Average Processing Time</dt><dd><strong>@dashboard.Performance.AverageProcessingDays d</strong><span>Average time to a processing outcome</span></dd></div>
@@ -104,7 +104,7 @@
             @foreach (ManagementStatusMetric status in dashboard.Statuses)
             {
                 <a class="mg-count-row" asp-page="/Management/Requests" asp-route-status="@status.Key">
-                    <span title="@status.Label">@status.Label</span><span class="mg-bar-track" aria-hidden="true"><span style="width:@((status.Count * 100d / maxStatus).ToString("0.##", CultureInfo.InvariantCulture))%"></span></span><strong>@status.Count</strong>
+                    <span title="@status.Label">@status.Label</span><span class="mg-bar-track" aria-hidden="true"><span style="width:@((status.Count * 100d / maxStatus).ToString("0.##", CultureInfo.InvariantCulture))%"></span></span><strong>@status.Count.ToString("N0")</strong>
                 </a>
             }
         </section>
@@ -116,11 +116,11 @@
                     (Label: "Partially Delivered", Key: "PartiallyDelivered", Value: dashboard.Delivery.PartiallyDelivered, Icon: "◐", Tone: "blue"),
                     (Label: "Failed / Not Delivered", Key: "Failed", Value: dashboard.Delivery.Failed, Icon: "×", Tone: "red") })
                 {
-                    <a class="mg-delivery-metric mg-tone-@metric.Tone" asp-page="/Management/Deliveries" asp-route-status="@metric.Key"><strong>@metric.Value</strong><span>@metric.Label</span></a>
+                    <a class="mg-delivery-metric mg-tone-@metric.Tone" asp-page="/Management/Deliveries" asp-route-status="@metric.Key"><strong>@metric.Value.ToString("N0")</strong><span>@metric.Label</span></a>
                 }
             </div>
             @if (dashboard.Delivery.PendingFfpManagerSync > 0)
-            { <p class="mg-note">@dashboard.Delivery.PendingFfpManagerSync proof-of-delivery confirmation(s) awaiting synchronization back to FFP Manager.</p> }
+            { <p class="mg-note">@dashboard.Delivery.PendingFfpManagerSync.ToString("N0") proof-of-delivery confirmation(s) awaiting synchronization back to FFP Manager.</p> }
         </section>
     </div>
 
@@ -137,7 +137,7 @@
                     <div class="mg-table-scroll" tabindex="0" role="region" aria-label="@dimension.Title"><table><thead><tr><th>@dimension.Column</th><th>Waiting</th><th>Delivered</th><th>Partial</th><th>Failed</th></tr></thead><tbody>
                     @foreach (var row in dimension.Rows)
                     {
-                        <tr><th scope="row"><a asp-page="/Management/Deliveries" asp-all-route-data="@(new Dictionary<string, string> { [dimension.Key] = row.Name })">@row.Name</a></th><td>@row.AwaitingAcknowledgement</td><td>@row.Delivered</td><td>@row.PartiallyDelivered</td><td>@row.Failed</td></tr>
+                        <tr><th scope="row"><a asp-page="/Management/Deliveries" asp-all-route-data="@(new Dictionary<string, string> { [dimension.Key] = row.Name })">@row.Name</a></th><td>@row.AwaitingAcknowledgement.ToString("N0")</td><td>@row.Delivered.ToString("N0")</td><td>@row.PartiallyDelivered.ToString("N0")</td><td>@row.Failed.ToString("N0")</td></tr>
                     }
                     </tbody></table></div>
                 }
@@ -150,7 +150,7 @@
             <div class="mg-chart" data-chart-kind="delivery"><canvas id="delivery-outcome-chart" role="img" aria-label="Delivered, partially delivered and failed outcomes by reporting week">Reporting values are available in the data table below.</canvas></div>
             @if (!dashboard.DeliveryAnalytics.Trend.Any(point => point.Delivered + point.PartiallyDelivered + point.Failed > 0)) { <p class="mg-note">No delivery outcomes recorded in these periods.</p> }
             <details class="mg-chart-details"><summary>View reporting data</summary><div class="mg-table-scroll"><table><thead><tr><th>Week starting</th><th>Delivered</th><th>Partial</th><th>Failed</th></tr></thead><tbody>
-            @foreach (var point in dashboard.DeliveryAnalytics.Trend) { <tr><th scope="row">@point.WeekStarting.ToString("MMM d, yyyy")</th><td>@point.Delivered</td><td>@point.PartiallyDelivered</td><td>@point.Failed</td></tr> }
+            @foreach (var point in dashboard.DeliveryAnalytics.Trend) { <tr><th scope="row">@point.WeekStarting.ToString("MMM d, yyyy")</th><td>@point.Delivered.ToString("N0")</td><td>@point.PartiallyDelivered.ToString("N0")</td><td>@point.Failed.ToString("N0")</td></tr> }
             </tbody></table></div></details>
         </section>
         @foreach (var dimension in new[] { (Title: "Requests by Category", Key: "category", Rows: dashboard.Categories), (Title: "Requests by Program", Key: "program", Rows: dashboard.Programs) })
@@ -162,7 +162,7 @@
                     int maximum = Math.Max(1, dimension.Rows.Max(item => item.Count));
                     foreach (var item in dimension.Rows)
                     {
-                        <a class="mg-count-row mg-dimension-row" asp-page="/Management/Requests" asp-all-route-data="@(new Dictionary<string, string> { [dimension.Key] = item.Name })"><span title="@item.Name">@item.Name</span><span class="mg-bar-track" aria-hidden="true"><span style="width:@((item.Count * 100d / maximum).ToString("0.##", CultureInfo.InvariantCulture))%"></span></span><strong>@item.Count</strong></a>
+                        <a class="mg-count-row mg-dimension-row" asp-page="/Management/Requests" asp-all-route-data="@(new Dictionary<string, string> { [dimension.Key] = item.Name })"><span title="@item.Name">@item.Name</span><span class="mg-bar-track" aria-hidden="true"><span style="width:@((item.Count * 100d / maximum).ToString("0.##", CultureInfo.InvariantCulture))%"></span></span><strong>@item.Count.ToString("N0")</strong></a>
                     }
                 }
             </section>
@@ -172,7 +172,7 @@
     <section class="mg-section mg-received-trend"><h2>Received vs. Completed</h2>
         <div class="mg-chart" data-chart-kind="requests"><canvas id="received-completed-chart" role="img" aria-label="Received and completed requests by reporting week">Reporting values are available in the data table below.</canvas></div>
         <details class="mg-chart-details"><summary>View reporting data</summary><div class="mg-table-scroll"><table><thead><tr><th>Week starting</th><th>Received</th><th>Completed</th></tr></thead><tbody>
-        @foreach (var point in dashboard.Trend) { <tr><th scope="row">@point.WeekStarting.ToString("MMM d, yyyy")</th><td>@point.Received</td><td>@point.Completed</td></tr> }
+        @foreach (var point in dashboard.Trend) { <tr><th scope="row">@point.WeekStarting.ToString("MMM d, yyyy")</th><td>@point.Received.ToString("N0")</td><td>@point.Completed.ToString("N0")</td></tr> }
         </tbody></table></div></details>
     </section>
     <script type="application/json" id="management-dashboard-data">@Html.Raw(JsonSerializer.Serialize(clientData))</script>
