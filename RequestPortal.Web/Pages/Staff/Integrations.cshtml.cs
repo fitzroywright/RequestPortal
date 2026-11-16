@@ -181,26 +181,6 @@ public sealed class IntegrationsModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostAcceptWithoutDocumentsAsync(Guid requestId, string? confirmation)
-    {
-        if (!CanOperate) return Forbid(StaffOidcOptions.StaffCookieScheme);
-        if (requestId == Guid.Empty || confirmation != "ACCEPT WITHOUT DOCUMENTS")
-            return BadRequest("Explicit confirmation is required for this request.");
-        try
-        {
-            var staff = await GetStaffUserAsync();
-            if (await integrationStatusService.RecoverApplicationWithoutArtifactsAsync(staff.Id, requestId, HttpContext.RequestAborted))
-                TempData["Success"] = "Existing FFP Manager application verified and accepted without supporting documents. Document transfer remains unacknowledged and the exception was audited.";
-            else
-                TempData["Error"] = "This request is not eligible. Only an unresolved artifact failure with missing document acknowledgement can be accepted without documents.";
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or IntegrationTransferException or HttpRequestException or TimeoutException or TaskCanceledException)
-        {
-            TempData["Error"] = "Application-only approval could not be completed. The application must exist and its identity must be verified in FFP Manager. No documents were skipped for this request.";
-        }
-        return RedirectToPage("/Staff/Integrations", new { RequestId = requestId, Source, NotVerified, Search, Status, ErrorCode, From, Through, Sort, PageNumber });
-    }
-
     public async Task<IActionResult> OnPostRecoverArtifactsOnceAsync()
     {
         if (!CanOperate) return Forbid(StaffOidcOptions.StaffCookieScheme);
