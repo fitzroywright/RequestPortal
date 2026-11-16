@@ -100,6 +100,11 @@
         return distinctPositive.length === 1 ? 4 : 1 + Math.floor(3 * rank / (distinctPositive.length - 1));
     };
     const color = count => fills[shadeIndex(count)];
+    // Lighten only the selected parish; all other fills retain their true-value shades.
+    const brighten = hex => '#' + [1, 3, 5].map(index => {
+        const channel = parseInt(hex.slice(index, index + 2), 16);
+        return Math.round(channel + (255 - channel) * .18).toString(16).padStart(2, '0');
+    }).join('');
     const legendBands = [4, 3, 2, 1, 0].map(index => {
         const counts = [...metrics.values()].filter(n => shadeIndex(n) === index);
         if (!counts.length) return null;
@@ -117,7 +122,12 @@
         map.attributionControl.setPrefix(false);
         map.attributionControl.addAttribution('Parishes: <a href="https://www.geoboundaries.org/">geoBoundaries</a> · CC BY-SA 2.0');
         const selectedParish = parishSelect?.value;
-        const boundaries = L.geoJSON(geography, { style: f => ({ color: '#fff', weight: 1.3, fillColor: color(metrics.get(f.properties.name)), fillOpacity: 1 }),
+        const parishStyle = feature => {
+            const selected = selectedParish && feature.properties.name === selectedParish;
+            const base = color(metrics.get(feature.properties.name));
+            return { color: selected ? '#187be3' : '#fff', weight: selected ? 3 : 1.3, fillColor: selected ? brighten(base) : base, fillOpacity: 1 };
+        };
+        const boundaries = L.geoJSON(geography, { style: parishStyle,
             onEachFeature(feature, layer) {
                 const name = feature.properties.name, count = metrics.get(name);
                 const tooltip = document.createElement('span'); tooltip.textContent = `${name}: ${Number(count).toLocaleString('en-JM')} Quick Intakes`;
@@ -125,7 +135,7 @@
                 const open = () => { const url = new URL(root.dataset.recordsUrl, location.origin); url.searchParams.set('From', data.range.from); url.searchParams.set('Through', data.range.through); url.searchParams.set('Parish', name); location.assign(url); };
                 layer.on('click', open);
                 layer.on('mouseover', () => layer.setStyle({ weight: 2, color: '#173955' }));
-                layer.on('mouseout', () => layer.setStyle({ weight: 1.3, color: '#fff' }));
+                layer.on('mouseout', () => layer.setStyle(parishStyle(feature)));
                 layer.on('add', () => { const path = layer.getElement(); if (path) { path.setAttribute('tabindex', '0'); path.setAttribute('role', 'link'); path.setAttribute('aria-label', `${name}: ${Number(count).toLocaleString('en-JM')} Quick Intakes. View records.`); path.addEventListener('keydown', e => { if (e.key === 'Enter') open(); }); } });
             }
         }).addTo(map);
