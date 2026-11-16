@@ -101,7 +101,7 @@
     };
     const color = count => fills[shadeIndex(count)];
     // The selected parish uses one vibrant accent for both its fill and its name.
-    const selectedParishColor = '#d92089';
+    const selectedParishColor = '#318A91';
     const legendBands = [4, 3, 2, 1, 0].map(index => {
         const counts = [...metrics.values()].filter(n => shadeIndex(n) === index);
         if (!counts.length) return null;
@@ -122,7 +122,7 @@
         const parishStyle = feature => {
             const selected = selectedParish && feature.properties.name === selectedParish;
             const base = color(metrics.get(feature.properties.name));
-            return { color: selected ? '#a00d60' : '#fff', weight: selected ? 3 : 1.3, fillColor: selected ? selectedParishColor : base, fillOpacity: 1 };
+            return { color: selected ? '#21656B' : '#fff', weight: selected ? 3 : 1.3, fillColor: selected ? selectedParishColor : base, fillOpacity: 1 };
         };
         const boundaries = L.geoJSON(geography, { style: parishStyle,
             onEachFeature(feature, layer) {
@@ -131,7 +131,7 @@
                 layer.bindTooltip(tooltip, { sticky: true });
                 const open = () => { const url = new URL(root.dataset.recordsUrl, location.origin); url.searchParams.set('From', data.range.from); url.searchParams.set('Through', data.range.through); url.searchParams.set('Parish', name); location.assign(url); };
                 layer.on('click', open);
-                layer.on('mouseover', () => layer.setStyle({ weight: selectedParish === name ? 3 : 2, color: selectedParish === name ? '#a00d60' : '#173955' }));
+                layer.on('mouseover', () => layer.setStyle({ weight: selectedParish === name ? 3 : 2, color: selectedParish === name ? '#21656B' : '#173955' }));
                 layer.on('mouseout', () => layer.setStyle(parishStyle(feature)));
                 layer.on('add', () => { const path = layer.getElement(); if (path) { path.setAttribute('tabindex', '0'); path.setAttribute('role', 'link'); path.setAttribute('aria-label', `${name}: ${Number(count).toLocaleString('en-JM')} Quick Intakes. View records.`); path.addEventListener('keydown', e => { if (e.key === 'Enter') open(); }); } });
             }
