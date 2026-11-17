@@ -9,5 +9,7 @@
     <InvariantGlobalization>false</InvariantGlobalization>
     <DefaultItemExcludes>$(DefaultItemExcludes);src/**</DefaultItemExcludes>
     <CommonRoot Condition="'$(CommonRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Common'))</CommonRoot>
+    <CommonSecurityRoot Condition="'$(CommonSecurityRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Common.Security\Common.Security.Hosting\Common.Security.Hosting.csproj')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Common.Security'))</CommonSecurityRoot>
+    <CommonSecurityRoot Condition="'$(CommonSecurityRoot)' == ''">$(CommonRoot)\Common.Security</CommonSecurityRoot>
   </PropertyGroup>
 </Project>

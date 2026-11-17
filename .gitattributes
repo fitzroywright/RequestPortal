@@ -1,0 +1,2 @@
+# Pinned geography hashes must stay identical on Windows and Unix checkouts.
+*.geojson text eol=lf
