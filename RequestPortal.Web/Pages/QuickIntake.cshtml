@@ -162,6 +162,7 @@
                             <span asp-validation-for="Attachments"></span>
                         </div>
                     </details>
+                    <p class="quick-intake-certification">By submitting this form, I certify that the information provided is true, accurate, and complete to the best of my knowledge. I understand that incomplete or inaccurate information may affect the review and processing of this request.</p>
                     <button class="quick-intake-primary" id="quickIntakeSubmit" type="submit"><span id="quickIntakeSubmitLabel">Submit</span><span class="quick-intake-spinner" aria-hidden="true"></span></button>
                     <p id="quickIntakeSubmitStatus" class="quick-intake-submit-status" role="status" aria-live="polite" hidden>Submitting your request. Please wait…</p>
                     <progress id="quickIntakeProgress" max="100" value="0" hidden style="width:100%"></progress>
@@ -174,6 +175,7 @@
 </section>
 
 <style>
+.quick-intake-certification{margin:16px 0 12px;color:#43576a;font-size:.9rem;line-height:1.5}
 .quick-intake-page{min-height:100vh;padding:18px 12px 38px;background:linear-gradient(180deg,#f3f7fa,#fff);color:#14324d}
 .quick-intake-shell{width:min(100%,760px);margin:auto}.quick-intake-card{background:#fff;border:1px solid #dbe5ec;border-radius:16px;box-shadow:0 14px 36px rgba(13,49,78,.1);overflow:hidden}
 .quick-intake-header{padding:22px;border-bottom:1px solid #e7eef3;background:#fffaf4}.quick-intake-header h1{margin:0;color:#0b2d57;font-size:1.8rem}.quick-intake-header p{margin:6px 0 0;color:#5b6f83}
