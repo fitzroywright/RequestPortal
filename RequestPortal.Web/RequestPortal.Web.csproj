@@ -21,8 +21,8 @@
     <ProjectReference Include="..\RequestPortal.Infrastructure\RequestPortal.Infrastructure.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Diagnostics\Common.Diagnostics.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Registration\Common.Registration.csproj" AdditionalProperties="Configuration=$(Configuration)" />
-    <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.Hosting\Common.Security.Hosting.csproj" />
-    <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.csproj" AdditionalProperties="Configuration=$(Configuration)" />
+    <ProjectReference Include="$(CommonSecurityRoot)\Common.Security.Hosting\Common.Security.Hosting.csproj" />
+    <ProjectReference Include="$(CommonSecurityRoot)\Common.Security.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Secrets\Common.Secrets.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Storage\Common.Storage.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.csproj" AdditionalProperties="Configuration=$(Configuration)" />

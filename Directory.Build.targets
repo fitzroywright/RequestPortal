@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup Condition="'$(BuildingSolutionFile)' == 'true'">
+    <!-- References outside the solution inherit its configuration and platform. -->
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
+    <_CommonReferenceRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(CommonRoot)'))</_CommonReferenceRoot>
+    <_CommonSecurityReferenceRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(CommonSecurityRoot)'))</_CommonSecurityReferenceRoot>
+  </PropertyGroup>
+
+  <Target Name="PreserveCommonProjectConfiguration"
+          BeforeTargets="AssignProjectConfiguration"
+          DependsOnTargets="ResolvePackageDependenciesForBuild"
+          Condition="'$(BuildingSolutionFile)' == 'true'">
+    <!-- Include project references from the assets file as well as declared references. -->
+    <ItemGroup>
+      <ProjectReference Condition="$([System.String]::Copy('%(ProjectReference.FullPath)').StartsWith('$(_CommonReferenceRoot)')) Or $([System.String]::Copy('%(ProjectReference.FullPath)').StartsWith('$(_CommonSecurityReferenceRoot)'))">
+        <AdditionalProperties>%(ProjectReference.AdditionalProperties);ShouldUnsetParentConfigurationAndPlatform=false</AdditionalProperties>
+      </ProjectReference>
+    </ItemGroup>
+  </Target>
+</Project>
