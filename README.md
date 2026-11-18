@@ -47,7 +47,7 @@ Important production requirements include PostgreSQL credentials, durable docume
 
 ## Quick development startup
 
-Prerequisites: Visual Studio 2022 with .NET 10 support and access to an existing PostgreSQL server.
+Prerequisites: the .NET 11 SDK and access to an existing PostgreSQL server.
 
 1. Pull `main` or the branch being reviewed.
 2. Open `RequestPortal.sln` in Visual Studio.

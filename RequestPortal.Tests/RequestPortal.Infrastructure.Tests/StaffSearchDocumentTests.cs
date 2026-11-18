@@ -35,7 +35,7 @@ public sealed class StaffSearchDocumentTests
         var ct = TestContext.Current.CancellationToken;
         await using var fixture = await PostgreSqlTestDatabase.CreateAsync(ct);
         var db = fixture.Db;
-        var now = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(2026, 11, 18, 12, 0, 0, TimeSpan.Zero);
         ApplicationUser User(string first, string last, string display)
         {
             var user = new ApplicationUser { Id = Guid.NewGuid(), FirstName = first, LastName = last, DisplayName = display, UserName = Guid.NewGuid().ToString(), CreatedUtc = now };

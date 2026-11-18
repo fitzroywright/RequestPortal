@@ -16,7 +16,7 @@ public sealed class QuickIntakeReportingReconciliationTests
     [Fact]
     public void PagingAndDetailRoutesPreserveReportingScope()
     {
-        var model = new RequestPortal.Web.Pages.Staff.IntegrationsModel(null!, null!, null!, null!, null!, null!)
+        var model = new RequestPortal.Web.Pages.Staff.IntegrationsModel(null!, null!, null!, null!, null!, null!, scopeFactory: null!)
         {
             Source = "QuickIntake", NotVerified = true, Search = "example", Status = "Failed",
             From = new(2026, 10, 1), Through = new(2026, 10, 31), Sort = "oldest"

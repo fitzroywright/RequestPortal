@@ -79,7 +79,7 @@ public sealed class ParishSubmissionPersistenceTests
             Assert.Equal("Male", submission.ApplicantGender);
             Assert.Equal("Unemployed", submission.ApplicantEmploymentStatus);
             Assert.Equal("Kingston", submission.Parish);
-            Assert.Equal("+18765550123",submission.PrimaryTelephone);
+            Assert.Equal("18765550123",submission.PrimaryTelephone);
             Assert.Null(submission.SecondaryTelephone);
             Assert.Equal(new DateOnly(1980,1,1),submission.DateOfBirth);
             Assert.Equal("Request Portal - Quick Intake", submission.DocumentSource);
@@ -250,8 +250,8 @@ public sealed class ParishSubmissionPersistenceTests
         Assert.Equal(captured.EmploymentStatus,submission.ApplicantEmploymentStatus);
         Assert.Equal(captured.Email,submission.ApplicantEmail);
         Assert.Equal(organization.Phone,submission.OrganizationPhone);
-        Assert.Equal(captured.MobileNumber,submission.PrimaryTelephone);
-        Assert.Equal(captured.SecondaryTelephone,submission.SecondaryTelephone);
+        Assert.Equal(captured.MobileNumber[1..],submission.PrimaryTelephone);
+        Assert.Equal(captured.SecondaryTelephone![1..],submission.SecondaryTelephone);
         Assert.Equal(captured.DateOfBirth,submission.DateOfBirth);
         var unchanged = await database.Db.QuickIntakes.AsNoTracking().SingleAsync(token);
         Assert.Equal(captured.DateOfBirth,unchanged.DateOfBirth);

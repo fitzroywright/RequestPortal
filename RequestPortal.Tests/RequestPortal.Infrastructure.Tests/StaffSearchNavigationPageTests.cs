@@ -157,6 +157,8 @@ public sealed class StaffSearchNavigationPageTests
             data.Reads++;
             return method switch {
                 "CountAttentionAsync" => Task.FromResult(1),
+                "GetFailedArtifactRecoveryIdsAsync" => Task.FromResult<IReadOnlyList<Guid>>([]),
+                "GetQuickIntakeCorrectionAsync" => Task.FromResult<QuickIntakeCorrection?>(null),
                 "GetReturnHistoryAsync" => Task.FromResult<IReadOnlyList<IntegrationReturnObservation>>([]),
                 "GetTransferAsync" => Task.FromResult<IntegrationTransferRow?>((Guid)args[0]! == RequestId ? data.Transfer : null),
                 "GetRequestAsync" => Task.FromResult<IntegrationTransferDetail?>((Guid)args[0]! == RequestId ? new(data.Transfer,

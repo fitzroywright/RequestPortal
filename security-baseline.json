@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "status": "candidate-not-approved-for-production",
   "commonLibraries": {
-    "Common.Security": "12247599fe75d6aeb0a2e4ff58c66349fe976e63",
-    "Common.Diagnostics": "4f90c9fd31aaa16ffbada97e33084a5356a45859",
-    "Common.Secrets": "0e081a55d5885a148decb0c86c1baad263448948",
-    "Common.Messaging": "cc015e8fcd9ea0c163859b3ed094243e4cddfbf4",
-    "Common.Storage": "bface4498b63f6e0b9dae1228bd9234a3a94b4d7",
-    "Common.Registration": "e673815b7e1f29ac1c713e849762e1af522a784d"
+    "Common.Security": "c0e1a1f0f1f6b3303ec28bf47fcb7a52c9af6748",
+    "Common.Diagnostics": "aea6757ff483be0d9262a9d239dea69ed2703eed",
+    "Common.Secrets": "21bee850d29f7a5a58d3fa3d3793272799682e6a",
+    "Common.Messaging": "1e85458baa6624826eeb32cc56bacbcfe053568c",
+    "Common.Storage": "c9cf0b599ea1295d63f39145cb1b25d1275d46a5",
+    "Common.Registration": "bfed9a94d38a3f23cc020d40bc811df49e789724"
   }
 }

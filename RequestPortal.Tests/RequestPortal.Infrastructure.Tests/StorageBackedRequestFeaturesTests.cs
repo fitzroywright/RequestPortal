@@ -94,7 +94,9 @@ public sealed class StorageBackedRequestFeaturesTests
         var saved=await service.ResolveAndSaveAsync(request.Id,"Half Way Tree, St. Andrew, Jamaica",null,null,ct);
         Assert.NotNull(saved);Assert.Equal("St. Andrew",saved.Parish);Assert.Equal("Half Way Tree",saved.Community);
         await using var read=fixture.CreateSiblingContext();
-        var row=await read.RequestLocations.SingleAsync(ct);Assert.Equal(saved,row.Snapshot());
+        var row = await read.RequestLocations.SingleAsync(ct);
+        var persistedTime = saved.ResolvedUtc.AddTicks(-(saved.ResolvedUtc.Ticks % TimeSpan.TicksPerMicrosecond));
+        Assert.Equal(saved with { ResolvedUtc = persistedTime }, row.Snapshot());
         Assert.True(await read.OutboxMessages.AnyAsync(x=>x.MessageType==ManagementDashboardAggregateRefresher.MessageType && x.ProcessedUtc==null,ct));
     }
 

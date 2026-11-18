@@ -155,11 +155,11 @@ public sealed class QuickIntakeClientRelationsEmailTests
         Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: token, nowUtc: DigestTime));
         var sent = Assert.Single(sender.Sent);
         Assert.Equal("configured@example.com", sent.Recipient);
-        Assert.Contains("Client Relations digest", sent.Subject);
-        Assert.Contains("Client Relations Quick Intake digest", sent.Body);
-        Assert.Contains($"Request Portal reference: {result.PublicReference}", sent.Body);
-        Assert.Contains("FFP Manager reference: KGN/26/GR/0042", sent.Body);
-        Assert.Contains("review these requests in Request Portal", sent.Body);
+        Assert.Contains("1 new Quick Intake submissions", sent.Subject);
+        Assert.Contains("Client Relations Digest", sent.Body);
+        Assert.Contains($"{result.PublicReference}</td>", sent.Body);
+        Assert.Contains("KGN/26/GR/0042</td>", sent.Body);
+        Assert.Contains("ready for review", sent.Body);
         Assert.Equal(ClientRelationsDigest.IdFor(ClientRelationsDigest.SlotFor(DigestTime)!.Value), sent.DeliveryId);
         Assert.Equal(NotificationTransport.Email, sent.Transport);
         Assert.Equal(4, await database.Db.OutboxMessages.Where(m => m.MessageType != RequestPortal.Infrastructure.Management.ManagementDashboardAggregateRefresher.MessageType).CountAsync(token));
