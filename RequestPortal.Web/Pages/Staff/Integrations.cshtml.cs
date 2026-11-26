@@ -171,7 +171,7 @@ public sealed class IntegrationsModel : PageModel
             string.IsNullOrWhiteSpace(Search))
         {
             Through = DateOnly.FromDateTime(DateTime.UtcNow);
-            From = Through.Value.AddDays(-29);
+            From = Through.Value.AddDays(-6);
         }
         string? filterError = FilterError();
         if (filterError is not null) return BadRequest(filterError);
