@@ -17,6 +17,7 @@
     <label class="integration-filter-from">Date From (UTC)<input asp-for="From" type="date" /></label>
     <label class="integration-filter-through">Date Through (UTC)<input asp-for="Through" type="date" /></label>
     <label class="integration-sort-field">Sort<select asp-for="Sort"><option value="activity">Newest activity</option><option value="received">Newest received</option><option value="oldest">Oldest received</option><option value="applicant">Applicant</option><option value="status">Status</option><option value="attempt">Last attempt</option></select></label>
+    <label>Rows per page<select asp-for="PageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
     <button class="button" type="submit">Apply filters</button><a class="integration-clear" asp-page="/Staff/Integrations">Clear</a>
 </form>
 </section>
@@ -26,7 +27,7 @@
 </div>
 <div class="integration-summary" role="group" aria-label="Filter transfers by status">
 @foreach(var item in new[] { ("synchronized","Synchronized",counts.Synchronized), ("pending","Pending",counts.Pending), ("reconciliation","Reconciliation Required",counts.ReconciliationRequired), ("retrying","Retrying",counts.Retrying), ("failed","Failed",counts.Failed) }) {
-    <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Source="@Model.Source" asp-route-NotVerified="@Model.NotVerified" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
+    <a class="integration-tile @item.Item1 @(string.Equals(Model.Status, item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1, StringComparison.OrdinalIgnoreCase) ? "is-selected" : "")" asp-page="/Staff/Integrations" asp-route-Source="@Model.Source" asp-route-NotVerified="@Model.NotVerified" asp-route-Search="@Model.Search" asp-route-Status="@(item.Item1 == "reconciliation" ? nameof(SynchronizationStatus.ReconciliationRequired) : item.Item1 == "pending" ? nameof(SynchronizationStatus.NotSent) : item.Item1)" asp-route-From="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-Through="@(Model.Through?.ToString("yyyy-MM-dd"))" asp-route-Sort="@Model.Sort" asp-route-PageNumber="1" asp-route-PageSize="@Model.PageSize" aria-label="Show @item.Item2 transfers: @item.Item3"><svg class="integration-icon" aria-hidden="true"><use href="#integration-@item.Item1"/></svg><span><strong class="integration-tile-label">@item.Item2</strong><b class="integration-tile-count">@item.Item3</b></span><span class="integration-tile-affordance" aria-hidden="true">›</span></a>
 }
 </div>
 </div>
@@ -166,7 +167,7 @@
         }
         @if(result.Items.Count == 0) { <div class="integration-empty"><p role="status">No matching transfers.</p><button type="button" class="button button-small button-outline" data-system-toggle aria-expanded="false" aria-controls="integration-operations">System diagnostics</button></div> }
         </div>
-        <section id="integration-operations" class="integration-operations" hidden aria-label="System diagnostics"><partial name="_IntegrationOperations" model="Model" /></section>
+        <section id="integration-operations" class="integration-operations" hidden aria-label="System diagnostics" data-system-url="@Url.Page("/Staff/Integrations", "SystemDiagnostics")"></section>
     </div>
     @if(result.TotalPages > 1) {
         <nav class="integration-paging" aria-label="Transfer pages"><span>Showing @((result.Page-1)*result.PageSize+1)–@(Math.Min(result.Page*result.PageSize,result.TotalCount)) of @result.TotalCount transfers · Page @result.Page of @result.TotalPages</span>

@@ -109,11 +109,16 @@ public sealed partial class IntegrationStatusService
         int Count(SynchronizationStatus status) => counts.FirstOrDefault(item => item.Status == status)?.Count ?? 0;
         var summary = new IntegrationMonitorCounts(Count(SynchronizationStatus.Failed), Count(SynchronizationStatus.Pending) + Count(SynchronizationStatus.NotSent),
             Count(SynchronizationStatus.Retrying), Count(SynchronizationStatus.Synchronized), Count(SynchronizationStatus.ReconciliationRequired));
+        int total;
         if (Enum.TryParse<SynchronizationStatus>(query.Status, true, out var status))
-            rows = status is SynchronizationStatus.Pending or SynchronizationStatus.NotSent
+        {
+            bool pending = status is SynchronizationStatus.Pending or SynchronizationStatus.NotSent;
+            rows = pending
                 ? rows.Where(item => item.Status == SynchronizationStatus.Pending || item.Status == SynchronizationStatus.NotSent)
                 : rows.Where(item => item.Status == status);
-        int total = await rows.CountAsync(cancellationToken);
+            total = pending ? summary.Pending : Count(status);
+        }
+        else total = counts.Sum(item => item.Count);
         int size = query.PageSize is 25 or 50 or 100 ? query.PageSize : 25;
         int page = Math.Clamp(query.Page, 1, Math.Max(1, (int)Math.Ceiling(total / (double)size)));
         var sorted = query.Sort switch {

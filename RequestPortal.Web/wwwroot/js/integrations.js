@@ -78,7 +78,25 @@
             panel.hidden = !panel.hidden;
             monitor.querySelectorAll('[data-system-toggle]').forEach(button => button.setAttribute('aria-expanded', String(!panel.hidden)));
             monitor.querySelectorAll('.integration-more-menu[open]').forEach(menu => menu.open = false);
-            if (!panel.hidden) panel.scrollIntoView({ block: 'start' });
+            if (!panel.hidden) {
+                panel.scrollIntoView({ block: 'start' });
+                if (!panel.dataset.loaded && !panel.dataset.loading) {
+                    panel.dataset.loading = 'true';
+                    panel.textContent = 'Loading system diagnostics…';
+                    try {
+                        const response = await fetch(panel.dataset.systemUrl, {
+                            headers: { 'Accept': 'text/html' }, credentials: 'same-origin', cache: 'no-store', redirect: 'error'
+                        });
+                        if (!response.ok) throw new Error('System diagnostics unavailable.');
+                        const parsed = new DOMParser().parseFromString(await response.text(), 'text/html');
+                        if (!parsed.querySelector('#return-events-title')) throw new Error('System diagnostics unavailable.');
+                        panel.replaceChildren(...parsed.body.childNodes);
+                        panel.dataset.loaded = 'true';
+                    } catch {
+                        panel.textContent = 'System diagnostics could not be loaded. Close and reopen this panel to retry.';
+                    } finally { delete panel.dataset.loading; }
+                }
+            }
         }
     });
     monitor.addEventListener('toggle', event => {

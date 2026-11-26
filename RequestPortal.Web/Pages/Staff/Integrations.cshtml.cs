@@ -72,6 +72,7 @@ public sealed class IntegrationsModel : PageModel
     [BindProperty(SupportsGet = true)] public DateOnly? Through { get; set; }
     [BindProperty(SupportsGet = true)] public string? Sort { get; set; } = "activity";
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
+    [BindProperty(SupportsGet = true)] public int PageSize { get; set; } = 25;
     [BindProperty(SupportsGet = true)] public Guid? RequestId { get; set; }
     public bool CanOperate => User.HasClaim(StaffOidcOptions.PermissionClaim, RequestPortalPermissions.ManageSecurity);
     public ApplicationFieldPreview? FieldPreview { get; private set; }
@@ -83,11 +84,11 @@ public sealed class IntegrationsModel : PageModel
         RequestPortal.Domain.Integration.SynchronizationStatus.ReconciliationRequired => "Reconciliation Required",
         RequestPortal.Domain.Integration.SynchronizationStatus.NotSent => "Pending", _ => status.ToString() };
     public Dictionary<string,string> Routes(int page) => new() { ["Source"] = Source ?? "", ["NotVerified"] = NotVerified.ToString(), ["Search"] = Search ?? "", ["Status"] = Status ?? "", ["ErrorCode"] = ErrorCode ?? "",
-        ["From"] = From?.ToString("yyyy-MM-dd") ?? "", ["Through"] = Through?.ToString("yyyy-MM-dd") ?? "", ["Sort"] = Sort ?? "activity", ["PageNumber"] = page.ToString() };
+        ["From"] = From?.ToString("yyyy-MM-dd") ?? "", ["Through"] = Through?.ToString("yyyy-MM-dd") ?? "", ["Sort"] = Sort ?? "activity", ["PageNumber"] = page.ToString(), ["PageSize"] = PageSize.ToString() };
     private IntegrationMonitorQuery Query(int? page = null) => new(Search, Status,
         From.HasValue ? new DateTimeOffset(From.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
         Through.HasValue ? Through.Value == DateOnly.MaxValue ? DateTimeOffset.MaxValue : new DateTimeOffset(Through.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
-        Sort ?? "activity", page ?? PageNumber, Source: Source, NotVerified: NotVerified, ErrorCode: ErrorCode);
+        Sort ?? "activity", page ?? PageNumber, PageSize: PageSize, Source: Source, NotVerified: NotVerified, ErrorCode: ErrorCode);
     public static string StatusClass(RequestPortal.Domain.Integration.SynchronizationStatus status) => status switch {
         RequestPortal.Domain.Integration.SynchronizationStatus.Failed => "failed",
         RequestPortal.Domain.Integration.SynchronizationStatus.Retrying => "retrying",
@@ -127,7 +128,7 @@ public sealed class IntegrationsModel : PageModel
         return routes;
     }
     private object ReturnRoutes() => new { Source, NotVerified, Search, Status, From = From?.ToString("yyyy-MM-dd"),
-        Through = Through?.ToString("yyyy-MM-dd"), Sort, PageNumber, RequestId, ErrorCode };
+        Through = Through?.ToString("yyyy-MM-dd"), Sort, PageNumber, PageSize, RequestId, ErrorCode };
     private string? FilterError()
     {
         // An unverified-only view always refers to Quick Intakes, including when
@@ -148,6 +149,8 @@ public sealed class IntegrationsModel : PageModel
             return "The validation-error filter is invalid. Clear the filter and try again.";
         if ((Search?.Length ?? 0) > 200)
             return "Search text must be 200 characters or fewer.";
+        if (PageSize is not (25 or 50 or 100))
+            return "Select a valid page size.";
         if (From > Through)
             return "Date From must be on or before Date Through.";
         if (!string.IsNullOrWhiteSpace(Status) &&
@@ -161,6 +164,15 @@ public sealed class IntegrationsModel : PageModel
     public async Task<IActionResult> OnGetAsync()
     {
         Response.Headers.CacheControl = "no-store";
+        // Bound ordinary navigation while preserving explicit historical searches
+        // and dashboard drill-down populations. Empty date inputs mean all dates.
+        if (!Request.Query.ContainsKey("From") && !Request.Query.ContainsKey("Through") &&
+            From is null && Through is null && !NotVerified && !RequestId.HasValue &&
+            string.IsNullOrWhiteSpace(Search))
+        {
+            Through = DateOnly.FromDateTime(DateTime.UtcNow);
+            From = Through.Value.AddDays(-29);
+        }
         string? filterError = FilterError();
         if (filterError is not null) return BadRequest(filterError);
         Transfers = await integrationStatusService.SearchAsync(Query(), HttpContext.RequestAborted);
@@ -173,14 +185,23 @@ public sealed class IntegrationsModel : PageModel
             if (CanOperate && Selected.Transfer.Source == "Quick Intake")
                 Correction = await integrationStatusService.GetQuickIntakeCorrectionAsync((await GetStaffUserAsync()).Id, RequestId.Value, HttpContext.RequestAborted);
         }
+        return Page();
+    }
+
+    // Keep system-wide diagnostics and remote calls out of the transfer list request.
+    public async Task<IActionResult> OnGetSystemDiagnosticsAsync()
+    {
+        Response.Headers.CacheControl = "no-store";
         StaffOperationsSnapshot snapshot = await staffOperationsService.GetSnapshotAsync(HttpContext.RequestAborted);
         DeadLetters = snapshot.DeadLetters;
         FailedNotificationDeliveries = snapshot.FailedNotificationDeliveries;
         ReturnHistory = await integrationStatusService.GetReturnHistoryAsync(HttpContext.RequestAborted);
-        try { ReturnOutbox = await bridgeClient.GetReturnOutboxAsync(HttpContext.RequestAborted); }
-        catch (Exception exception) when (exception is HttpRequestException or IntegrationTransferException or NotSupportedException or TaskCanceledException)
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try { ReturnOutbox = await bridgeClient.GetReturnOutboxAsync(timeout.Token); }
+        catch (Exception exception) when (exception is HttpRequestException or IntegrationTransferException or NotSupportedException or TimeoutException or TaskCanceledException)
         { ReturnOutboxError = "Return-event diagnostics could not be read. Initial submission status is shown separately; inspect bridge readiness and callback delivery."; }
-        return Page();
+        return Partial("_IntegrationOperations", this);
     }
 
     public async Task<IActionResult> OnPostRecoverArtifactsOnceAsync()
