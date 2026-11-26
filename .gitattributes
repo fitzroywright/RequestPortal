@@ -1,2 +1,2 @@
-# Keep the pinned geography checksum stable across checkouts.
-/RequestPortal.Web/wwwroot/data/jamaica-parishes.528b7394d3b3.geojson text eol=lf
+# Pinned geography hashes must stay identical on Windows and Unix checkouts.
+*.geojson text eol=lf
