@@ -568,6 +568,18 @@ public sealed class OutboxDispatcher
         if (eventStatus == RequestStatus.IntakeCompleted)
         {
             await SendIntakeCompletedAssessmentEmailAsync(request, recipientUserId, message, cancellationToken);
+            const string clientBody = "Your request is now being reviewed by our Assessment Team. They will be in contact with you within 3 business days.";
+            string clientSubject = $"Request status: {request.PublicReference}";
+            IReadOnlyCollection<Guid> clientRecipients = await GetRequestNotificationRecipientsAsync(
+                request.OrganizationId, recipientUserId, cancellationToken);
+            Guid[] clientPortalRecipients = clientRecipients.Concat(
+                await routing.RecipientsAsync(request.Id, false, cancellationToken)).Distinct().ToArray();
+            await portalMessageService.SendSystemMessageAsync(
+                request.OrganizationId, request.Id, null, clientSubject, clientBody,
+                clientPortalRecipients, cancellationToken,
+                CreateDeterministicGuid(message.MessageId, "StatusNotification"), notifyExternally: false);
+            await DeliverToRecipientsAsync(clientRecipients, request.OrganizationId, request.Id,
+                clientSubject, clientBody, cancellationToken, message.MessageId, emailOnly: true);
             return;
         }
         string? reason = message.Detail ?? request.StatusHistory.Where(item =>

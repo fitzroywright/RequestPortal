@@ -221,7 +221,7 @@ public sealed class FfpManagerStatusMappingTests
     }
 
     [Fact]
-    public async Task IntakeCompletedNotifiesAssessmentOnceWithoutApplicantEmail()
+    public async Task IntakeCompletedNotifiesAssessmentAndApplicantOnce()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var fixture = await Fixture(ct); var db = fixture.Db;
@@ -239,8 +239,12 @@ public sealed class FfpManagerStatusMappingTests
         Assert.Null(pending.ProcessedUtc);
         pending.NextAttemptUtc = null; pending.LastError = null; pending.AttemptCount = 0; await db.SaveChangesAsync(ct);
         Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: ct));
-        var email = Assert.Single(queue.Items);
-        Assert.Equal("assessment@ffpja.org", email.Recipients.Single().Email);
+        Assert.Equal(2, queue.Items.Count);
+        var email = Assert.Single(queue.Items, item => item.Recipients.Single().Email == "assessment@ffpja.org");
+        var clientEmail = Assert.Single(queue.Items, item => item.Recipients.Single().Email == "applicant@example.com");
+        Assert.Equal("Your request is now being reviewed by our Assessment Team. They will be in contact with you within 3 business days.", clientEmail.Request.Body);
+        Assert.Equal($"Request status: {request.PublicReference}", clientEmail.Request.Title);
+        Assert.Equal(clientEmail.Request.Body, Assert.Single(db.PortalMessages).Body);
         Assert.Contains("FFP/26/0042", email.Request.Title);
         Assert.Contains("Test Applicant", email.Request.Body);
         Assert.Contains("Test district", email.Request.Body);
@@ -248,7 +252,8 @@ public sealed class FfpManagerStatusMappingTests
         Assert.Contains(request.PublicReference, email.Request.Body);
         pending.ProcessedUtc = null; await db.SaveChangesAsync(ct);
         Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: ct));
-        Assert.Single(queue.Items);
+        Assert.Equal(2, queue.Items.Count);
+        Assert.Single(db.PortalMessages);
     }
 
     [Fact]
