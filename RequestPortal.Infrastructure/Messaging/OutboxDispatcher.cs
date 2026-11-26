@@ -544,10 +544,17 @@ public sealed class OutboxDispatcher
             $"Request submitted: {confirmationReference}", body, portalRecipients,
             cancellationToken, CreateDeterministicGuid(message.MessageId, "SubmissionConfirmation"),
             notifyExternally: false);
+        bool isQuickIntake = await dbContext.QuickIntakes.AsNoTracking()
+            .AnyAsync(item => item.RequestId == message.RequestId, cancellationToken);
+        string? emailBody = isQuickIntake
+            ? $"Thank you! Your request for help has been received. Someone will contact you within 5 business days. If you need immediate follow up, please call us at 876-984-5005 or 876-618-0141. Your reference number is: {request.PublicReference}"
+            : null;
         await DeliverToRecipientsAsync(
             recipients, request.OrganizationId, message.RequestId,
             $"Request submitted: {confirmationReference}", body, cancellationToken,
-            applicationNumber is null ? null : message.MessageId);
+            applicationNumber is null ? null : message.MessageId,
+            emailBody: emailBody,
+            emailSubject: isQuickIntake ? $"Request submitted: {request.PublicReference}" : null);
     }
 
     private async Task SendRequestStatusChangedAsync(RequestStatusChangedMessage message, CancellationToken cancellationToken)
@@ -722,13 +729,15 @@ public sealed class OutboxDispatcher
         string body,
         CancellationToken cancellationToken,
         Guid? deliveryId = null,
-        bool emailOnly = false)
+        bool emailOnly = false,
+        string? emailBody = null,
+        string? emailSubject = null)
     {
         foreach (Guid userId in recipients.Distinct())
         {
             if (emailOnly)
             {
-                await DeliverEmailAsync(userId, organizationId, requestId, subject, body, cancellationToken, deliveryId);
+                await DeliverEmailAsync(userId, organizationId, requestId, emailSubject ?? subject, emailBody ?? body, cancellationToken, deliveryId);
                 continue;
             }
             await DeliverNotificationsAsync(
@@ -737,7 +746,7 @@ public sealed class OutboxDispatcher
                 requestId,
                 subject,
                 body,
-                cancellationToken, deliveryId);
+                cancellationToken, deliveryId, emailBody, emailSubject);
         }
     }
 
@@ -748,14 +757,16 @@ public sealed class OutboxDispatcher
         string subject,
         string body,
         CancellationToken cancellationToken,
-        Guid? deliveryId = null)
+        Guid? deliveryId = null,
+        string? emailBody = null,
+        string? emailSubject = null)
     {
         await DeliverEmailAsync(
             userId,
             organizationId,
             requestId,
-            subject,
-            body,
+            emailSubject ?? subject,
+            emailBody ?? body,
             cancellationToken, deliveryId);
 
         await DeliverSupplementalChannelAsync(

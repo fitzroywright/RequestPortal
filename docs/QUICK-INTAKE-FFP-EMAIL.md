@@ -13,8 +13,11 @@ identifiers and queues one durable applicant confirmation per request. Failed or
 invalid transfers remain retryable without releasing reference notifications.
 A retry reuses the external application and notification identities.
 
-The applicant confirmation labels the generated FFP reference and Portal code
-separately. Existing email preferences and WhatsApp consent/commissioning still
+The standard applicant confirmation labels the generated FFP reference and Portal code
+separately. Quick Intake applicant email instead uses the Portal code in its subject
+and body, confirms receipt, promises contact within five business days, and provides
+the two Client Relations telephone numbers. In-app and WhatsApp confirmations retain
+their existing wording and reference behavior. Existing email preferences and WhatsApp consent/commissioning still
 apply: WhatsApp being disabled does not block an available email channel. In-app
 messages and external delivery identities remain stable across retries. When the
 bridge is disabled, the existing Portal-code submission confirmation is retained.

@@ -327,7 +327,7 @@ public sealed class NotificationWorkflowTests
         Assert.Equal(expectedEmails, queue.Items.Count);
         Assert.All(queue.Items, item => {
             Assert.Equal(MessageChannel.MsEmail, item.RequestedChannels);
-            Assert.Contains("FIXTURE/26/0042", item.Request.Body);
+            Assert.Equal($"Thank you! Your request for help has been received. Someone will contact you within 5 business days. If you need immediate follow up, please call us at 876-984-5005 or 876-618-0141. Your reference number is: {request.PublicReference}", item.Request.Body);
         });
         var addresses = queue.Items.SelectMany(item => item.Recipients).Select(recipient => recipient.Email).ToArray();
         if (expectedEmails > 0 && intakeEmail is not null)
@@ -396,8 +396,8 @@ public sealed class NotificationWorkflowTests
         Assert.Null(staff.ProcessedUtc);
         var email = Assert.Single(sender.Notifications, m=>m.Transport==NotificationTransport.Email);
         Assert.Equal("client@example.com", email.Recipient);
-        Assert.Contains("KGN/26/GR/0042", email.Body);
-        Assert.Contains(request.PublicReference, email.Body);
+        Assert.Equal($"Thank you! Your request for help has been received. Someone will contact you within 5 business days. If you need immediate follow up, please call us at 876-984-5005 or 876-618-0141. Your reference number is: {request.PublicReference}", email.Body);
+        Assert.Equal($"Request submitted: {request.PublicReference}", email.Subject);
         Assert.NotNull(email.DeliveryId);
         Assert.Equal(whatsApp && consent ? 1 : 0, sender.Notifications.Count(m=>m.Transport==NotificationTransport.WhatsApp));
         if (whatsApp && consent)
