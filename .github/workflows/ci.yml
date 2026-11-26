@@ -35,6 +35,15 @@ jobs:
       - name: Checkout RequestPortal
         uses: actions/checkout@v4
 
+      - name: Check for tracked build and IDE artifacts
+        shell: bash
+        run: |
+          tracked_artifacts=$(git ls-files -- ':(glob,icase)**/bin/**' ':(glob,icase)**/obj/**' ':(glob,icase)**/.vs/**')
+          if [ -n "$tracked_artifacts" ]; then
+            printf '%s\n' 'Remove generated build and IDE files from Git:' "$tracked_artifacts" >&2
+            exit 1
+          fi
+
       - name: Checkout Common.Diagnostics
         uses: actions/checkout@v4
         with:
