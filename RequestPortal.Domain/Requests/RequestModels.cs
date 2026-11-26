@@ -17,7 +17,8 @@ public enum RequestStatus
     RepresentativeReviewRequired = 10,
     OnHold = 11,
     Investigated = 12,
-    SentForAssessment = 13
+    SentForAssessment = 13,
+    IntakeCompleted = 14
 }
 
 public enum RequestPriority

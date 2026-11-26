@@ -267,7 +267,7 @@ public sealed class AssistanceRequest
             return false;
         if (status is not (RequestStatus.Submitted or RequestStatus.MoreInformationRequired or RequestStatus.Approved
             or RequestStatus.Rejected or RequestStatus.Cancelled or RequestStatus.Fulfilled or RequestStatus.OnHold
-            or RequestStatus.Investigated or RequestStatus.SentForAssessment))
+            or RequestStatus.Investigated or RequestStatus.SentForAssessment or RequestStatus.IntakeCompleted))
             throw new ArgumentOutOfRangeException(nameof(status));
         if (Status == status) return false;
         TransitionTo(status, actorUserId, changedUtc, detail);

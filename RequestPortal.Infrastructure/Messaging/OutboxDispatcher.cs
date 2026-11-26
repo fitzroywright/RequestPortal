@@ -565,6 +565,11 @@ public sealed class OutboxDispatcher
             .Select(intake => (Guid?)(intake.ConvertedToUserId ?? intake.AnonymousUserId))
             .SingleOrDefaultAsync(cancellationToken) ?? request.SubmittedByUserId ?? request.CreatedByUserId;
         RequestStatus eventStatus = (RequestStatus)message.Status;
+        if (eventStatus == RequestStatus.IntakeCompleted)
+        {
+            await SendIntakeCompletedAssessmentEmailAsync(request, recipientUserId, message, cancellationToken);
+            return;
+        }
         string? reason = message.Detail ?? request.StatusHistory.Where(item =>
                 message.StatusHistoryId.HasValue ? item.Id == message.StatusHistoryId.Value
                     : item.Status == eventStatus && item.ChangedUtc <= message.OccurredUtc)
@@ -602,6 +607,36 @@ public sealed class OutboxDispatcher
                 CorrelationId: request.Id.ToString("D"),
                 DeliveryId: CreateDeterministicGuid(message.MessageId, "AssessmentEmail")), cancellationToken);
         }
+    }
+
+    private async Task SendIntakeCompletedAssessmentEmailAsync(
+        AssistanceRequest request, Guid recipientUserId, RequestStatusChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (!notificationOptions.Enabled)
+            throw new InvalidOperationException("Intake completed assessment email is pending because notification delivery is disabled.");
+        string? reference = await dbContext.IntegrationLinks.AsNoTracking()
+            .Where(link => link.RequestId == request.Id && link.SystemName == ffpManagerOptions.SystemName)
+            .Select(link => link.ApplicationNumber).SingleOrDefaultAsync(cancellationToken);
+        var intake = await dbContext.QuickIntakes.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.RequestId == request.Id, cancellationToken);
+        var applicant = intake is null ? await dbContext.Users.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == recipientUserId && !item.IsInternalStaff, cancellationToken) : null;
+        string name = intake is not null ? $"{intake.FirstName} {intake.LastName}" : applicant?.DisplayName ?? "Not recorded";
+        string telephone = intake?.MobileNumber ?? applicant?.PhoneNumber ?? "Not recorded";
+        string community = intake?.CommunityDistrict ?? applicant?.DistrictArea ?? applicant?.Town ?? "Not recorded";
+        string parish = intake?.Parish ?? applicant?.Parish ?? "Not recorded";
+        string assistance = intake?.HelpCategory ?? request.Summary ?? request.Category ?? "See application";
+        string subjectReference = string.IsNullOrWhiteSpace(reference) ? request.PublicReference : reference;
+        string body = $"Dear Assessment Team,\n\nThe intake process for the following application has been completed and the application is now ready for assessment.\n\n" +
+            $"Application Details\nReference Number: {subjectReference}\nRequest Portal Code: {request.PublicReference}\n" +
+            $"Applicant: {name}\nTelephone: {telephone}\nCommunity: {community}\nParish: {parish}\nAssistance Requested: {assistance}\n" +
+            $"Intake Completed: {message.OccurredUtc.ToOffset(TimeSpan.FromHours(-5)):yyyy-MM-dd HH:mm} Jamaica time\n\n" +
+            "Please review the application in FFP Manager and proceed with the necessary assessment arrangements.\n\n" +
+            "Thank you.\n\nFood For The Poor Jamaica\nAutomated Application Notification";
+        await notificationSender.SendAsync(new NotificationEnvelope("assessment@ffpja.org",
+            $"New Application Ready for Assessment - {subjectReference}", body,
+            CorrelationId: request.Id.ToString("D"),
+            DeliveryId: CreateDeterministicGuid(message.MessageId, "IntakeCompletedAssessmentEmail")), cancellationToken);
     }
 
     private async Task SendFfpManagerInformationRequestedAsync(FfpManagerInformationRequestedMessage message, CancellationToken cancellationToken)

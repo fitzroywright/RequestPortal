@@ -32,7 +32,7 @@ public sealed class FfpManagerStatusMappingTests
     private static readonly DateTimeOffset Now = new(2026, 11, 8, 12, 0, 0, TimeSpan.Zero);
     private static readonly RequestStatus[] Mapped = [RequestStatus.Submitted, RequestStatus.MoreInformationRequired,
         RequestStatus.Approved, RequestStatus.Rejected, RequestStatus.Cancelled, RequestStatus.Fulfilled,
-        RequestStatus.OnHold, RequestStatus.Investigated, RequestStatus.SentForAssessment];
+        RequestStatus.OnHold, RequestStatus.Investigated, RequestStatus.SentForAssessment, RequestStatus.IntakeCompleted];
 
     [Theory]
     [InlineData("Pending Investigation", RequestStatus.Submitted)]
@@ -45,6 +45,7 @@ public sealed class FfpManagerStatusMappingTests
     [InlineData("On Hold", RequestStatus.OnHold)]
     [InlineData("Investigated", RequestStatus.Investigated)]
     [InlineData("Sent for Assessment", RequestStatus.SentForAssessment)]
+    [InlineData("Intake Completed", RequestStatus.IntakeCompleted)]
     public void ExactCodesAndOnlyCaseOrOuterWhitespaceNormalization(string code, RequestStatus expected)
     {
         Assert.Equal(expected, FfpManagerStatusMapping.Map(code));
@@ -67,6 +68,8 @@ public sealed class FfpManagerStatusMappingTests
         for (int i = 0; i < existing.Length; i++) Assert.Equal(i, (int)Enum.Parse<RequestStatus>(existing[i]));
         Assert.Equal(11, (int)RequestStatus.OnHold); Assert.Equal(12, (int)RequestStatus.Investigated);
         Assert.Equal(13, (int)RequestStatus.SentForAssessment);
+        Assert.Equal(14, (int)RequestStatus.IntakeCompleted);
+        Assert.Equal("Intake Completed", RequestStatusPresentation.Label("IntakeCompleted"));
         Assert.Equal("On Hold", RequestStatusPresentation.Label("OnHold"));
         Assert.Equal("Investigated", RequestStatusPresentation.Label("Investigated"));
         Assert.Equal("Sent for Assessment", RequestStatusPresentation.Label("SentForAssessment"));
@@ -215,6 +218,37 @@ public sealed class FfpManagerStatusMappingTests
         var portal = Assert.Single(db.PortalMessages); Assert.Contains("Sent for Assessment", portal.Body);
         Assert.Contains(request.PublicReference, portal.Body);
         Assert.DoesNotContain(db.NotificationHistory, item => item.Channel == NotificationChannel.WhatsApp);
+    }
+
+    [Fact]
+    public async Task IntakeCompletedNotifiesAssessmentOnceWithoutApplicantEmail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var fixture = await Fixture(ct); var db = fixture.Db;
+        var request = await db.AssistanceRequests.SingleAsync(ct);
+        var link = await db.IntegrationLinks.SingleAsync(ct);
+        link.MarkSynchronized("42", Now, "FFP/26/0042"); await db.SaveChangesAsync(ct);
+        var service = Service(db);
+        var status = new ExternalApplicationStatus("42", "Intake Completed", "Ignored", Now);
+        await service.ReceiveStatusAsync(Guid.NewGuid(), request.Id, status, ct);
+        await service.ReceiveStatusAsync(Guid.NewGuid(), request.Id, status, ct);
+        Assert.Equal(RequestStatus.IntakeCompleted, request.Status);
+        var pending = Assert.Single(StatusEvents(db));
+        var queue = new Queue { FailAssessmentOnce = true }; var dispatcher = Dispatcher(db, queue);
+        Assert.Equal(0, await dispatcher.DispatchBatchAsync(cancellationToken: ct));
+        Assert.Null(pending.ProcessedUtc);
+        pending.NextAttemptUtc = null; pending.LastError = null; pending.AttemptCount = 0; await db.SaveChangesAsync(ct);
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: ct));
+        var email = Assert.Single(queue.Items);
+        Assert.Equal("assessment@ffpja.org", email.Recipients.Single().Email);
+        Assert.Contains("FFP/26/0042", email.Request.Title);
+        Assert.Contains("Test Applicant", email.Request.Body);
+        Assert.Contains("Test district", email.Request.Body);
+        Assert.Contains("Kingston", email.Request.Body);
+        Assert.Contains(request.PublicReference, email.Request.Body);
+        pending.ProcessedUtc = null; await db.SaveChangesAsync(ct);
+        Assert.Equal(1, await dispatcher.DispatchBatchAsync(cancellationToken: ct));
+        Assert.Single(queue.Items);
     }
 
     [Fact]

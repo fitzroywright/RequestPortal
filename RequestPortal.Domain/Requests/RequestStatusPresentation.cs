@@ -18,6 +18,7 @@ public static class RequestStatusPresentation
         "OnHold" => "On Hold",
         "Investigated" => "Investigated",
         "SentForAssessment" => "Sent for Assessment",
+        "IntakeCompleted" => "Intake Completed",
         _ => Humanize(status)
     };
 

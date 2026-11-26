@@ -15,6 +15,7 @@ public static class FfpManagerStatusMapping
         "ON HOLD" => RequestStatus.OnHold,
         "INVESTIGATED" => RequestStatus.Investigated,
         "SENT FOR ASSESSMENT" => RequestStatus.SentForAssessment,
+        "INTAKE COMPLETED" => RequestStatus.IntakeCompleted,
         _ => null
     };
 }
