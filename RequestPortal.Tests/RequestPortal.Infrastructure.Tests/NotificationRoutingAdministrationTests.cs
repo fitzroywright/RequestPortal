@@ -7,6 +7,7 @@ using Common.Security.Authorization;
 using Common.Security.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
@@ -59,6 +60,7 @@ public sealed class NotificationRoutingAdministrationTests
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ApplicationName = assembly.GetName().Name,
             ContentRootPath = Path.GetFullPath("../../../../../RequestPortal.Web", AppContext.BaseDirectory), EnvironmentName = "Test" });
         builder.WebHost.UseTestServer(); builder.Logging.ClearProviders(); builder.Services.AddHttpContextAccessor();
+        builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
         builder.Services.AddSingleton(db.Db); builder.Services.AddSingleton(accounts); builder.Services.AddSingleton<IAuthorizationStore>(roles);
         builder.Services.AddSingleton<IPermissionAuthorizer>(permissions); builder.Services.AddSingleton(administration); builder.Services.AddSingleton(service);
         builder.Services.AddIdentityCore<RequestPortal.Infrastructure.Identity.ApplicationUser>().AddEntityFrameworkStores<RequestPortalDbContext>();
